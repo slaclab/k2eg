@@ -6,7 +6,7 @@ on:
       - opened
       - synchronize
     branches:
-      - 'main'
+      - main
 
 jobs:
     test_debian_bullseye:
