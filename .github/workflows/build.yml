@@ -47,7 +47,14 @@ jobs:
             - name: Build
               # Build your program with the given configuration
               run: cmake --build build --config ${{env.BUILD_TYPE}} --target install
-            - name: Archive production artifacts
+            - name: Get log on failure
+              if: ${{ failure() }}
+              uses: actions/upload-artifact@v3
+              with:
+                name: ${{env.ARTIFACT_NAME}}-log
+                path: build/**/*.log
+                retention-days: 1
+            - name: Archive artifacts
               uses: actions/upload-artifact@v3
               with:
                 name: ${{env.ARTIFACT_NAME}}
@@ -101,7 +108,14 @@ jobs:
             - name: Build
               # Build your program with the given configuration
               run: cmake --build build --config ${{env.BUILD_TYPE}} --target install
-            - name: Archive production artifacts
+            - name: Get log on failure
+              if: ${{ failure() }}
+              uses: actions/upload-artifact@v3
+              with:
+                name: ${{env.ARTIFACT_NAME}}-log
+                path: build/**/*.log
+                retention-days: 1
+            - name: Archive artifacts
               uses: actions/upload-artifact@v3
               with:
                 name: ${{env.ARTIFACT_NAME}}

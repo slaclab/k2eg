@@ -1,5 +1,5 @@
-#define k2eg_VERSION_MAJOR 1
-#define k2eg_VERSION_MINOR 0
+#define k2eg_VERSION_MAJOR 0
+#define k2eg_VERSION_MINOR 1
 #define k2eg_VERSION_PATCH 0
 #define k2eg_BOOST_VERSION "1.77.0"
 #define k2eg_EPICS_VERSION "R7.0.3.1"
