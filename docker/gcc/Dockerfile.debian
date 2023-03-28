@@ -1,0 +1,28 @@
+FROM scr.svc.stanford.edu/eed-public/build-image/cpp-build-image/gcc-debian:12.2.0-bullseye as builder
+LABEL maintainer="bisegni@slac.stanford.edu"
+
+COPY ../../src /opt/app/src
+COPY ./test /opt/app/test
+COPY ./CMakeLists.txt /opt/app/
+
+RUN mkdir /opt/app/build && cd /opt/app/build && cmake -DCMAKE_BUILD_TYPE=Debug .. && make install
+
+from gcc:12.2.0-bullseye
+
+RUN apt update && \
+    apt install -y libreadline8 libicu67 libcurl4 && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN mkdir /opt/app
+WORKDIR /opt/app
+COPY --from=builder /opt/app/build/local/bin /opt/app/bin
+COPY --from=builder /opt/app/build/local/lib /opt/app/lib
+COPY --from=builder /opt/app/build/k2eg-test /opt/app
+COPY --from=builder /opt/app/build/k2eg /opt/app
+ENV PATH="${PATH}:/opt/app:/opt/app/bin"
+ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/app/lib:/opt/app/lib/linux-x86_64"
+
+# Add docker-compose-wait tool -------------------
+ENV WAIT_VERSION 2.7.2
+ADD https://github.com/ufoscout/docker-compose-wait/releases/download/$WAIT_VERSION/wait /opt/wait
+RUN chmod +x /opt/wait

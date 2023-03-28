@@ -1,0 +1,261 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Test Application",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/k2eg",
+            "args": ["--log-on-console","--cmd-input-topic=cmd_topic_in","--log-level=debug","--sub-server-address=kafka:9092","--pub-server-address=kafka:9092"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "$LD_LIBRARY_PATH:${workspaceFolder}/build/local/lib"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },{
+            "name": "All Test",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/k2eg-test",
+            "args": [""],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "$LD_LIBRARY_PATH:${workspaceFolder}/build/local/lib"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },{
+            "name": "Test Program Option",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/k2eg-test",
+            "args": ["--gtest_filter=ProgramOptions*"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "$LD_LIBRARY_PATH:${workspaceFolder}/build/local/lib"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },{
+            "name": "Test k2egateway",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/k2eg-test",
+            "args": ["--gtest_filter=k2egateway*"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "$LD_LIBRARY_PATH:${workspaceFolder}/build/local/lib"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },{
+            "name": "Test Kafka",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/k2eg-test",
+            "args": ["--gtest_filter=Kafka*"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "$LD_LIBRARY_PATH:${workspaceFolder}/build/local/lib"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },{
+            "name": "Test EPICS",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/k2eg-test",
+            "args": ["--gtest_filter=Epics*"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "$LD_LIBRARY_PATH:${workspaceFolder}/build/local/lib:${workspaceFolder}/build/local/lib/linux_86_64"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },{
+            "name": "Test DataStorage",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/k2eg-test",
+            "args": ["--gtest_filter=DataStorage*"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "$LD_LIBRARY_PATH:${workspaceFolder}/build/local/lib:${workspaceFolder}/build/local/lib/linux_86_64"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },{
+            "name": "Test CMDController",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/k2eg-test",
+            "args": ["--gtest_filter=CMDController*"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "$LD_LIBRARY_PATH:${workspaceFolder}/build/local/lib:${workspaceFolder}/build/local/lib/linux_86_64"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },{
+            "name": "Test NodeController",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/k2eg-test",
+            "args": ["--gtest_filter=NodeController*"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "$LD_LIBRARY_PATH:${workspaceFolder}/build/local/lib:${workspaceFolder}/build/local/lib/linux_86_64"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}

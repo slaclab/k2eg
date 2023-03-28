@@ -1,0 +1,109 @@
+name: Build k2eg with CMake
+
+on: 
+  pull_request:
+    types:
+      - opened
+      - synchronize
+    branches:
+      - 'main'
+
+jobs:
+    test_debian_bullseye:
+      needs: [build_debian_bullseye] 
+      uses: ./.github/workflows/test.yml
+      with:
+        build_image: ${{ needs.build_debian_bullseye.outputs.build_image }}
+        artifact_name: ${{ needs.build_debian_bullseye.outputs.artifact_name }}
+      secrets: inherit
+
+    build_debian_bullseye:
+        runs-on: ubuntu-22.04
+        container: scr.svc.stanford.edu/eed-public/build-image/cpp-build-image/gcc-debian:12.2.0-bullseye
+        env:
+          BUILD_IMAGE: scr.svc.stanford.edu/eed-public/build-image/cpp-build-image/gcc-debian:12.2.0-bullseye
+          ARTIFACT_NAME: artifact-gcc-debian-12-2-0-bullseye
+          BUILD_TYPE: Debug
+          
+        outputs:
+          build_image: ${{ env.BUILD_IMAGE }}
+          artifact_name: ${{ env.ARTIFACT_NAME}}  
+
+        steps:
+            - name: Checkout source code
+              uses: actions/checkout@v3
+            - name: Restore cached build directory
+              id: cache-build-restore
+              uses: actions/cache@v3
+              with:
+               path: build
+               key: ubuntu-22-04-${{ hashFiles('CMakeLists.txt') }}
+            - name: Configure CMake
+              # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
+              # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
+              run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+            - name: Build
+              # Build your program with the given configuration
+              run: cmake --build build --config ${{env.BUILD_TYPE}} --target install
+            - name: Archive production artifacts
+              uses: actions/upload-artifact@v3
+              with:
+                name: ${{env.ARTIFACT_NAME}}
+                path: |
+                    build/local/lib
+                    build/local/bin
+                retention-days: 1
+            - uses: ouzi-dev/commit-status-updater@v2
+        
+    test_ubuntu_kinetic:
+      needs: [build_ubuntu_kinetic] 
+      uses: ./.github/workflows/test.yml
+      with:
+        build_image: ${{ needs.build_ubuntu_kinetic.outputs.build_image }}
+        artifact_name: ${{ needs.build_ubuntu_kinetic.outputs.artifact_name }}
+      secrets: inherit
+
+    build_ubuntu_kinetic:
+        runs-on: ubuntu-22.04
+        container: docker.io/ubuntu:kinetic
+        env:
+          BUILD_IMAGE: ubuntu:kinetic
+          ARTIFACT_NAME: artifact-gcc-ubuntu-kinetic
+          BUILD_TYPE: Debug
+          
+        outputs:
+          build_image: ${{ env.BUILD_IMAGE }}
+          artifact_name: ${{ env.ARTIFACT_NAME}}  
+
+        steps:
+            - name: Setup bild system
+              run: |
+                export DEBIAN_FRONTEND=noninteractive
+                apt update
+                apt install -y build-essential cmake git tclsh ninja-build
+            - name: Checkout source code
+              uses: actions/checkout@v3
+            - name: Restore cached build directory
+              id: cache-build-restore
+              uses: actions/cache@v3
+              with:
+               path: build
+               key: ubuntu-22-04-${{ hashFiles('CMakeLists.txt') }}
+            - name: Configure CMake
+              # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
+              # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
+              run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+            - run: git config --global --add safe.directory '*'
+            - name: Build
+              # Build your program with the given configuration
+              run: cmake --build build --config ${{env.BUILD_TYPE}} --target install
+            - name: Archive production artifacts
+              uses: actions/upload-artifact@v3
+              with:
+                name: ${{env.ARTIFACT_NAME}}
+                path: |
+                    build/local/lib
+                    build/local/bin
+                retention-days: 1
+            - name: Set job status
+              uses: ouzi-dev/commit-status-updater@v2

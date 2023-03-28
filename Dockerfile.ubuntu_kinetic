@@ -1,0 +1,32 @@
+ARG TEST_IMAGE
+FROM ubuntu:kinetic as builder
+LABEL maintainer="bisegni@slac.stanford.edu"
+LABEL org.opencontainers.image.description="Kafka To Epics Gateway"
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN     apt update \
+    &&  apt install -y build-essential cmake git tclsh ninja-build
+
+COPY src /opt/app/src
+COPY test /opt/app/test
+COPY tools /opt/app/tools
+COPY k2eg.h.in /opt/app/
+COPY CMakeLists.txt /opt/app/
+
+RUN mkdir /opt/app/build && cd /opt/app/build && cmake -DCMAKE_BUILD_TYPE=Release .. && make install
+
+from ubuntu:kinetic
+
+RUN mkdir /opt/app
+WORKDIR /opt/app
+COPY --from=builder /opt/app/build/local/bin /opt/app/bin
+COPY --from=builder /opt/app/build/local/lib /opt/app/lib
+COPY --from=builder /opt/app/build/k2eg-test /opt/app
+COPY --from=builder /opt/app/build/k2eg /opt/app
+ENV PATH="${PATH}:/opt/app:/opt/app/bin"
+ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/app/lib:/opt/app/lib/linux-x86_64"
+
+# Add docker-compose-wait tool -------------------
+ENV WAIT_VERSION 2.9.0
+ADD https://github.com/ufoscout/docker-compose-wait/releases/download/$WAIT_VERSION/wait /opt/wait
+RUN chmod +x /opt/wait

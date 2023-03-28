@@ -1,0 +1,47 @@
+name: Testk2eg
+
+on:
+    workflow_call:
+        inputs:
+            build_image:
+                required: true
+                type: string
+            artifact_name:
+                required: true
+                type: string
+        secrets:
+            token:
+                required: false
+jobs:
+    test_build:
+        runs-on: ubuntu-latest
+        container: docker:23.0.0-cli
+
+        steps:
+            # Downloads a copy of the code in your repository before running CI tests
+            - name: Check out repository code
+              uses: actions/checkout@v3
+            - run: mkdir docker/build
+            - name: Download artifact for ${{ inputs.artifact_name }}
+              uses: actions/download-artifact@v3
+              with:
+                name: ${{ inputs.artifact_name }}
+                path: docker/build/local
+            - name: Execute Tests
+              run: |
+                apk add curl
+                apk add wget
+                export TEST_IMAGE=${{ inputs.build_image  }}
+                export WAIT_HOSTS=kafka:9092
+                export PATH=$PATH:$PWD/build/local/bin
+                export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/build/local/lib:$PWD/build/local/lib/linux-x86_64
+                wget  https://github.com/ufoscout/docker-compose-wait/releases/download/2.9.0/wait -P docker/build/local/bin
+                chmod +x docker/build/local/bin/wait
+                chmod +x docker/build/local/bin/linux-x86_64/pvget
+                chmod +x docker/build/local/bin/k2eg
+                chmod +x docker/build/local/bin/k2eg-test
+                chmod 777 docker/run-test.sh
+                echo "Create test environment from $TEST_IMAGE"
+                docker compose -f docker/docker-compose.yml -f docker/docker-compose-app.yml build --build-arg TEST_IMAGE=${{ inputs.build_image  }}
+                docker compose -f docker/docker-compose.yml -f docker/docker-compose-app.yml up --attach app --exit-code-from app
+            - uses: ouzi-dev/commit-status-updater@v2

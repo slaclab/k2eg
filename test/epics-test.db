@@ -1,0 +1,39 @@
+# Calculator test
+record(ao, "variable:a")
+{
+    field(DRVH, "100")
+    field(DOL, "0")
+    field(PINI, "YES")
+}
+record(ao, "variable:b")
+{
+    field(DRVH, "100")
+    field(DOL, "0")
+    field(PINI, "YES")
+}
+record(calc, "variable:sum")
+{
+    field(SCAN, "1 second")
+    field(INPA, "variable:a")
+    field(INPB, "variable:b")
+    field(CALC, "A+B")
+}
+
+# A ramp from 0 to 'limit', were limit
+# can be configured via a separate record
+record(ao, "channel:ramp:limit")
+{
+    field(DRVH, "100")
+    field(DOL, "10")
+    field(PINI, "YES")
+}
+
+record(calc, "channel:ramp:ramp")
+{
+    field(SCAN, "1 second")
+    field(INPA, "channel:ramp:ramp")
+    field(INPB, "channel:ramp:limit")
+    field(CALC, "A<B ? A+1 : 0")
+    field(HIGH, "90")
+    field(HSV, "MAJOR")
+}
