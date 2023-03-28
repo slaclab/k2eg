@@ -4,6 +4,8 @@ A c++ implementation of a two way gateway from kafka and [EPICS](https://epics.a
 It reveice command from a specific kafka's topic and permit to inject EPICS  data torwards other topics.
 
 ## Implementation Status
+Actual implementation receive command and interpret command and uses only JSON serializaiton (described later). It's lack of cluster management and other advanced feature
+
 ```[tasklist]
 ### Command Task List
 - [x] Get Command
