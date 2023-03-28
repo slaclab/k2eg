@@ -1,5 +1,22 @@
 # Kafka to Epics Gateway
-A c++ implementation of a two way gateway from kafka and [EPICS](https://epics.anl.gov) Control System.
+A c++ implementation of a two way gateway from kafka and [EPICS](https://epics.anl.gov) Control System, that aim to be a central processing unit for specific daq needs for high level alghoritms.
+
+It reveice command from a specific kafka's topic and permit to inject EPICS  data torwards other topics.
+
+## Implementation Status
+```[tasklist]
+### Command Task List
+- [x] Get Command
+- [x] Monitor Command
+- [ ] Put Command
+- [ ] Inf Command
+
+### Functional Task List
+- [x] JSON Serialization
+- [ ] Binary serialization
+- [ ] Advanced DAQ Specific logic
+- [ ] Cluster implementation
+```
 
 
 ## Getting started
@@ -77,6 +94,17 @@ export EPICS_k2eg_conf-file-name=<path/to/configuration/file>
 
 ## Commands
 
+### Get Command
+This implemets the base caget|pvaget fucntion of epics command, if possible will use a client from a monitor thread, otherwhise allcoate new client and perform a get operation
+```json
+{
+    "command": "get",
+    "protocol": "pva|ca",
+    "channel_name": "channel::a",
+    "dest_topic": "destination_topic"
+}
+```
+
 ### Monitor Command
 This implements the base camonitor|pvamonitor function of epics client, create a monitor thread into the gateway that send over the destination topic the received values.
 
@@ -98,16 +126,5 @@ Monitor deactivation
     "activate": false,
     "channel_name": "channel name",
     "dest_topic": "destination topic"
-}
-```
-
-### Get Command
-This implemets the base caget|pvaget fucntion of epics command, if possible will use a client from a monitor thread, otherwhise allcoate new client and perform a get operation
-```json
-{
-    "command": "get",
-    "protocol": "pva|ca",
-    "channel_name": "channel::a",
-    "dest_topic": "destination_topic"
 }
 ```
