@@ -10,6 +10,7 @@ on:
 
 jobs:
     test_debian_bullseye:
+      name: Test Bullseye
       needs: [build_debian_bullseye] 
       uses: ./.github/workflows/test.yml
       with:
@@ -18,6 +19,7 @@ jobs:
       secrets: inherit
 
     build_debian_bullseye:
+        name: Build Bullseye
         runs-on: ubuntu-22.04
         container: scr.svc.stanford.edu/eed-public/build-image/cpp-build-image/gcc-debian:12.2.0-bullseye
         env:
@@ -56,6 +58,7 @@ jobs:
             - uses: ouzi-dev/commit-status-updater@v2
         
     test_ubuntu_kinetic:
+      name: Test Ubuntu Kinetic
       needs: [build_ubuntu_kinetic] 
       uses: ./.github/workflows/test.yml
       with:
@@ -64,6 +67,7 @@ jobs:
       secrets: inherit
 
     build_ubuntu_kinetic:
+        name: Build Ubuntu Kinetic
         runs-on: ubuntu-22.04
         container: docker.io/ubuntu:kinetic
         env:
