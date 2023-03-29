@@ -29,20 +29,13 @@ const std::string& GetMessage::getReqType() { return request_type; }
 #pragma endregion GetMessage
 
 #pragma region GetCommandWorker
-GetCommandWorker::GetCommandWorker(std::shared_ptr<BS::thread_pool> shared_worker_processing,
-                                   EpicsServiceManagerShrdPtr epics_service_manager)
-    : CommandWorker(shared_worker_processing)
-    , logger(ServiceResolver<ILogger>::resolve())
+GetCommandWorker::GetCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager)
+    : logger(ServiceResolver<ILogger>::resolve())
     , publisher(ServiceResolver<IPublisher>::resolve())
     , epics_service_manager(epics_service_manager) {}
 
-bool GetCommandWorker::submitCommand(k2eg::controller::command::CommandConstShrdPtr command) {
-    if(command->type != CommandType::get) return false;
-    shared_worker_processing->push_task(&GetCommandWorker::getOp, this, command);
-    return true;
-}
-
-void GetCommandWorker::getOp(k2eg::controller::command::CommandConstShrdPtr command) {
+void GetCommandWorker::processCommand(k2eg::controller::command::CommandConstShrdPtr command) {
+    if(command->type != CommandType::get) return;
     ConstGetCommandShrdPtr g_ptr = static_pointer_cast<const GetCommand>(command);
     auto channel_data = epics_service_manager->getChannelData(g_ptr->channel_name);
     if(channel_data) {
@@ -51,6 +44,8 @@ void GetCommandWorker::getOp(k2eg::controller::command::CommandConstShrdPtr comm
         // data not received => timeout
         logger->logMessage(STRING_FORMAT("Message not recevide for %1%", g_ptr->channel_name), LogLevel::ERROR);
     }
-    
+    return;
 }
+
+
 #pragma endregion GetCommandWorker

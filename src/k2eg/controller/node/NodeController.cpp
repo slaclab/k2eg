@@ -29,10 +29,10 @@ NodeController::NodeController(DataStorageUPtr data_storage)
     // register worker for command type
     worker_resolver.registerService(
         CommandType::monitor,
-        std::make_shared<AcquireCommandWorker>(processing_pool, ServiceResolver<EpicsServiceManager>::resolve()));
+        std::make_shared<AcquireCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
     worker_resolver.registerService(
         CommandType::get,
-        std::make_shared<GetCommandWorker>(processing_pool, ServiceResolver<EpicsServiceManager>::resolve()));
+        std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
 }
 
 NodeController::~NodeController() { processing_pool->wait_for_tasks(); }
@@ -73,10 +73,7 @@ void NodeController::submitCommand(CommandConstShrdPtrVec commands) {
         logger->logMessage(STRING_FORMAT("Process command => %1%",to_json_string(c)));
         // submit command to appropiate worker
         if (auto worker = worker_resolver.resolve(c->type); worker != nullptr) {
-            auto type_str = command_type_to_string(c->type);
-            if(!worker->submitCommand(c)) {
-                logger->logMessage(STRING_FORMAT("Error submitting command to worker for type '%1%'",std::string(command_type_to_string(c->type))));
-            }
+            processing_pool->push_task(&CommandWorker::processCommand, worker.get(), c);
         } else {
             logger->logMessage(STRING_FORMAT("No worker found for command type '%1%'",std::string(command_type_to_string(c->type))));
         }

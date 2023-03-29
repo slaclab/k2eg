@@ -30,32 +30,20 @@ const std::string& MonitorMessage::getReqType() { return request_type; }
 #pragma endregion MonitorMessage
 
 #pragma region AcquireCommandWorker
-AcquireCommandWorker::AcquireCommandWorker(std::shared_ptr<BS::thread_pool> shared_worker_processing,
-                                           EpicsServiceManagerShrdPtr epics_service_manager)
-    : CommandWorker(shared_worker_processing)
-    , logger(ServiceResolver<ILogger>::resolve())
+AcquireCommandWorker::AcquireCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager)
+    : logger(ServiceResolver<ILogger>::resolve())
     , publisher(ServiceResolver<IPublisher>::resolve())
     , epics_service_manager(epics_service_manager) {
-    handler_token = epics_service_manager->addHandler(
-        std::bind(&AcquireCommandWorker::epicsMonitorEvent, this, std::placeholders::_1));
+    handler_token = epics_service_manager->addHandler(std::bind(&AcquireCommandWorker::epicsMonitorEvent, this, std::placeholders::_1));
 }
 
-AcquireCommandWorker::~AcquireCommandWorker() {}
-
-bool AcquireCommandWorker::submitCommand(CommandConstShrdPtr command) {
-    if (command->type != CommandType::monitor) return false;
-    shared_worker_processing->push_task(&AcquireCommandWorker::acquireManagement, this, command);
-    return true;
-}
-
-void AcquireCommandWorker::acquireManagement(k2eg::controller::command::CommandConstShrdPtr command) {
+void AcquireCommandWorker::processCommand(CommandConstShrdPtr command) {
+    if (command->type != CommandType::monitor) return;
     bool activate = false;
     ConstAquireCommandShrdPtr a_ptr = static_pointer_cast<const AquireCommand>(command);
     // lock the vector for write
     {
-        logger->logMessage(STRING_FORMAT("%1% monitor on '%2%' for topic '%3%'",
-                                         (a_ptr->activate ? "Activate" : "Deactivate") % a_ptr->channel_name
-                                             % a_ptr->destination_topic));
+        logger->logMessage(STRING_FORMAT("%1% monitor on '%2%' for topic '%3%'", (a_ptr->activate ? "Activate" : "Deactivate") % a_ptr->channel_name % a_ptr->destination_topic));
 
         auto& vec_ref = channel_topics_map[a_ptr->channel_name];
         if (a_ptr->activate) {
@@ -65,8 +53,7 @@ void AcquireCommandWorker::acquireManagement(k2eg::controller::command::CommandC
                 std::unique_lock lock(channel_map_mtx);
                 channel_topics_map[a_ptr->channel_name].push_back(a_ptr->destination_topic);
             } else {
-                logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated",
-                                                 a_ptr->channel_name % a_ptr->destination_topic));
+                logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated", a_ptr->channel_name % a_ptr->destination_topic));
             }
         } else {
             // remove topic to channel
@@ -75,8 +62,7 @@ void AcquireCommandWorker::acquireManagement(k2eg::controller::command::CommandC
                 std::unique_lock lock(channel_map_mtx);
                 vec_ref.erase(itr);
             } else {
-                logger->logMessage(STRING_FORMAT("No active monitor on '%1%' for topic '%2%'",
-                                                 a_ptr->channel_name % a_ptr->destination_topic));
+                logger->logMessage(STRING_FORMAT("No active monitor on '%1%' for topic '%2%'", a_ptr->channel_name % a_ptr->destination_topic));
             }
         }
         activate = vec_ref.size();
@@ -94,8 +80,7 @@ void AcquireCommandWorker::epicsMonitorEvent(const MonitorEventVecShrdPtr& event
         // publisher
         if (e->type != MonitorType::Data) continue;
         for (auto& topic: channel_topics_map[e->channel_data.channel_name]) {
-            logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", e->channel_data.channel_name % topic),
-                               LogLevel::TRACE);
+            logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", e->channel_data.channel_name % topic), LogLevel::TRACE);
             publisher->pushMessage(std::make_unique<MonitorMessage>(topic, e));
         }
     }
