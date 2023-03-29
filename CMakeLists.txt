@@ -132,10 +132,8 @@ endif()
 ExternalProject_Add(
   boost
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/boost
-  GIT_PROGRESS 1
   GIT_REPOSITORY https://github.com/boostorg/boost.git
   GIT_TAG boost-${BOOST_VERSION}
-  GIT_PROGRESS 1
   BUILD_IN_SOURCE 1
   GIT_SUBMODULES_RECURSE true
   UPDATE_COMMAND ${BOOST_BOOTSTRAP_CMD}
@@ -157,10 +155,8 @@ MESSAGE(STATUS "Configure EPICS version ${EPICS_VERSION}")
 ExternalProject_Add(
   epics
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/epics
-  GIT_PROGRESS 1
   GIT_REPOSITORY https://github.com/epics-base/epics-base.git
   GIT_TAG ${EPICS_VERSION}
-  GIT_PROGRESS 1
   BUILD_IN_SOURCE 1
   PATCH_COMMAND ${PROJECT_SOURCE_DIR}/tools/epics-patch.sh ${CMAKE_CURRENT_BINARY_DIR}
   CONFIGURE_COMMAND ""
@@ -235,7 +231,6 @@ endif()
 MESSAGE(STATUS "Configure liblz4 version ${LIBLZ4_VERSION}")
 ExternalProject_Add(
   liblz4
-  GIT_PROGRESS 1
   GIT_REPOSITORY https://github.com/lz4/lz4.git
   GIT_TAG ${LIBLZ4_VERSION}
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/liblz4
@@ -280,7 +275,6 @@ MESSAGE(STATUS "Configure sqlite version ${SQLITE_VERSION}")
 ExternalProject_Add(
   sqlite_dist
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/sqlite
-  GIT_PROGRESS 1
   GIT_TAG ${SQLITE_VERSION}
   GIT_REPOSITORY https://github.com/sqlite/sqlite.git
   BUILD_IN_SOURCE 1
@@ -291,7 +285,6 @@ ExternalProject_Add(
 MESSAGE(STATUS "Configure sqlite orm version ${SQLITEORM_VERSION}")
 ExternalProject_Add(
   sqlite_orm
-  GIT_PROGRESS 1
   GIT_TAG ${SQLITEORM_VERSION}
   GIT_REPOSITORY https://github.com/fnc12/sqlite_orm.git
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/sqlite_orm
