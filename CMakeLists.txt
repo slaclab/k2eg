@@ -137,7 +137,7 @@ ExternalProject_Add(
   BUILD_IN_SOURCE 1
   GIT_SUBMODULES_RECURSE true
   UPDATE_COMMAND ${BOOST_BOOTSTRAP_CMD}
-  BUILD_COMMAND ${BOOST_BUILD_CMD} --with-system --with-program_options --with-log --with-json link=shared install --prefix=${CMAKE_INSTALL_PREFIX}
+  BUILD_COMMAND ${BOOST_BUILD_CMD} cxxstd=17 --with-system --with-program_options --with-log --with-json link=shared install --prefix=${CMAKE_INSTALL_PREFIX}
   INSTALL_COMMAND ""
   LOG_DOWNLOAD 1
   LOG_UPDATE 1
