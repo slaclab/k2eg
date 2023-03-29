@@ -63,7 +63,8 @@ jobs:
                     build/local/bin
                 retention-days: 1
             - uses: ouzi-dev/commit-status-updater@v2
-        
+              with:
+                status: success
     test_ubuntu_kinetic:
       name: Test Ubuntu Kinetic
       needs: [build_ubuntu_kinetic] 
@@ -125,3 +126,5 @@ jobs:
                 retention-days: 1
             - name: Set job status
               uses: ouzi-dev/commit-status-updater@v2
+              with:
+                status: success
