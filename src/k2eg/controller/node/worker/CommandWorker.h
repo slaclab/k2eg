@@ -13,7 +13,7 @@ public:
     CommandWorker(const CommandWorker&) = delete;
     CommandWorker& operator=(const CommandWorker&) = delete;
     ~CommandWorker() = default;
-    virtual bool processCommand(k2eg::controller::command::CommandConstShrdPtr command) = 0;
+    virtual void processCommand(k2eg::controller::command::CommandConstShrdPtr command) = 0;
 };
 DEFINE_PTR_TYPES(CommandWorker)
 } // namespace k2eg::controller::node::worker

@@ -34,8 +34,8 @@ GetCommandWorker::GetCommandWorker(EpicsServiceManagerShrdPtr epics_service_mana
     , publisher(ServiceResolver<IPublisher>::resolve())
     , epics_service_manager(epics_service_manager) {}
 
-bool GetCommandWorker::processCommand(k2eg::controller::command::CommandConstShrdPtr command) {
-    if(command->type != CommandType::get) return false;
+void GetCommandWorker::processCommand(k2eg::controller::command::CommandConstShrdPtr command) {
+    if(command->type != CommandType::get) return;
     ConstGetCommandShrdPtr g_ptr = static_pointer_cast<const GetCommand>(command);
     auto channel_data = epics_service_manager->getChannelData(g_ptr->channel_name);
     if(channel_data) {
@@ -44,7 +44,7 @@ bool GetCommandWorker::processCommand(k2eg::controller::command::CommandConstShr
         // data not received => timeout
         logger->logMessage(STRING_FORMAT("Message not recevide for %1%", g_ptr->channel_name), LogLevel::ERROR);
     }
-    return true;
+    return;
 }
 
 

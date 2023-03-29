@@ -49,8 +49,8 @@ class AcquireCommandWorker : public CommandWorker {
     void epicsMonitorEvent(const k2eg::service::epics_impl::MonitorEventVecShrdPtr& event_data);
 public:
     AcquireCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
-    virtual ~AcquireCommandWorker();
-    bool processCommand(k2eg::controller::command::CommandConstShrdPtr command);
+    virtual ~AcquireCommandWorker() = default;
+    void processCommand(k2eg::controller::command::CommandConstShrdPtr command);
 };
 
 } // namespace k2eg::controller::node::worker

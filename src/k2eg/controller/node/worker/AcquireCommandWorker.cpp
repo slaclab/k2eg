@@ -37,10 +37,8 @@ AcquireCommandWorker::AcquireCommandWorker(EpicsServiceManagerShrdPtr epics_serv
     handler_token = epics_service_manager->addHandler(std::bind(&AcquireCommandWorker::epicsMonitorEvent, this, std::placeholders::_1));
 }
 
-AcquireCommandWorker::~AcquireCommandWorker() {}
-
-bool AcquireCommandWorker::processCommand(CommandConstShrdPtr command) {
-    if (command->type != CommandType::monitor) return false;
+void AcquireCommandWorker::processCommand(CommandConstShrdPtr command) {
+    if (command->type != CommandType::monitor) return;
     bool activate = false;
     ConstAquireCommandShrdPtr a_ptr = static_pointer_cast<const AquireCommand>(command);
     // lock the vector for write
@@ -71,7 +69,6 @@ bool AcquireCommandWorker::processCommand(CommandConstShrdPtr command) {
     }
     // if the vec_ref has size > 0 mean that someone is still needed the channel data in monitor way
     epics_service_manager->monitorChannel(a_ptr->channel_name, activate, a_ptr->protocol);
-    return true;
 }
 
 void AcquireCommandWorker::epicsMonitorEvent(const MonitorEventVecShrdPtr& event_data) {

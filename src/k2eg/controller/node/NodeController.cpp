@@ -20,13 +20,6 @@ using namespace k2eg::service::data::repository;
 using namespace k2eg::service::log;
 using namespace k2eg::service::epics_impl;
 
-void executeInThreadPool(CommandWorkerShrdPtr worker, CommandConstShrdPtr cmd) {
-    auto logger = ServiceResolver<ILogger>::resolve();
-    if(!worker->processCommand(cmd)) {
-        logger->logMessage(STRING_FORMAT("Error submitting command to worker for type '%1%'",std::string(command_type_to_string(cmd->type))));
-    }
-}
-
 NodeController::NodeController(DataStorageUPtr data_storage)
     : node_configuration(std::make_unique<NodeConfiguration>(std::move(data_storage)))
     , processing_pool(std::make_shared<BS::thread_pool>()) {
@@ -80,8 +73,7 @@ void NodeController::submitCommand(CommandConstShrdPtrVec commands) {
         logger->logMessage(STRING_FORMAT("Process command => %1%",to_json_string(c)));
         // submit command to appropiate worker
         if (auto worker = worker_resolver.resolve(c->type); worker != nullptr) {
-            auto type_str = command_type_to_string(c->type);
-            processing_pool->push_task(executeInThreadPool, worker, c);
+            processing_pool->push_task(&CommandWorker::processCommand, worker.get(), c);
         } else {
             logger->logMessage(STRING_FORMAT("No worker found for command type '%1%'",std::string(command_type_to_string(c->type))));
         }
