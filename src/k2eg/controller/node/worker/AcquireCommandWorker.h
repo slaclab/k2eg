@@ -46,14 +46,11 @@ class AcquireCommandWorker : public CommandWorker {
     // Handler's liveness token
     k2eg::common::BroadcastToken handler_token;
 
-    void acquireManagement(k2eg::controller::command::CommandConstShrdPtr command);
     void epicsMonitorEvent(const k2eg::service::epics_impl::MonitorEventVecShrdPtr& event_data);
-
 public:
-    AcquireCommandWorker(std::shared_ptr<BS::thread_pool> shared_worker_processing,
-                         k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
+    AcquireCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     virtual ~AcquireCommandWorker();
-    bool submitCommand(k2eg::controller::command::CommandConstShrdPtr command);
+    bool processCommand(k2eg::controller::command::CommandConstShrdPtr command);
 };
 
 } // namespace k2eg::controller::node::worker

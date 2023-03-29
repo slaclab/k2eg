@@ -29,13 +29,10 @@ class GetCommandWorker : public CommandWorker {
         k2eg::service::log::ILoggerShrdPtr logger;
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
-    void getOp(k2eg::controller::command::CommandConstShrdPtr command);
-
 public:
-    GetCommandWorker(std::shared_ptr<BS::thread_pool> shared_worker_processing,
-                     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
+    GetCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     virtual ~GetCommandWorker() = default;
-    bool submitCommand(k2eg::controller::command::CommandConstShrdPtr command);
+    bool processCommand(k2eg::controller::command::CommandConstShrdPtr command);
 };
 
 } // namespace k2eg::controller::node::worker
