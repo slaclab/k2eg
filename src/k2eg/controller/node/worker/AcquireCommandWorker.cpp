@@ -20,10 +20,10 @@ MonitorMessage::MonitorMessage(const std::string& queue, ConstMonitorEventShrdPt
     : request_type("monitor")
     , monitor_event(monitor_event)
     , queue(queue)
-    , message(to_json(this->monitor_event->channel_data)) {}
+    , message(serialize(this->monitor_event->channel_data, SerializationType::JSON)) {}
 
-char* MonitorMessage::getBufferPtr() { return const_cast<char*>(message.c_str()); }
-size_t MonitorMessage::getBufferSize() { return message.size(); }
+char* MonitorMessage::getBufferPtr() { return const_cast<char*>(message->data()); }
+const size_t MonitorMessage::getBufferSize() { return message->size(); }
 const std::string& MonitorMessage::getQueue() { return queue; }
 const std::string& MonitorMessage::getDistributionKey() { return monitor_event->channel_data.channel_name; }
 const std::string& MonitorMessage::getReqType() { return request_type; }

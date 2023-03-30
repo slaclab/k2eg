@@ -19,10 +19,10 @@ GetMessage::GetMessage(const std::string& destination_topic, ConstChannelDataUPt
     : request_type("get")
     , destination_topic(destination_topic)
     , channel_data(std::move(channel_data))
-    , message(to_json(*this->channel_data)) {}
+    , message(serialize(*this->channel_data, SerializationType::JSON)) {}
 
-char* GetMessage::getBufferPtr() { return const_cast<char*>(message.c_str()); }
-size_t GetMessage::getBufferSize() { return message.size(); }
+char* GetMessage::getBufferPtr() { return const_cast<char*>(message->data()); }
+const size_t GetMessage::getBufferSize() { return message->size(); }
 const std::string& GetMessage::getQueue() { return destination_topic; }
 const std::string& GetMessage::getDistributionKey() { return channel_data->channel_name; }
 const std::string& GetMessage::getReqType() { return request_type; }

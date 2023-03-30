@@ -1,4 +1,9 @@
 # Kafka to Epics Gateway
+Author: Claudio Bisegni
+
+Company: SLAC National Accelerator Laboratory
+
+## Description
 A c++ implementation of a two way gateway from kafka and [EPICS](https://epics.anl.gov) Control System, that aim to be a central processing unit for specific daq needs for high level alghoritms.
 
 It reveice command from a specific kafka's topic and permit to inject EPICS  data torwards other topics.

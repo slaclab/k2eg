@@ -11,15 +11,15 @@ namespace k2eg::controller::node::worker {
 class GetMessage : public k2eg::service::pubsub::PublishMessage {
     const std::string request_type;
     const std::string destination_topic;
-     k2eg::service::epics_impl::ConstChannelDataUPtr channel_data;
-    const std::string message;
+    k2eg::service::epics_impl::ConstChannelDataUPtr channel_data;
+    const k2eg::service::epics_impl::ConstSerializedMessageUPtr message;
 public:
     GetMessage(
         const std::string& destination_topic,
     k2eg::service::epics_impl::ConstChannelDataUPtr channel_data);
     virtual ~GetMessage() = default;
     char* getBufferPtr();
-    size_t getBufferSize();
+    const size_t getBufferSize();
     const std::string& getQueue();
     const std::string& getDistributionKey();
     const std::string& getReqType();

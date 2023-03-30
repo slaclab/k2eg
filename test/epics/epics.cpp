@@ -35,10 +35,11 @@ TEST(Epics, ChannelOKSerialize) {
     EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>("pva", "variable:sum", "epics"););
     EXPECT_NO_THROW(pc->connect());
     EXPECT_NO_THROW(val = pc->getChannelData(););
-    std::string json = to_json(*val);
-    const char* s = json.c_str();
-    int size = json.size();
-    EXPECT_NE(val, nullptr);
+    auto json_ser = serialize(*val, SerializationType::JSON);
+    EXPECT_NE(json_ser, nullptr);
+    EXPECT_NE(json_ser->data(), nullptr);
+    EXPECT_NE(json_ser->size(), 0);
+    std::string json(json_ser->data(), json_ser->size());
 }
 
 bool retry_eq(const EpicsChannel& channel, const std::string& name, double value, int mseconds, int retry_times) {

@@ -41,8 +41,10 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/data/DataStorage.cpp
   src/k2eg/service/data/repository/ChannelRepository.cpp
 
+  src/k2eg/service/epics/EpicsData.cpp
   src/k2eg/service/epics/EpicsChannel.cpp
   src/k2eg/service/epics/EpicsServiceManager.cpp
+  src/k2eg/service/epics/JsonSerializer.cpp
 
   src/k2eg/service/pubsub/IPublisher.cpp
   src/k2eg/service/pubsub/ISubscriber.cpp

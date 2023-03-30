@@ -3,12 +3,13 @@
 
 
 #include <k2eg/common/types.h>
+#include <k2eg/common/ObjectFactory.h>
 
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/controller/command/CMDCommand.h>
 #include <k2eg/controller/node/configuration/NodeConfiguration.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
-#include <k2eg/controller/node/worker/WorkerResolver.h>
+
 
 #include <k2eg/service/log/ILogger.h>
 
@@ -22,7 +23,7 @@ namespace k2eg::controller::node {
  */
 class NodeController {
     std::shared_ptr<BS::thread_pool> processing_pool;
-    worker::WorkerResolver<worker::CommandWorker> worker_resolver;
+    k2eg::common::ObjectByTypeFactory<k2eg::controller::command::CommandType, worker::CommandWorker> worker_resolver;
     configuration::NodeConfigurationUPtr node_configuration;
 
     k2eg::service::log::ILoggerShrdPtr logger;
