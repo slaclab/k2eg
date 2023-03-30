@@ -35,12 +35,12 @@ jobs:
       - name: Configure CMake
         run: cmake -DCMAKE_BUILD_TYPE=Debug
       - name: Build
-        run: cmake --config Debug --target boost epics liblz4 librdkafka sqlite_dist sqlite_orm
+        run: cmake --target boost epics liblz4 librdkafka sqlite_dist sqlite_orm
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
         with:
           languages: ${{ matrix.language }}
       - name: Build
-        run: cmake --config Debug --target k2eg -j 8 --
+        run: cmake --target k2eg
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
