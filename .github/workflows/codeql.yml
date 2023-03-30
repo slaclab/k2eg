@@ -24,10 +24,6 @@ jobs:
       matrix:
         language: [ cpp ]
     steps:
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
-        with:
-          languages: ${{ matrix.language }}
       - name: Checkout source code
         uses: actions/checkout@v3
       - name: Restore cached build directory
@@ -39,6 +35,12 @@ jobs:
       - name: Configure CMake
         run: cmake -DCMAKE_BUILD_TYPE=Debug
       - name: Build
-        run: make && make install
+        run: cmake --config Debug --target boost epics liblz4 librdkafka sqlite_dist sqlite_orm -j 8 --
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: ${{ matrix.language }}
+      - name: Build
+        run: cmake --config Debug --target k2eg -j 8 --
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2

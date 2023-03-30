@@ -9,6 +9,44 @@ on:
       - main
 
 jobs:
+    check-changed-file:
+      runs-on: ubuntu-latest
+      name: Test changed source file
+      outputs:
+        source_changed: ${{ steps.changed-src.outputs.any_changed }}
+      steps:
+        - uses: actions/checkout@v3
+          with:
+            fetch-depth: 2
+        - name: Get changed files in the source folder
+          id: changed-src
+          uses: tj-actions/changed-files@v35
+          with:
+            files: src/** 
+        - name: Set Buil Bullseye to success
+          if: steps.changed-src.outputs.any_changed == 'false'
+          uses: ouzi-dev/commit-status-updater@v2
+          with:
+            name: Buil Bullseye
+            status: success
+        - name: Set Test Ubuntu Kinetic / test_build to success
+          if: steps.changed-src.outputs.any_changed == 'false'
+          uses: ouzi-dev/commit-status-updater@v2
+          with:
+            name: Test Bullseye / test_build
+            status: success
+        - name: Set Build Ubuntu Kinetic to success
+          if: steps.changed-src.outputs.any_changed == 'false'
+          uses: ouzi-dev/commit-status-updater@v2
+          with:
+            name: Build Ubuntu Kinetic
+            status: success
+        - name: Set Test Ubuntu Kinetic / test_build to success
+          if: steps.changed-src.outputs.any_changed == 'false'
+          uses: ouzi-dev/commit-status-updater@v2
+          with:
+            name: Test Ubuntu Kinetic / test_build
+            status: success
     test_debian_bullseye:
       name: Test Bullseye
       needs: [build_debian_bullseye] 
@@ -20,6 +58,8 @@ jobs:
 
     build_debian_bullseye:
         name: Build Bullseye
+        needs: check-changed-file
+        if: needs.check-changed-file.outputs.source_changed == 'true'
         runs-on: ubuntu-22.04
         container: scr.svc.stanford.edu/eed-public/build-image/cpp-build-image/gcc-debian:12.2.0-bullseye
         env:
@@ -73,9 +113,10 @@ jobs:
         build_image: ${{ needs.build_ubuntu_kinetic.outputs.build_image }}
         artifact_name: ${{ needs.build_ubuntu_kinetic.outputs.artifact_name }}
       secrets: inherit
-
     build_ubuntu_kinetic:
         name: Build Ubuntu Kinetic
+        needs: check-changed-file
+        if: needs.check-changed-file.outputs.source_changed == 'true'
         runs-on: ubuntu-22.04
         container: docker.io/ubuntu:kinetic
         env:
