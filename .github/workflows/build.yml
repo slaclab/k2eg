@@ -49,8 +49,7 @@ jobs:
             status: success
     test_debian_bullseye:
       name: Test Bullseye
-      if: ${{needs.check-changed-file.outputs.source_changed}} == 'true'
-      needs: [build_debian_bullseye, check-changed-file] 
+      needs: [build_debian_bullseye] 
       uses: ./.github/workflows/test.yml
       with:
         build_image: ${{ needs.build_debian_bullseye.outputs.build_image }}
@@ -108,8 +107,7 @@ jobs:
                 status: success
     test_ubuntu_kinetic:
       name: Test Ubuntu Kinetic
-      if: ${{needs.check-changed-file.outputs.source_changed}} == 'true'
-      needs: [build_ubuntu_kinetic, check-changed-file] 
+      needs: [build_ubuntu_kinetic] 
       uses: ./.github/workflows/test.yml
       with:
         build_image: ${{ needs.build_ubuntu_kinetic.outputs.build_image }}
