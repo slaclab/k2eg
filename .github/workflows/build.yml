@@ -26,28 +26,31 @@ jobs:
         - name: Set Buil Bullseye to success
           if: steps.changed-src.outputs.any_changed == 'false'
           uses: ouzi-dev/commit-status-updater@v2
-          name: Buil Bullseye
-          status: success
+          with:
+            name: Buil Bullseye
+            status: success
         - name: Set Test Ubuntu Kinetic / test_build to success
           if: steps.changed-src.outputs.any_changed == 'false'
           uses: ouzi-dev/commit-status-updater@v2
-          name: Test Bullseye / test_build
-          status: success
+          with:
+            name: Test Bullseye / test_build
+            status: success
         - name: Set Build Ubuntu Kinetic to success
           if: steps.changed-src.outputs.any_changed == 'false'
           uses: ouzi-dev/commit-status-updater@v2
-          name: Build Ubuntu Kinetic
-          status: success
+          with:
+            name: Build Ubuntu Kinetic
+            status: success
         - name: Set Test Ubuntu Kinetic / test_build to success
           if: steps.changed-src.outputs.any_changed == 'false'
           uses: ouzi-dev/commit-status-updater@v2
-          name: Test Ubuntu Kinetic / test_build
-          status: success
+          with:
+            name: Test Ubuntu Kinetic / test_build
+            status: success
     test_debian_bullseye:
       name: Test Bullseye
-      needs: check-changed-file
       if: ${{needs.check-changed-file.outputs.source_changed}} == 'true'
-      needs: [build_debian_bullseye] 
+      needs: [build_debian_bullseye, check-changed-file] 
       uses: ./.github/workflows/test.yml
       with:
         build_image: ${{ needs.build_debian_bullseye.outputs.build_image }}
@@ -105,11 +108,8 @@ jobs:
                 status: success
     test_ubuntu_kinetic:
       name: Test Ubuntu Kinetic
-      needs: check-changed-file
       if: ${{needs.check-changed-file.outputs.source_changed}} == 'true'
-      needs: check-changed-file
-      if: ${{needs.check-changed-file.outputs.source_changed}} == 'true'
-      needs: [build_ubuntu_kinetic] 
+      needs: [build_ubuntu_kinetic, check-changed-file] 
       uses: ./.github/workflows/test.yml
       with:
         build_image: ${{ needs.build_ubuntu_kinetic.outputs.build_image }}
