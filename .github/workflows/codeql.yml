@@ -32,15 +32,17 @@ jobs:
         with:
           path: build
           key: codeql-${{ hashFiles('CMakeLists.txt') }}
+      - name: Create build directory
+        run: mkdir build
       - name: Configure CMake
-        run: cmake -DCMAKE_BUILD_TYPE=Debug
+        run: cmake -DCMAKE_BUILD_TYPE=Debug -B build
       - name: Build
-        run: cmake --target boost epics liblz4 librdkafka sqlite_dist sqlite_orm
+        run: cmake --build build --config Debug --target boost epics liblz4 librdkafka sqlite_dist sqlite_orm
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
         with:
           languages: ${{ matrix.language }}
       - name: Build
-        run: cmake --target k2eg
+        run:  cmake --build build --config Debug --target k2eg
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
