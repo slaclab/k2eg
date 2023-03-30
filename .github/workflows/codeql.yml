@@ -1,12 +1,12 @@
 name: CodeQL
 
 on:
-  # pull_request:
-  #   types:
-  #     - opened
-  #     - synchronize
-  #   branches:
-  #     - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+    branches:
+      - main
 
   schedule:
     - cron: 0 4 * * *

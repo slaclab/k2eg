@@ -196,39 +196,6 @@ elseif(UNIX)
   TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/lib/linux-x86_64)
 endif()
 
-# --------------------protobuf--------------------------
-# MESSAGE(STATUS "Configure protobuf version ${PROTOBUF_VERSION}")
-# ExternalProject_Add(
-# protobuf
-# PREFIX ${CMAKE_CURRENT_BINARY_DIR}/protobuf
-# GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
-# GIT_TAG ${PROTOBUF_VERSION}
-# GIT_PROGRESS 1
-# LOG_DOWNLOAD 1
-# LOG_UPDATE 1
-# LOG_CONFIGURE 1
-# LOG_BUILD 1
-# LOG_INSTALL 1
-# CMAKE_ARGS
-# -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
-# )
-# SET(BUILD_LIBRARY ${BUILD_LIBRARY} )
-# ADD_DEPENDENCIES(${PROJECT_NAME} protobuf)
-# ADD_DEPENDENCIES(${PROJECT_NAME}-test protobuf)
-# ------------Nuraft----------------
-# MESSAGE(STATUS "Configure NuRAFT")
-# ExternalProject_Add(
-# nuraft
-# PREFIX ${CMAKE_CURRENT_BINARY_DIR}/nuraft
-# GIT_REPOSITORY https://github.com/bisegni/NuRaft.git
-# GIT_TAG feature/asio-module
-# CMAKE_ARGS
-# -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
-# )
-# SET(BUILD_LIBRARY ${BUILD_LIBRARY} )
-# ADD_DEPENDENCIES(${PROJECT_NAME} nuraft)
-# ADD_DEPENDENCIES(${PROJECT_NAME}-test nuraft)
-
 # ----------------kafka------------------
 MESSAGE(STATUS "Configure liblz4 version ${LIBLZ4_VERSION}")
 ExternalProject_Add(
@@ -250,7 +217,7 @@ ExternalProject_Add(
 
 MESSAGE(STATUS "Configure librdkafka version ${LIBRDKAFKA_VERSION}")
 ExternalProject_Add(
-  librdkafa
+  librdkafka
   GIT_TAG ${LIBRDKAFKA_VERSION}
   GIT_REPOSITORY https://github.com/edenhill/librdkafka.git
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/librdkafa
@@ -268,9 +235,9 @@ ExternalProject_Add(
   LOG_INSTALL 1
 )
 SET(BUILD_LIBRARY ${BUILD_LIBRARY} rdkafka rdkafka++)
-ADD_DEPENDENCIES(librdkafa liblz4)
-ADD_DEPENDENCIES(${PROJECT_NAME} librdkafa liblz4)
-ADD_DEPENDENCIES(${PROJECT_NAME}-test librdkafa liblz4)
+ADD_DEPENDENCIES(librdkafka liblz4)
+ADD_DEPENDENCIES(${PROJECT_NAME} librdkafka liblz4)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test librdkafka liblz4)
 
 # ----------sqlite orm-----
 MESSAGE(STATUS "Configure sqlite version ${SQLITE_VERSION}")
@@ -330,7 +297,3 @@ TARGET_LINK_LIBRARIES(${PROJECT_NAME} PUBLIC ${BUILD_LIBRARY} pthread)
 TARGET_LINK_LIBRARIES(${PROJECT_NAME}-test PUBLIC ${BUILD_LIBRARY} pthread gtest)
 MESSAGE(STATUS "Linked library: ${BUILD_LIBRARY}")
 MESSAGE(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
-
-# enable_testing()
-# add_test(NAME    unit_test
-# COMMAND unit_test)
