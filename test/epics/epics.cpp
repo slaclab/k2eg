@@ -35,7 +35,8 @@ TEST(Epics, ChannelOKSerialize) {
     EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>("pva", "variable:sum", "epics"););
     EXPECT_NO_THROW(pc->connect());
     EXPECT_NO_THROW(val = pc->getChannelData(););
-    std::string json = serialize(*val, SerializationType::JSON);
+    auto json_ser = serialize_epics_data(*val, SerializationType::JSON);
+    std::string json(json_ser->data.get(), json_ser->data_len);
     const char* s = json.c_str();
     int size = json.size();
     EXPECT_NE(val, nullptr);

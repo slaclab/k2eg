@@ -50,7 +50,7 @@ public:
     virtual ~CMDMessage() = default;
 
     char* getBufferPtr() { return const_cast<char*>(message.c_str()); }
-    size_t getBufferSize() { return message.size(); }
+    const size_t getBufferSize() { return message.size(); }
     const std::string& getQueue() { return queue; }
     const std::string& getDistributionKey() { return distribution_key; }
     const std::string& getReqType() { return request_type; }
