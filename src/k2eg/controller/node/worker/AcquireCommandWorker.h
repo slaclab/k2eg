@@ -18,12 +18,12 @@ class MonitorMessage : public k2eg::service::pubsub::PublishMessage {
     const std::string request_type;
     k2eg::service::epics_impl::ConstMonitorEventShrdPtr monitor_event;
     const std::string queue;
-    const std::string message;
+    k2eg::service::epics_impl::ConstSerializedMessageUPtr message;
 public:
     MonitorMessage(const std::string& queue, k2eg::service::epics_impl::ConstMonitorEventShrdPtr monitor_event);
     virtual ~MonitorMessage() = default;
     char* getBufferPtr();
-    size_t getBufferSize();
+    const size_t getBufferSize();
     const std::string& getQueue();
     const std::string& getDistributionKey();
     const std::string& getReqType();

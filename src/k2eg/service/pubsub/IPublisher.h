@@ -28,7 +28,7 @@ class PublishMessage {
 public:
     virtual ~PublishMessage() {}
     virtual char* getBufferPtr() = 0;
-    virtual size_t getBufferSize() = 0;
+    virtual const size_t getBufferSize() = 0;
     virtual const std::string& getQueue() = 0;
     virtual const std::string& getDistributionKey() = 0;
     virtual const std::string& getReqType() = 0;

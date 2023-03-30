@@ -3,7 +3,6 @@
 //------------ command include ----------
 #include <k2eg/controller/node/worker/AcquireCommandWorker.h>
 #include <k2eg/controller/node/worker/GetCommandWorker.h>
-#include <k2eg/controller/node/worker/WorkerResolver.h>
 #include <k2eg/service/ServiceResolver.h>
 
 #include <k2eg/common/utility.h>
@@ -27,10 +26,10 @@ NodeController::NodeController(DataStorageUPtr data_storage)
     logger = ServiceResolver<ILogger>::resolve();
 
     // register worker for command type
-    worker_resolver.registerService(
+    worker_resolver.registerObjectInstance(
         CommandType::monitor,
         std::make_shared<AcquireCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
-    worker_resolver.registerService(
+    worker_resolver.registerObjectInstance(
         CommandType::get,
         std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
 }

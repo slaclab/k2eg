@@ -108,7 +108,8 @@
         "ios": "cpp",
         "locale": "cpp",
         "queue": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "cassert": "cpp"
     },
     "git.ignoreLimitWarning": true,
     "c-cpp-flylint.enable": false
