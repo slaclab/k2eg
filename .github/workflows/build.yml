@@ -59,7 +59,7 @@ jobs:
     build_debian_bullseye:
         name: Build Bullseye
         needs: check-changed-file
-        if: ${{needs.check-changed-file.outputs.source_changed}} == 'true'
+        if: needs.check-changed-file.outputs.source_changed == 'true'
         runs-on: ubuntu-22.04
         container: scr.svc.stanford.edu/eed-public/build-image/cpp-build-image/gcc-debian:12.2.0-bullseye
         env:
@@ -72,7 +72,7 @@ jobs:
           artifact_name: ${{ env.ARTIFACT_NAME}}  
 
         steps:
-            - run: echo  ${{needs.check-changed-file.outputs.source_changed}} 
+            - run: echo needs.check-changed-file.outputs.source_changed == 'true'
             - name: Checkout source code
               uses: actions/checkout@v3
             - name: Restore cached build directory
