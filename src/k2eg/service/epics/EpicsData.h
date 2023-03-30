@@ -34,7 +34,7 @@ public:
 DEFINE_PTR_TYPES(Serializer)
 
 //DEFINE_MAP_FOR_TYPE(SerializationType, SerializerShrdPtr, SerializerMap);
-static k2eg::common::ObjectByTypeFactory<SerializationType, Serializer> serializer_factory;
+inline k2eg::common::ObjectByTypeFactory<SerializationType, Serializer> serializer_factory;
 
 inline ConstSerializedMessageUPtr serialize_epics_data(const ChannelData& message, SerializationType type) {
     // check if serilizer is present
@@ -54,7 +54,7 @@ public:
 };
 
 #define REGISTER_SERIALIZER(T, S) \
-static SerializerRegister<SerializationType, S> S##_serializer_register(T);
+SerializerRegister<SerializationType, S> S##_serializer_register(T);
 
 } // namespace k2eg::service::epics_impl
 
