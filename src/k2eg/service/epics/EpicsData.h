@@ -20,9 +20,12 @@ DEFINE_PTR_TYPES(ChannelData)
 enum class SerializationType { Undefined, JSON, MessagePack };
 
 // the serialized message
-struct SerializedMessage {
-    const size_t data_len;
-    std::unique_ptr<const char[]> data;
+class SerializedMessage {
+    public:
+    SerializedMessage()=default;
+    ~SerializedMessage()=default;
+    virtual const size_t size() const = 0;
+    virtual const char * data()const = 0;
 };
 DEFINE_PTR_TYPES(SerializedMessage);
 
@@ -33,24 +36,27 @@ public:
 };
 DEFINE_PTR_TYPES(Serializer)
 
-//DEFINE_MAP_FOR_TYPE(SerializationType, SerializerShrdPtr, SerializerMap);
-inline k2eg::common::ObjectByTypeFactory<SerializationType, Serializer> serializer_factory;
+// define the single instance of epics serializer factory
+inline k2eg::common::ObjectByTypeFactory<SerializationType, Serializer> epics_serializer_factory;
 
-inline ConstSerializedMessageUPtr serialize_epics_data(const ChannelData& message, SerializationType type) {
+// serilizer entry point
+inline ConstSerializedMessageUPtr serialize(const ChannelData& message, SerializationType type) {
     // check if serilizer is present
-    if (!serializer_factory.hasType(type)) {
+    if (!epics_serializer_factory.hasType(type)) {
         return ConstSerializedMessageUPtr();
     }
-    return serializer_factory.resolve(type)->serialize(message) ;
+    return epics_serializer_factory.resolve(type)->serialize(message) ;
 }
 
+// check for a serializer for a specific type
 inline bool has_serialization_for_type(SerializationType type) { 
-    return serializer_factory.hasType(type);
+    return epics_serializer_factory.hasType(type);
 }
 
+// helper for serializer registration
 template <typename T, typename S> class SerializerRegister {
 public:
-    SerializerRegister(T type) { serializer_factory.registerObjectInstance(type, std::make_shared<S>()); }
+    SerializerRegister(T type) { epics_serializer_factory.registerObjectInstance(type, std::make_shared<S>()); }
 };
 
 #define REGISTER_SERIALIZER(T, S) \

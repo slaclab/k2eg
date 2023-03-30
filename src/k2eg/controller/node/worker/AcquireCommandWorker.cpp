@@ -20,10 +20,10 @@ MonitorMessage::MonitorMessage(const std::string& queue, ConstMonitorEventShrdPt
     : request_type("monitor")
     , monitor_event(monitor_event)
     , queue(queue)
-    , message(serialize_epics_data(this->monitor_event->channel_data, SerializationType::JSON)) {}
+    , message(serialize(this->monitor_event->channel_data, SerializationType::JSON)) {}
 
-char* MonitorMessage::getBufferPtr() { return const_cast<char*>(message->data.get()); }
-const size_t MonitorMessage::getBufferSize() { return message->data_len; }
+char* MonitorMessage::getBufferPtr() { return const_cast<char*>(message->data()); }
+const size_t MonitorMessage::getBufferSize() { return message->size(); }
 const std::string& MonitorMessage::getQueue() { return queue; }
 const std::string& MonitorMessage::getDistributionKey() { return monitor_event->channel_data.channel_name; }
 const std::string& MonitorMessage::getReqType() { return request_type; }
