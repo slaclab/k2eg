@@ -72,6 +72,7 @@ jobs:
           artifact_name: ${{ env.ARTIFACT_NAME}}  
 
         steps:
+            - run: echo  ${{needs.check-changed-file.outputs.source_changed}} 
             - name: Checkout source code
               uses: actions/checkout@v3
             - name: Restore cached build directory
