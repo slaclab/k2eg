@@ -24,7 +24,24 @@ Actual implementation receive command and interpret command and uses only JSON s
 - [ ] Advanced DAQ Specific logic
 - [ ] Cluster implementation
 ```
+## Application Architecture
+<p>The application architecture follow logic designed follow the scheme below. The dotted line boxes represent element not yet developed.</p>
+<p>
+There are two principal layer:
 
+* Controller:
+    * Node Controller
+    * Command Controller
+    * Cluster Controller (to design)
+* Service:
+    * Publisher and Subscriber:
+    * Data storage
+    * Log
+    * EPICS
+    * Cluster Services (to design)
+</p>
+
+![K2EG Software Layer Interaction](doc/image/scheme.png)
 
 ## Getting started
 This project aim to realize an [EPICS](https://epics.anl.gov) gateway for interact with epics IOCs using kafka. It uses a input topic from a kafka cluster for receive json encoded commands that permit to execute IO operation on the IOCs.
