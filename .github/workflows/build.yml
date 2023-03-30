@@ -22,7 +22,10 @@ jobs:
           id: changed-src
           uses: tj-actions/changed-files@v35
           with:
-            files: src/** 
+            files: |
+              CMakeLists.txt
+              src/**
+              test/**
         - name: Set Buil Bullseye to success
           if: steps.changed-src.outputs.any_changed == 'false'
           uses: ouzi-dev/commit-status-updater@v2
