@@ -32,7 +32,7 @@ jobs:
           path: build
           key: codeql-${{ hashFiles('CMakeLists.txt') }}
       - name: Create build directory
-        run: mkdir build
+        run: mkdir -p build
       - name: Configure CMake
         run: cmake -DCMAKE_BUILD_TYPE=Debug -B build
       - name: Build
