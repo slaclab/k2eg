@@ -2,7 +2,7 @@ FROM ubuntu:kinetic
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN     apt update \
-    &&  apt install -y build-essential cmake git tclsh ninja-build
+    &&  apt install -y build-essential cmake git tclsh ninja-build gdb
 
 #install clang
 RUN apt install -y lsb-release wget software-properties-common gnupg
