@@ -7,14 +7,12 @@ RUN     apt update \
 #install clang
 RUN apt install -y lsb-release wget software-properties-common gnupg
 RUN bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
-# Install llvm
-# COPY tools/llvm.sh /tmp/
-# RUN chmod +x /tmp/llvm.sh && /tmp/llvm.sh
-# RUN update-alternatives --install /usr/bin/cc cc /usr/bin/clang-14 100
-# RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-14 100
-# RUN update-alternatives --install /usr/bin/clang cc /usr/bin/clang-14 100
-# RUN update-alternatives --install /usr/bin/clang++ c++ /usr/bin/clang++-14 100
-# RUN update-alternatives --install /usr/bin/lldb lldb /usr/bin/lldb-14 100
+
+RUN update-alternatives --install /usr/bin/cc cc /usr/bin/clang-15 100
+RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-15 100
+RUN update-alternatives --install /usr/bin/clang cc /usr/bin/clang-15 100
+RUN update-alternatives --install /usr/bin/clang++ c++ /usr/bin/clang++-15 100
+RUN update-alternatives --install /usr/bin/lldb lldb /usr/bin/lldb-15 100
 
 RUN useradd -rm -d /home/vscode -s /bin/bash -g root -G sudo -u 1001 developer
 USER developer
