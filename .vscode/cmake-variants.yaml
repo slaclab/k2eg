@@ -1,0 +1,14 @@
+useCoverage:
+  default: 'yes'
+  description: "Code coverage"
+  choices:
+    'yes':
+      short: Coverage 
+      long: Activate test coverage
+      setting: 
+        ENABLE_COVERAGE: yes
+    'no':
+      short: No Coverage 
+      long: Deactivate test coverage
+      setting: 
+        ENABLE_COVERAGE: no
