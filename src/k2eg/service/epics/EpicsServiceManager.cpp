@@ -36,13 +36,13 @@ void EpicsServiceManager::addChannel(const std::string& channel_name, const std:
 
 StringVector EpicsServiceManager::getMonitoredChannels() {
     std::unique_lock guard(channel_map_mutex);
-#ifdef __APPLE__
+#if defined(__clang__)
     StringVector result;
     for (auto& p: channel_map) {
         result.push_back(p.first);
     }
     return result;
-#elif __linux__ or __unix__
+#elif  __GNUC_PREREQ(11,0)
     auto kv = std::views::keys(channel_map);
     return {kv.begin(), kv.end()};
 #endif
