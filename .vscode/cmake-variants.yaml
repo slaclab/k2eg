@@ -1,3 +1,24 @@
+buildType: 
+  default: debug 
+  description: BuildType  
+  choices:
+    debug:
+      short: Debug 
+      long: Build with debugging information 
+      buildType: Debug
+    release:
+      short: Release 
+      long: Optimize the resulting binaries
+      buildType: Release
+    RelWithDebInfo:
+      short: RelWithDebInfo 
+      long: Release with debug infromation
+      buildType: RelWithDebInfo
+    MinSizeRel:
+      short: MinSizeRel 
+      long: Release imnimum size
+      buildType: MinSizeRel
+
 useCoverage:
   default: 'yes'
   description: "Code coverage"
