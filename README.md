@@ -23,7 +23,9 @@ Actual implementation receive command and interpret command and uses only JSON s
 - [ ] Binary serialization
 - [ ] Advanced DAQ Specific logic
 - [ ] Cluster implementation
+- [ ] Multithreading EPICS Monitor
 ```
+For the serialization and message format see documentation [here](doc/message-format.md)
 ## Application Architecture
 <p>The application architecture follow logic designed follow the scheme below. The dotted line boxes represent element not yet developed.</p>
 <p>
