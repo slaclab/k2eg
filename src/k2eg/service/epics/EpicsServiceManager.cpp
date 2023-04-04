@@ -36,7 +36,7 @@ void EpicsServiceManager::addChannel(const std::string& channel_name, const std:
 
 StringVector EpicsServiceManager::getMonitoredChannels() {
     std::unique_lock guard(channel_map_mutex);
-#ifdef __clang__
+#if defined(__clang__)
     StringVector result;
     for (auto& p: channel_map) {
         result.push_back(p.first);

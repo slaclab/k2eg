@@ -23,7 +23,7 @@ enum class SerializationType { Undefined, JSON, MessagePack };
 class SerializedMessage {
     public:
     SerializedMessage()=default;
-    ~SerializedMessage()=default;
+    virtual ~SerializedMessage()=default;
     virtual const size_t size() const = 0;
     virtual const char * data()const = 0;
 };

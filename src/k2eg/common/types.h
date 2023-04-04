@@ -9,7 +9,7 @@ namespace k2eg::common
 {
 #define DEFINE_PTR_TYPES(x) \
 typedef std::unique_ptr<x> x##UPtr; \
-typedef std::unique_ptr< const x> Const##x##UPtr; \
+typedef std::unique_ptr<const x> Const##x##UPtr; \
 typedef std::shared_ptr<x> x##ShrdPtr; \
 typedef std::shared_ptr<const x> Const##x##ShrdPtr; \
 template<typename... _Args> \
