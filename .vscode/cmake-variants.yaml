@@ -18,7 +18,6 @@ buildType:
       short: MinSizeRel 
       long: Release imnimum size
       buildType: MinSizeRel
-
 useCoverage:
   default: NoCover
   description: "Code coverage"
