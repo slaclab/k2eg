@@ -153,12 +153,10 @@ jobs:
             - name: Capture coverage
               run: lcov -capture --directory build --output-file coverage_report.info
             - name: Generate Code Coverage report
-              id: Upload code coverage report
               uses: barecheck/code-coverage-action@v1
               with:
                 barecheck-github-app-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
-                lcov-file: "./coverage/lcov.info"
-                base-lcov-file: "./coverage/base-lcov.info"
+                lcov-file: "./coverage_report.info"
                 send-summary-comment: true
                 show-annotations: "warning"
             - name: Get log on failure
