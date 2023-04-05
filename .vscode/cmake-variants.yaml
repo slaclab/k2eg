@@ -20,16 +20,14 @@ buildType:
       buildType: MinSizeRel
 
 useCoverage:
-  default: 'yes'
+  default: NoCover
   description: "Code coverage"
   choices:
-    'yes':
+    Cover:
       short: Coverage 
-      long: Activate test coverage
-      setting: 
+      settings: 
         ENABLE_COVERAGE: yes
-    'no':
+    NoCover:
       short: No Coverage 
-      long: Deactivate test coverage
-      setting: 
+      settings: 
         ENABLE_COVERAGE: no

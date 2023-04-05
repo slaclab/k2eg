@@ -13,6 +13,7 @@ find_package(Git)
 message(STATUS "GIT_EXECUTABLE='${GIT_EXECUTABLE}'")
 message(STATUS "Using compiler ${CMAKE_CXX_COMPILER_ID}_${CMAKE_CXX_COMPILER_VERSION}")
 
+#manage code coverage
 include(${CMAKE_CURRENT_SOURCE_DIR}/configuration/coverage.cmake)
 
 set(CMAKE_CXX_STANDARD 20)

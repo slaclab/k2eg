@@ -1,6 +1,6 @@
-if(CMAKE_BUILD_TYPE STREQUAL "coverage" OR ENABLE_COVERAGE)
+if(${ENABLE_COVERAGE})
     if("${CMAKE_C_COMPILER_ID}" MATCHES "(Apple)?[Cc]lang" OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "(Apple)?[Cc]lang")
-        message("Building with llvm Code Coverage Tools")
+        message(STATUS "Building with llvm Code Coverage Tools")
 
         # Warning/Error messages
         if(NOT LLVM_COV_PATH)
@@ -12,8 +12,9 @@ if(CMAKE_BUILD_TYPE STREQUAL "coverage" OR ENABLE_COVERAGE)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-instr-generate -fcoverage-mapping")
 
     elseif(CMAKE_COMPILER_IS_GNUCXX)
-        message("Building with lcov Code Coverage Tools")
-
+        find_program(LCOV_PATH lcov)
+        find_program(GENHTML_PATH genhtml)
+        message(STATUS "Building with lcov Code Coverage Tools with ${LCOV_PATH} and ${GENHTML_PATH}")
         # Warning/Error messages
         if(NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
             message(WARNING "Code coverage results with an optimized (non-Debug) build may be misleading")
