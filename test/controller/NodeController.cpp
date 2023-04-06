@@ -89,7 +89,7 @@ TEST(NodeController, AcquireCommand) {
     EXPECT_NO_THROW(cmd_controller = std::make_unique<NodeController>(std::move(storage)););
 
     EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const AquireCommand>(
-        AquireCommand{CommandType::monitor, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+        AquireCommand{CommandType::monitor, MessageSerType::json ,"pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
 
     work_done.wait();
     // we need to have publish some message
@@ -98,7 +98,7 @@ TEST(NodeController, AcquireCommand) {
 
     // stop acquire
     EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const AquireCommand>(
-        AquireCommand{CommandType::monitor, "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
+        AquireCommand{CommandType::monitor, k2eg::controller::command::MessageSerType::json , "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
 
     sleep(1);
     EXPECT_NO_THROW(published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(););
@@ -134,7 +134,7 @@ TEST(NodeController, AcquireCommandAfterReboot) {
     EXPECT_NO_THROW(node_controller = std::make_unique<NodeController>(std::move(storage)););
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const AquireCommand>(
-        AquireCommand{CommandType::monitor, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+        AquireCommand{CommandType::monitor,MessageSerType::json , "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
 
     work_done.wait();
     // we need to have publish some message
@@ -190,7 +190,7 @@ TEST(NodeController, GetCommand) {
     EXPECT_NO_THROW(cmd_controller = std::make_unique<NodeController>(std::move(storage)););
 
     EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const GetCommand>(
-        GetCommand{CommandType::get, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
+        GetCommand{CommandType::get, MessageSerType::json ,"pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
 
     work_done.wait();
     // we need to have publish some message
@@ -226,7 +226,7 @@ TEST(NodeController, GetCommandBadChannel) {
     EXPECT_NO_THROW(cmd_controller = std::make_unique<NodeController>(std::move(storage)););
 
     EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const GetCommand>(
-        GetCommand{CommandType::get, "pva", "bad:channel:name", KAFKA_TOPIC_ACQUIRE_IN})}););
+        GetCommand{CommandType::get, MessageSerType::json ,"pva", "bad:channel:name", KAFKA_TOPIC_ACQUIRE_IN})}););
     //give some time for the timeout
     sleep(5);
     // we need to have publish some message
@@ -265,17 +265,17 @@ TEST(NodeController, RandomCommand) {
         switch (random_num(0, 2)) {
         case 0: {
             EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const AquireCommand>(
-                AquireCommand{CommandType::monitor, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+                AquireCommand{CommandType::monitor, MessageSerType::json ,"pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
             break;
         }
         case 1: {
             EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const AquireCommand>(
-                AquireCommand{CommandType::monitor, "pva", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
+                AquireCommand{CommandType::monitor, MessageSerType::json ,"pva", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
             break;
         }
         case 2: {
             EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const GetCommand>(
-                GetCommand{CommandType::get, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
+                GetCommand{CommandType::get, MessageSerType::json, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
             break;
         }
         }

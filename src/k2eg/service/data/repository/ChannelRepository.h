@@ -12,6 +12,7 @@ namespace repository {
 struct ChannelMonitorType {
     int id = -1;
     std::string channel_name;
+    std::uint8_t event_serialization;
     std::string channel_protocol;
     std::string channel_destination;
 };
@@ -19,6 +20,7 @@ struct ChannelMonitorType {
 inline ChannelMonitorType toChannelMonitor(const k2eg::controller::command::AquireCommand& acquire_command) {
     return ChannelMonitorType {
         .channel_name = acquire_command.channel_name, 
+        .event_serialization = static_cast<std::uint8_t>(acquire_command.serialization),
         .channel_protocol = acquire_command.protocol,
         .channel_destination = acquire_command.destination_topic
     };
@@ -27,6 +29,7 @@ inline ChannelMonitorType toChannelMonitor(const k2eg::controller::command::Aqui
 inline  k2eg::controller::command::CommandConstShrdPtr  fromChannelMonitor(const ChannelMonitorType& command) {
     return std::make_shared<k2eg::controller::command::AquireCommand>(k2eg::controller::command::AquireCommand {
         k2eg::controller::command::CommandType::monitor,
+         static_cast<k2eg::controller::command::MessageSerType>(command.event_serialization),
         command.channel_protocol,
         command.channel_name, 
         true,
