@@ -36,6 +36,7 @@ constexpr const char* command_type_to_string(CommandType t) noexcept {
 }
 
 #define KEY_COMMAND "command"
+#define KEY_SERIALIZATION "serialization"
 #define KEY_PROTOCOL "protocol"
 #define KEY_CHANNEL_NAME "channel_name"
 #define KEY_ACTIVATE "activate"
@@ -43,11 +44,22 @@ constexpr const char* command_type_to_string(CommandType t) noexcept {
 #define KEY_VALUE "value"
 
 // is the type of the serialization
-enum class SerializationType { json, mesgpack };
+enum class MessageSerType: std::uint8_t{unknown , json, mesgpack};
+constexpr const char* serialization_to_string(MessageSerType t) noexcept {
+    switch (t) {
+    case MessageSerType::json:
+        return "json";
+    case MessageSerType::mesgpack:
+        return "mesgpack";
+    case MessageSerType::unknown:
+        return "unknown";
+    }
+    return "undefined";
+}
 
 struct Command {
     CommandType type;
-    SerializationType serialization;
+    MessageSerType serialization;
     std::string protocol;
     std::string channel_name;
     
