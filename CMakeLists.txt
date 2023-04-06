@@ -11,8 +11,11 @@ set(IS_DEBUG_BUILD CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 find_package(Git)
 message(STATUS "GIT_EXECUTABLE='${GIT_EXECUTABLE}'")
-
 message(STATUS "Using compiler ${CMAKE_CXX_COMPILER_ID}_${CMAKE_CXX_COMPILER_VERSION}")
+
+#manage code coverage
+include(${CMAKE_CURRENT_SOURCE_DIR}/configuration/coverage.cmake)
+
 set(CMAKE_CXX_STANDARD 20)
 set(BOOST_VERSION 1.77.0)
 set(EPICS_VERSION R7.0.3.1)
