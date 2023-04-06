@@ -17,6 +17,7 @@
 namespace k2eg::controller::command {
 #define JSON_VALUE_TO(t, v) boost::json::value_to<t>(v)
 
+// are all the possible command
 enum class CommandType { monitor, get, put, info, unknown };
 constexpr const char* command_type_to_string(CommandType t) noexcept {
     switch (t) {
@@ -41,10 +42,15 @@ constexpr const char* command_type_to_string(CommandType t) noexcept {
 #define KEY_DEST_TOPIC "dest_topic"
 #define KEY_VALUE "value"
 
+// is the type of the serialization
+enum class SerializationType { json, mesgpack };
+
 struct Command {
     CommandType type;
+    SerializationType serialization;
     std::string protocol;
     std::string channel_name;
+    
 };
 DEFINE_PTR_TYPES(Command)
 
