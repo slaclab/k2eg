@@ -1,5 +1,5 @@
-#ifndef k2eg_CONTROLLER_NODE_WORKER_ACQUIRECOMMANDWORKER_H_
-#define k2eg_CONTROLLER_NODE_WORKER_ACQUIRECOMMANDWORKER_H_
+#ifndef k2eg_CONTROLLER_NODE_WORKER_MonitorCommandWORKER_H_
+#define k2eg_CONTROLLER_NODE_WORKER_MonitorCommandWORKER_H_
 
 #include <k2eg/common/types.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
@@ -35,9 +35,9 @@ DEFINE_PTR_TYPES(MonitorMessage)
 DEFINE_MAP_FOR_TYPE(std::string, std::vector<std::string>, ChannelTopicsMap);
 
 //
-// ss the command handler for the management of the AcquireCommand
+// ss the command handler for the management of the MonitorCommand
 //
-class AcquireCommandWorker : public CommandWorker {
+class MonitorCommandWorker : public CommandWorker {
     mutable std::shared_mutex channel_map_mtx;
     ChannelTopicsMap channel_topics_map;
     k2eg::service::log::ILoggerShrdPtr logger;
@@ -48,11 +48,11 @@ class AcquireCommandWorker : public CommandWorker {
 
     void epicsMonitorEvent(const k2eg::service::epics_impl::MonitorEventVecShrdPtr& event_data);
 public:
-    AcquireCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
-    virtual ~AcquireCommandWorker() = default;
-    void processCommand(k2eg::controller::command::CommandConstShrdPtr command);
+    MonitorCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
+    virtual ~MonitorCommandWorker() = default;
+    void processCommand(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 };
 
 } // namespace k2eg::controller::node::worker
 
-#endif // k2eg_CONTROLLER_NODE_WORKER_ACQUIRECOMMANDWORKER_H_
+#endif // k2eg_CONTROLLER_NODE_WORKER_MonitorCommandWORKER_H_

@@ -23,7 +23,7 @@ namespace k2eg::controller::node {
  */
 class NodeController {
     std::shared_ptr<BS::thread_pool> processing_pool;
-    k2eg::common::ObjectByTypeFactory<k2eg::controller::command::CommandType, worker::CommandWorker> worker_resolver;
+    k2eg::common::ObjectByTypeFactory<k2eg::controller::command::cmd::CommandType, worker::CommandWorker> worker_resolver;
     configuration::NodeConfigurationUPtr node_configuration;
 
     k2eg::service::log::ILoggerShrdPtr logger;
@@ -39,7 +39,7 @@ public:
     void reloadPersistentCommand();
     
     // Process an array of command
-    void submitCommand(k2eg::controller::command::CommandConstShrdPtrVec commands);
+    void submitCommand(k2eg::controller::command::cmd::ConstCommandShrdPtrVec commands);
 };
 DEFINE_PTR_TYPES(NodeController)
 } // namespace k2eg::controller::node

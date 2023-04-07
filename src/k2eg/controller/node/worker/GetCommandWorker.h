@@ -32,7 +32,7 @@ class GetCommandWorker : public CommandWorker {
 public:
     GetCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     virtual ~GetCommandWorker() = default;
-    void processCommand(k2eg::controller::command::CommandConstShrdPtr command);
+    void processCommand(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 };
 
 } // namespace k2eg::controller::node::worker

@@ -20,6 +20,7 @@ namespace fs = std::filesystem;
 using namespace k2eg::common;
 
 using namespace k2eg::controller::command;
+using namespace k2eg::controller::command::cmd;
 using namespace k2eg::controller::node;
 
 using namespace k2eg::service;
@@ -67,7 +68,7 @@ int random_num(int min, int max) {
     return dist(generator);
 }
 #ifdef __linux__
-TEST(NodeController, AcquireCommand) {
+TEST(NodeController, MonitorCommand) {
     int argc = 1;
     const char* argv[1] = {"epics-k2eg-test"};
     DataStorageUPtr storage;
@@ -88,8 +89,8 @@ TEST(NodeController, AcquireCommand) {
     toShared(storage->getChannelRepository())->removeAll();
     EXPECT_NO_THROW(cmd_controller = std::make_unique<NodeController>(std::move(storage)););
 
-    EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const AquireCommand>(
-        AquireCommand{CommandType::monitor, MessageSerType::json ,"pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+    EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const MonitorCommand>(
+        MonitorCommand{CommandType::monitor, MessageSerType::json ,"pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
 
     work_done.wait();
     // we need to have publish some message
@@ -97,8 +98,14 @@ TEST(NodeController, AcquireCommand) {
     EXPECT_NE(published, 0);
 
     // stop acquire
-    EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const AquireCommand>(
-        AquireCommand{CommandType::monitor, k2eg::controller::command::MessageSerType::json , "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
+    EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const MonitorCommand>(
+        MonitorCommand{
+            CommandType::monitor, 
+            k2eg::controller::command::cmd::MessageSerType::json, 
+            "", 
+            "channel:ramp:ramp", 
+            false, 
+            KAFKA_TOPIC_ACQUIRE_IN})}););
 
     sleep(1);
     EXPECT_NO_THROW(published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(););
@@ -111,7 +118,7 @@ TEST(NodeController, AcquireCommand) {
     EXPECT_NO_THROW(ServiceResolver<ILogger>::resolve().reset(););
 }
 
-TEST(NodeController, AcquireCommandAfterReboot) {
+TEST(NodeController, MonitorCommandAfterReboot) {
     int argc = 1;
     const char* argv[1] = {"epics-k2eg-test"};
     DataStorageUPtr storage;
@@ -133,8 +140,8 @@ TEST(NodeController, AcquireCommandAfterReboot) {
     toShared(storage->getChannelRepository())->removeAll();
     EXPECT_NO_THROW(node_controller = std::make_unique<NodeController>(std::move(storage)););
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const AquireCommand>(
-        AquireCommand{CommandType::monitor,MessageSerType::json , "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
+        MonitorCommand{CommandType::monitor,MessageSerType::json , "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
 
     work_done.wait();
     // we need to have publish some message
@@ -264,13 +271,13 @@ TEST(NodeController, RandomCommand) {
     for (int idx = 0; idx < 100; idx++) {
         switch (random_num(0, 2)) {
         case 0: {
-            EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const AquireCommand>(
-                AquireCommand{CommandType::monitor, MessageSerType::json ,"pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+            EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const MonitorCommand>(
+                MonitorCommand{CommandType::monitor, MessageSerType::json ,"pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
             break;
         }
         case 1: {
-            EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const AquireCommand>(
-                AquireCommand{CommandType::monitor, MessageSerType::json ,"pva", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
+            EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const MonitorCommand>(
+                MonitorCommand{CommandType::monitor, MessageSerType::json ,"pva", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
             break;
         }
         case 2: {

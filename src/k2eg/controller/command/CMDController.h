@@ -27,7 +27,7 @@ DEFINE_PTR_TYPES(CMDControllerConfig)
  * Manage the received command, whe an exception is thrown by this method
  * the received message on the underline message bug consumer will be not committed
  */
-typedef std::function<void(CommandConstShrdPtrVec)> CMDControllerCommandHandler;
+typedef std::function<void(cmd::ConstCommandShrdPtrVec)> CMDControllerCommandHandler;
 
 /**
  * receive command and dispatch to other layer

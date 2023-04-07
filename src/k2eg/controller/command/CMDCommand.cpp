@@ -3,7 +3,7 @@
 #include <k2eg/service/log/ILogger.h>
 
 using namespace k2eg::controller::command;
-
+using namespace k2eg::controller::command::cmd;
 using namespace k2eg::service;
 using namespace k2eg::service::log;
 using namespace boost::json;
@@ -57,19 +57,19 @@ FieldValuesMapUPtr MapToCommand::checkFields(const object& obj, const std::vecto
     return result;
 }
 
-CommandConstShrdPtr MapToCommand::parse(const object& obj) {
+ConstCommandShrdPtr MapToCommand::parse(const object& obj) {
     auto logger = ServiceResolver<ILogger>::resolve();
 #ifdef __DEBUG__
     logger->logMessage("Received command: " + serialize(obj), LogLevel::DEBUG);
 #endif
-    CommandConstShrdPtr result = nullptr;
+    ConstCommandShrdPtr result = nullptr;
     switch (getCMDType(obj)) {
     case CommandType::monitor: {
         if (auto activation = obj.if_contains(KEY_ACTIVATE); activation != nullptr && activation->is_bool()) {
             if (activation->as_bool()) {
                 if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_CHANNEL_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
                     MessageSerType ser_type = MessageSerType::json;
-                    result = std::make_shared<AquireCommand>(AquireCommand{CommandType::monitor,
+                    result = std::make_shared<MonitorCommand>(MonitorCommand{CommandType::monitor,
                                                                            ser_type,
                                                                            std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
                                                                            std::any_cast<std::string>(fields->find(KEY_CHANNEL_NAME)->second),
@@ -81,8 +81,8 @@ CommandConstShrdPtr MapToCommand::parse(const object& obj) {
             } else {
                 if (auto fields = checkFields(obj, {{KEY_CHANNEL_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
                     result =
-                        std::make_shared<AquireCommand>(
-                            AquireCommand{
+                        std::make_shared<MonitorCommand>(
+                            MonitorCommand{
                                 CommandType::monitor, 
                                 MessageSerType::unknown, 
                                 "", 

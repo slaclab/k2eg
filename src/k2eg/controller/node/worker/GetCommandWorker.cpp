@@ -6,6 +6,7 @@
 
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::command;
+using namespace k2eg::controller::command::cmd;
 
 using namespace k2eg::service;
 using namespace k2eg::service::log;
@@ -34,7 +35,7 @@ GetCommandWorker::GetCommandWorker(EpicsServiceManagerShrdPtr epics_service_mana
     , publisher(ServiceResolver<IPublisher>::resolve())
     , epics_service_manager(epics_service_manager) {}
 
-void GetCommandWorker::processCommand(k2eg::controller::command::CommandConstShrdPtr command) {
+void GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
     if(command->type != CommandType::get) return;
     ConstGetCommandShrdPtr g_ptr = static_pointer_cast<const GetCommand>(command);
     auto channel_data = epics_service_manager->getChannelData(g_ptr->channel_name);
@@ -46,6 +47,4 @@ void GetCommandWorker::processCommand(k2eg::controller::command::CommandConstShr
     }
     return;
 }
-
-
 #pragma endregion GetCommandWorker

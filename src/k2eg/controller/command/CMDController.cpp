@@ -6,6 +6,7 @@
 
 using namespace k2eg::service;
 using namespace k2eg::controller::command;
+using namespace k2eg::controller::command::cmd;
 using namespace k2eg::service::log;
 using namespace k2eg::service::pubsub;
 
@@ -27,7 +28,7 @@ void CMDController::consume() {
         // fetch message
         subscriber->getMsg(received_message, configuration->max_message_to_fetch, configuration->fetch_time_out);
         if (received_message.size()) {
-            CommandConstShrdPtrVec result_vec;
+            ConstCommandShrdPtrVec result_vec;
             std::for_each(
                 received_message.begin(),
                 received_message.end(),

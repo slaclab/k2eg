@@ -17,7 +17,7 @@ struct ChannelMonitorType {
     std::string channel_destination;
 };
 
-inline ChannelMonitorType toChannelMonitor(const k2eg::controller::command::AquireCommand& acquire_command) {
+inline ChannelMonitorType toChannelMonitor(const k2eg::controller::command::cmd::MonitorCommand& acquire_command) {
     return ChannelMonitorType {
         .channel_name = acquire_command.channel_name, 
         .event_serialization = static_cast<std::uint8_t>(acquire_command.serialization),
@@ -26,10 +26,10 @@ inline ChannelMonitorType toChannelMonitor(const k2eg::controller::command::Aqui
     };
 }
 
-inline  k2eg::controller::command::CommandConstShrdPtr  fromChannelMonitor(const ChannelMonitorType& command) {
-    return std::make_shared<k2eg::controller::command::AquireCommand>(k2eg::controller::command::AquireCommand {
-        k2eg::controller::command::CommandType::monitor,
-         static_cast<k2eg::controller::command::MessageSerType>(command.event_serialization),
+inline  k2eg::controller::command::cmd::ConstCommandShrdPtr  fromChannelMonitor(const ChannelMonitorType& command) {
+    return std::make_shared<k2eg::controller::command::cmd::MonitorCommand>(k2eg::controller::command::cmd::MonitorCommand {
+        k2eg::controller::command::cmd::CommandType::monitor,
+         static_cast<k2eg::controller::command::cmd::MessageSerType>(command.event_serialization),
         command.channel_protocol,
         command.channel_name, 
         true,

@@ -22,6 +22,7 @@
 using namespace k2eg::common;
 
 using namespace k2eg::controller::command;
+using namespace k2eg::controller::command::cmd;
 
 using namespace k2eg::service;
 using namespace k2eg::service::log;
@@ -59,7 +60,7 @@ public:
 TEST(CMDController, CheckConfiguration) {
     int argc = 1;
     const char* argv[1] = {"epics-k2eg-test"};
-    CMDControllerCommandHandler handler = [](CommandConstShrdPtrVec received_command) {
+    CMDControllerCommandHandler handler = [](ConstCommandShrdPtrVec received_command) {
     };
     // set environment variable for test
     clearenv();
@@ -82,7 +83,7 @@ TEST(CMDController, CheckConfiguration) {
 TEST(CMDController, InitFaultCheckWithNoQueue) {
     int argc = 1;
     const char* argv[1] = {"epics-k2eg-test"};
-    CMDControllerCommandHandler handler = [](CommandConstShrdPtrVec received_command) {
+    CMDControllerCommandHandler handler = [](ConstCommandShrdPtrVec received_command) {
     };
     // set environment variable for test
     clearenv();
@@ -101,7 +102,7 @@ TEST(CMDController, InitFaultCheckWithNoQueue) {
 TEST(CMDController, StartStop) {
     int argc = 1;
     const char* argv[1] = {"epics-k2eg-test"};
-    CMDControllerCommandHandler handler = [](CommandConstShrdPtrVec received_command) {
+    CMDControllerCommandHandler handler = [](ConstCommandShrdPtrVec received_command) {
     };
     // set environment variable for test
     clearenv();
@@ -171,14 +172,14 @@ TEST_P(CMDControllerCommandTestParametrized, CheckCommand) {
 }
 
 //------------------------------ command tests -------------------------
-CMDControllerCommandHandler acquire_test = [](CommandConstShrdPtrVec received_command) {
+CMDControllerCommandHandler acquire_test = [](ConstCommandShrdPtrVec received_command) {
     ASSERT_EQ(received_command.size(), 1);
     ASSERT_EQ(received_command[0]->type, CommandType::monitor);
     ASSERT_EQ(received_command[0]->protocol.compare("pv"), 0);
     ASSERT_EQ(received_command[0]->channel_name.compare("channel::a"), 0);
-    ASSERT_EQ(reinterpret_cast<const AquireCommand*>(received_command[0].get())->activate, true);
+    ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->activate, true);
     ASSERT_EQ(
-        reinterpret_cast<const AquireCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"), 0);
+        reinterpret_cast<const MonitorCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"), 0);
 };
 boost::json::value acquire_json = {{KEY_COMMAND, "monitor"},
                                    {KEY_ACTIVATE, true},
@@ -186,7 +187,7 @@ boost::json::value acquire_json = {{KEY_COMMAND, "monitor"},
                                    {KEY_CHANNEL_NAME, "channel::a"},
                                    {KEY_DEST_TOPIC, "topic-dest"}};
 
-CMDControllerCommandHandler get_test = [](CommandConstShrdPtrVec received_command) {
+CMDControllerCommandHandler get_test = [](ConstCommandShrdPtrVec received_command) {
     ASSERT_EQ(received_command.size(), 1);
     ASSERT_EQ(received_command[0]->type, CommandType::get);
     ASSERT_EQ(received_command[0]->protocol.compare("pv"), 0);
@@ -197,7 +198,7 @@ CMDControllerCommandHandler get_test = [](CommandConstShrdPtrVec received_comman
 boost::json::value get_json = {
     {KEY_COMMAND, "get"}, {KEY_PROTOCOL, "pv"}, {KEY_CHANNEL_NAME, "channel::a"}, {KEY_DEST_TOPIC, "topic-dest"}};
 
-CMDControllerCommandHandler put_test = [](CommandConstShrdPtrVec received_command) {
+CMDControllerCommandHandler put_test = [](ConstCommandShrdPtrVec received_command) {
     ASSERT_EQ(received_command.size(), 1);
     ASSERT_EQ(received_command[0]->type, CommandType::put);
     ASSERT_EQ(received_command[0]->protocol.compare("pv"), 0);
@@ -207,7 +208,7 @@ CMDControllerCommandHandler put_test = [](CommandConstShrdPtrVec received_comman
 boost::json::value put_json = {
     {KEY_COMMAND, "put"}, {KEY_PROTOCOL, "pv"}, {KEY_CHANNEL_NAME, "channel::a"}, {KEY_VALUE, "set-value"}};
 
-CMDControllerCommandHandler info_test = [](CommandConstShrdPtrVec received_command) {
+CMDControllerCommandHandler info_test = [](ConstCommandShrdPtrVec received_command) {
     ASSERT_EQ(received_command.size(), 1);
     ASSERT_EQ(received_command[0]->type, CommandType::info);
     ASSERT_EQ(received_command[0]->protocol.compare("pv"), 0);
@@ -222,7 +223,7 @@ boost::json::value info_json = {
 boost::json::value bad_acquire_command = {
     {KEY_COMMAND, "monitor"}, {KEY_PROTOCOL, "pv"}, {"destination", "topic-dest"}};
 
-CMDControllerCommandHandler dummy_receiver = [](CommandConstShrdPtrVec received_command) {
+CMDControllerCommandHandler dummy_receiver = [](ConstCommandShrdPtrVec received_command) {
 };
 
 using random_bytes_engine = std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned char>;
