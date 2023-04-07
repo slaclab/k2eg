@@ -12,6 +12,7 @@ COPY test /opt/app/test
 COPY tools /opt/app/tools
 COPY k2eg.h.in /opt/app/
 COPY CMakeLists.txt /opt/app/
+COPY configuration/coverage.cmake /opt/app/configuration/coverage.cmake
 
 RUN mkdir /opt/app/build && cd /opt/app/build && cmake -DCMAKE_BUILD_TYPE=Release .. && make install
 
