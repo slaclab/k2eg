@@ -1,7 +1,7 @@
 #ifndef K2EG_SERVICE_EPICS_JSONSERIALIZATION_H_
 #define K2EG_SERVICE_EPICS_JSONSERIALIZATION_H_
 
-#include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/epics/Serialization.h>
 #include <string>
 namespace k2eg::service::epics_impl {
 
@@ -12,7 +12,7 @@ public:
     virtual ~JsonSerializer() = default;
     ConstSerializedMessageUPtr serialize(const ChannelData& message);
 };
-
+DEFINE_PTR_TYPES(JsonSerializer)
 // Serialization message for json encoding
 class JsonMessage : public SerializedMessage {
     friend class JsonSerializer;

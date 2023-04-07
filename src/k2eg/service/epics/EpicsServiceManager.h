@@ -3,6 +3,7 @@
 #include <k2eg/common/types.h>
 #include <k2eg/common/broadcaster.h>
 #include <k2eg/service/epics/EpicsChannel.h>
+#include <k2eg/service/epics/Serialization.h>
 #include <functional>
 #include <map>
 #include <memory>

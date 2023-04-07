@@ -1,4 +1,4 @@
-#include <k2eg/service/epics/JsonSerializer.h>
+#include <k2eg/service/epics/JsonSerialization.h>
 
 #include <pv/bitSet.h>
 #include <pv/json.h>

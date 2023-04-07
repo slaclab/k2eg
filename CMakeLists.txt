@@ -23,6 +23,7 @@ set(LIBLZ4_VERSION v1.9.2)
 set(LIBRDKAFKA_VERSION v2.0.2)
 set(SQLITE_VERSION version-3.41.2)
 set(SQLITEORM_VERSION v1.8.2)
+set(MSGPACK_VERSION cpp-6.0.0)
 set(GTEST_VERSION 1.8.0)
 
 # set(PROTOBUF_VERSION v22.0)
@@ -50,7 +51,8 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/epics/EpicsData.cpp
   src/k2eg/service/epics/EpicsChannel.cpp
   src/k2eg/service/epics/EpicsServiceManager.cpp
-  src/k2eg/service/epics/JsonSerializer.cpp
+  src/k2eg/service/epics/JsonSerialization.cpp
+  src/k2eg/service/epics/MsgPackSerialization.cpp
 
   src/k2eg/service/pubsub/IPublisher.cpp
   src/k2eg/service/pubsub/ISubscriber.cpp
@@ -284,6 +286,31 @@ ADD_DEPENDENCIES(sqlite_orm sqlite_dist)
 SET(BUILD_LIBRARY ${BUILD_LIBRARY} sqlite3)
 ADD_DEPENDENCIES(${PROJECT_NAME} sqlite_orm sqlite_dist)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test sqlite_orm sqlite_dist)
+
+# -------- Mesgpack -----------
+MESSAGE(STATUS "Configure messagepack version ${MSGPACK_VERSION}")
+ExternalProject_Add(
+  msgpack
+  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/msgpack
+  GIT_REPOSITORY https://github.com/msgpack/msgpack-c.git
+  GIT_TAG ${MSGPACK_VERSION}
+  GIT_PROGRESS 1
+  LOG_DOWNLOAD 1
+  LOG_UPDATE 1
+  LOG_CONFIGURE 1
+  LOG_BUILD 1
+  LOG_INSTALL 1
+  CMAKE_ARGS
+  -DMSGPACK_USE_BOOST=ON
+  -DMSGPACK_CXX20=ON
+  -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+)
+SET(BUILD_LIBRARY ${BUILD_LIBRARY})
+ADD_DEPENDENCIES(msgpack boost)
+ADD_DEPENDENCIES(${PROJECT_NAME} msgpack)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test msgpack)
 
 # --------Google Test------
 message(STATUS "Setup GTest version ${GTEST_VERSION}")

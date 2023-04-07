@@ -44,8 +44,8 @@ std::optional<ChannelMonitorTypeUPtr> ChannelRepository::getChannelMonitor(
     auto result =
         data_storage.getLockedStorage().get()->get_all_pointer<ChannelMonitorType>(
             where(c(&ChannelMonitorType::channel_name) == channel_descirption.channel_name
-                  and c(&ChannelMonitorType::channel_protocol)
-                          == channel_descirption.channel_protocol
+                //   and c(&ChannelMonitorType::channel_protocol)
+                //           == channel_descirption.channel_protocol
                   and c(&ChannelMonitorType::channel_destination)
                           == channel_descirption.channel_destination));
     return (result.size() == 0)
