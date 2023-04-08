@@ -2,6 +2,7 @@
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <gtest/gtest.h>
 #include <msgpack.hpp>
+#include <sstream>
 
 using namespace k2eg::service::epics_impl;
 
@@ -35,6 +36,6 @@ TEST(Epics, SerializationMsgpack) {
     EXPECT_NE(ser_value, nullptr);
     EXPECT_NE(ser_value->data(), nullptr);
     EXPECT_NE(ser_value->size(), 0);
-    msgpack::unpack(result, ser_value->data(), ser_value->size(), off);
-    msgpack::object obj(result.get());
-}
+    EXPECT_NO_THROW(msgpack::unpack(result, ser_value->data(), ser_value->size(), off););
+    EXPECT_NO_THROW(msgpack::object obj(result.get()););
+    EXPECT_EQ(off, 0);
