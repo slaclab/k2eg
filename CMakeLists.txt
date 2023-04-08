@@ -102,6 +102,7 @@ set(TEST_SOURCE_FILES
   test/k2eg.cpp
   test/data/DataStorage.cpp
   test/epics/epics.cpp
+  test/epics/epics_data_serialization.cpp
   test/pubsub/kafka.cpp
   test/common/ProgramOptions.cpp
   test/controller/CMDController.cpp
@@ -303,6 +304,7 @@ ExternalProject_Add(
   CMAKE_ARGS
   -DMSGPACK_USE_BOOST=ON
   -DMSGPACK_CXX20=ON
+  -DMSGPACK_USE_CPP03=ON
   -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
   -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
   -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}

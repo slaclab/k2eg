@@ -29,19 +29,6 @@ TEST(Epics, ChannelOKWithAddress) {
     EXPECT_NE(val, nullptr);
 }
 
-TEST(Epics, ChannelOKSerialize) {
-    EpicsChannelUPtr pc;
-    ConstChannelDataUPtr val;
-    EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>("pva", "variable:sum", "epics"););
-    EXPECT_NO_THROW(pc->connect());
-    EXPECT_NO_THROW(val = pc->getChannelData(););
-    auto json_ser = serialize(*val, SerializationType::JSON);
-    EXPECT_NE(json_ser, nullptr);
-    EXPECT_NE(json_ser->data(), nullptr);
-    EXPECT_NE(json_ser->size(), 0);
-    std::string json(json_ser->data(), json_ser->size());
-}
-
 bool retry_eq(const EpicsChannel& channel, const std::string& name, double value, int mseconds, int retry_times) {
     for (int times = retry_times; times != 0; times--) {
         auto val = channel.getData();

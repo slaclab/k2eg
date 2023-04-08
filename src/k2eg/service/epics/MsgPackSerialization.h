@@ -9,6 +9,7 @@ namespace k2eg::service::epics_impl {
 class MsgPackSerializer : public Serializer {
     void processScalar(const epics::pvData::PVScalar* scalar, msgpack::packer<msgpack::sbuffer>& packer);
     void processScalarArray(const epics::pvData::PVScalarArray* scalarArray, msgpack::packer<msgpack::sbuffer>& packer);
+    void processStructure(const epics::pvData::PVStructure* scalarArray, msgpack::packer<msgpack::sbuffer>& packer);
 public:
     MsgPackSerializer() = default;
     virtual ~MsgPackSerializer() = default;
@@ -18,11 +19,9 @@ DEFINE_PTR_TYPES(MsgPackSerializer)
 // Serialization message for json encoding
 class MsgPackMessage : public SerializedMessage {
     friend class MsgPackSerializer;
-    msgpack::sbuffer msgpack_buffer;
-    MsgPackMessage(msgpack::sbuffer msgpack_buffer);
-
+    msgpack::sbuffer buf;
 public:
-    MsgPackMessage() = delete;
+    MsgPackMessage() = default;
     ~MsgPackMessage() = default;
     const size_t size() const;
     const char* data() const;

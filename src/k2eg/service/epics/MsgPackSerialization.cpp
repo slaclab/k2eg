@@ -5,52 +5,27 @@
 
 using namespace k2eg::service::epics_impl;
 
-using namespace msgpack;
 namespace pvd = epics::pvData;
 
-#pragma region JsonMessage
-MsgPackMessage::MsgPackMessage(msgpack::sbuffer msgpack_buffer)
-    : msgpack_buffer(std::move(msgpack_buffer)) {}
+#pragma region MsgPackMessage
+const size_t MsgPackMessage::size() const { return buf.size(); }
+const char* MsgPackMessage::data() const { return buf.data(); }
+#pragma endregion MsgPackMessage
 
-const size_t MsgPackMessage::size() const { return msgpack_buffer.size(); }
-const char* MsgPackMessage::data() const { return msgpack_buffer.data(); }
-#pragma endregion JsonMessage
-
-#pragma region JsonSerializer
-REGISTER_SERIALIZER(SerializationType::MessagePack, MsgPackSerializer)
+#pragma region MsgPackSerializer
+REGISTER_SERIALIZER(SerializationType::MsgPack, MsgPackSerializer)
 ConstSerializedMessageUPtr MsgPackSerializer::serialize(const ChannelData& message) {
-    sbuffer sbuf;
-    msgpack::packer<msgpack::sbuffer> packer(&sbuf);
+    MsgPackMessageUPtr result = MakeMsgPackMessageUPtr();
+    msgpack::packer<msgpack::sbuffer> packer(&result->buf);
 
-    const pvd::StructureConstPtr& type = message.data->getStructure();
-    const pvd::PVFieldPtrArray& children = message.data->getPVFields();
-    const pvd::StringArray& names = type->getFieldNames();
-
-    // init map
-    packer.pack_map(names.size());
-
-    for (size_t i = 0, N = names.size(); i < N; i++) {
-        auto const& fld = children[i].get();
-
-        // pack key
-        packer.pack(std::string_view(names[i]));
-
-        switch (fld->getField()->getType()) {
-        case pvd::Type::scalar: {
-            processScalar(static_cast<const pvd::PVScalar*>(fld), packer);
-            break;
-        }
-        case pvd::Type::scalarArray: {
-            processScalarArray(static_cast<const pvd::PVScalarArray*>(fld), packer);
-            break;
-        }
-        }
-    }
+    // porcess root structure
+    processStructure(message.data.get(), packer);
 
     // std::tuple<int, std::string_view, msgpack::type::raw_ref> data(idx, "example", msgpack::type::raw_ref(buffer.get(), buffer_size));
     // packer.pack_map std::cout << "Index " << idx << "\t\r" << std::flush;
-    return nullptr;
+    return std::move(result);
 }
+
 
 void MsgPackSerializer::processScalar(const pvd::PVScalar* scalar, msgpack::packer<msgpack::sbuffer>& packer) {
     switch (scalar->getScalar()->getScalarType()) {
@@ -162,4 +137,36 @@ void MsgPackSerializer::processScalarArray(const pvd::PVScalarArray* scalarArray
     // }
     //}
 }
-#pragma endregion JsonSerializer
+
+void MsgPackSerializer::processStructure(const epics::pvData::PVStructure* structure, msgpack::packer<msgpack::sbuffer>& packer) {
+    const pvd::StructureConstPtr& type = structure->getStructure();
+    const pvd::PVFieldPtrArray& children = structure->getPVFields();
+    const pvd::StringArray& names = type->getFieldNames();
+
+    // init map
+    packer.pack_map(names.size());
+
+    for (size_t i = 0, N = names.size(); i < N; i++) {
+        auto const& fld = children[i].get();
+
+        // pack key
+        packer.pack(std::string_view(names[i]));
+        auto type = fld->getField()->getType();
+        switch (type) {
+        case pvd::Type::scalar: {
+            processScalar(static_cast<const pvd::PVScalar*>(fld), packer);
+            break;
+        }
+        case pvd::Type::scalarArray: {
+            processScalarArray(static_cast<const pvd::PVScalarArray*>(fld), packer);
+            break;
+        }
+        case pvd::Type::structure: {
+            processStructure(static_cast<const pvd::PVStructure*>(fld), packer);
+            break;
+        }
+        }
+    }
+}
+
+#pragma endregion MsgPackSerializer
