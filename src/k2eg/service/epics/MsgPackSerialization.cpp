@@ -8,6 +8,8 @@ using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;
 
 #pragma region MsgPackMessage
+MsgPackMessage::MsgPackMessage(epics::pvData::PVStructure::const_shared_pointer):
+epics_pvstructure(std::move(epics_pvstructure)) {}
 const size_t MsgPackMessage::size() const { return buf.size(); }
 const char* MsgPackMessage::data() const { return buf.data(); }
 #pragma endregion MsgPackMessage
@@ -15,17 +17,15 @@ const char* MsgPackMessage::data() const { return buf.data(); }
 #pragma region MsgPackSerializer
 REGISTER_SERIALIZER(SerializationType::MsgPack, MsgPackSerializer)
 ConstSerializedMessageUPtr MsgPackSerializer::serialize(const ChannelData& message) {
-    MsgPackMessageUPtr result = MakeMsgPackMessageUPtr();
+    auto result = MakeMsgPackMessageUPtr(std::move(message.data));
     msgpack::packer<msgpack::sbuffer> packer(&result->buf);
-
-    // porcess root structure
+    // add channel message
+    packer.pack_map(1);
+    packer.pack(std::string_view(message.channel_name));
+    // process root structure
     processStructure(message.data.get(), packer);
-
-    // std::tuple<int, std::string_view, msgpack::type::raw_ref> data(idx, "example", msgpack::type::raw_ref(buffer.get(), buffer_size));
-    // packer.pack_map std::cout << "Index " << idx << "\t\r" << std::flush;
     return std::move(result);
 }
-
 
 void MsgPackSerializer::processScalar(const pvd::PVScalar* scalar, msgpack::packer<msgpack::sbuffer>& packer) {
     switch (scalar->getScalar()->getScalarType()) {

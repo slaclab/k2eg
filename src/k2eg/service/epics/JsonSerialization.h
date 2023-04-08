@@ -3,10 +3,14 @@
 
 #include <k2eg/service/epics/Serialization.h>
 #include <string>
+#include <boost/json.hpp>
 namespace k2eg::service::epics_impl {
 
 // JSON serializer
 class JsonSerializer : public Serializer {
+    void processScalar(const epics::pvData::PVScalar* scalar, const std::string& key, boost::json::object& json_object);
+    void processScalarArray(const epics::pvData::PVScalarArray* scalarArray,const std::string& key,  boost::json::object& json_object);
+    void processStructure(const epics::pvData::PVStructure* scalarArray,const std::string& key,  boost::json::object& json_object);
 public:
     JsonSerializer() = default;
     virtual ~JsonSerializer() = default;

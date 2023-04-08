@@ -20,7 +20,9 @@ DEFINE_PTR_TYPES(MsgPackSerializer)
 class MsgPackMessage : public SerializedMessage {
     friend class MsgPackSerializer;
     msgpack::sbuffer buf;
+    epics::pvData::PVStructure::const_shared_pointer epics_pvstructure;
 public:
+    MsgPackMessage(epics::pvData::PVStructure::const_shared_pointer);
     MsgPackMessage() = default;
     ~MsgPackMessage() = default;
     const size_t size() const;
