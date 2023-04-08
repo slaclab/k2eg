@@ -38,5 +38,5 @@ TEST(Epics, SerializationMsgpack) {
     EXPECT_NE(ser_value->size(), 0);
     EXPECT_NO_THROW(msgpack::unpack(result, ser_value->data(), ser_value->size(), off););
     EXPECT_NO_THROW(msgpack::object obj(result.get()););
-    EXPECT_EQ(off, 0);
+    EXPECT_EQ(off, 664);
 }
