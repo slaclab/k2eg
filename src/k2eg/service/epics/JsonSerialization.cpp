@@ -52,11 +52,21 @@ void JsonSerializer::processScalar(const pvd::PVScalar* scalar, const std::strin
         break;
     }
     case pvd::ScalarType::pvDouble: {
-        json_object[key] = scalar->getAs<double>();
+        const double double_value = scalar->getAs<double>();
+        if(std::isnan(double_value)) {
+            json_object[key] = "NaN";
+        } else {
+            json_object[key] = double_value;
+        }
         break;
     }
     case pvd::ScalarType::pvFloat: {
-        json_object[key] = scalar->getAs<float>();
+        const float float_value = scalar->getAs<float>();
+        if(std::isnan(float_value)) {
+            json_object[key] = "NaN";
+        } else {
+            json_object[key] = float_value;
+        }
         break;
     }
     case pvd::ScalarType::pvInt: {
