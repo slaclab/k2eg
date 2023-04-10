@@ -29,7 +29,7 @@ SerializedMessageShrdPtr MsgPackSerializer::serialize(const ChannelData& message
     //processStructure(message.data.get(), packer);
      size_t off;
     msgpack::object_handle msg_hndl;
-    msgpack::unpack(msg_hndl, sub_packer.data(), sub_packer.size(), off);
+    msgpack::unpack(msg_hndl, sbuf.data(), sbuf.size(), off);
 
     std::cout << result.get();
     return result;
