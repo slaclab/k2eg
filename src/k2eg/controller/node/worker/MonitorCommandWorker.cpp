@@ -17,12 +17,11 @@ using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::pubsub;
 
 #pragma region MonitorMessage
-MonitorMessage::MonitorMessage(const std::string& queue, ConstMonitorEventShrdPtr monitor_event)
+MonitorMessage::MonitorMessage(const std::string& queue, ConstMonitorEventShrdPtr monitor_event, ConstSerializedMessageShrdPtr message)
     : request_type("monitor")
     , monitor_event(monitor_event)
     , queue(queue)
-    , message(serialize(this->monitor_event->channel_data, SerializationType::JSON)) {}
-
+    , message(message) {}
 char* MonitorMessage::getBufferPtr() { return const_cast<char*>(message->data()); }
 const size_t MonitorMessage::getBufferSize() { return message->size(); }
 const std::string& MonitorMessage::getQueue() { return queue; }
@@ -50,15 +49,17 @@ void MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
         if (a_ptr->activate) {
             // add topic to channel
             // check if the topic is already present[fault tollerant check]
-            if (std::find(std::begin(vec_ref), std::end(vec_ref), a_ptr->destination_topic) == std::end(vec_ref)) {
+            if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&a_ptr](auto& info_topic) { return info_topic->dest_topic.compare(a_ptr->destination_topic) == 0; }) == std::end(vec_ref)) {
                 std::unique_lock lock(channel_map_mtx);
-                channel_topics_map[a_ptr->channel_name].push_back(a_ptr->destination_topic);
+                channel_topics_map[a_ptr->channel_name].push_back(MakeChannelTopicMonitorInfoShrdPtr(ChannelTopicMonitorInfo{.dest_topic = a_ptr->destination_topic, .ser_type = a_ptr->serialization})
+
+                );
             } else {
                 logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated", a_ptr->channel_name % a_ptr->destination_topic));
             }
         } else {
             // remove topic to channel
-            auto itr = std::find(std::begin(vec_ref), std::end(vec_ref), a_ptr->destination_topic);
+            auto itr = std::find_if(std::begin(vec_ref), std::end(vec_ref), [&a_ptr](auto& info_topic) { return info_topic->dest_topic.compare(a_ptr->destination_topic) == 0; });
             if (itr != std::end(vec_ref)) {
                 std::unique_lock lock(channel_map_mtx);
                 vec_ref.erase(itr);
@@ -77,12 +78,24 @@ void MonitorCommandWorker::epicsMonitorEvent(const MonitorEventVecShrdPtr& event
     logger->logMessage(STRING_FORMAT("Received epics monitor %1% events", event_data->size()), LogLevel::TRACE);
 #endif
     std::shared_lock slock(channel_map_mtx);
-    for (auto& e: *event_data) {
+    // cache the varius serilized message for each serializaiton type
+    std::map<MessageSerType, ConstSerializedMessageShrdPtr> local_serialization_cache;
+    for (auto& event: *event_data) {
         // publisher
-        if (e->type != MonitorType::Data) continue;
-        for (auto& topic: channel_topics_map[e->channel_data.channel_name]) {
-            logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", e->channel_data.channel_name % topic), LogLevel::TRACE);
-            publisher->pushMessage(std::make_unique<MonitorMessage>(topic, e));
+        if (event->type != MonitorType::Data) continue;
+        for (auto& info_topic: channel_topics_map[event->channel_data.channel_name]) {
+            logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", event->channel_data.channel_name % info_topic->dest_topic), LogLevel::TRACE);
+            if (!local_serialization_cache.contains(info_topic->ser_type)) {
+                // cache new serialized message
+                local_serialization_cache[info_topic->ser_type] = serialize(event->channel_data, static_cast<SerializationType>(info_topic->ser_type));
+            }
+
+            publisher->pushMessage(
+                MakeMonitorMessageUPtr(
+                    info_topic->dest_topic, event, 
+                    local_serialization_cache[info_topic->ser_type]
+                    )
+           );
         }
     }
     publisher->flush(100);

@@ -13,16 +13,16 @@ class MsgPackSerializer : public Serializer {
 public:
     MsgPackSerializer() = default;
     virtual ~MsgPackSerializer() = default;
-    ConstSerializedMessageUPtr serialize(const ChannelData& message);
+    SerializedMessageShrdPtr serialize(const ChannelData& message);
 };
 DEFINE_PTR_TYPES(MsgPackSerializer)
 // Serialization message for json encoding
 class MsgPackMessage : public SerializedMessage {
     friend class MsgPackSerializer;
     msgpack::sbuffer buf;
-    epics::pvData::PVStructure::const_shared_pointer epics_pvstructure;
+    epics::pvData::PVStructure::const_shared_pointer epics_pv_struct;
 public:
-    MsgPackMessage(epics::pvData::PVStructure::const_shared_pointer);
+    MsgPackMessage(epics::pvData::PVStructure::const_shared_pointer epics_pv_struct);
     MsgPackMessage() = default;
     ~MsgPackMessage() = default;
     const size_t size() const;

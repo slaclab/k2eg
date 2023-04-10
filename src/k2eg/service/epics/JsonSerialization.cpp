@@ -22,7 +22,7 @@ const char* JsonMessage::data() const {
 
 #pragma region JsonSerializer
 REGISTER_SERIALIZER(SerializationType::JSON, JsonSerializer)
-ConstSerializedMessageUPtr JsonSerializer::serialize(const ChannelData& message) {
+SerializedMessageShrdPtr JsonSerializer::serialize(const ChannelData& message) {
     std::stringstream ss;
     boost::json::object json_root_object;
     processStructure(message.data.get(), message.channel_name, json_root_object);
@@ -38,7 +38,7 @@ ConstSerializedMessageUPtr JsonSerializer::serialize(const ChannelData& message)
     // epics::pvData::printJSON(ss, *message.data, bs_mask, opt);
     // ss << "}";
     ss << json_root_object;
-    return MakeJsonMessageUPtr(std::move(ss.str()));
+    return MakeJsonMessageShrdPtr(std::move(ss.str()));
 }
 
 void JsonSerializer::processScalar(const pvd::PVScalar* scalar, const std::string& key, boost::json::object& json_object) {

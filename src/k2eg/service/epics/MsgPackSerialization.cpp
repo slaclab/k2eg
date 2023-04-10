@@ -8,23 +8,31 @@ using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;
 
 #pragma region MsgPackMessage
-MsgPackMessage::MsgPackMessage(epics::pvData::PVStructure::const_shared_pointer):
-epics_pvstructure(std::move(epics_pvstructure)) {}
+MsgPackMessage::MsgPackMessage(epics::pvData::PVStructure::const_shared_pointer epics_pv_struct):
+epics_pv_struct(epics_pv_struct) {}
 const size_t MsgPackMessage::size() const { return buf.size(); }
 const char* MsgPackMessage::data() const { return buf.data(); }
 #pragma endregion MsgPackMessage
 
 #pragma region MsgPackSerializer
 REGISTER_SERIALIZER(SerializationType::MsgPack, MsgPackSerializer)
-ConstSerializedMessageUPtr MsgPackSerializer::serialize(const ChannelData& message) {
-    auto result = MakeMsgPackMessageUPtr(std::move(message.data));
-    msgpack::packer<msgpack::sbuffer> packer(&result->buf);
+SerializedMessageShrdPtr MsgPackSerializer::serialize(const ChannelData& message) {
+    auto result = MakeMsgPackMessageShrdPtr(message.data);
+    msgpack::packer<msgpack::sbuffer> packer(result->buf);
+    msgpack::sbuffer sbuf;
+    msgpack::packer<msgpack::sbuffer> sub_packer(sbuf);
     // add channel message
-    packer.pack_map(1);
-    packer.pack(std::string_view(message.channel_name));
+    sub_packer.pack_map(1);
+    sub_packer.pack(message.channel_name);
+    sub_packer.pack("message.channel_name");
     // process root structure
-    processStructure(message.data.get(), packer);
-    return std::move(result);
+    //processStructure(message.data.get(), packer);
+     size_t off;
+    msgpack::object_handle msg_hndl;
+    msgpack::unpack(msg_hndl, sub_packer.data(), sub_packer.size(), off);
+
+    std::cout << result.get();
+    return result;
 }
 
 void MsgPackSerializer::processScalar(const pvd::PVScalar* scalar, msgpack::packer<msgpack::sbuffer>& packer) {
@@ -148,21 +156,26 @@ void MsgPackSerializer::processStructure(const epics::pvData::PVStructure* struc
 
     for (size_t i = 0, N = names.size(); i < N; i++) {
         auto const& fld = children[i].get();
-
         // pack key
         packer.pack(std::string_view(names[i]));
         auto type = fld->getField()->getType();
         switch (type) {
         case pvd::Type::scalar: {
+            std::cout << "scalar:" << names[i] << std::endl;
             processScalar(static_cast<const pvd::PVScalar*>(fld), packer);
             break;
         }
         case pvd::Type::scalarArray: {
+            std::cout << "scalarArray:" << names[i] << std::endl;
             processScalarArray(static_cast<const pvd::PVScalarArray*>(fld), packer);
             break;
         }
         case pvd::Type::structure: {
+            std::cout << "structure:" << names[i] << std::endl;
             processStructure(static_cast<const pvd::PVStructure*>(fld), packer);
+            break;
+        }
+        case pvd::Type::structureArray: {
             break;
         }
         }

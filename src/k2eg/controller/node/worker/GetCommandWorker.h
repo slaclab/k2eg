@@ -12,11 +12,12 @@ class GetMessage : public k2eg::service::pubsub::PublishMessage {
     const std::string request_type;
     const std::string destination_topic;
     k2eg::service::epics_impl::ConstChannelDataUPtr channel_data;
-    const k2eg::service::epics_impl::ConstSerializedMessageUPtr message;
+    const k2eg::service::epics_impl::ConstSerializedMessageShrdPtr message;
 public:
     GetMessage(
         const std::string& destination_topic,
-    k2eg::service::epics_impl::ConstChannelDataUPtr channel_data);
+    k2eg::service::epics_impl::ConstChannelDataUPtr channel_data,
+    k2eg::service::epics_impl::SerializationType ser_type = k2eg::service::epics_impl::SerializationType::JSON);
     virtual ~GetMessage() = default;
     char* getBufferPtr();
     const size_t getBufferSize();

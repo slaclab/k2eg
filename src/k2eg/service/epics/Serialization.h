@@ -19,7 +19,7 @@ DEFINE_PTR_TYPES(SerializedMessage);
 // base serializer class
 class Serializer {
 public:
-    virtual ConstSerializedMessageUPtr serialize(const ChannelData& message) = 0;
+    virtual SerializedMessageShrdPtr serialize(const ChannelData& message) = 0;
 };
 DEFINE_PTR_TYPES(Serializer)
 
@@ -27,10 +27,10 @@ DEFINE_PTR_TYPES(Serializer)
 inline k2eg::common::ObjectByTypeFactory<SerializationType, Serializer> epics_serializer_factory;
 
 // serilizer entry point
-inline ConstSerializedMessageUPtr serialize(const ChannelData& message, SerializationType type) {
+inline ConstSerializedMessageShrdPtr serialize(const ChannelData& message, SerializationType type) {
     // check if serilizer is present
     if (!epics_serializer_factory.hasType(type)) {
-        return ConstSerializedMessageUPtr();
+        return ConstSerializedMessageShrdPtr();
     }
     return epics_serializer_factory.resolve(type)->serialize(message) ;
 }

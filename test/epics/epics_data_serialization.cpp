@@ -9,7 +9,7 @@ using namespace k2eg::service::epics_impl;
 TEST(Epics, SerializationJSON) {
     EpicsChannelUPtr pc;
     ConstChannelDataUPtr value;
-    ConstSerializedMessageUPtr ser_value;
+    ConstSerializedMessageShrdPtr ser_value;
 
     EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>("pva", "variable:sum"););
     EXPECT_NO_THROW(pc->connect());
@@ -26,7 +26,7 @@ TEST(Epics, SerializationJSON) {
 TEST(Epics, SerializationMsgpack) {
     EpicsChannelUPtr pc;
     ConstChannelDataUPtr value;
-    ConstSerializedMessageUPtr ser_value;
+    ConstSerializedMessageShrdPtr ser_value;
     msgpack::object_handle result;
     std::size_t off = 0;
     EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>("pva", "variable:sum"););

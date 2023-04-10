@@ -14,7 +14,7 @@ class JsonSerializer : public Serializer {
 public:
     JsonSerializer() = default;
     virtual ~JsonSerializer() = default;
-    ConstSerializedMessageUPtr serialize(const ChannelData& message);
+    SerializedMessageShrdPtr serialize(const ChannelData& message);
 };
 DEFINE_PTR_TYPES(JsonSerializer)
 // Serialization message for json encoding

@@ -16,11 +16,11 @@ using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::pubsub;
 
 #pragma region GetMessage
-GetMessage::GetMessage(const std::string& destination_topic, ConstChannelDataUPtr channel_data)
+GetMessage::GetMessage(const std::string& destination_topic, ConstChannelDataUPtr channel_data, SerializationType ser_type)
     : request_type("get")
     , destination_topic(destination_topic)
     , channel_data(std::move(channel_data))
-    , message(serialize(*this->channel_data, SerializationType::JSON)) {}
+    , message(serialize(*this->channel_data, ser_type)) {}
 
 char* GetMessage::getBufferPtr() { return const_cast<char*>(message->data()); }
 const size_t GetMessage::getBufferSize() { return message->size(); }
