@@ -183,6 +183,7 @@ CMDControllerCommandHandler acquire_test = [](ConstCommandShrdPtrVec received_co
 };
 boost::json::value acquire_json = {{KEY_COMMAND, "monitor"},
                                    {KEY_ACTIVATE, true},
+                                   {KEY_SERIALIZATION, "json"},
                                    {KEY_PROTOCOL, "pv"},
                                    {KEY_CHANNEL_NAME, "channel::a"},
                                    {KEY_DEST_TOPIC, "topic-dest"}};

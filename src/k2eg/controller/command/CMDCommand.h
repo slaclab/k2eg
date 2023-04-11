@@ -50,6 +50,7 @@ static const std::string to_json_string(cmd::ConstCommandShrdPtr c) {
  * class that help to map the json structure to a command
  */
 class MapToCommand {
+    static k2eg::controller::command::cmd::MessageSerType getSerializationType(const  boost::json::value& v);
     /**
      * Extract the command type
      */

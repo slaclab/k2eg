@@ -74,7 +74,7 @@ int random_num(int min, int max) {
 }
 #ifdef __linux__
 
-std::unique_ptr<NodeController> initBackend(IPublisherShrdPtr pub) {
+std::unique_ptr<NodeController> initBackend(IPublisherShrdPtr pub, bool clear_data = true) {
     int argc = 1;
     const char* argv[1] = {"epics-k2eg-test"};
     clearenv();
@@ -85,7 +85,7 @@ std::unique_ptr<NodeController> initBackend(IPublisherShrdPtr pub) {
     ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>());
     ServiceResolver<IPublisher>::registerService(pub);
     DataStorageUPtr storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");
-    toShared(storage->getChannelRepository())->removeAll();
+    if(clear_data){toShared(storage->getChannelRepository())->removeAll();}
     return std::make_unique<NodeController>(std::move(storage));
 }
 
@@ -104,10 +104,9 @@ boost::json::object getJsonObject(PublishMessage& published_message) {
     return result;
 }
  msgpack::object getMsgPackObject(PublishMessage& published_message) {
-    size_t off;
-    msgpack::object_handle result;
-    msgpack::unpack(result, published_message.getBufferPtr(), published_message.getBufferSize(), off);
-    return result.get();
+    msgpack::unpacked msg_upacked;
+    msgpack::unpack(msg_upacked, published_message.getBufferPtr(), published_message.getBufferSize());
+    return msg_upacked.get();
 }
 
 TEST(NodeController, MonitorCommandJsonSerByDefault) {
@@ -167,25 +166,10 @@ TEST(NodeController, MonitorCommandMsgPackSer) {
 }
 
 TEST(NodeController, MonitorCommandAfterReboot) {
-    int argc = 1;
-    const char* argv[1] = {"epics-k2eg-test"};
-    DataStorageUPtr storage;
-    std::unique_ptr<NodeController> node_controller;
     std::latch work_done{1};
     std::latch work_done_2{1};
-    // set environment variable for test
-    clearenv();
-    setenv("EPICS_k2eg_log-on-console", "false", 1);
-    std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
-    ASSERT_NO_THROW(opt->parse(argc, argv));
-    // configure the services
-    ASSERT_NO_THROW(ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration())););
-    ASSERT_NO_THROW(ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>()););
-    ASSERT_NO_THROW(ServiceResolver<IPublisher>::registerService(std::make_shared<DummyPublisher>(work_done)););
 
-    EXPECT_NO_THROW(storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite"););
-    toShared(storage->getChannelRepository())->removeAll();
-    EXPECT_NO_THROW(node_controller = std::make_unique<NodeController>(std::move(storage)););
+    auto node_controller = initBackend(std::make_shared<DummyPublisher>(work_done));
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, MessageSerType::json, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
 
@@ -195,52 +179,26 @@ TEST(NodeController, MonitorCommandAfterReboot) {
     EXPECT_NE(published, 0);
 
     // stop the node controller
-    node_controller.reset();
-    EXPECT_NO_THROW(ServiceResolver<IPublisher>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<EpicsServiceManager>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<ILogger>::resolve().reset(););
+    deinitBackend(std::move(node_controller));
 
-    // reboot
-    ASSERT_NO_THROW(ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration())););
-    ASSERT_NO_THROW(ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>()););
-    ASSERT_NO_THROW(ServiceResolver<IPublisher>::registerService(std::make_shared<DummyPublisher>(work_done_2)););
-    EXPECT_NO_THROW(storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite"););
-    EXPECT_NO_THROW(node_controller = std::make_unique<NodeController>(std::move(storage)););
-    EXPECT_NO_THROW(node_controller->reloadPersistentCommand(););
-
+    // reboot without delete database
+    node_controller = initBackend(std::make_shared<DummyPublisher>(work_done_2), false);
+    node_controller->reloadPersistentCommand();
     work_done_2.wait();
     // we need to have publish some message
     published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
     EXPECT_NE(published, 0);
 
     // dispose all
-    node_controller.reset();
-    EXPECT_NO_THROW(ServiceResolver<IPublisher>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<EpicsServiceManager>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<ILogger>::resolve().reset(););
+    deinitBackend(std::move(node_controller));
 }
 
 TEST(NodeController, GetCommand) {
-    int argc = 1;
-    const char* argv[1] = {"epics-k2eg-test"};
-    DataStorageUPtr storage;
-    std::unique_ptr<NodeController> cmd_controller;
     std::latch work_done{1};
     // set environment variable for test
-    clearenv();
-    setenv("EPICS_k2eg_log-on-console", "false", 1);
-    std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
-    ASSERT_NO_THROW(opt->parse(argc, argv));
-    // configure the services
-    ASSERT_NO_THROW(ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration())););
-    ASSERT_NO_THROW(ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>()););
-    ASSERT_NO_THROW(ServiceResolver<IPublisher>::registerService(std::make_shared<DummyPublisher>(work_done)););
+    auto node_controller = initBackend(std::make_shared<DummyPublisher>(work_done));
 
-    EXPECT_NO_THROW(storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite"););
-    toShared(storage->getChannelRepository())->removeAll();
-    EXPECT_NO_THROW(cmd_controller = std::make_unique<NodeController>(std::move(storage)););
-
-    EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
 
     work_done.wait();
     // we need to have publish some message
@@ -248,33 +206,15 @@ TEST(NodeController, GetCommand) {
     EXPECT_NE(published, 0);
 
     // dispose all
-    cmd_controller.reset();
-    EXPECT_NO_THROW(ServiceResolver<IPublisher>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<EpicsServiceManager>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<ILogger>::resolve().reset(););
+     deinitBackend(std::move(node_controller));
 }
 
 TEST(NodeController, GetCommandBadChannel) {
-    int argc = 1;
-    const char* argv[1] = {"epics-k2eg-test"};
-    DataStorageUPtr storage;
-    std::unique_ptr<NodeController> cmd_controller;
     std::latch work_done{1};
     // set environment variable for test
-    clearenv();
-    setenv("EPICS_k2eg_log-on-console", "false", 1);
-    std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
-    ASSERT_NO_THROW(opt->parse(argc, argv));
-    // configure the services
-    ASSERT_NO_THROW(ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration())););
-    ASSERT_NO_THROW(ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>()););
-    ASSERT_NO_THROW(ServiceResolver<IPublisher>::registerService(std::make_shared<DummyPublisher>(work_done)););
+    auto node_controller = initBackend(std::make_shared<DummyPublisher>(work_done));
 
-    EXPECT_NO_THROW(storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite"););
-    toShared(storage->getChannelRepository())->removeAll();
-    EXPECT_NO_THROW(cmd_controller = std::make_unique<NodeController>(std::move(storage)););
-
-    EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "pva", "bad:channel:name", KAFKA_TOPIC_ACQUIRE_IN})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "pva", "bad:channel:name", KAFKA_TOPIC_ACQUIRE_IN})}););
     // give some time for the timeout
     sleep(5);
     // we need to have publish some message
@@ -282,51 +222,31 @@ TEST(NodeController, GetCommandBadChannel) {
     EXPECT_EQ(published, 0);
 
     // dispose all
-    cmd_controller.reset();
-    EXPECT_NO_THROW(ServiceResolver<IPublisher>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<EpicsServiceManager>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<ILogger>::resolve().reset(););
+    deinitBackend(std::move(node_controller));
 }
 #endif // __linux__
 TEST(NodeController, RandomCommand) {
-    int argc = 1;
-    const char* argv[1] = {"epics-k2eg-test"};
-    DataStorageUPtr storage;
-    std::unique_ptr<NodeController> cmd_controller;
     std::latch work_done{1};
     // set environment variable for test
-    setenv("EPICS_k2eg_log-on-console", "false", 1);
-    std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
-    ASSERT_NO_THROW(opt->parse(argc, argv));
-    // configure the services
-    ASSERT_NO_THROW(ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration())););
-    ASSERT_NO_THROW(ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>()););
-    ASSERT_NO_THROW(ServiceResolver<IPublisher>::registerService(std::make_shared<DummyPublisher>(work_done)););
-
-    EXPECT_NO_THROW(storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite"););
-    toShared(storage->getChannelRepository())->removeAll();
-    EXPECT_NO_THROW(cmd_controller = std::make_unique<NodeController>(std::move(storage)););
+    auto node_controller = initBackend(std::make_shared<DummyPublisher>(work_done));
 
     // send 100 random commands equence iteration
     for (int idx = 0; idx < 100; idx++) {
         switch (random_num(0, 2)) {
         case 0: {
-            EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, MessageSerType::json, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+            EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, MessageSerType::json, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
             break;
         }
         case 1: {
-            EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, MessageSerType::json, "pva", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
+            EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, MessageSerType::json, "pva", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
             break;
         }
         case 2: {
-            EXPECT_NO_THROW(cmd_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
+            EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
             break;
         }
         }
     }
     // dispose all
-    cmd_controller.reset();
-    EXPECT_NO_THROW(ServiceResolver<IPublisher>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<EpicsServiceManager>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<ILogger>::resolve().reset(););
+    deinitBackend(std::move(node_controller));
 }

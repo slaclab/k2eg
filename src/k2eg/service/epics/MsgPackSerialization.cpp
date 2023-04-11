@@ -19,19 +19,11 @@ REGISTER_SERIALIZER(SerializationType::MsgPack, MsgPackSerializer)
 SerializedMessageShrdPtr MsgPackSerializer::serialize(const ChannelData& message) {
     auto result = MakeMsgPackMessageShrdPtr(message.data);
     msgpack::packer<msgpack::sbuffer> packer(result->buf);
-    msgpack::sbuffer sbuf;
-    msgpack::packer<msgpack::sbuffer> sub_packer(sbuf);
     // add channel message
-    sub_packer.pack_map(1);
-    sub_packer.pack(message.channel_name);
-    sub_packer.pack("message.channel_name");
+    packer.pack_map(1);
+    packer.pack(message.channel_name);
     // process root structure
-    //processStructure(message.data.get(), packer);
-     size_t off;
-    msgpack::object_handle msg_hndl;
-    msgpack::unpack(msg_hndl, sbuf.data(), sbuf.size(), off);
-
-    std::cout << result.get();
+    processStructure(message.data.get(), packer);
     return result;
 }
 
@@ -161,17 +153,14 @@ void MsgPackSerializer::processStructure(const epics::pvData::PVStructure* struc
         auto type = fld->getField()->getType();
         switch (type) {
         case pvd::Type::scalar: {
-            std::cout << "scalar:" << names[i] << std::endl;
             processScalar(static_cast<const pvd::PVScalar*>(fld), packer);
             break;
         }
         case pvd::Type::scalarArray: {
-            std::cout << "scalarArray:" << names[i] << std::endl;
             processScalarArray(static_cast<const pvd::PVScalarArray*>(fld), packer);
             break;
         }
         case pvd::Type::structure: {
-            std::cout << "structure:" << names[i] << std::endl;
             processStructure(static_cast<const pvd::PVStructure*>(fld), packer);
             break;
         }
