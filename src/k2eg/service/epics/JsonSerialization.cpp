@@ -26,17 +26,6 @@ SerializedMessageShrdPtr JsonSerializer::serialize(const ChannelData& message) {
     std::stringstream ss;
     boost::json::object json_root_object;
     processStructure(message.data.get(), message.channel_name, json_root_object);
-    // ss << "{\"" << message.channel_name << "\":{";
-    // epics::pvData::BitSet bs_mask;
-    // epics::pvData::JSONPrintOptions opt;
-    // opt.ignoreUnprintable = true;
-    // opt.indent = 0;
-    // opt.multiLine = false;
-    // for (size_t idx = 1, N = message.data->getStructure()->getNumberFields(); idx < N; idx++) {
-    //     bs_mask.set(idx);
-    // }
-    // epics::pvData::printJSON(ss, *message.data, bs_mask, opt);
-    // ss << "}";
     ss << json_root_object;
     return MakeJsonMessageShrdPtr(std::move(ss.str()));
 }

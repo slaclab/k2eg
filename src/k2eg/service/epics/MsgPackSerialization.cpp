@@ -8,8 +8,8 @@ using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;
 
 #pragma region MsgPackMessage
-MsgPackMessage::MsgPackMessage(epics::pvData::PVStructure::const_shared_pointer epics_pv_struct):
-epics_pv_struct(epics_pv_struct) {}
+MsgPackMessage::MsgPackMessage(epics::pvData::PVStructure::const_shared_pointer epics_pv_struct)
+    : epics_pv_struct(epics_pv_struct) {}
 const size_t MsgPackMessage::size() const { return buf.size(); }
 const char* MsgPackMessage::data() const { return buf.data(); }
 #pragma endregion MsgPackMessage
@@ -84,11 +84,12 @@ void MsgPackSerializer::processScalarArray(const pvd::PVScalarArray* scalarArray
     pvd::shared_vector<const void> arr;
     scalarArray->getAs<const void>(arr);
     packer.pack_bin(arr.size());
-    packer.pack_bin_body(static_cast<const char *>(arr.data()), arr.size());
-    //switch (scalarArray->getScalarArray()->getElementType()) {
-    // case pvd::ScalarType::pvBoolean: {
-    //     packer.pack(pvd::shared_vector_convert<const pvd::boolean>(arr));
-        
+    packer.pack_bin_body(static_cast<const char*>(arr.data()), arr.size());
+
+    // switch (scalarArray->getScalarArray()->getElementType()) {
+    //  case pvd::ScalarType::pvBoolean: {
+    //      packer.pack(pvd::shared_vector_convert<const pvd::boolean>(arr));
+
     //     break;
     // }
     // case pvd::ScalarType::pvByte: {
@@ -165,9 +166,17 @@ void MsgPackSerializer::processStructure(const epics::pvData::PVStructure* struc
             break;
         }
         case pvd::Type::structureArray: {
+            processStructureArray(static_cast<const pvd::PVStructureArray*>(fld)->view(), packer);
             break;
         }
         }
+    }
+}
+
+void MsgPackSerializer::processStructureArray(pvd::PVStructureArray::const_svector structure_array, msgpack::packer<msgpack::sbuffer>& packer) {
+    packer.pack_array(structure_array.size());
+    for (size_t i = 0, N = structure_array.size(); i < N; i++) {
+        processStructure(structure_array[i].get(), packer);
     }
 }
 
