@@ -193,10 +193,11 @@ TEST(NodeController, MonitorCommandAfterReboot) {
     deinitBackend(std::move(node_controller));
 }
 
-TEST(NodeController, GetCommand) {
+TEST(NodeController, GetCommandJson) {
     std::latch work_done{1};
+    std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initBackend(std::make_shared<DummyPublisher>(work_done));
+    auto node_controller = initBackend(publisher);
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
 
@@ -204,7 +205,26 @@ TEST(NodeController, GetCommand) {
     // we need to have publish some message
     size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
     EXPECT_NE(published, 0);
+    // check for json forward
+    EXPECT_NO_THROW(auto json_object = getJsonObject(*publisher->sent_messages[0]););
+    // dispose all
+     deinitBackend(std::move(node_controller));
+}
 
+TEST(NodeController, GetCommandMsgPack) {
+    std::latch work_done{1};
+    std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
+    // set environment variable for test
+    auto node_controller = initBackend(publisher);
+
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::mesgpack, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
+
+    work_done.wait();
+    // we need to have publish some message
+    size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+    EXPECT_NE(published, 0);
+    // check for json forward
+    EXPECT_NO_THROW(auto msgpack_object = getMsgPackObject(*publisher->sent_messages[0]););
     // dispose all
      deinitBackend(std::move(node_controller));
 }
