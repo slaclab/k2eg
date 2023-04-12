@@ -40,7 +40,7 @@ void GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
     ConstGetCommandShrdPtr g_ptr = static_pointer_cast<const GetCommand>(command);
     auto channel_data = epics_service_manager->getChannelData(g_ptr->channel_name);
     if(channel_data) {
-        publisher->pushMessage(std::make_unique<GetMessage>(g_ptr->destination_topic, std::move(channel_data)));
+        publisher->pushMessage(std::make_unique<GetMessage>(g_ptr->destination_topic, std::move(channel_data), static_cast<SerializationType>(command->serialization)));
     } else {
         // data not received => timeout
         logger->logMessage(STRING_FORMAT("Message not recevide for %1%", g_ptr->channel_name), LogLevel::ERROR);
