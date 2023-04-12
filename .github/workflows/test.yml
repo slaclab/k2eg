@@ -14,7 +14,7 @@ on:
                 required: false
 jobs:
     test_build:
-        runs-on: self-hosted
+        runs-on: ubuntu-latest
         container: docker:23.0.0-cli
 
         steps:
