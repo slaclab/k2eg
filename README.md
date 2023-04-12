@@ -3,6 +3,9 @@ Author: Claudio Bisegni
 
 Company: SLAC National Accelerator Laboratory
 
+[![Build k2eg with CMake](https://github.com/slaclab/k2eg/actions/workflows/build.yml/badge.svg)](https://github.com/slaclab/k2eg/actions/workflows/build.yml)
+[![CodeQL](https://github.com/slaclab/k2eg/actions/workflows/codeql.yml/badge.svg)](https://github.com/slaclab/k2eg/actions/workflows/codeql.yml)
+[![Build k2eg Docker Image](https://github.com/slaclab/k2eg/actions/workflows/build-docker-image.yml/badge.svg)](https://github.com/slaclab/k2eg/actions/workflows/build-docker-image.yml)
 ## Description
 A c++ implementation of a two way gateway from kafka and [EPICS](https://epics.anl.gov) Control System, that aim to be a central processing unit for specific daq needs for high level alghoritms.
 

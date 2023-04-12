@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
     check-changed-file:
-      runs-on: ubuntu-latest
+      runs-on: self-hosted
       name: Test changed source file
       outputs:
         source_changed: ${{ steps.changed-src.outputs.any_changed }}
@@ -65,7 +65,7 @@ jobs:
         name: Build Bullseye
         needs: check-changed-file
         if: needs.check-changed-file.outputs.source_changed == 'true'
-        runs-on: ubuntu-22.04
+        runs-on: self-hosted
         container: scr.svc.stanford.edu/eed-public/build-image/cpp-build-image/gcc-debian:12.2.0-bullseye
         env:
           BUILD_IMAGE: scr.svc.stanford.edu/eed-public/build-image/cpp-build-image/gcc-debian:12.2.0-bullseye
@@ -122,7 +122,7 @@ jobs:
         name: Build Ubuntu Kinetic
         needs: check-changed-file
         if: needs.check-changed-file.outputs.source_changed == 'true'
-        runs-on: ubuntu-22.04
+        runs-on: self-hosted
         container: docker.io/ubuntu:kinetic
         env:
           BUILD_IMAGE: ubuntu:kinetic
