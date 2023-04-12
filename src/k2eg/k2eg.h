@@ -25,7 +25,7 @@ namespace k2eg
         k2eg::controller::node::NodeControllerUPtr node_controller;
         
         int setup(int argc, const char *argv[]);
-        void commandReceived(k2eg::controller::command::CommandConstShrdPtrVec received_command);
+        void commandReceived(k2eg::controller::command::cmd::ConstCommandShrdPtrVec received_command);
         const std::string getTextVersion(bool short_version = false);
     public:
         K2EGateway();

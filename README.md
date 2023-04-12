@@ -20,7 +20,9 @@ Actual implementation receive command and interpret command and uses only JSON s
 
 ### Functional Task List
 - [x] JSON Serialization
-- [ ] Binary serialization
+- [X] MSGPack Binary serialization
+- [ ] MSGPack compact serialization
+- [ ] Filter out the message key
 - [ ] Advanced DAQ Specific logic
 - [ ] Cluster implementation
 - [ ] Multithreading EPICS Monitor
@@ -125,6 +127,7 @@ This implemets the base caget|pvaget fucntion of epics command, if possible will
 ```json
 {
     "command": "get",
+    "serialization": "json|msgpack",
     "protocol": "pva|ca",
     "channel_name": "channel::a",
     "dest_topic": "destination_topic"
@@ -138,10 +141,11 @@ Monitor Activation
 ```json
 {
     "command": "monitor",
-    "activate": true,
-    "channel_name": "channel name",
+    "serialization": "json|msgpack",
     "protocol": "pva|ca",
-    "dest_topic": "destination topic"
+    "channel_name": "channel name",
+    "dest_topic": "destination topic",
+    "activate": true
 }
 ```
 
@@ -149,8 +153,8 @@ Monitor deactivation
 ```json
 {
     "command": "monitor",
-    "activate": false,
     "channel_name": "channel name",
-    "dest_topic": "destination topic"
+    "dest_topic": "destination topic",
+    "activate": false
 }
 ```

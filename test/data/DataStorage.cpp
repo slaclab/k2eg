@@ -9,6 +9,7 @@
 
 namespace fs = std::filesystem;
 using namespace k2eg::common;
+using namespace k2eg::controller::command::cmd;
 using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
 
@@ -19,16 +20,17 @@ TEST(DataStorage, Default) {
     EXPECT_NO_THROW(toShared(storage->getChannelRepository())->removeAll(););
     EXPECT_NO_THROW(toShared(storage->getChannelRepository())
                         ->insert({.channel_name = "channel::a",
-                                  .channel_protocol = "pv",
+                                  .event_serialization = static_cast<uint8_t>(MessageSerType::json),
+                                  .channel_protocol = "pva",
                                   .channel_destination = "dest"}););
     auto found_channel = toShared(storage->getChannelRepository())
                              ->getChannelMonitor({.channel_name = "channel::a",
-                                                  .channel_protocol = "pv",
                                                   .channel_destination = "dest"});
 
     EXPECT_EQ(found_channel.has_value(), true);
     EXPECT_STREQ(found_channel->get()->channel_name.c_str(), "channel::a");
-    EXPECT_STREQ(found_channel->get()->channel_protocol.c_str(), "pv");
+    EXPECT_EQ(found_channel->get()->event_serialization, static_cast<uint8_t>(MessageSerType::json));
+    EXPECT_STREQ(found_channel->get()->channel_protocol.c_str(), "pva");
     EXPECT_STREQ(found_channel->get()->channel_destination.c_str(), "dest");
 }
 

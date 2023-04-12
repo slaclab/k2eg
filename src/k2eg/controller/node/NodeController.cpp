@@ -1,7 +1,7 @@
 #include <k2eg/controller/node/NodeController.h>
 
 //------------ command include ----------
-#include <k2eg/controller/node/worker/AcquireCommandWorker.h>
+#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
 #include <k2eg/controller/node/worker/GetCommandWorker.h>
 #include <k2eg/service/ServiceResolver.h>
 
@@ -12,6 +12,7 @@ using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::node::configuration;
 
 using namespace k2eg::controller::command;
+using namespace k2eg::controller::command::cmd;
 
 using namespace k2eg::service;
 using namespace k2eg::service::data;
@@ -28,7 +29,7 @@ NodeController::NodeController(DataStorageUPtr data_storage)
     // register worker for command type
     worker_resolver.registerObjectInstance(
         CommandType::monitor,
-        std::make_shared<AcquireCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
+        std::make_shared<MonitorCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
     worker_resolver.registerObjectInstance(
         CommandType::get,
         std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
@@ -45,12 +46,12 @@ void NodeController::reloadPersistentCommand() {
     );
 }
 
-void NodeController::submitCommand(CommandConstShrdPtrVec commands) {
+void NodeController::submitCommand(ConstCommandShrdPtrVec commands) {
     // scann and process al command
     for (auto& c: commands) {
         switch (c->type) {
         case CommandType::monitor: {
-            std::shared_ptr<const AquireCommand> acquire_command_shrd = static_pointer_cast<const AquireCommand>(c);
+            auto acquire_command_shrd = static_pointer_cast<const MonitorCommand>(c);
             if (acquire_command_shrd->activate) {
                 // start monitoring
                 node_configuration->addChannelMonitor(

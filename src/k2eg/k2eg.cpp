@@ -110,7 +110,7 @@ void K2EGateway::stop() {
 const bool K2EGateway::isStopRequested() { return quit; }
 const bool K2EGateway::isTerminated() { return terminated; }
 
-void K2EGateway::commandReceived(k2eg::controller::command::CommandConstShrdPtrVec received_command) {
+void K2EGateway::commandReceived(k2eg::controller::command::cmd::ConstCommandShrdPtrVec received_command) {
     node_controller->submitCommand(received_command);
 }
 
