@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   check-changed-file:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     name: Test changed source file
     outputs:
       source_changed: ${{ steps.changed-src.outputs.any_changed }}
