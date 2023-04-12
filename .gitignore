@@ -9,3 +9,4 @@ ekg.sqlite
 coverage_report.info
 cli/venv
 cli/k2egcli/__pycache__
+.cache
