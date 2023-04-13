@@ -1,19 +1,17 @@
 name: Build Python cli
 
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-    branches:
-      - main
+  push:
+    branches: [main]
+    tags:
+      - v*
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Python "3.11"
+      - name: Set up Python "3.9"
         uses: actions/setup-python@v4
         with:
           python-version: 3.9
