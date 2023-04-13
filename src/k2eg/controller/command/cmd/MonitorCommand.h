@@ -20,6 +20,7 @@ DEFINE_PTR_TYPES(MonitorCommand)
 
 static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, MonitorCommand const& c) {
     jv = {
+        {"serialization", serialization_to_string(c.serialization)},
         {"channel_name", c.channel_name}, 
         {"protocol", c.protocol}, 
         {"activate", c.activate}, 

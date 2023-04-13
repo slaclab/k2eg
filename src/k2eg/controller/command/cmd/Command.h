@@ -59,10 +59,19 @@ typedef  std::vector<ConstCommandShrdPtr> ConstCommandShrdPtrVec;
         {"type", command_type_to_string(cfg)}
     };
  }
+
+static void tag_invoke(boost::json::value_from_tag, boost::json::value &jv, MessageSerType const &ser) {
+    jv = {
+        {"type", serialization_to_string(ser)}
+    };
+ }
+
  static void tag_invoke(boost::json::value_from_tag, boost::json::value &jv,  Command const &c) {
  jv = {
+        {"serialization", serialization_to_string(c.serialization)},
         {"channel_name", c.channel_name},
         {"protocol", c.protocol}
+
     };
 }
 }
