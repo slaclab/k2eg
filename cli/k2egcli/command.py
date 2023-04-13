@@ -25,16 +25,16 @@ def get(
         help="Is the k2eg command input topic",
     ),
     channel_name: str = typer.Option(
-        "channel_name",
+        ...,
         "--channel-name",
         "-n",
-        help="Is the name of the channel(pv) target of get opration",
+        help="Is the name of the channel(pv) target of get operation",
     ),
     channel_protocol: str = typer.Option(
         "pva",
         "--channel-protocol",
         "-p",
-        help="Is the epics protocol of the channel(pv) target of get opration",
+        help="Is the epics protocol of the channel(pv) target of get operation",
     ),
     destination_topic: str = typer.Option(
         "data_topic_out",
@@ -48,11 +48,11 @@ def get(
         "-s",
         help="Is the srializaiotn type of the output message",
     ),
-    liste_for_event: bool = typer.Option(
+    listen_for_event: bool = typer.Option(
         "false",
-        "--liste",
+        "--listen",
         "-l",
-        help="Liste for the event",
+        help="Listen for the event",
     ),
 ):
     print(f"Using kafka host: [bold green]{kafka_host}[/bold green]")
@@ -108,7 +108,7 @@ def start_monitor(
         help="Is the k2eg command input topic",
     ),
     channel_name: str = typer.Option(
-        "channel_name",
+        ...,
         "--channel-name",
         "-n",
         help="Is the name of the channel(pv) target of monitor operation",
@@ -131,11 +131,11 @@ def start_monitor(
         "-s",
         help="Is the srializaiotn type of the output message",
     ),
-    liste_for_event: bool = typer.Option(
+    listen_for_event: bool = typer.Option(
         "false",
-        "--liste",
+        "--listen",
         "-l",
-        help="Liste for the event",
+        help="Listen for the event",
     ),
 ):
     print(f"Using kafka host: [bold green]{kafka_host}[/bold green]")
@@ -192,7 +192,7 @@ def stop_monitor(
         help="Is the k2eg command input topic",
     ),
     channel_name: str = typer.Option(
-        "channel_name",
+        ...,
         "--channel-name",
         "-n",
         help="Is the name of the channel(pv) target of monitor operation",
