@@ -25,7 +25,9 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Build
         run: |
+          cd cli
           python -m build .
       - name: Upload on TestPyPi
         run: |
+          cd cli
           twine upload -u ${{ secrets.TWINE_USERNAME }} -p ${{ secrets.TWINE_PASSWORD }} -r  testpypi dist/*
