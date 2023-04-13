@@ -4,7 +4,6 @@
 import typer
 import json
 from k2egcli import producer
-from rich import print
 import uuid
 from kafka import KafkaConsumer
 
