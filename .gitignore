@@ -8,5 +8,7 @@ ekg.sqlite
 .trunk
 coverage_report.info
 cli/venv
+cli/dist
+cli/k2egcli.egg-info
 cli/k2egcli/__pycache__
 .cache
