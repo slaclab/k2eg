@@ -30,4 +30,4 @@ jobs:
       - name: Upload on TestPyPi
         run: |
           cd cli
-          twine upload -u ${{ secrets.TWINE_USERNAME }} -p ${{ secrets.TWINE_PASSWORD }}  --verbose -r  testpypi dist/*
+          twine upload -u ${{ secrets.TWINE_USERNAME }} -p ${{ secrets.TWINE_PASSWORD }}  --verbose --skip-existing -r  testpypi dist/*
