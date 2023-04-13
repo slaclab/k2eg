@@ -21,12 +21,11 @@ jobs:
         run: |
           cd cli
           python -m pip install --upgrade pip
-          pip install build
+          pip install build twine
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          twine  upload --verbose -r  testpypi dist/*
       - name: Build
         run: |
           python -m build .
       - name: Upload on TestPyPi
         run: |
-          twine  upload --verbose -r  testpypi dist/*
+          twine upload -u ${{ secrets.TWINE_USERNAME }} -p ${{ secrets.TWINE_PASSWORD }} -r  testpypi dist/*
