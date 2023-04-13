@@ -143,7 +143,7 @@ TEST(NodeController, MonitorCommandMsgPackSer) {
     auto publisher = std::make_shared<DummyPublisher>(work_done);
     node_controller = initBackend(publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, MessageSerType::mesgpack, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, MessageSerType::msgpack, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
 
     work_done.wait();
     // we need to have publish some message
@@ -152,7 +152,7 @@ TEST(NodeController, MonitorCommandMsgPackSer) {
 
     // stop acquire
     EXPECT_NO_THROW(
-        node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, k2eg::controller::command::cmd::MessageSerType::mesgpack, "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
+        node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, k2eg::controller::command::cmd::MessageSerType::esgpack, "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
 
     sleep(1);
     EXPECT_NO_THROW(published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(););
@@ -217,7 +217,7 @@ TEST(NodeController, GetCommandMsgPack) {
     // set environment variable for test
     auto node_controller = initBackend(publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::mesgpack, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::msgpack, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
 
     work_done.wait();
     // we need to have publish some message

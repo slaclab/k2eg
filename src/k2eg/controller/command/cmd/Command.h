@@ -33,13 +33,13 @@ constexpr const char* command_type_to_string(CommandType t) noexcept {
 #define KEY_VALUE "value"
 
 // is the type of the serialization
-enum class MessageSerType: std::uint8_t{unknown , json, mesgpack};
+enum class MessageSerType: std::uint8_t{unknown , json, msgpack};
 constexpr const char* serialization_to_string(MessageSerType t) noexcept {
     switch (t) {
     case MessageSerType::json:
         return "json";
-    case MessageSerType::mesgpack:
-        return "mesgpack";
+    case MessageSerType::msgpack:
+        return "msgpack";
     case MessageSerType::unknown:
         return "unknown";
     }

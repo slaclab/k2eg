@@ -36,7 +36,7 @@ MessageSerType MapToCommand::getSerializationType(const boost::json::value& v) {
     if (cmd.compare("json") == 0)
         result = MessageSerType::json;
     else if (cmd.compare("msgpack") == 0)
-        result = MessageSerType::mesgpack;
+        result = MessageSerType::msgpack;
     return result;
 }
 
