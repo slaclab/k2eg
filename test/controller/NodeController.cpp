@@ -152,7 +152,7 @@ TEST(NodeController, MonitorCommandMsgPackSer) {
 
     // stop acquire
     EXPECT_NO_THROW(
-        node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, k2eg::controller::command::cmd::MessageSerType::esgpack, "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
+        node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, k2eg::controller::command::cmd::MessageSerType::msgpack, "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
 
     sleep(1);
     EXPECT_NO_THROW(published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(););

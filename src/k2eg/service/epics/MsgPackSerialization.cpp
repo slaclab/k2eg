@@ -89,8 +89,9 @@ MsgPackSerializer::processScalar(const pvd::PVScalar* scalar, msgpack::packer<ms
   }
 }
 
-#define PACK_ARRAY(t, arr)                                         \
+#define PACK_ARRAY(t, arr, packer)                                 \
   auto converted_array = pvd::shared_vector_convert<const t>(arr); \
+  packer.pack_array(converted_array.size());                       \
   for (auto& e : converted_array) { packer.pack(e); }
 
 void
@@ -99,59 +100,53 @@ MsgPackSerializer::processScalarArray(const pvd::PVScalarArray* scalarArray, msg
   scalarArray->getAs<const void>(arr);
   // packer.pack_bin(arr.size());
   // packer.pack_bin_body(static_cast<const char*>(arr.data()), arr.size());
-
-  packer.pack_array(arr.size());
   switch (scalarArray->getScalarArray()->getElementType()) {
     case pvd::ScalarType::pvBoolean: {
-      PACK_ARRAY(pvd::boolean, arr)
+      PACK_ARRAY(pvd::boolean, arr, packer)
       break;
     }
     case pvd::ScalarType::pvByte: {
-      PACK_ARRAY(pvd::int8, arr)
+      PACK_ARRAY(pvd::int8, arr, packer)
       break;
     }
     case pvd::ScalarType::pvDouble: {
-      PACK_ARRAY(double, arr)
+      PACK_ARRAY(double, arr, packer)
       break;
     }
     case pvd::ScalarType::pvFloat: {
-      PACK_ARRAY(float, arr)
+      PACK_ARRAY(float, arr, packer)
       break;
     }
     case pvd::ScalarType::pvInt: {
-      PACK_ARRAY(pvd::int32, arr)
+      PACK_ARRAY(pvd::int32, arr, packer)
       break;
     }
     case pvd::ScalarType::pvLong: {
-      PACK_ARRAY(pvd::int64, arr)
+      PACK_ARRAY(pvd::int64, arr, packer)
       break;
     }
     case pvd::ScalarType::pvShort: {
-      PACK_ARRAY(pvd::int8, arr)
+      PACK_ARRAY(pvd::int8, arr, packer)
       break;
     }
     case pvd::ScalarType::pvString: {
-        auto converted_array = pvd::shared_vector_convert<const std::string>(arr);
-        for (auto& e : converted_array) { 
-            packer.pack(e); 
-        }
-      //PACK_ARRAY(std::string, arr)
+      PACK_ARRAY(std::string, arr, packer)
       break;
     }
     case pvd::ScalarType::pvUByte: {
-      PACK_ARRAY(pvd::uint8, arr)
+      PACK_ARRAY(pvd::uint8, arr, packer)
       break;
     }
     case pvd::ScalarType::pvUInt: {
-      PACK_ARRAY(pvd::uint32, arr)
+      PACK_ARRAY(pvd::uint32, arr, packer)
       break;
     }
     case pvd::ScalarType::pvULong: {
-      PACK_ARRAY(pvd::uint64, arr)
+      PACK_ARRAY(pvd::uint64, arr, packer)
       break;
     }
     case pvd::ScalarType::pvUShort: {
-      PACK_ARRAY(pvd::uint16, arr)
+      PACK_ARRAY(pvd::uint16, arr, packer)
       break;
     }
   }
