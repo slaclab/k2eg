@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.1.0'
+VERSION = '0.1.1'
 DESCRIPTION = 'A k2eg client'
 LONG_DESCRIPTION = 'Permit to submit command and listen from result using k2eg gateway'
 

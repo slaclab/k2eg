@@ -208,7 +208,7 @@ boost::json::value acquire_json = {{KEY_COMMAND, "monitor"},
 CMDControllerCommandHandler acquire_test_msgpack = [](ConstCommandShrdPtrVec received_command) {
     ASSERT_EQ(received_command.size(), 1);
     ASSERT_EQ(received_command[0]->type, CommandType::monitor);
-    ASSERT_EQ(received_command[0]->serialization, MessageSerType::mesgpack);
+    ASSERT_EQ(received_command[0]->serialization, MessageSerType::msgpack);
     ASSERT_EQ(received_command[0]->protocol.compare("pv"), 0);
     ASSERT_EQ(received_command[0]->channel_name.compare("channel::a"), 0);
     ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->activate, true);
@@ -236,7 +236,7 @@ boost::json::value get_json = {
 CMDControllerCommandHandler get_test_msgpack = [](ConstCommandShrdPtrVec received_command) {
     ASSERT_EQ(received_command.size(), 1);
     ASSERT_EQ(received_command[0]->type, CommandType::get);
-    ASSERT_EQ(received_command[0]->serialization, MessageSerType::mesgpack);
+    ASSERT_EQ(received_command[0]->serialization, MessageSerType::msgpack);
     ASSERT_EQ(received_command[0]->protocol.compare("pv"), 0);
     ASSERT_EQ(received_command[0]->channel_name.compare("channel::a"), 0);
     ASSERT_EQ(reinterpret_cast<const GetCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"),

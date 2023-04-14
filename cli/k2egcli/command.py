@@ -2,7 +2,9 @@
 # k2egcli/command.py
 
 import typer
+import msgpack
 import json
+from rich import print
 from k2egcli import producer
 import uuid
 from kafka import KafkaConsumer
@@ -47,19 +49,13 @@ def get(
         "--serialization",
         "-s",
         help="Is the srializaiotn type of the output message",
-    ),
-    listen_for_event: bool = typer.Option(
-        "false",
-        "--listen",
-        "-l",
-        help="Listen for the event",
-    ),
+    )
 ):
     print(f"Using kafka host: [bold green]{kafka_host}[/bold green]")
     print(f"Using command topic: [bold green]{cmd_topic}[/bold green]")
     get_command = {
         "command": "get",
-        "serialization": seriailization_type,
+        "serialization": seriailization_type.lower(),
         "protocol": channel_protocol,
         "channel_name": channel_name,
         "dest_topic": destination_topic
@@ -68,30 +64,7 @@ def get(
     print(f"Send command: [bold green]{get_command}[/bold green]")
     kp = producer.Producer(kafka_host)
     kp.send(cmd_topic, json.dumps(get_command).encode('utf-8'))
-    if liste_for_event:
-        ks = KafkaConsumer(
-            bootstrap_servers=[kafka_host],
-            auto_offset_reset="latest",
-            enable_auto_commit=False,
-            group_id='k2eg_'+str(uuid.uuid1())
-        )
-        ks.subscribe([destination_topic])
-        try:
-            for message in ks:
-                ks.commit()
-                message = f"""
-                Message received: {message.value}
-                Message key: {message.key}
-                Message partition: {message.partition}
-                Message offset: {message.offset}
-                """
-                print(message)
-                break
-        except KeyboardInterrupt:
-            print('stop listening!')
-        
-        ks.close()
-        kp.close()
+    kp.close()
 
 @app.command()
 def start_monitor(
@@ -130,13 +103,7 @@ def start_monitor(
         "--serialization",
         "-s",
         help="Is the srializaiotn type of the output message",
-    ),
-    listen_for_event: bool = typer.Option(
-        "false",
-        "--listen",
-        "-l",
-        help="Listen for the event",
-    ),
+    )
 ):
     print(f"Using kafka host: [bold green]{kafka_host}[/bold green]")
     print(f"Using command topic: [bold green]{cmd_topic}[/bold green]")
@@ -152,30 +119,7 @@ def start_monitor(
     print(f"Send command: [bold green]{start_monitor_command}[/bold green]")
     kp = producer.Producer(kafka_host)
     kp.send(cmd_topic, json.dumps(start_monitor_command).encode('utf-8'))
-    if liste_for_event:
-        ks = KafkaConsumer(
-            bootstrap_servers=[kafka_host],
-            auto_offset_reset="latest",
-            enable_auto_commit=False,
-            group_id='k2eg_'+str(uuid.uuid1())
-        )
-        ks.subscribe([destination_topic])
-        try:
-            for message in ks:
-                ks.commit()
-                message = f"""
-                Message received: {message.value}
-                Message key: {message.key}
-                Message partition: {message.partition}
-                Message offset: {message.offset}
-                """
-                print(message)
-        except KeyboardInterrupt:
-            print('stop listening!')
-
-        
-        ks.close()
-        kp.close()
+    kp.close()
 
 @app.command()
 def stop_monitor(
@@ -223,3 +167,47 @@ def stop_monitor(
     kp = producer.Producer(kafka_host)
     kp.send(cmd_topic, json.dumps(start_monitor_command).encode('utf-8'))
     kp.close()
+
+@app.command()
+def listen(
+        kafka_host: str = typer.Option(
+        "kafka:9092",
+        "--kafka",
+        "-k",
+        help="Is the hostname of kafka boostrap server",
+        ),
+        listen_topic: str = typer.Option(
+            "data_topic_out",
+            "--cmd-topic",
+            "-ct",
+            help="Is the k2eg command input topic",
+        ),
+        seriailization_type: str = typer.Option(
+        "json",
+        "--serialization",
+        "-s",
+        help="Is the srializaiotn type of the output message",
+        ),
+):
+    print(f"Using kafka host: [bold green]{kafka_host}[/bold green]")
+    print(f"Using listening topic: [bold green]{listen_topic}[/bold green]")
+    print(f"Using serialization: [bold green]{seriailization_type}[/bold green]")
+    ks = KafkaConsumer(
+            bootstrap_servers=[kafka_host],
+            auto_offset_reset="latest",
+            enable_auto_commit=False,
+            group_id='k2eg_'+str(uuid.uuid1())
+        )
+    ks.subscribe([listen_topic])
+    try:
+        for message in ks:
+            ks.commit()
+            if seriailization_type.lower() == 'json':
+                print(message.value)
+            elif seriailization_type.lower() == 'msgpack':
+                object = msgpack.loads(message.value)
+                print(object)
+    except KeyboardInterrupt:
+        print('stop listening!')
+    
+    ks.close()

@@ -38,6 +38,7 @@ GetCommandWorker::GetCommandWorker(EpicsServiceManagerShrdPtr epics_service_mana
 void GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
     if(command->type != CommandType::get) return;
     ConstGetCommandShrdPtr g_ptr = static_pointer_cast<const GetCommand>(command);
+    logger->logMessage(STRING_FORMAT("Perform get command for %1% on topic %2% with sertype: %3%", g_ptr->channel_name%g_ptr->destination_topic%serialization_to_string(g_ptr->serialization)), LogLevel::DEBUG);
     auto channel_data = epics_service_manager->getChannelData(g_ptr->channel_name);
     if(channel_data) {
         publisher->pushMessage(std::make_unique<GetMessage>(g_ptr->destination_topic, std::move(channel_data), static_cast<SerializationType>(command->serialization)));

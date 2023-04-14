@@ -36,6 +36,8 @@ TEST(Epics, SerializationMsgpack) {
     EXPECT_NE(ser_value->data(), nullptr);
     EXPECT_NE(ser_value->size(), 0);
     msgpack::unpacked msg_upacked;
+    const char * ptr = ser_value->data();
+    const size_t size = ser_value->size();
     EXPECT_NO_THROW(msgpack::unpack(msg_upacked, ser_value->data(), ser_value->size()););
     EXPECT_NO_THROW(msgpack::object obj(result.get()););
     //{"variable:sum":{"value":7,"alarm":{"severity":0,"status":0,"message":"NO_ALARM"},"timeStamp":{"secondsPastEpoch":1680995907,"nanoseconds":899753530,"userTag":0},"display":{"limitLow":0,"limitHigh":0,"description":"","units":"","precision":0,"form":{"index":0,"choices":"BIN(size:224)"}},"control":{"limitLow":0,"limitHigh":0,"minStep":0},"valueAlarm":{"active":0,"lowAlarmLimit":nan,"lowWarningLimit":nan,"highWarningLimit":nan,"highAlarmLimit":nan,"lowAlarmSeverity":0,"lowWarningSeverity":0,"highWarningSeverity":0,"highAlarmSeverity":0,"hysteresis":0}}}
