@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.1.1'
+VERSION = '0.1.2'
 DESCRIPTION = 'A k2eg client'
 LONG_DESCRIPTION = 'Permit to submit command and listen from result using k2eg gateway'
 
@@ -19,6 +19,8 @@ setup(
         'shellingham',
         'kafka_python',
         'python_snappy',
+        'rich',
+        'msgpack'
     ],
     entry_points={
         'console_scripts': [
