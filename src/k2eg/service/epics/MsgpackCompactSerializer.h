@@ -16,6 +16,7 @@ public:
     virtual ~MsgpackCompactSerializer() = default;
     SerializedMessageShrdPtr serialize(const ChannelData& message);
 };
+
 DEFINE_PTR_TYPES(MsgpackCompactSerializer)
 // Serialization message for json encoding
 class MsgpackCompactMessage : public SerializedMessage {
