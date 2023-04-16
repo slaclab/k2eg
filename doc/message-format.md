@@ -31,7 +31,7 @@ Actually k2eg support two different serialization JSON or Msgpack for message fr
 The 'get' command permit to retrive the current value of an epics channel, so it generate a single message with the following schema:
 ```json
 {
-    "variable:sum":
+    "<channel name>":
     {
         "value":0,
         "alarm":{
@@ -102,7 +102,7 @@ The 'get' command permit to retrive the current value of an epics channel, so it
 The **monitor** command permits to enable or disable the update notification, for a specific EPICS channel, into a specific kafka topic. K2eg permit to enbale the monitoring of the same channel and forward event message on different topics and in different serializaton format for the specific topic. The message received for the event monitor is the same as the **get** command:
 ```json
 {
-    "variable:sum":
+    "<channel name>":
     {
         "value":0,
         "alarm":{
