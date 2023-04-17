@@ -67,7 +67,7 @@ TEST(Epics, SerializationMsgpack) {
   //{"variable:sum":{"value":7,"alarm":{"severity":0,"status":0,"message":"NO_ALARM"},"timeStamp":{"secondsPastEpoch":1680995907,"nanoseconds":899753530,"userTag":0},"display":{"limitLow":0,"limitHigh":0,"description":"","units":"","precision":0,"form":{"index":0,"choices":"BIN(size:224)"}},"control":{"limitLow":0,"limitHigh":0,"minStep":0},"valueAlarm":{"active":0,"lowAlarmLimit":nan,"lowWarningLimit":nan,"highWarningLimit":nan,"highAlarmLimit":nan,"lowAlarmSeverity":0,"lowWarningSeverity":0,"highWarningSeverity":0,"highAlarmSeverity":0,"hysteresis":0}}}
 }
 
-typedef std::vector<msgpack::object> MsgpackVariantVector;
+typedef std::vector<msgpack::object> MsgpackObjectVector;
 TEST(Epics, SerializationMsgpackCompact) {
   EpicsChannelUPtr              pc;
   ConstChannelDataUPtr          value;
@@ -82,6 +82,7 @@ TEST(Epics, SerializationMsgpackCompact) {
   msgpack::object_handle obj;
   EXPECT_NO_THROW(obj = msgpack::unpack(ser_value->data(), ser_value->size()););
   EXPECT_EQ(msgpack::type::ARRAY, obj->type);
+  auto object_vector = obj.get().as<MsgpackObjectVector>();
+  EXPECT_EQ(object_vector.size(), 28);
   //["variable:sum",7,0,0,"NO_ALARM",1681706068,208836822,0,0,0,"","",0,0,["Default","String","Binary","Decimal","Hex","Exponential","Engineering"],0,0,0,0,nan,nan,nan,nan,0,0,0,0,0]
-  
 }
