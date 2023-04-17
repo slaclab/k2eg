@@ -9,8 +9,8 @@ namespace k2eg::service::epics_impl {
 class MsgpackCompactSerializer : public Serializer {
     void processScalar(const epics::pvData::PVScalar* scalar, msgpack::packer<msgpack::sbuffer>& packer);
     void processScalarArray(const epics::pvData::PVScalarArray* scalarArray, msgpack::packer<msgpack::sbuffer>& packer);
-    void processStructure(const epics::pvData::PVStructure* scalarArray, msgpack::packer<msgpack::sbuffer>& packer);
-    void processStructureArray(epics::pvData::PVStructureArray::const_svector structure_array, msgpack::packer<msgpack::sbuffer>& packer);
+    void scannStructure(const epics::pvData::PVStructure* scalarArray, std::vector<const epics::pvData::PVField*>& values);
+    void scannStructureArray(epics::pvData::PVStructureArray::const_svector structure_array, std::vector<const epics::pvData::PVField*>& values);
 public:
     MsgpackCompactSerializer() = default;
     virtual ~MsgpackCompactSerializer() = default;

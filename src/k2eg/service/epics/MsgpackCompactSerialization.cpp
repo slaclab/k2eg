@@ -23,12 +23,31 @@ MsgpackCompactMessage::data() const {
 REGISTER_SERIALIZER(SerializationType::MsgpackCompact, MsgpackCompactSerializer)
 SerializedMessageShrdPtr
 MsgpackCompactSerializer::serialize(const ChannelData& message) {
+  std::vector<const pvd::PVField*> values;
   auto                              result = MakeMsgpackCompactMessageShrdPtr(message.data);
   msgpack::packer<msgpack::sbuffer> packer(result->buf);
-  // add channel message
-  packer.pack(message.channel_name);
+ 
   // process root structure
-  processStructure(message.data.get(), packer);
+  scannStructure(message.data.get(), values);
+
+  packer.pack_array(values.size()+1);
+  packer.pack(message.channel_name);
+  //serialize
+  for(auto & f: values) {
+    auto type = f->getField()->getType();
+    switch (type) {
+      case pvd::Type::scalar: {
+        processScalar(static_cast<const pvd::PVScalar*>(f), packer);
+        break;
+      }
+      case pvd::Type::scalarArray: {
+        processScalarArray(static_cast<const pvd::PVScalarArray*>(f), packer);
+        break;
+      }
+
+      default: break;
+    }
+  }
   return result;
 }
 
@@ -150,7 +169,7 @@ MsgpackCompactSerializer::processScalarArray(const pvd::PVScalarArray* scalarArr
 }
 
 void
-MsgpackCompactSerializer::processStructure(const epics::pvData::PVStructure* structure, msgpack::packer<msgpack::sbuffer>& packer) {
+MsgpackCompactSerializer::scannStructure(const epics::pvData::PVStructure* structure, std::vector<const epics::pvData::PVField*>& values) {
   const pvd::StructureConstPtr& type     = structure->getStructure();
   const pvd::PVFieldPtrArray&   children = structure->getPVFields();
   const pvd::StringArray&       names    = type->getFieldNames();
@@ -162,19 +181,19 @@ MsgpackCompactSerializer::processStructure(const epics::pvData::PVStructure* str
     auto type = fld->getField()->getType();
     switch (type) {
       case pvd::Type::scalar: {
-        processScalar(static_cast<const pvd::PVScalar*>(fld), packer);
+        values.push_back(fld);
         break;
       }
       case pvd::Type::scalarArray: {
-        processScalarArray(static_cast<const pvd::PVScalarArray*>(fld), packer);
+        values.push_back(fld);
         break;
       }
       case pvd::Type::structure: {
-        processStructure(static_cast<const pvd::PVStructure*>(fld), packer);
+        scannStructure(static_cast<const pvd::PVStructure*>(fld), values);
         break;
       }
       case pvd::Type::structureArray: {
-        processStructureArray(static_cast<const pvd::PVStructureArray*>(fld)->view(), packer);
+        scannStructureArray(static_cast<const pvd::PVStructureArray*>(fld)->view(), values);
         break;
       }
       default: break;
@@ -183,9 +202,8 @@ MsgpackCompactSerializer::processStructure(const epics::pvData::PVStructure* str
 }
 
 void
-MsgpackCompactSerializer::processStructureArray(pvd::PVStructureArray::const_svector structure_array, msgpack::packer<msgpack::sbuffer>& packer) {
-  packer.pack_array(structure_array.size());
-  for (size_t i = 0, N = structure_array.size(); i < N; i++) { processStructure(structure_array[i].get(), packer); }
+MsgpackCompactSerializer::scannStructureArray(pvd::PVStructureArray::const_svector structure_array, std::vector<const epics::pvData::PVField*>& values) {
+  for (size_t i = 0, N = structure_array.size(); i < N; i++) { scannStructure(structure_array[i].get(), values); }
 }
 
 #pragma endregion MsgPackSerializer

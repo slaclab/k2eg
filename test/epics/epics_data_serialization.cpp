@@ -38,6 +38,7 @@ TEST(Epics, SerializationJSON) {
   EXPECT_EQ(sub_obj.contains("control"), true);
   EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
 }
+
 typedef std::map<std::string, msgpack::object> MapStrMsgPackObj;
 TEST(Epics, SerializationMsgpack) {
   EpicsChannelUPtr              pc;
@@ -78,10 +79,9 @@ TEST(Epics, SerializationMsgpackCompact) {
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);
-  size_t off =0;
-  while(off != ser_value->size()) {
-    msgpack::object_handle obj;
-    EXPECT_NO_THROW(obj = msgpack::unpack(ser_value->data(), ser_value->size(), off););
-    std::cout << obj.get() << std::endl;
-  }
+  msgpack::object_handle obj;
+  EXPECT_NO_THROW(obj = msgpack::unpack(ser_value->data(), ser_value->size()););
+  EXPECT_EQ(msgpack::type::ARRAY, obj->type);
+  //["variable:sum",7,0,0,"NO_ALARM",1681706068,208836822,0,0,0,"","",0,0,["Default","String","Binary","Decimal","Hex","Exponential","Engineering"],0,0,0,0,nan,nan,nan,nan,0,0,0,0,0]
+  
 }
