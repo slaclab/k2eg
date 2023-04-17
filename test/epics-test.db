@@ -37,3 +37,14 @@ record(calc, "channel:ramp:ramp")
     field(HIGH, "90")
     field(HSV, "MAJOR")
 }
+
+record (waveform,"channel:waveform")
+{
+    field(DESC, "Setpoints")
+    field(EGU, "C")
+    field(FTVL, "DOUBLE")
+    field(HOPR, "3.0")
+    field(LOPR, "0.0")
+    field(NELM, "8")
+}
+
