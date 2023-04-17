@@ -1,5 +1,7 @@
 #include <k2eg/service/epics/MsgpackCompactSerializion.h>
 #include "pvType.h"
+#include <vector>
+#include <any>
 
 using namespace k2eg::service::epics_impl;
 
@@ -24,7 +26,6 @@ MsgpackCompactSerializer::serialize(const ChannelData& message) {
   auto                              result = MakeMsgpackCompactMessageShrdPtr(message.data);
   msgpack::packer<msgpack::sbuffer> packer(result->buf);
   // add channel message
-  packer.pack_map(1);
   packer.pack(message.channel_name);
   // process root structure
   processStructure(message.data.get(), packer);
@@ -155,13 +156,9 @@ MsgpackCompactSerializer::processStructure(const epics::pvData::PVStructure* str
   const pvd::StringArray&       names    = type->getFieldNames();
 
   // init map
-  packer.pack_map(names.size());
-
   for (size_t i = 0, N = names.size(); i < N; i++) {
     auto const& fld = children[i].get();
-    int choff = children[i]->getFieldOffset();
     // pack key
-    packer.pack(std::string_view(names[i]));
     auto type = fld->getField()->getType();
     switch (type) {
       case pvd::Type::scalar: {

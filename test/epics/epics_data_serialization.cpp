@@ -65,3 +65,23 @@ TEST(Epics, SerializationMsgpack) {
   EXPECT_EQ(om_sub_1.contains("valueAlarm"), true);
   //{"variable:sum":{"value":7,"alarm":{"severity":0,"status":0,"message":"NO_ALARM"},"timeStamp":{"secondsPastEpoch":1680995907,"nanoseconds":899753530,"userTag":0},"display":{"limitLow":0,"limitHigh":0,"description":"","units":"","precision":0,"form":{"index":0,"choices":"BIN(size:224)"}},"control":{"limitLow":0,"limitHigh":0,"minStep":0},"valueAlarm":{"active":0,"lowAlarmLimit":nan,"lowWarningLimit":nan,"highWarningLimit":nan,"highAlarmLimit":nan,"lowAlarmSeverity":0,"lowWarningSeverity":0,"highWarningSeverity":0,"highAlarmSeverity":0,"hysteresis":0}}}
 }
+
+typedef std::vector<msgpack::object> MsgpackVariantVector;
+TEST(Epics, SerializationMsgpackCompact) {
+  EpicsChannelUPtr              pc;
+  ConstChannelDataUPtr          value;
+  ConstSerializedMessageShrdPtr ser_value;
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>("pva", "variable:sum"););
+  EXPECT_NO_THROW(pc->connect());
+  EXPECT_NO_THROW(value = pc->getChannelData(););
+  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::MsgpackCompact););
+  EXPECT_NE(ser_value, nullptr);
+  EXPECT_NE(ser_value->data(), nullptr);
+  EXPECT_NE(ser_value->size(), 0);
+  size_t off =0;
+  while(off != ser_value->size()) {
+    msgpack::object_handle obj;
+    EXPECT_NO_THROW(obj = msgpack::unpack(ser_value->data(), ser_value->size(), off););
+    std::cout << obj.get() << std::endl;
+  }
+}
