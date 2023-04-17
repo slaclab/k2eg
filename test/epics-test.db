@@ -46,5 +46,6 @@ record (waveform,"channel:waveform")
     field(HOPR, "3.0")
     field(LOPR, "0.0")
     field(NELM, "8")
+    field(PINI, "YES")
 }
 
