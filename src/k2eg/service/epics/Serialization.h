@@ -4,7 +4,7 @@
 
 namespace k2eg::service::epics_impl {
 // define the type of the supported serailization
-enum class SerializationType: std::uint8_t { Unknown, JSON, MsgPack, MsgpackCompact };
+enum class SerializationType: std::uint8_t { Unknown, JSON, Msgpack, MsgpackCompact };
 
 // base serialized message
 class SerializedMessage {

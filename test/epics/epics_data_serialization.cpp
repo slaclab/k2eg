@@ -77,7 +77,7 @@ TEST(Epics, SerializationMsgpack) {
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>("pva", "variable:sum"););
   EXPECT_NO_THROW(pc->connect());
   EXPECT_NO_THROW(value = pc->getChannelData(););
-  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::MsgPack););
+  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::Msgpack););
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);
@@ -104,7 +104,7 @@ TEST(Epics, SerializationMsgpackWaveform) {
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>("pva", "channel:waveform"););
   EXPECT_NO_THROW(pc->connect());
   EXPECT_NO_THROW(value = pc->getChannelData(););
-  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::MsgPack););
+  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::Msgpack););
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);

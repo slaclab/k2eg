@@ -22,7 +22,7 @@ MsgPackMessage::data() const {
 #pragma endregion MsgPackMessage
 
 #pragma region MsgPackSerializer
-REGISTER_SERIALIZER(SerializationType::MsgPack, MsgPackSerializer)
+REGISTER_SERIALIZER(SerializationType::Msgpack, MsgPackSerializer)
 SerializedMessageShrdPtr
 MsgPackSerializer::serialize(const ChannelData& message) {
   auto                              result = MakeMsgPackMessageShrdPtr(message.data);
