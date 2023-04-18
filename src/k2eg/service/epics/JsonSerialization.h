@@ -10,7 +10,8 @@ namespace k2eg::service::epics_impl {
 class JsonSerializer : public Serializer {
     void processScalar(const epics::pvData::PVScalar* scalar, const std::string& key, boost::json::object& json_object);
     void processScalarArray(const epics::pvData::PVScalarArray* scalarArray,const std::string& key,  boost::json::object& json_object);
-    void processStructure(const epics::pvData::PVStructure* scalarArray,const std::string& key,  boost::json::object& json_object);
+    void processStructure(const epics::pvData::PVStructure* scalarArray, const std::string& key,  boost::json::object& json_object);
+    void processStructureArray(epics::pvData::PVStructureArray::const_svector structure_array, const std::string& key, boost::json::object& json_object);
 public:
     JsonSerializer() = default;
     virtual ~JsonSerializer() = default;
