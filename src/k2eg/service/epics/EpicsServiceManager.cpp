@@ -61,7 +61,7 @@ void EpicsServiceManager::monitorChannel(const std::string& channel_name, bool a
     }
 }
 
-ConstChannelDataUPtr EpicsServiceManager::getChannelData(const std::string& channel_name, const std::string& protocoll) {
+ConstChannelDataUPtr EpicsServiceManager::getChannelData(const std::string& channel_name, const std::string& protocol) {
     ConstChannelDataUPtr result;
     std::unique_lock guard(channel_map_mutex);
     if (auto search = channel_map.find(channel_name); search != channel_map.end()) {
@@ -69,11 +69,24 @@ ConstChannelDataUPtr EpicsServiceManager::getChannelData(const std::string& chan
         result = search->second->getChannelData();
     } else {
         // allocate channel and return data
-        auto channel = std::make_unique<EpicsChannel>(protocoll, channel_name);
+        auto channel = std::make_unique<EpicsChannel>(protocol, channel_name);
         channel->connect();
         result = channel->getChannelData();
     }
     return result;
+}
+
+void EpicsServiceManager::putChannelData(const std::string& channel_name, const std::string& channel_value, const std::string& protocol = "pva") {
+    std::unique_lock guard(channel_map_mutex);
+    if (auto search = channel_map.find(channel_name); search != channel_map.end()) {
+        // the same channel is in monitor so we can use it
+        search->second->putData("value", channel_value);
+    } else {
+        // allocate channel and return data
+        auto channel = std::make_unique<EpicsChannel>(protocol, channel_name);
+        channel->connect();
+        channel->putData("value", channel_value);
+    }
 }
 
 size_t EpicsServiceManager::getChannelMonitoredSize() {

@@ -9,13 +9,18 @@
 #include <pv/createRequest.h>
 #include <pv/json.h>
 #include <pva/client.h>
-#include <string>
+#include <epicsEvent.h>
+#include <epicsMutex.h>
+#include <epicsGuard.h>
+#include <epicsGetopt.h>
+
 
 namespace k2eg::service::epics_impl {
 
 enum MonitorType { Fail, Cancel, Disconnec, Data };
 
-
+typedef epicsGuard<epicsMutex> Guard;
+typedef epicsGuardRelease<epicsMutex> UnGuard;
 typedef struct {
     MonitorType type;
     const std::string message;
@@ -25,6 +30,18 @@ DEFINE_PTR_TYPES(MonitorEvent)
 
 typedef std::vector<MonitorEventShrdPtr> MonitorEventVec;
 typedef std::shared_ptr<MonitorEventVec> MonitorEventVecShrdPtr;
+
+class PutTracker : public pvac::ClientChannel::PutCallback
+{
+    pvac::Operation op;
+    const std::string value;
+    PutTracker(pvac::ClientChannel& channel,
+               const epics::pvData::PVStructure::const_shared_pointer& pvReq,
+               const std::string& value);
+    virtual ~PutTracker();
+    virtual void putBuild(const epics::pvData::StructureConstPtr &build, pvac::ClientChannel::PutCallback::Args& args) OVERRIDE FINAL ;
+    virtual void putDone(const pvac::PutEvent &evt) OVERRIDE FINAL;
+};
 
 class EpicsChannel {
     const std::string channel_name;
