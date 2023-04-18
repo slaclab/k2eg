@@ -70,6 +70,7 @@ set(COMMON_SOURCE_FILES
   src/k2eg/controller/node/configuration/NodeConfiguration.cpp
   src/k2eg/controller/node/worker/MonitorCommandWorker.cpp
   src/k2eg/controller/node/worker/GetCommandWorker.cpp
+  src/k2eg/controller/node/worker/PutCommandWorker.cpp
 )
 
 set(SOURCE_FILES
