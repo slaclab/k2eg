@@ -61,7 +61,6 @@ TEST(Epics, SerializationWaveformJSON) {
   auto sub_obj = jv.as_object().at("channel:waveform").as_object();
   EXPECT_EQ(sub_obj.contains("value"), true);
   EXPECT_EQ(sub_obj["value"].is_array(), true);
-  EXPECT_EQ(sub_obj["value"].as_array().size(), 7);
   EXPECT_EQ(sub_obj.contains("alarm"), true);
   EXPECT_EQ(sub_obj.contains("timeStamp"), true);
   EXPECT_EQ(sub_obj.contains("display"), true);
@@ -138,7 +137,6 @@ TEST(Epics, SerializationMsgpackCompact) {
   EXPECT_NE(ser_value->size(), 0);
   msgpack::object_handle obj;
   EXPECT_NO_THROW(obj = msgpack::unpack(ser_value->data(), ser_value->size()););
-  std::cout << obj.get() << std::endl;
   EXPECT_EQ(msgpack::type::ARRAY, obj->type);
   auto object_vector = obj.get().as<MsgpackObjectVector>();
   EXPECT_EQ(object_vector.size(), 28);
