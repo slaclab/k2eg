@@ -34,6 +34,8 @@ MapToCommand::getSerializationType(const boost::json::value& v) {
     result = MessageSerType::json;
   else if (cmd.compare("msgpack") == 0)
     result = MessageSerType::msgpack;
+  else if (cmd.compare("msgpack-compact") == 0)
+    result = MessageSerType::msgpack_compact;
   return result;
 }
 
@@ -51,6 +53,7 @@ MapToCommand::checkFields(const object& obj, const std::vector<std::tuple<std::s
           case kind::uint64: result->insert(FieldValuesMapPair(std::get<0>(field), value_to<uint64_t>(v))); break;
           case kind::double_: result->insert(FieldValuesMapPair(std::get<0>(field), value_to<double>(v))); break;
           case kind::string: result->insert(FieldValuesMapPair(std::get<0>(field), value_to<std::string>(v))); break;
+          default: break;
         }
       }
     }
