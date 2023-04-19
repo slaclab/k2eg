@@ -61,8 +61,8 @@ EpicsChannel::putData(const std::string& name, const epics::pvData::AnyScalar& n
 }
 
 ConstPutOperationUPtr
-EpicsChannel::putValue(const std::string& value) {
-  return MakePutOperationUPtr(channel, pvReq, value);
+EpicsChannel::putValue(const std::string& field, const std::string& value) {
+  return MakePutOperationUPtr(channel, pvReq, field, value);
 }
 
 void

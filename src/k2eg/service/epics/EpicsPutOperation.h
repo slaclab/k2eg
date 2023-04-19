@@ -9,6 +9,7 @@ namespace k2eg::service::epics_impl {
 class PutOperation : public pvac::ClientChannel::PutCallback {
   std::shared_ptr<pvac::ClientChannel> channel;
   pvac::Operation                      op;
+  const std::string                    field;
   const std::string                    value;
   std::string                          message;
   pvac::PutEvent                       evt;
@@ -17,7 +18,7 @@ class PutOperation : public pvac::ClientChannel::PutCallback {
   virtual void                         putDone(const pvac::PutEvent& evt) OVERRIDE FINAL;
 
  public:
-  PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const epics::pvData::PVStructure::const_shared_pointer& pvReq, const std::string& value);
+  PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const epics::pvData::PVStructure::const_shared_pointer& pvReq, const std::string& field, const std::string& value);
   virtual ~PutOperation();
 
   const std::string     getOpName() const;

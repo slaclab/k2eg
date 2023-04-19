@@ -77,17 +77,17 @@ ConstChannelDataUPtr EpicsServiceManager::getChannelData(const std::string& chan
     return result;
 }
 
-ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& channel_name, const std::string& channel_value, const std::string& protocol) {
+ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& channel_name, const std::string& field, const std::string& value, const std::string& protocol) {
     ConstPutOperationUPtr result;
     std::unique_lock guard(channel_map_mutex);
     if (auto search = channel_map.find(channel_name); search != channel_map.end()) {
         // the same channel is in monitor so we can use it
-        result = search->second->putValue(channel_value);
+        result = search->second->putValue(field, value);
     } else {
         // allocate channel and return data
         auto channel = std::make_unique<EpicsChannel>(protocol, channel_name);
         channel->connect();
-        result = channel->putValue(channel_value);
+        result = channel->putValue(field, value);
     }
     return result;
 }

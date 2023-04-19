@@ -5,8 +5,8 @@ using namespace k2eg::service::epics_impl;
 
 namespace pvd = epics::pvData;
 
-PutOperation::PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const pvd::PVStructure::const_shared_pointer& pvReq, const std::string& value)
-    : channel(channel), value(value), done(false) {
+PutOperation::PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const pvd::PVStructure::const_shared_pointer& pvReq, const std::string& field, const std::string& value)
+    : channel(channel), field(field), value(value), done(false) {
   op = channel->put(this, pvReq);
 }
 
@@ -20,7 +20,8 @@ PutOperation::putBuild(const epics::pvData::StructureConstPtr& build, pvac::Clie
   // we are one-shot so don't bother to re-use
   pvd::PVStructurePtr root(pvd::getPVDataCreate()->createPVStructure(build));
   // we only know about writes to scalar 'value' field
-  pvd::PVScalarPtr valfld(root->getSubFieldT<pvd::PVScalar>("value"));
+  pvd::PVScalarPtr valfld(root->getSubFieldT<pvd::PVScalar>(field));
+
   // attempt convert string to actual field type
   valfld->putFrom(value);
   args.root = root;  // non-const -> const
