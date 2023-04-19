@@ -175,7 +175,8 @@ TEST(Epics, EpicsServiceManagerGetPut) {
     WHILE(put_op_a->isDone(), false);
     EXPECT_NO_THROW(put_op_b = manager->putChannelData("variable:b", "value", "2"););
     WHILE(put_op_b->isDone(), false);
-
+    //give time to update
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_NO_THROW(sum_data = manager->getChannelData("variable:sum"););
     EXPECT_EQ(sum_data->data->getSubField<epics::pvData::PVDouble>("value")->get(), 3);
     manager.reset();
