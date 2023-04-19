@@ -6,6 +6,7 @@
 #include <thread>
 #include "k2eg/service/epics/EpicsPutOperation.h"
 #include "epics.h"
+#include "pvData.h"
 
 using namespace k2eg::service::epics_impl;
 
@@ -180,5 +181,29 @@ TEST(Epics, EpicsServiceManagerGetPut) {
     EXPECT_NO_THROW(sum_data = manager->getChannelData("variable:sum"););
     EXPECT_EQ(sum_data->data->getSubField<epics::pvData::PVDouble>("value")->get(), 3);
     manager.reset();
-    
+}
+
+TEST(Epics, EpicsServiceManagerGetPutWaveForm) {
+    allEvent.clear();
+    ConstChannelDataUPtr sum_data;
+    ConstPutOperationUPtr put_op_a;
+    ConstPutOperationUPtr put_op_b;
+    std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
+    EXPECT_NO_THROW(put_op_a = manager->putChannelData("channel:waveform", "value", "8 1 2 3 4 5 6 7 8"););
+    WHILE(put_op_a->isDone(), false);
+    EXPECT_NO_THROW(sum_data = manager->getChannelData("channel:waveform"););
+    epics::pvData::PVScalarArray::const_shared_pointer arr_result;
+    EXPECT_NO_THROW(arr_result = sum_data->data->getSubField<epics::pvData::PVScalarArray>("value"));
+    epics::pvData::shared_vector<const double> arr;
+    arr_result->getAs<const double>(arr);
+    EXPECT_EQ(arr.size(), 8);
+    EXPECT_EQ(arr[0], 1);
+    EXPECT_EQ(arr[1], 2);
+    EXPECT_EQ(arr[2], 3);
+    EXPECT_EQ(arr[3], 4);
+    EXPECT_EQ(arr[4], 5);
+    EXPECT_EQ(arr[5], 6);
+    EXPECT_EQ(arr[6], 7);
+    EXPECT_EQ(arr[7], 8);
+    manager.reset();
 }
