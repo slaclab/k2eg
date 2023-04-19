@@ -55,6 +55,7 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/epics/JsonSerialization.cpp
   src/k2eg/service/epics/MsgPackSerialization.cpp
   src/k2eg/service/epics/MsgpackCompactSerialization.cpp
+  
   src/k2eg/service/pubsub/IPublisher.cpp
   src/k2eg/service/pubsub/ISubscriber.cpp
 
