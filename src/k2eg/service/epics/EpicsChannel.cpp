@@ -8,14 +8,17 @@ using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;
 namespace pva = epics::pvAccess;
 
-EpicsChannel::EpicsChannel(const std::string& provider_name, const std::string& channel_name, const std::string& address)
+EpicsChannel::EpicsChannel(pvac::ClientProvider& provider, const std::string& channel_name, const std::string& address)
     : channel_name(channel_name), address(address) {
-  provider = std::make_unique<pvac::ClientProvider>(provider_name, conf);
+  //provider = std::make_unique<pvac::ClientProvider>(provider_name, conf);
+  pvac::ClientChannel::Options opt;
+  if (!address.empty()) { opt.address = address; }
+  channel = std::make_unique<pvac::ClientChannel>(provider.connect(channel_name, opt));
 }
 
 EpicsChannel::~EpicsChannel() {
   if (channel) { channel->reset(); }
-  if (provider) { provider->disconnect(); }
+  //if (provider) { provider->disconnect(); }
 }
 
 void
@@ -30,13 +33,6 @@ EpicsChannel::deinit() {
   // "pva" provider automatically in registry
   // add "ca" provider to registry
   pva::ca::CAClientFactory::stop();
-}
-
-void
-EpicsChannel::connect() {
-  pvac::ClientChannel::Options opt;
-  if (!address.empty()) { opt.address = address; }
-  channel = std::make_unique<pvac::ClientChannel>(provider->connect(channel_name, opt));
 }
 
 ConstChannelDataUPtr
@@ -55,13 +51,8 @@ EpicsChannel::getData() const {
   return channel->get();
 }
 
-void
-EpicsChannel::putData(const std::string& name, const epics::pvData::AnyScalar& new_value) const {
-  channel->put().set(name, new_value).exec();
-}
-
 ConstPutOperationUPtr
-EpicsChannel::putValue(const std::string& field, const std::string& value) {
+EpicsChannel::put(const std::string& field, const std::string& value) {
   return MakePutOperationUPtr(channel, pvReq, field, value);
 }
 

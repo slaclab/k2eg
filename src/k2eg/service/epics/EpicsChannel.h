@@ -31,26 +31,19 @@ class EpicsChannel {
   const std::string                              channel_name;
   const std::string                              address;
   epics::pvData::PVStructure::shared_pointer     pvReq = epics::pvData::createRequest("field()");
-  epics::pvAccess::Configuration::shared_pointer conf  = epics::pvAccess::ConfigurationBuilder().push_env().build();
-  std::unique_ptr<pvac::ClientProvider>          provider;
+  //epics::pvAccess::Configuration::shared_pointer conf  = epics::pvAccess::ConfigurationBuilder().push_env().build();
+  //std::unique_ptr<pvac::ClientProvider>          provider;
   std::shared_ptr<pvac::ClientChannel>           channel;
   pvac::MonitorSync                              mon;
 
  public:
-  explicit EpicsChannel(const std::string& provider_name, const std::string& channel_name, const std::string& address = std::string());
+  explicit EpicsChannel(pvac::ClientProvider& provider, const std::string& channel_name, const std::string& address = std::string());
   ~EpicsChannel();
   static void                                      init();
   static void                                      deinit();
-  void                                             connect();
   ConstChannelDataUPtr                             getChannelData() const;
   epics::pvData::PVStructure::const_shared_pointer getData() const;
-  template <typename T>
-  void
-  putData(const std::string& name, T new_value) const {
-    channel->put().set(name, new_value).exec();
-  }
-  void                   putData(const std::string& name, const epics::pvData::AnyScalar& value) const;
-  ConstPutOperationUPtr  putValue(const std::string& field, const std::string& value);
+  ConstPutOperationUPtr  put(const std::string& field, const std::string& value);
   void                   startMonitor();
   MonitorEventVecShrdPtr monitor();
   void                   stopMonitor();

@@ -22,6 +22,8 @@ class EpicsServiceManager {
     std::map<std::string, std::shared_ptr<EpicsChannel>> channel_map;
     std::unique_ptr<std::thread> scheduler_thread;
     k2eg::common::broadcaster<EpicsServiceManagerHandlerParamterType> handler_broadcaster;
+    std::unique_ptr<pvac::ClientProvider> pva_provider;
+    std::unique_ptr<pvac::ClientProvider> ca_provider;
     bool run = false;
     void task();
     void processIterator(const std::shared_ptr<EpicsChannel>& epics_channel);

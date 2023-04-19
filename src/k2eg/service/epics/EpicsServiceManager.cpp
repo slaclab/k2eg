@@ -8,23 +8,30 @@ using namespace k2eg::service::epics_impl;
 
 EpicsServiceManager::EpicsServiceManager() {
     run = true;
+    pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
+    ca_provider = std::make_unique<pvac::ClientProvider>("ca", 
+    epics::pvAccess::ConfigurationBuilder()
+    .add("PATH", "build/local/bin/linux-x86_64").push_map()
+    .push_env().build());
     scheduler_thread = std::make_unique<std::thread>(&EpicsServiceManager::task, this);
-    // EpicsChannel::init();
 }
 EpicsServiceManager::~EpicsServiceManager() {
     run = false;
     scheduler_thread->join();
-    // EpicsChannel::deinit();
+    pva_provider->reset();
+    ca_provider->reset();
 }
 
-void EpicsServiceManager::addChannel(const std::string& channel_name, const std::string& protocoll) {
+#define SELECT_PROVIDER(p) \
+(protocol.find("pva") == 0?*pva_provider:*ca_provider)
+
+void EpicsServiceManager::addChannel(const std::string& channel_name, const std::string& protocol) {
     std::unique_lock guard(channel_map_mutex);
     if (auto search = channel_map.find(channel_name); search != channel_map.end()) {
         return;
     }
     try {
-        channel_map[channel_name] = std::make_shared<EpicsChannel>(protocoll, channel_name);
-        channel_map[channel_name]->connect();
+        channel_map[channel_name] = std::make_shared<EpicsChannel>(SELECT_PROVIDER(protocol), channel_name);
         channel_map[channel_name]->startMonitor();
     } catch (std::exception& ex) {
         channel_map.erase(channel_name);
@@ -70,8 +77,7 @@ ConstChannelDataUPtr EpicsServiceManager::getChannelData(const std::string& chan
         result = search->second->getChannelData();
     } else {
         // allocate channel and return data
-        auto channel = std::make_unique<EpicsChannel>(protocol, channel_name);
-        channel->connect();
+        auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), channel_name);
         result = channel->getChannelData();
     }
     return result;
@@ -82,12 +88,11 @@ ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& cha
     std::unique_lock guard(channel_map_mutex);
     if (auto search = channel_map.find(channel_name); search != channel_map.end()) {
         // the same channel is in monitor so we can use it
-        result = search->second->putValue(field, value);
+        result = search->second->put(field, value);
     } else {
         // allocate channel and return data
-        auto channel = std::make_unique<EpicsChannel>(protocol, channel_name);
-        channel->connect();
-        result = channel->putValue(field, value);
+        auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), channel_name);
+        result = channel->put(field, value);
     }
     return result;
 }
