@@ -2,7 +2,9 @@
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <gtest/gtest.h>
+#include <unistd.h>
 #include <thread>
+#include "k2eg/service/epics/EpicsPutOperation.h"
 
 using namespace k2eg::service::epics_impl;
 
@@ -40,6 +42,8 @@ bool retry_eq(const EpicsChannel& channel, const std::string& name, double value
     return false;
 }
 
+
+
 TEST(Epics, ChannelGetSetTemplatedGet) {
     EpicsChannelUPtr pc_sum;
     EpicsChannelUPtr pc_a;
@@ -75,6 +79,36 @@ TEST(Epics, ChannelGetSetPVDatadGet) {
     EXPECT_EQ(retry_eq(*pc_sum, "value", 0, 500, 3), true);
     EXPECT_NO_THROW(pc_a->putData("value", epics::pvData::AnyScalar(5)););
     EXPECT_NO_THROW(pc_b->putData("value", epics::pvData::AnyScalar(5)););
+    EXPECT_EQ(retry_eq(*pc_sum, "value", 10, 500, 3), true);
+}
+#define WHILE(x,v) \
+do{std::this_thread::sleep_for(std::chrono::milliseconds(250));}while(x == v)
+TEST(Epics, ChannelPutValue) {
+    ConstPutOperationUPtr put_op_a;
+    ConstPutOperationUPtr put_op_b;
+    EpicsChannelUPtr pc_sum;
+    EpicsChannelUPtr pc_a;
+    EpicsChannelUPtr pc_b;
+    epics::pvData::PVStructure::const_shared_pointer val;
+    EXPECT_NO_THROW(pc_sum = std::make_unique<EpicsChannel>("pva", "variable:sum"););
+    EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>("pva", "variable:a"););
+    EXPECT_NO_THROW(pc_b = std::make_unique<EpicsChannel>("pva", "variable:b"););
+    EXPECT_NO_THROW(pc_sum->connect());
+    EXPECT_NO_THROW(pc_a->connect());
+    EXPECT_NO_THROW(pc_b->connect());
+    EXPECT_NO_THROW(put_op_a = pc_a->putValue("0"));
+    EXPECT_NO_THROW(put_op_b = pc_b->putValue("0"));
+    WHILE(put_op_a->isDone(), false);
+    EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::event_t::Success);
+    WHILE(put_op_b->isDone(), false);
+    EXPECT_EQ(put_op_b->getState().event, pvac::PutEvent::event_t::Success);
+    EXPECT_EQ(retry_eq(*pc_sum, "value", 0, 500, 3), true);
+    EXPECT_NO_THROW(put_op_a = pc_a->putValue("5"));
+    EXPECT_NO_THROW(put_op_b = pc_b->putValue("5"));
+    WHILE(put_op_a->isDone(), false);
+    EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::event_t::Success);
+    WHILE(put_op_b->isDone(), false);
+    EXPECT_EQ(put_op_b->getState().event, pvac::PutEvent::event_t::Success);
     EXPECT_EQ(retry_eq(*pc_sum, "value", 10, 500, 3), true);
 }
 

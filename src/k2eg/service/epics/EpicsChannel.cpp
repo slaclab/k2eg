@@ -1,45 +1,12 @@
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <pv/caProvider.h>
 #include <pv/clientFactory.h>
-
+#include "k2eg/service/epics/EpicsPutOperation.h"
 
 using namespace k2eg::service::epics_impl;
 
 namespace pvd = epics::pvData;
 namespace pva = epics::pvAccess;
-
-PutTracker::PutTracker(pvac::ClientChannel& channel, const pvd::PVStructure::const_shared_pointer& pvReq, const std::string& value)
-    : op(channel.put(this, pvReq))  // put() starts here
-      ,
-      value(value) {}
-PutTracker::~PutTracker() { op.cancel(); }
-void
-PutTracker::putBuild(const epics::pvData::StructureConstPtr& build, pvac::ClientChannel::PutCallback::Args& args) {
-  // At this point we have the user provided value string 'value'
-  // and the server provided structure (with types).
-  // note: an exception thrown here will result in putDone() w/ Fail
-  // allocate a new structure instance.
-  // we are one-shot so don't bother to re-use
-  pvd::PVStructurePtr root(pvd::getPVDataCreate()->createPVStructure(build));
-  // we only know about writes to scalar 'value' field
-  pvd::PVScalarPtr valfld(root->getSubFieldT<pvd::PVScalar>("value"));
-  // attempt convert string to actual field type
-  valfld->putFrom(value);
-  args.root = root;  // non-const -> const
-  // mark only 'value' field to be sent.
-  // other fields w/ default values won't be sent.
-  args.tosend.set(valfld->getFieldOffset());
-  std::cout << "Put value " << valfld << " sending=" << args.tosend << "\n";
-}
-
-void
-PutTracker::putDone(const pvac::PutEvent& evt) {
-  switch (evt.event) {
-    case pvac::PutEvent::Fail: std::cerr << op.name() << " Error: " << evt.message << "\n"; break;
-    case pvac::PutEvent::Cancel: std::cerr << op.name() << " Cancelled\n"; break;
-    case pvac::PutEvent::Success: std::cout << op.name() << " Done\n";
-  }
-}
 
 EpicsChannel::EpicsChannel(const std::string& provider_name, const std::string& channel_name, const std::string& address)
     : channel_name(channel_name), address(address) {
@@ -91,6 +58,11 @@ EpicsChannel::getData() const {
 void
 EpicsChannel::putData(const std::string& name, const epics::pvData::AnyScalar& new_value) const {
   channel->put().set(name, new_value).exec();
+}
+
+ConstPutOperationUPtr
+EpicsChannel::putValue(const std::string& value) {
+  return MakePutOperationUPtr(channel, pvReq, value);
 }
 
 void

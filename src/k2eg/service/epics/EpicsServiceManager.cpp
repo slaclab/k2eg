@@ -1,6 +1,7 @@
 #include <chrono>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <ranges>
+#include "k2eg/service/epics/EpicsPutOperation.h"
 
 using namespace k2eg::common;
 using namespace k2eg::service::epics_impl;
@@ -76,17 +77,19 @@ ConstChannelDataUPtr EpicsServiceManager::getChannelData(const std::string& chan
     return result;
 }
 
-void EpicsServiceManager::putChannelData(const std::string& channel_name, const std::string& channel_value, const std::string& protocol = "pva") {
+ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& channel_name, const std::string& channel_value, const std::string& protocol) {
+    ConstPutOperationUPtr result;
     std::unique_lock guard(channel_map_mutex);
     if (auto search = channel_map.find(channel_name); search != channel_map.end()) {
         // the same channel is in monitor so we can use it
-        search->second->putData("value", channel_value);
+        result = search->second->putValue(channel_value);
     } else {
         // allocate channel and return data
         auto channel = std::make_unique<EpicsChannel>(protocol, channel_name);
         channel->connect();
-        channel->putData("value", channel_value);
+        result = channel->putValue(channel_value);
     }
+    return result;
 }
 
 size_t EpicsServiceManager::getChannelMonitoredSize() {
