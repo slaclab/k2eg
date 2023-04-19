@@ -13,15 +13,27 @@ typedef std::unique_ptr<const x> Const##x##UPtr; \
 typedef std::shared_ptr<x> x##ShrdPtr; \
 typedef std::shared_ptr<const x> Const##x##ShrdPtr; \
 template<typename... _Args> \
+inline x##UPtr Make##x##UPtr(_Args&... __args) \
+{ \
+    return std::make_unique<x>(__args...); \
+} \
+template<typename... _Args> \
 inline x##UPtr Make##x##UPtr(_Args&&... __args) \
 { \
     return std::make_unique<x>(__args...); \
+} \
+template<typename... _Args> \
+inline x##ShrdPtr Make##x##ShrdPtr(_Args&... __args) \
+{ \
+    return std::make_shared<x>(__args...); \
 } \
 template<typename... _Args> \
 inline x##ShrdPtr Make##x##ShrdPtr(_Args&&... __args) \
 { \
     return std::make_shared<x>(__args...); \
 }
+
+
 
 
 

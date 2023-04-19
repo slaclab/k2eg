@@ -14,9 +14,9 @@
 namespace k2eg::controller::node::worker {
 
 struct PutOpInfo {
-    const std::string channel_name;
-    const std::string value;
-    service::epics_impl::ConstPutOperationShrdPtr op;
+    std::string channel_name;
+    std::string value;
+    service::epics_impl::ConstPutOperationUPtr op;
 };
 DEFINE_PTR_TYPES(PutOpInfo)
 

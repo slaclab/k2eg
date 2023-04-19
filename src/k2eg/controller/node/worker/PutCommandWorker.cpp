@@ -1,7 +1,9 @@
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/worker/PutCommandWorker.h>
 #include <k2eg/service/ServiceResolver.h>
+#include <memory>
 
+#include "k2eg/controller/command/cmd/Command.h"
 #include "k2eg/controller/command/cmd/PutCommand.h"
 #include "k2eg/service/epics/EpicsPutOperation.h"
 
@@ -27,7 +29,10 @@ PutCommandWorker::processCommand(ConstCommandShrdPtr command) {
   logger->logMessage(STRING_FORMAT("Perform put command for %1%", p_ptr->channel_name), LogLevel::DEBUG);
   auto put_op = epics_service_manager->putChannelData(p_ptr->channel_name, "value", p_ptr->value);
   processing_pool->push_task(
-      &PutCommandWorker::checkPutCompletion, this, MakePutOpInfoShrdPtr(p_ptr->channel_name, p_ptr->value, MakePutCommandShrdPtr(put_op)));
+      &PutCommandWorker::checkPutCompletion, 
+      this,
+      std::make_shared<PutOpInfo>(p_ptr->channel_name, p_ptr->value, std::move(put_op))
+      );
 }
 
 void
