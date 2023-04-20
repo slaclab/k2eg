@@ -18,9 +18,9 @@
 #include <random>
 #include <string>
 
-#include "k2eg/controller/command/cmd/PutCommand.h"
-#include "k2eg/service/epics/EpicsData.h"
-#include "msgpack/v3/object_fwd_decl.hpp"
+#include <k2eg/controller/command/cmd/PutCommand.h>
+#include <k2eg/service/epics/EpicsData.h>
+
 namespace bj = boost::json;
 
 namespace fs = std::filesystem;
@@ -326,6 +326,20 @@ TEST(NodeController, GetCommandBadChannel) {
   // we need to have publish some message
   size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
   EXPECT_EQ(published, 0);
+
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
+TEST(NodeController, PutCommandBadChannel) {
+  std::latch work_done{1};
+  // set environment variable for test
+  auto node_controller = initBackend(std::make_shared<DummyPublisher>(work_done));
+
+  EXPECT_NO_THROW(node_controller->submitCommand(
+      {std::make_shared<const PutCommand>(PutCommand{CommandType::put, MessageSerType::unknown, "pva", "bad:channel:name", "1"})}););
+
+  //this should give the timeout of the put command so the node controller will exit without problem
 
   // dispose all
   deinitBackend(std::move(node_controller));

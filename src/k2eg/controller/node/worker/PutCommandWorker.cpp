@@ -41,6 +41,13 @@ PutCommandWorker::processCommand(ConstCommandShrdPtr command) {
 
 void
 PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
+    // check for timeout 
+  if(put_info->isTimeout()) {
+    logger->logMessage(STRING_FORMAT("Timeout put command for %1% and value %2%", put_info->channel_name % put_info->value), LogLevel::ERROR);
+    return;
+  } 
+  //give some time of relaxing
+  std::this_thread::sleep_for(std::chrono::milliseconds(20));
   if (!put_info->op->isDone()) {
     // re-enque the op class
     processing_pool->push_task(&PutCommandWorker::checkPutCompletion, this, put_info);

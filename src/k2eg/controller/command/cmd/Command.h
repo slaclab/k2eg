@@ -3,6 +3,7 @@
 
 #include <boost/json.hpp>
 #include <string>
+#include <k2eg/common/types.h>
 
 namespace k2eg::controller::command::cmd {
 
