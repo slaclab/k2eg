@@ -15,7 +15,7 @@ services:
       driver: none
       
   zookeeper:
-    image: bitnami/zookeeper:3.7
+    image: bitnami/zookeeper:3.8.1
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
     logging:

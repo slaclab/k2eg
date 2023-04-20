@@ -41,7 +41,7 @@ services:
       - ../test/epics-test.db:/db/softioc.db
   
   zookeeper:
-    image: bitnami/zookeeper:latest
+    image: bitnami/zookeeper:3.8.1
     ports:
       - 2181:2181
     environment:
