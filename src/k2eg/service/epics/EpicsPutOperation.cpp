@@ -1,11 +1,15 @@
 #include <k2eg/service/epics/EpicsPutOperation.h>
 #include <pv/createRequest.h>
+#include "pvData.h"
 
 using namespace k2eg::service::epics_impl;
 
 namespace pvd = epics::pvData;
 
-PutOperation::PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const pvd::PVStructure::const_shared_pointer& pvReq, const std::string& field, const std::string& value)
+PutOperation::PutOperation(std::shared_ptr<pvac::ClientChannel>          channel,
+                           const pvd::PVStructure::const_shared_pointer& pvReq,
+                           const std::string&                            field,
+                           const std::string&                            value)
     : channel(channel), field(field), value(value), done(false) {
   op = channel->put(this, pvReq);
 }
@@ -18,16 +22,45 @@ PutOperation::putBuild(const epics::pvData::StructureConstPtr& build, pvac::Clie
   // note: an exception thrown here will result in putDone() w/ Fail
   // allocate a new structure instance.
   // we are one-shot so don't bother to re-use
+  std::size_t field_bit = 0;
   pvd::PVStructurePtr root(pvd::getPVDataCreate()->createPVStructure(build));
   // we only know about writes to scalar 'value' field
-  pvd::PVScalarPtr valfld(root->getSubFieldT<pvd::PVScalar>(field));
-
+  auto fld = root->getSubField(field);
+  switch (fld->getField()->getType()) {
+    case pvd::scalar: {
+      pvd::PVScalarPtr pv = static_pointer_cast<pvd::PVScalar>(fld);
+      pv->putFrom(value);
+      field_bit = pv->getFieldOffset();
+      break;
+    }
+    case pvd::scalarArray: {
+      pvd::PVScalarArrayPtr pvArray = static_pointer_cast<pvd::PVScalarArray>(fld);
+      std::string cn;
+      std::istringstream array_stream(value);
+      pvd::PVStringArray::svector vec_values;
+      //std::vector<std::string> vec_values;
+      while (true)
+      {
+          array_stream >> cn;
+          if (!(array_stream))
+              break;
+          vec_values.push_back(cn);
+      }
+      pvArray->putFrom<std::string>(freeze(vec_values));
+      field_bit = pvArray->getFieldOffset();
+      break;
+    }
+    case epics::pvData::structure: break;
+    case epics::pvData::structureArray: break;
+    case epics::pvData::union_: break;
+    case epics::pvData::unionArray: break;
+  }
   // attempt convert string to actual field type
-  valfld->putFrom(value);
+  //valfld->putFrom(value);
   args.root = root;  // non-const -> const
   // mark only 'value' field to be sent.
   // other fields w/ default values won't be sent.
-  args.tosend.set(valfld->getFieldOffset());
+  args.tosend.set(field_bit);
 }
 
 void

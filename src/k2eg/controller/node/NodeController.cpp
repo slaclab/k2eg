@@ -51,6 +51,10 @@ void NodeController::reloadPersistentCommand() {
     );
 }
 
+void NodeController::waitForTaskCompletion() {
+    processing_pool->wait_for_tasks();
+}
+
 void NodeController::submitCommand(ConstCommandShrdPtrVec commands) {
     // scann and process al command
     for (auto& c: commands) {

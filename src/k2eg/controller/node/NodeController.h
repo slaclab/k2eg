@@ -38,6 +38,8 @@ public:
     // apply all the spermanent command
     void reloadPersistentCommand();
     
+    void waitForTaskCompletion();
+
     // Process an array of command
     void submitCommand(k2eg::controller::command::cmd::ConstCommandShrdPtrVec commands);
 };

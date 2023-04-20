@@ -28,7 +28,7 @@ class PutCommandWorker : public CommandWorker {
     void checkPutCompletion(PutOpInfoShrdPtr put_info);
 public:
     PutCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
-    virtual ~PutCommandWorker() = default;
+    virtual ~PutCommandWorker();
     void processCommand(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 };
 }

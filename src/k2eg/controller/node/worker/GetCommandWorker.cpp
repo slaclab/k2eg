@@ -46,6 +46,5 @@ void GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
         // data not received => timeout
         logger->logMessage(STRING_FORMAT("Message not recevide for %1%", g_ptr->channel_name), LogLevel::ERROR);
     }
-    return;
 }
 #pragma endregion GetCommandWorker

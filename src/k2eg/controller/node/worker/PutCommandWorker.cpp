@@ -22,9 +22,13 @@ using namespace k2eg::common;
 PutCommandWorker::PutCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager)
     : processing_pool(std::make_shared<BS::thread_pool>()), logger(ServiceResolver<ILogger>::resolve()), epics_service_manager(epics_service_manager) {}
 
+PutCommandWorker::~PutCommandWorker() {
+  processing_pool->wait_for_tasks();
+}
+
 void
 PutCommandWorker::processCommand(ConstCommandShrdPtr command) {
-  if (command->type != CommandType::get) return;
+  if (command->type != CommandType::put) return;
   ConstPutCommandShrdPtr p_ptr = static_pointer_cast<const PutCommand>(command);
   logger->logMessage(STRING_FORMAT("Perform put command for %1%", p_ptr->channel_name), LogLevel::DEBUG);
   auto put_op = epics_service_manager->putChannelData(p_ptr->channel_name, "value", p_ptr->value);
@@ -43,10 +47,10 @@ PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
   } else {
     switch (put_info->op->getState().event) {
       case pvac::PutEvent::Fail:
-        logger->logMessage(STRING_FORMAT("Failed put command for %1% and value %2%", put_info->channel_name % put_info->value), LogLevel::INFO);
+        logger->logMessage(STRING_FORMAT("Failed put command for %1% and value %2%", put_info->channel_name % put_info->value), LogLevel::ERROR);
         break;
       case pvac::PutEvent::Cancel:
-        logger->logMessage(STRING_FORMAT("Cancelled put command for %1% and value %2%", put_info->channel_name % put_info->value), LogLevel::INFO);
+        logger->logMessage(STRING_FORMAT("Cancelled put command for %1% and value %2%", put_info->channel_name % put_info->value), LogLevel::ERROR);
         break;
       case pvac::PutEvent::Success:
         logger->logMessage(STRING_FORMAT("Success put command for %1% and value %2%", put_info->channel_name % put_info->value), LogLevel::INFO);
