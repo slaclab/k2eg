@@ -4,12 +4,15 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 #include <thread>
+#include "k2eg/service/epics/EpicsGetOperation.h"
 #include "k2eg/service/epics/EpicsPutOperation.h"
 #include "epics.h"
 #include "pvData.h"
 
 using namespace k2eg::service::epics_impl;
 
+#define WHILE(x,v) \
+do{std::this_thread::sleep_for(std::chrono::milliseconds(250));}while(x == v)
 
 TEST(Epics, ChannelFault) {
     INIT_CA_PROVIDER()
@@ -37,6 +40,18 @@ TEST(Epics, ChannelOKWithAddress) {
     EXPECT_NE(val, nullptr);
 }
 
+TEST(Epics, ChannelGetOpOk) {
+    INIT_PVA_PROVIDER()
+    EpicsChannelUPtr pc;
+    ConstGetOperationUPtr get_op;
+    epics::pvData::PVStructure::const_shared_pointer val;
+    EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
+    // EXPECT_NO_THROW(pc->connect());
+    EXPECT_NO_THROW(get_op = pc->get(););
+    WHILE(get_op->isDone(), false);
+    EXPECT_EQ(get_op->getState().event, pvac::GetEvent::Success);
+}
+
 bool retry_eq(const EpicsChannel& channel, const std::string& name, double value, int mseconds, int retry_times) {
     for (int times = retry_times; times != 0; times--) {
         auto val = channel.getData();
@@ -49,9 +64,6 @@ bool retry_eq(const EpicsChannel& channel, const std::string& name, double value
     return false;
 }
 
-
-#define WHILE(x,v) \
-do{std::this_thread::sleep_for(std::chrono::milliseconds(250));}while(x == v)
 TEST(Epics, ChannelPutValue) {
      INIT_PVA_PROVIDER()
     ConstPutOperationUPtr put_op_a;
@@ -189,7 +201,7 @@ TEST(Epics, EpicsServiceManagerGetPutWaveForm) {
     ConstPutOperationUPtr put_op_a;
     ConstPutOperationUPtr put_op_b;
     std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-    EXPECT_NO_THROW(put_op_a = manager->putChannelData("channel:waveform", "value", "8 1 2 3 4 5 6 7 8"););
+    EXPECT_NO_THROW(put_op_a = manager->putChannelData("channel:waveform", "value", "1 2 3 4 5 6 7 8"););
     WHILE(put_op_a->isDone(), false);
     EXPECT_NO_THROW(sum_data = manager->getChannelData("channel:waveform"););
     epics::pvData::PVScalarArray::const_shared_pointer arr_result;

@@ -1,6 +1,7 @@
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <pv/caProvider.h>
 #include <pv/clientFactory.h>
+#include "k2eg/service/epics/EpicsGetOperation.h"
 #include "k2eg/service/epics/EpicsPutOperation.h"
 
 using namespace k2eg::service::epics_impl;
@@ -54,6 +55,11 @@ EpicsChannel::getData() const {
 ConstPutOperationUPtr
 EpicsChannel::put(const std::string& field, const std::string& value) {
   return MakePutOperationUPtr(channel, pvReq, field, value);
+}
+
+ConstGetOperationUPtr
+EpicsChannel::get() {
+  return MakeGetOperationUPtr(channel, channel_name);
 }
 
 void
