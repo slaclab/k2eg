@@ -1,6 +1,7 @@
 #include <chrono>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <ranges>
+#include "k2eg/service/epics/EpicsGetOperation.h"
 #include "k2eg/service/epics/EpicsPutOperation.h"
 
 using namespace k2eg::common;
@@ -69,16 +70,32 @@ void EpicsServiceManager::monitorChannel(const std::string& channel_name, bool a
     }
 }
 
-ConstChannelDataUPtr EpicsServiceManager::getChannelData(const std::string& channel_name, const std::string& protocol) {
-    // allocate channel and return data
-    auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), channel_name);
-    return channel->getChannelData();
+ConstGetOperationUPtr EpicsServiceManager::getChannelData(const std::string& channel_name, const std::string& protocol) {
+    ConstGetOperationUPtr result;
+    std::unique_lock guard(channel_map_mutex);
+    if (auto search = channel_map.find(channel_name); search != channel_map.end()) {
+        // the same channel is in monitor so we can use it
+        result = search->second->get();
+    } else {
+        // allocate channel and return data
+        auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), channel_name);
+        result = channel->get();
+    }
+    return result;
 }
 
 ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& channel_name, const std::string& field, const std::string& value, const std::string& protocol) {
-    // allocate channel and return data
-    auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), channel_name);
-    return channel->put(field, value);
+    ConstPutOperationUPtr result;
+    std::unique_lock guard(channel_map_mutex);
+    if (auto search = channel_map.find(channel_name); search != channel_map.end()) {
+        // the same channel is in monitor so we can use it
+        result = search->second->put(field, value);
+    } else {
+        // allocate channel and return data
+        auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), channel_name);
+        result = channel->put(field, value);
+    }
+    return result;
 }
 
 size_t EpicsServiceManager::getChannelMonitoredSize() {

@@ -14,11 +14,11 @@ EpicsChannel::EpicsChannel(pvac::ClientProvider& provider, const std::string& ch
   //provider = std::make_unique<pvac::ClientProvider>(provider_name, conf);
   pvac::ClientChannel::Options opt;
   if (!address.empty()) { opt.address = address; }
-  channel = std::make_unique<pvac::ClientChannel>(provider.connect(channel_name, opt));
+  channel = std::make_shared<pvac::ClientChannel>(provider.connect(channel_name, opt));
 }
 
 EpicsChannel::~EpicsChannel() {
-  if (channel) { channel->reset(); }
+  //if (channel) { channel->reset(); }
   //if (provider) { provider->disconnect(); }
 }
 

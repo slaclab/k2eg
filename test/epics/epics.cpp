@@ -180,7 +180,7 @@ TEST(Epics, EpicsServiceManagerRemoveHandler) {
 
 TEST(Epics, EpicsServiceManagerGetPut) {
     allEvent.clear();
-    ConstChannelDataUPtr sum_data;
+    ConstGetOperationUPtr sum_data;
     ConstPutOperationUPtr put_op_a;
     ConstPutOperationUPtr put_op_b;
     std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
@@ -191,21 +191,23 @@ TEST(Epics, EpicsServiceManagerGetPut) {
     //give time to update
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_NO_THROW(sum_data = manager->getChannelData("variable:sum"););
-    EXPECT_EQ(sum_data->data->getSubField<epics::pvData::PVDouble>("value")->get(), 3);
+    WHILE(sum_data->isDone(), false);
+    EXPECT_EQ(sum_data->getChannelData()->data->getSubField<epics::pvData::PVDouble>("value")->get(), 3);
     manager.reset();
 }
 
 TEST(Epics, EpicsServiceManagerGetPutWaveForm) {
     allEvent.clear();
-    ConstChannelDataUPtr sum_data;
+    ConstGetOperationUPtr sum_data;
     ConstPutOperationUPtr put_op_a;
     ConstPutOperationUPtr put_op_b;
     std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
     EXPECT_NO_THROW(put_op_a = manager->putChannelData("channel:waveform", "value", "1 2 3 4 5 6 7 8"););
     WHILE(put_op_a->isDone(), false);
     EXPECT_NO_THROW(sum_data = manager->getChannelData("channel:waveform"););
+    WHILE(sum_data->isDone(), false);
     epics::pvData::PVScalarArray::const_shared_pointer arr_result;
-    EXPECT_NO_THROW(arr_result = sum_data->data->getSubField<epics::pvData::PVScalarArray>("value"));
+    EXPECT_NO_THROW(arr_result = sum_data->getChannelData()->data->getSubField<epics::pvData::PVScalarArray>("value"));
     epics::pvData::shared_vector<const double> arr;
     arr_result->getAs<const double>(arr);
     EXPECT_EQ(arr.size(), 8);

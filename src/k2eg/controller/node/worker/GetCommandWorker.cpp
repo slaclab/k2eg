@@ -3,6 +3,8 @@
 #include <k2eg/service/ServiceResolver.h>
 
 #include <k2eg/common/utility.h>
+#include <chrono>
+#include <thread>
 
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::command;
@@ -40,8 +42,9 @@ void GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
     ConstGetCommandShrdPtr g_ptr = static_pointer_cast<const GetCommand>(command);
     logger->logMessage(STRING_FORMAT("Perform get command for %1% on topic %2% with sertype: %3%", g_ptr->channel_name%g_ptr->destination_topic%serialization_to_string(g_ptr->serialization)), LogLevel::DEBUG);
     auto channel_data = epics_service_manager->getChannelData(g_ptr->channel_name);
+    while(!channel_data->isDone()){std::this_thread::sleep_for(std::chrono::milliseconds(100));}
     if(channel_data) {
-        publisher->pushMessage(std::make_unique<GetMessage>(g_ptr->destination_topic, std::move(channel_data), static_cast<SerializationType>(command->serialization)));
+        publisher->pushMessage(std::make_unique<GetMessage>(g_ptr->destination_topic, std::move(channel_data->getChannelData()), static_cast<SerializationType>(command->serialization)));
     } else {
         // data not received => timeout
         logger->logMessage(STRING_FORMAT("Message not recevide for %1%", g_ptr->channel_name), LogLevel::ERROR);

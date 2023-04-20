@@ -34,7 +34,7 @@ public:
     void addChannel(const std::string& channel_name, const std::string& protocol = "pva");
     void removeChannel(const std::string& channel_name);
     void monitorChannel(const std::string& channel_name, bool activate, const std::string& protocol);
-    ConstChannelDataUPtr getChannelData(const std::string& channel_name, const std::string& protocol = "pva");
+    ConstGetOperationUPtr getChannelData(const std::string& channel_name, const std::string& protocol = "pva");
     ConstPutOperationUPtr putChannelData(const std::string& channel_name, const std::string& field, const std::string& value, const std::string& protocol = "pva");
     size_t getChannelMonitoredSize();
     /**
