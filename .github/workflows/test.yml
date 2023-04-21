@@ -46,7 +46,7 @@ jobs:
                 chmod 777 docker/run-test.sh
                 echo "Create test environment from $TEST_IMAGE"
                 docker compose -f docker/docker-compose.yml -f docker/docker-compose-app.yml build --build-arg TEST_IMAGE=${{ inputs.build_image  }}
-                docker compose -f docker/docker-compose.yml -f docker/docker-compose-app.yml run app --exit-code-from app
+                docker compose -f docker/docker-compose.yml -f docker/docker-compose-app.yml up --exit-code-from app
             - name: Clean resources
               if: always()
               run: |
