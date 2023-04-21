@@ -27,6 +27,7 @@ services:
       - 9092:9092
       - 9093:9093
     environment:
+      - BITNAMI_DEBUG=yes
       - KAFKA_BROKER_ID=1
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
       - ALLOW_PLAINTEXT_LISTENER=yes
