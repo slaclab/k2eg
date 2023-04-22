@@ -15,7 +15,7 @@ services:
       driver: none
       
   zookeeper:
-    image: bitnami/zookeeper:latest
+    image: bitnami/zookeeper:3.8.1
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
     logging:
@@ -27,7 +27,9 @@ services:
       - 9092:9092
       - 9093:9093
     environment:
+      - BITNAMI_DEBUG=yes
       - KAFKA_BROKER_ID=1
+      - KAFKA_ENABLE_KRAFT=no
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
       - ALLOW_PLAINTEXT_LISTENER=yes
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT

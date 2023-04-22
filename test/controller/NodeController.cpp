@@ -17,7 +17,10 @@
 #include <msgpack.hpp>
 #include <random>
 #include <string>
-#include "msgpack/v3/object_fwd_decl.hpp"
+
+#include <k2eg/controller/command/cmd/PutCommand.h>
+#include <k2eg/service/epics/EpicsData.h>
+
 namespace bj = boost::json;
 
 namespace fs = std::filesystem;
@@ -296,8 +299,8 @@ TEST(NodeController, GetCommandMsgPackCompack) {
   // set environment variable for test
   auto node_controller = initBackend(publisher);
 
-  EXPECT_NO_THROW(node_controller->submitCommand(
-      {std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::msgpack_compact, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(
+      GetCommand{CommandType::get, MessageSerType::msgpack_compact, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
 
   work_done.wait();
   // we need to have publish some message
@@ -327,6 +330,55 @@ TEST(NodeController, GetCommandBadChannel) {
   // dispose all
   deinitBackend(std::move(node_controller));
 }
+
+TEST(NodeController, PutCommandBadChannel) {
+  std::latch work_done{1};
+  // set environment variable for test
+  auto node_controller = initBackend(std::make_shared<DummyPublisher>(work_done));
+
+  EXPECT_NO_THROW(node_controller->submitCommand(
+      {std::make_shared<const PutCommand>(PutCommand{CommandType::put, MessageSerType::unknown, "pva", "bad:channel:name", "1"})}););
+
+  //this should give the timeout of the put command so the node controller will exit without problem
+
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
+typedef std::vector<msgpack::object> MsgpackObjectVector;
+TEST(NodeController, PutCommand) {
+  std::latch           work_done{1};
+  ConstChannelDataUPtr value_readout;
+  std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
+  // set environment variable for test
+  auto node_controller = initBackend(publisher);
+
+  EXPECT_NO_THROW(node_controller->submitCommand(
+      {std::make_shared<const PutCommand>(PutCommand{CommandType::put, MessageSerType::unknown, "pva", "channel:waveform", "8 0 0 0 0 0 0 0 0"})}););
+  // give some time for the timeout
+  //sleep(2);
+
+  EXPECT_NO_THROW(node_controller->submitCommand(
+      {std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::msgpack_compact, "pva", "channel:waveform", KAFKA_TOPIC_ACQUIRE_IN})}););
+
+  // wait for the result of get command
+  work_done.wait();
+
+  msgpack::object msgpack_object;
+  EXPECT_NO_THROW(msgpack_object = getMsgPackObject(*publisher->sent_messages[0]););
+
+  EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
+
+  auto vec = msgpack_object.as<MsgpackObjectVector>();
+  EXPECT_EQ(vec[1].type, msgpack::type::ARRAY);
+
+  auto value_vec = vec[1].as<MsgpackObjectVector>();
+  EXPECT_EQ(value_vec[0].type, msgpack::type::POSITIVE_INTEGER);;
+
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
 #endif  // __linux__
 TEST(NodeController, RandomCommand) {
   std::latch work_done{1};
@@ -353,6 +405,7 @@ TEST(NodeController, RandomCommand) {
       }
     }
   }
+  node_controller->waitForTaskCompletion();
   // dispose all
   deinitBackend(std::move(node_controller));
 }

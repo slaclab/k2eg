@@ -18,7 +18,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/configuration/coverage.cmake)
 
 set(CMAKE_CXX_STANDARD 20)
 set(BOOST_VERSION 1.77.0)
-set(EPICS_VERSION R7.0.3.1)
+set(EPICS_VERSION R7.0.7)
 set(LIBLZ4_VERSION v1.9.2)
 set(LIBRDKAFKA_VERSION v2.0.2)
 set(SQLITE_VERSION version-3.41.2)
@@ -50,10 +50,13 @@ set(COMMON_SOURCE_FILES
 
   src/k2eg/service/epics/EpicsData.cpp
   src/k2eg/service/epics/EpicsChannel.cpp
+  src/k2eg/service/epics/EpicsPutOperation.cpp
+  src/k2eg/service/epics/EpicsGetOperation.cpp
   src/k2eg/service/epics/EpicsServiceManager.cpp
   src/k2eg/service/epics/JsonSerialization.cpp
   src/k2eg/service/epics/MsgPackSerialization.cpp
   src/k2eg/service/epics/MsgpackCompactSerialization.cpp
+  
   src/k2eg/service/pubsub/IPublisher.cpp
   src/k2eg/service/pubsub/ISubscriber.cpp
 
@@ -70,6 +73,7 @@ set(COMMON_SOURCE_FILES
   src/k2eg/controller/node/configuration/NodeConfiguration.cpp
   src/k2eg/controller/node/worker/MonitorCommandWorker.cpp
   src/k2eg/controller/node/worker/GetCommandWorker.cpp
+  src/k2eg/controller/node/worker/PutCommandWorker.cpp
 )
 
 set(SOURCE_FILES

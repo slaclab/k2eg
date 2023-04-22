@@ -22,6 +22,8 @@ class EpicsServiceManager {
     std::map<std::string, std::shared_ptr<EpicsChannel>> channel_map;
     std::unique_ptr<std::thread> scheduler_thread;
     k2eg::common::broadcaster<EpicsServiceManagerHandlerParamterType> handler_broadcaster;
+    std::unique_ptr<pvac::ClientProvider> pva_provider;
+    std::unique_ptr<pvac::ClientProvider> ca_provider;
     bool run = false;
     void task();
     void processIterator(const std::shared_ptr<EpicsChannel>& epics_channel);
@@ -32,8 +34,8 @@ public:
     void addChannel(const std::string& channel_name, const std::string& protocol = "pva");
     void removeChannel(const std::string& channel_name);
     void monitorChannel(const std::string& channel_name, bool activate, const std::string& protocol);
-    ConstChannelDataUPtr getChannelData(const std::string& channel_name, const std::string& protocol = "pva");
-
+    ConstGetOperationUPtr getChannelData(const std::string& channel_name, const std::string& protocol = "pva");
+    ConstPutOperationUPtr putChannelData(const std::string& channel_name, const std::string& field, const std::string& value, const std::string& protocol = "pva");
     size_t getChannelMonitoredSize();
     /**
      * Register an event handler and return a token. Unitl this token is alive

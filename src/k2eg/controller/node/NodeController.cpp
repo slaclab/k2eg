@@ -1,8 +1,10 @@
 #include <k2eg/controller/node/NodeController.h>
 
 //------------ command include ----------
-#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
 #include <k2eg/controller/node/worker/GetCommandWorker.h>
+#include <k2eg/controller/node/worker/PutCommandWorker.h>
+#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
+
 #include <k2eg/service/ServiceResolver.h>
 
 #include <k2eg/common/utility.h>
@@ -33,6 +35,9 @@ NodeController::NodeController(DataStorageUPtr data_storage)
     worker_resolver.registerObjectInstance(
         CommandType::get,
         std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
+    worker_resolver.registerObjectInstance(
+        CommandType::put,
+        std::make_shared<PutCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
 }
 
 NodeController::~NodeController() { processing_pool->wait_for_tasks(); }
@@ -44,6 +49,10 @@ void NodeController::reloadPersistentCommand() {
            submitCommand({command});
         }   
     );
+}
+
+void NodeController::waitForTaskCompletion() {
+    processing_pool->wait_for_tasks();
 }
 
 void NodeController::submitCommand(ConstCommandShrdPtrVec commands) {

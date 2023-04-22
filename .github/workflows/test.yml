@@ -27,6 +27,9 @@ jobs:
               with:
                 name: ${{ inputs.artifact_name }}
                 path: docker/build/local
+            - name: Clean resources
+              run: |
+                docker compose -f docker/docker-compose.yml -f docker/docker-compose-app.yml down -v --rmi all
             - name: Execute Tests
               run: |
                 apk add curl
@@ -44,6 +47,10 @@ jobs:
                 echo "Create test environment from $TEST_IMAGE"
                 docker compose -f docker/docker-compose.yml -f docker/docker-compose-app.yml build --build-arg TEST_IMAGE=${{ inputs.build_image  }}
                 docker compose -f docker/docker-compose.yml -f docker/docker-compose-app.yml up --attach app --exit-code-from app
+            - name: Clean resources
+              if: always()
+              run: |
+                docker compose -f docker/docker-compose.yml -f docker/docker-compose-app.yml down -v --rmi all
             - uses: ouzi-dev/commit-status-updater@v2
               with:
                 status: success
