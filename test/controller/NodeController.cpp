@@ -11,12 +11,14 @@
 #include <k2eg/service/pubsub/pubsub.h>
 
 #include <boost/json.hpp>
+#include <chrono>
 #include <ctime>
 #include <filesystem>
 #include <latch>
 #include <msgpack.hpp>
 #include <random>
 #include <string>
+#include <thread>
 
 #include <k2eg/controller/command/cmd/PutCommand.h>
 #include <k2eg/service/epics/EpicsData.h>
@@ -427,16 +429,19 @@ TEST(NodeController, RandomCommand) {
   for (int idx = 0; idx < 10000; idx++) {
     switch (random_num(0, 2)) {
       case 0: {
+        std::this_thread::sleep_for(std::chrono::microseconds(random_num(1, 1000)));
         EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
             MonitorCommand{CommandType::monitor, MessageSerType::json, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
         break;
       }
       case 1: {
+        std::this_thread::sleep_for(std::chrono::microseconds(random_num(1, 1000)));
         EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
             MonitorCommand{CommandType::monitor, MessageSerType::json, "pva", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
         break;
       }
       case 2: {
+        std::this_thread::sleep_for(std::chrono::microseconds(random_num(1, 1000)));
         EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(
           GetCommand{CommandType::get, MessageSerType::json, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
         break;
