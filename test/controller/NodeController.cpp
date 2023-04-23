@@ -126,11 +126,11 @@ getJsonObject(PublishMessage& published_message) {
   if (ec) throw std::runtime_error("invalid json");
   return result;
 }
-msgpack::object
+msgpack::unpacked
 getMsgPackObject(PublishMessage& published_message) {
   msgpack::unpacked msg_upacked;
   msgpack::unpack(msg_upacked, published_message.getBufferPtr(), published_message.getBufferSize());
-  return msg_upacked.get();
+  return msg_upacked;
 }
 
 TEST(NodeController, MonitorCommandJsonSerByDefault) {
@@ -186,8 +186,10 @@ TEST(NodeController, MonitorCommandMsgPackSer) {
   EXPECT_EQ(ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(), published);
 
   // check that we have msgpack data
+  msgpack::unpacked msgpack_unpacked;
   msgpack::object msgpack_object;
-  EXPECT_NO_THROW(msgpack_object = getMsgPackObject(*publisher->sent_messages[0]););
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+  msgpack_object = msgpack_unpacked.get();
   EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
   // dispose all
   deinitBackend(std::move(node_controller));
@@ -217,8 +219,10 @@ TEST(NodeController, MonitorCommandMsgPackCompactSer) {
   EXPECT_EQ(ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(), published);
 
   // check that we have msgpack compact
+  msgpack::unpacked msgpack_unpacked;
   msgpack::object msgpack_object;
-  EXPECT_NO_THROW(msgpack_object = getMsgPackObject(*publisher->sent_messages[0]););
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+  msgpack_object = msgpack_unpacked.get();
   EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
   // dispose all
   deinitBackend(std::move(node_controller));
@@ -286,8 +290,10 @@ TEST(NodeController, GetCommandMsgPack) {
   size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
   EXPECT_NE(published, 0);
   // check for msgpack map
+  msgpack::unpacked msgpack_unpacked;
   msgpack::object msgpack_object;
-  EXPECT_NO_THROW(msgpack_object = getMsgPackObject(*publisher->sent_messages[0]););
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+  msgpack_object = msgpack_unpacked.get();
   EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
   // dispose all
   deinitBackend(std::move(node_controller));
@@ -307,8 +313,10 @@ TEST(NodeController, GetCommandMsgPackCompack) {
   size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
   EXPECT_NE(published, 0);
   // check for masgpack compact array
+  msgpack::unpacked msgpack_unpacked;
   msgpack::object msgpack_object;
-  EXPECT_NO_THROW(msgpack_object = getMsgPackObject(*publisher->sent_messages[0]););
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+  msgpack_object = msgpack_unpacked.get();
   EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
   // dispose all
   deinitBackend(std::move(node_controller));
@@ -363,10 +371,10 @@ TEST(NodeController, PutCommandScalar) {
 
   // wait for the result of get command
   work_done.wait();
-
+  msgpack::unpacked msgpack_unpacked;
   msgpack::object msgpack_object;
-  EXPECT_NO_THROW(msgpack_object = getMsgPackObject(*publisher->sent_messages[0]););
-
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+  msgpack_object = msgpack_unpacked.get();
   EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
 
   auto vec = msgpack_object.as<MsgpackObjectVector>();
@@ -393,10 +401,10 @@ TEST(NodeController, PutCommandScalarArray) {
 
   // wait for the result of get command
   work_done.wait();
-
+  msgpack::unpacked msgpack_unpacked;
   msgpack::object msgpack_object;
-  EXPECT_NO_THROW(msgpack_object = getMsgPackObject(*publisher->sent_messages[0]););
-
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+  msgpack_object = msgpack_unpacked.get();
   EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
 
   auto vec = msgpack_object.as<MsgpackObjectVector>();
