@@ -13,9 +13,6 @@ find_package(Git)
 message(STATUS "GIT_EXECUTABLE='${GIT_EXECUTABLE}'")
 message(STATUS "Using compiler ${CMAKE_CXX_COMPILER_ID}_${CMAKE_CXX_COMPILER_VERSION}")
 
-#manage code coverage
-include(${CMAKE_CURRENT_SOURCE_DIR}/configuration/coverage.cmake)
-
 set(CMAKE_CXX_STANDARD 20)
 set(BOOST_VERSION 1.77.0)
 set(EPICS_VERSION R7.0.7)
@@ -32,6 +29,15 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
 set(CMAKE_BINARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)
 set(SQLITE_INCLUDE ${CMAKE_INSTALL_PREFIX}/include)
+
+#manage code coverage
+include(${CMAKE_CURRENT_SOURCE_DIR}/configuration/coverage.cmake)
+#manage Address sanitizer
+if(${ENABLE_ASAN})
+  message(STATUS "Enable address sanitizer")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fsanitize=address")
+  set (CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fno-omit-frame-pointer -fsanitize=address")
+endif()
 
 
 configure_file(k2eg.h.in ../src/k2eg/config.h)

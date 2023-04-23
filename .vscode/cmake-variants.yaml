@@ -18,14 +18,18 @@ buildType:
       short: MinSizeRel 
       long: Release imnimum size
       buildType: MinSizeRel
-    asan:
+useAsan:
+  default: NoAsan
+  description: "Address Sinitizer"
+  choices:
+    Asan:
       short: Asan
-      long: Instrument with Address Sanitizer
-      buildType: Asan
-    tsan:
-      short: Tsan
-      long: Instrument with Thread Sanitizer
-      buildType: Tsan
+      settings: 
+        ENABLE_ASAN: yes
+    NoAsan:
+      short: NoAsan
+      settings: 
+        ENABLE_ASAN: no
 useCoverage:
   default: NoCover
   description: "Code coverage"
