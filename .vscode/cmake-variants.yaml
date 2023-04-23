@@ -18,6 +18,18 @@ buildType:
       short: MinSizeRel 
       long: Release imnimum size
       buildType: MinSizeRel
+useAsan:
+  default: NoAsan
+  description: "Address Sinitizer"
+  choices:
+    Asan:
+      short: Asan
+      settings: 
+        ENABLE_ASAN: yes
+    NoAsan:
+      short: NoAsan
+      settings: 
+        ENABLE_ASAN: no
 useCoverage:
   default: NoCover
   description: "Code coverage"

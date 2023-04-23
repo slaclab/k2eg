@@ -153,4 +153,14 @@ The **monitor** command permits to enable or disable the update notification, fo
     "activate": false
 }
 ```
-
+# Put Command
+Put command is ismilar to caput or pvput epics command, it permit to applya a value to a channel. IN case the channel is a scalar array, each value need to be separated by a space, like in the example below.
+## JSON Structure
+```json
+{
+    "command": "put",
+    "protocol": "pva|ca",
+    "channel_name": "channel name",
+    "value": "<value>|<value> <value> <value> <value>"
+}
+```

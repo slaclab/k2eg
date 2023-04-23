@@ -18,13 +18,15 @@ Actual implementation receive command and interpret command and uses only JSON s
 ### Command Task List
 - [x] Get Command
 - [x] Monitor Command
-- [ ] Put Command
+- [X] Put Command
+    - Scalar
+    - ScalarArray
 - [ ] Inf Command
 
 ### Functional Task List
 - [x] JSON Serialization
 - [X] MSGPack Binary serialization
-- [ ] MSGPack compact serialization
+- [X] MSGPack compact serialization
 - [ ] Filter out the message key
 - [ ] Advanced DAQ Specific logic
 - [ ] Cluster implementation

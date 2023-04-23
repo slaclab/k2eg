@@ -84,14 +84,15 @@ int RDKafkaPublisher::flush(const int timeo) {
 
 int RDKafkaPublisher::createQueue(const std::string& queue) {
     std::string errstr;
-    RdKafka::Topic* topic = nullptr;
+    std::unique_ptr<RdKafka::Topic> topic = nullptr;
     if (!queue.empty()) {
-        topic = RdKafka::Topic::create(producer.get(), queue, t_conf.get(), errstr);
+        topic = std::unique_ptr<RdKafka::Topic>(RdKafka::Topic::create(producer.get(), queue, t_conf.get(), errstr));
         if (!topic) {
             // RDK_PUB_ERR_ << "Failed to create topic: " << errstr;
             return -1;
         }
     }
+    
     return 0;
 }
 

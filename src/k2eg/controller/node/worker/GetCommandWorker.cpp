@@ -19,8 +19,11 @@ using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::pubsub;
 
 #pragma region GetMessage
-GetMessage::GetMessage(const std::string& destination_topic, ConstChannelDataUPtr channel_data, SerializationType ser_type)
-    : request_type("get"), destination_topic(destination_topic), channel_data(std::move(channel_data)), message(serialize(*this->channel_data, ser_type)) {}
+GetMessage::GetMessage(
+  const std::string& destination_topic, 
+  ConstChannelDataUPtr channel_data, 
+  ConstSerializedMessageShrdPtr message)
+    : request_type("get"), destination_topic(destination_topic), channel_data(std::move(channel_data)), message(message) {}
 
 char*
 GetMessage::getBufferPtr() {
@@ -51,6 +54,8 @@ GetCommandWorker::GetCommandWorker(EpicsServiceManagerShrdPtr epics_service_mana
       publisher(ServiceResolver<IPublisher>::resolve()),
       epics_service_manager(epics_service_manager) {}
 
+GetCommandWorker::~GetCommandWorker() { processing_pool->wait_for_tasks(); }
+
 void
 GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
   if (command->type != CommandType::get) return;
@@ -67,14 +72,14 @@ GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
 
 void
 GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
-  // check for timeout 
-  if(get_info->isTimeout()) {
+  // check for timeout
+  if (get_info->isTimeout()) {
     logger->logMessage(STRING_FORMAT("Timeout get command for %1%", get_info->channel_name), LogLevel::ERROR);
     return;
-  } 
-  //give some time of relaxing
+  }
+  // give some time of relaxing
   std::this_thread::sleep_for(std::chrono::milliseconds(20));
-  
+
   if (!get_info->op->isDone()) {
     // re-enque the op class
     processing_pool->push_task(&GetCommandWorker::checkGetCompletion, this, get_info);
@@ -84,8 +89,17 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
       case pvac::GetEvent::Cancel: logger->logMessage(STRING_FORMAT("Cancelled get command for %1%", get_info->channel_name), LogLevel::ERROR); break;
       case pvac::GetEvent::Success:
         logger->logMessage(STRING_FORMAT("Success get command for %1%", get_info->channel_name), LogLevel::INFO);
-        publisher->pushMessage(std::make_unique<GetMessage>(
-            get_info->destination_topic, std::move(get_info->op->getChannelData()), static_cast<SerializationType>(get_info->serialization)));
+        auto c_data = get_info->op->getChannelData();
+        if (!c_data) {
+          logger->logMessage(STRING_FORMAT("No data received for %1%", get_info->channel_name), LogLevel::ERROR);
+          break;
+        }
+        auto serialized_message = serialize(*c_data, static_cast<SerializationType>(get_info->serialization));
+        if (!serialized_message) {
+          logger->logMessage("Invalid serilized message", LogLevel::ERROR);
+          break;
+        }
+        publisher->pushMessage(std::make_unique<GetMessage>(get_info->destination_topic, std::move(get_info->op->getChannelData()), serialized_message));
         break;
     }
   }
