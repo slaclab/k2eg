@@ -424,7 +424,7 @@ TEST(NodeController, RandomCommand) {
   auto node_controller = initBackend(std::make_shared<DummyPublisher>(work_done));
 
   // send 100 random commands equence iteration
-  for (int idx = 0; idx < 1000; idx++) {
+  for (int idx = 0; idx < 10000; idx++) {
     switch (random_num(0, 2)) {
       case 0: {
         EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
