@@ -346,7 +346,37 @@ TEST(NodeController, PutCommandBadChannel) {
 }
 
 typedef std::vector<msgpack::object> MsgpackObjectVector;
-TEST(NodeController, PutCommand) {
+TEST(NodeController, PutCommandScalar) {
+  std::latch           work_done{1};
+  ConstChannelDataUPtr value_readout;
+  std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
+  // set environment variable for test
+  auto node_controller = initBackend(publisher);
+  auto random_scalar = random_num(1,100);
+  EXPECT_NO_THROW(node_controller->submitCommand(
+      {std::make_shared<const PutCommand>(PutCommand{CommandType::put, MessageSerType::unknown, "pva", "variable:b", std::to_string(random_scalar)})}););
+  // give some time for the timeout
+  //sleep(2);
+
+  EXPECT_NO_THROW(node_controller->submitCommand(
+      {std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::msgpack_compact, "pva", "variable:b", KAFKA_TOPIC_ACQUIRE_IN})}););
+
+  // wait for the result of get command
+  work_done.wait();
+
+  msgpack::object msgpack_object;
+  EXPECT_NO_THROW(msgpack_object = getMsgPackObject(*publisher->sent_messages[0]););
+
+  EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
+
+  auto vec = msgpack_object.as<MsgpackObjectVector>();
+  EXPECT_EQ(vec[1].type, msgpack::type::POSITIVE_INTEGER);
+
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
+TEST(NodeController, PutCommandScalarArray) {
   std::latch           work_done{1};
   ConstChannelDataUPtr value_readout;
   std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
@@ -386,7 +416,7 @@ TEST(NodeController, RandomCommand) {
   auto node_controller = initBackend(std::make_shared<DummyPublisher>(work_done));
 
   // send 100 random commands equence iteration
-  for (int idx = 0; idx < 100; idx++) {
+  for (int idx = 0; idx < 1000; idx++) {
     switch (random_num(0, 2)) {
       case 0: {
         EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
