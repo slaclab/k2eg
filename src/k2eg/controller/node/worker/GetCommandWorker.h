@@ -22,7 +22,7 @@ class GetMessage : public k2eg::service::pubsub::PublishMessage {
   GetMessage(const std::string&                                       destination_topic,
              k2eg::service::epics_impl::ConstChannelDataUPtr          channel_data,
              k2eg::service::epics_impl::ConstSerializedMessageShrdPtr message);
-  virtual ~GetMessage() = default;
+  virtual ~GetMessage();
   char*              getBufferPtr();
   const size_t       getBufferSize();
   const std::string& getQueue();
