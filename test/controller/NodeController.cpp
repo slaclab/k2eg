@@ -437,8 +437,8 @@ TEST(NodeController, RandomCommand) {
         break;
       }
       case 2: {
-        EXPECT_NO_THROW(node_controller->submitCommand(
-            {std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
+        EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(
+          GetCommand{CommandType::get, MessageSerType::json, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
         break;
       }
     }
