@@ -427,7 +427,7 @@ TEST(NodeController, RandomCommand) {
 
   // send 100 random commands equence iteration
   for (int idx = 0; idx < 10000; idx++) {
-    switch (random_num(0, 2)) {
+    switch (random_num(0, 3)) {
       case 0: {
         std::this_thread::sleep_for(std::chrono::microseconds(random_num(1, 1000)));
         EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
@@ -445,6 +445,13 @@ TEST(NodeController, RandomCommand) {
         EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(
           GetCommand{CommandType::get, MessageSerType::json, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
         break;
+      }
+
+      case 3: {
+        auto random_scalar = random_num(1,100);
+        std::this_thread::sleep_for(std::chrono::microseconds(random_num(1, 1000)));
+        EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(
+          PutCommand{CommandType::put, MessageSerType::unknown, "pva", "variable:b", std::to_string(random_scalar)})}););
       }
     }
   }
