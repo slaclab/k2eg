@@ -73,6 +73,9 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/pubsub/impl/kafka/RDKafkaPublisher.cpp
   src/k2eg/service/pubsub/impl/kafka/RDKafkaSubscriber.cpp
 
+  src/k2eg/service/metric/IMetricService.cpp
+  src/k2eg/service/metric/impl/PrometheusMetricService.cpp
+
   src/k2eg/service/log/impl/BoostLogger.cpp
 
   src/k2eg/controller/command/CMDController.cpp
