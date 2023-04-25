@@ -3,6 +3,9 @@ FROM scr.svc.stanford.edu/eed-public/build-image/cpp-build-image/gcc-debian:12.2
 LABEL maintainer="bisegni@slac.stanford.edu"
 LABEL org.opencontainers.image.description="Kafka To Epics Gateway"
 
+RUN apt update && \
+    apt install -y libssl-dev
+
 COPY src /opt/app/src
 COPY test /opt/app/test
 COPY tools /opt/app/tools
