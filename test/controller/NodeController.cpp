@@ -381,7 +381,7 @@ TEST(NodeController, PutCommandScalar) {
 
   auto vec = msgpack_object.as<MsgpackObjectVector>();
   EXPECT_EQ(vec[1].type, msgpack::type::POSITIVE_INTEGER);
-
+  EXPECT_EQ(vec[1].as<int>(), random_scalar);
   // dispose all
   deinitBackend(std::move(node_controller));
 }
