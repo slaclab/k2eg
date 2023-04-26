@@ -12,10 +12,26 @@ using namespace prometheus;
 using namespace k2eg::service::metric;
 using namespace k2eg::service::metric::impl;
 
-PrometheusEpicsMetric::PrometheusEpicsMetric():registry(std::make_shared<Registry>()) {
+PrometheusEpicsMetric::PrometheusEpicsMetric()
+    : registry(std::make_shared<Registry>()),
+      ioc_read_write(BuildCounter().Name("epics_ioc_operation").Help("Epics description").Register(*registry)),
+      read_counter(ioc_read_write.Add({{"op", "read"}})),
+      write_counter(ioc_read_write.Add({{"op", "write"}})),
+      monitor_event_data(ioc_read_write.Add({{"op", "write"}, {"evt_type", "data"}})),
+      monitor_event_fail(ioc_read_write.Add({{"op", "write"}, {"evt_type", "fail"}})),
+      monitor_event_cancel(ioc_read_write.Add({{"op", "write"}, {"evt_type", "cancel"}})),
+      monitor_event_disconnected(ioc_read_write.Add({{"op", "write"}, {"evt_type", "disconnect"}})) {}
 
-    auto& packet_counter = BuildCounter().Name("Epics").Help("Epics description").Register(*registry);
-
+void
+PrometheusEpicsMetric::incrementCounter(IEpicsMetricCounterType type) {
+  switch (type) {
+    case IEpicsMetricCounterType::Read: read_counter.Increment(); break;
+    case IEpicsMetricCounterType::Write: write_counter.Increment(); break;
+    case IEpicsMetricCounterType::MonitorData: monitor_event_data.Increment(); break;
+    case IEpicsMetricCounterType::MonitorFail: monitor_event_fail.Increment(); break;
+    case IEpicsMetricCounterType::MonitorCancel: monitor_event_cancel.Increment(); break;
+    case IEpicsMetricCounterType::MonitorDisconnect: monitor_event_disconnected.Increment(); break;
+  }
 }
 
 PrometheusMetricService::PrometheusMetricService(ConstMetricConfigurationUPtr metric_configuration) : IMetricService(std::move(metric_configuration)) {
@@ -25,10 +41,12 @@ PrometheusMetricService::PrometheusMetricService(ConstMetricConfigurationUPtr me
 
 PrometheusMetricService::~PrometheusMetricService() {}
 
-IEpicsMetric *PrometheusMetricService::getEpicsMetric() {
-     std::lock_guard<std::mutex> lk(service_mux);
-     if(!epics_metric) {
-        epics_metric = std::shared_ptr<PrometheusEpicsMetric>(new PrometheusEpicsMetric());
-     }
-     return epics_metric.get();
+IEpicsMetric&
+PrometheusMetricService::getEpicsMetric() {
+  std::lock_guard<std::mutex> lk(service_mux);
+  if (!epics_metric) { 
+    epics_metric = std::shared_ptr<PrometheusEpicsMetric>(new PrometheusEpicsMetric()); 
+    exposer_uptr->RegisterCollectable(epics_metric->registry);
+  }
+  return *epics_metric;
 }

@@ -107,10 +107,10 @@ TEST(Epics, ChannelMonitor) {
     EXPECT_EQ(retry_eq(*pc_a, "value", 0, 500, 3), true);
 
     EXPECT_NO_THROW(pc_a->startMonitor(););
-    MonitorEventVecShrdPtr fetched = pc_a->monitor();
-    EXPECT_EQ(fetched->size(), 1);
-    EXPECT_EQ(fetched->at(0)->type, MonitorType::Data);
-    EXPECT_EQ(fetched->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 0);
+    auto fetched = pc_a->monitor();
+    EXPECT_EQ(fetched->event_data->size(), 1);
+    EXPECT_EQ(fetched->event_data->at(0)->type, MonitorType::Data);
+    EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 0);
 
     EXPECT_NO_THROW(put_op = pc_a->put("value", "1"););
     WHILE(put_op->isDone(), false);
@@ -119,11 +119,11 @@ TEST(Epics, ChannelMonitor) {
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
     fetched = pc_a->monitor();
-    EXPECT_EQ(fetched->size(), 2);
-    EXPECT_EQ(fetched->at(0)->type, MonitorType::Data);
-    EXPECT_EQ(fetched->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 1);
-    EXPECT_EQ(fetched->at(1)->type, MonitorType::Data);
-    EXPECT_EQ(fetched->at(1)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 2);
+    EXPECT_EQ(fetched->event_data->size(), 2);
+    EXPECT_EQ(fetched->event_data->at(0)->type, MonitorType::Data);
+    EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 1);
+    EXPECT_EQ(fetched->event_data->at(1)->type, MonitorType::Data);
+    EXPECT_EQ(fetched->event_data->at(1)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 2);
     EXPECT_NO_THROW(pc_a->stopMonitor(););
 }
 

@@ -1,6 +1,7 @@
 #include <chrono>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <ranges>
+#include "k2eg/service/epics/EpicsChannel.h"
 #include "k2eg/service/epics/EpicsGetOperation.h"
 #include "k2eg/service/epics/EpicsPutOperation.h"
 
@@ -114,9 +115,9 @@ size_t EpicsServiceManager::getHandlerSize() {
     return handler_broadcaster.targets.size();
 }
 void EpicsServiceManager::processIterator(const std::shared_ptr<EpicsChannel>& epics_channel) {
-    MonitorEventVecShrdPtr received_event = epics_channel->monitor();
-    if (!received_event->size() || !handler_broadcaster.targets.size()) return;
-    handler_broadcaster.broadcast(received_event);
+    EventReceivedShrdPtr received_event = epics_channel->monitor();
+    if (!received_event->event_data->size() || !handler_broadcaster.targets.size()) return;
+    handler_broadcaster.broadcast(received_event->event_data);
 }
 
 void EpicsServiceManager::task() {

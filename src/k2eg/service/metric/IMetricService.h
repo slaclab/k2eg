@@ -11,11 +11,21 @@ struct MetricConfiguration {
 };
 DEFINE_PTR_TYPES(MetricConfiguration)
 
+enum class IEpicsMetricCounterType{
+  Read,
+  Write,
+  MonitorData,
+  MonitorFail,
+  MonitorCancel,
+  MonitorDisconnect
+} ;
 class IEpicsMetric {
+
 friend class IMetricService;
 public:
   IEpicsMetric()  = default;
   virtual ~IEpicsMetric() = default;
+  virtual void incrementCounter(IEpicsMetricCounterType type) = 0;
 };
 
 // abstra the metric implementation
@@ -27,7 +37,7 @@ class IMetricService {
   IMetricService(ConstMetricConfigurationUPtr metric_configuration);
   virtual ~IMetricService() = default;
 
-  virtual IEpicsMetric *getEpicsMetric() = 0;
+  virtual IEpicsMetric& getEpicsMetric() = 0;
 };
 }  // namespace k2eg::service::metric
 
