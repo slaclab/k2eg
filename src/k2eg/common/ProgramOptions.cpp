@@ -43,6 +43,7 @@ ProgramOptions::ProgramOptions() {
         (SUB_GROUP_ID, po::value<std::string>()->default_value("k2eg-default-group"), "Subscriber group id")
         (SUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for subscriber implementation driver")
         (STORAGE_PATH, po::value<std::string>()->default_value(actual_path), "The path where the storage files are saved")
+        (METRIC_ENABLE, po::value<bool>()->default_value(false), "Enable metric management")
         (METRIC_HTTP_PORT, po::value<unsigned int>()->default_value(8080), "The port used for publish the http metric server");
 }
 
@@ -142,7 +143,9 @@ ConstSubscriberConfigurationUPtr ProgramOptions::getSubscriberConfiguration() {
 }
 
 ConstMetricConfigurationUPtr ProgramOptions::getMetricConfiguration() {
-    return std::make_unique<const MetricConfiguration>(MetricConfiguration{.tcp_port = GET_OPTION(METRIC_HTTP_PORT, unsigned int, 8080)});
+    return std::make_unique<const MetricConfiguration>(MetricConfiguration{
+        .enable = GET_OPTION(METRIC_ENABLE, bool, false),
+        .tcp_port = GET_OPTION(METRIC_HTTP_PORT, unsigned int, 8080)});
 }
 
 const std::string ProgramOptions::getStoragePath() { return GET_OPTION_NO_DEF(STORAGE_PATH, std::string); }

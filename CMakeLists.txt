@@ -75,6 +75,7 @@ set(COMMON_SOURCE_FILES
 
   src/k2eg/service/metric/IMetricService.cpp
   src/k2eg/service/metric/impl/PrometheusMetricService.cpp
+  src/k2eg/service/metric/impl/DummyMetricService.cpp
 
   src/k2eg/service/log/impl/BoostLogger.cpp
 

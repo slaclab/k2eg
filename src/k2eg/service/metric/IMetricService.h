@@ -8,6 +8,7 @@
 #include <mutex>
 namespace k2eg::service::metric {
 struct MetricConfiguration {
+  bool enable;
   unsigned int tcp_port;
 };
 DEFINE_PTR_TYPES(MetricConfiguration)

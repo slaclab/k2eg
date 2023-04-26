@@ -95,6 +95,9 @@ Epics k2eg:
   --storage-path arg (=/workspace/k2eg.sqlite)
                                         The path where the storage files are 
                                         saved
+  --metric-enable arg (=0)              Enable metric management
+  --metric-server-http-port arg (=8080) The port used for publish the http 
+                                        metric server 
 ```
 
 There are two ohter different way to configure the application other to the common command line option and are:

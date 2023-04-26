@@ -7,6 +7,7 @@
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/log/impl/BoostLogger.h>
 #include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/metric/impl/DummyMetricService.h>
 #include <k2eg/service/metric/impl/PrometheusMetricService.h>
 #include <k2eg/service/pubsub/pubsub.h>
 
@@ -52,7 +53,7 @@ K2EGateway::setup(int argc, const char* argv[]) {
     ServiceResolver<ILogger>::registerService(logger = std::make_shared<BoostLogger>(po->getloggerConfiguration()));
     logger->logMessage(getTextVersion(true));
     logger->logMessage("Start Metric Service");
-    ServiceResolver<IMetricService>::registerService(std::make_shared<PrometheusMetricService>(po->getMetricConfiguration()));
+    ServiceResolver<IMetricService>::registerService(instanceMetricService(po->getMetricConfiguration()));
     logger->logMessage("Start EPICS service");
     ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>());
     logger->logMessage("Start publisher service");
@@ -67,6 +68,7 @@ K2EGateway::setup(int argc, const char* argv[]) {
     logger->logMessage("Start command controller");
     cmd_controller = std::make_unique<CMDController>(po->getCMDControllerConfiguration(), std::bind(&K2EGateway::commandReceived, this, std::placeholders::_1));
 
+    //wait for termination request
     cv.wait(lk, [this] { return this->quit; });
 
     // deallocation
@@ -94,6 +96,15 @@ K2EGateway::setup(int argc, const char* argv[]) {
   }
 
   return err;
+}
+
+IMetricServiceShrdPtr
+K2EGateway::instanceMetricService(ConstMetricConfigurationUPtr metric_conf) {
+  if (metric_conf->enable) {
+    return std::make_shared<PrometheusMetricService>(std::move(metric_conf));
+  } else {
+    return std::make_shared<DummyMetricService>(std::move(metric_conf));
+  }
 }
 
 int
