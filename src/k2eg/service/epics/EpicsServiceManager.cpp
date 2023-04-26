@@ -117,7 +117,7 @@ size_t EpicsServiceManager::getHandlerSize() {
 void EpicsServiceManager::processIterator(const std::shared_ptr<EpicsChannel>& epics_channel) {
     EventReceivedShrdPtr received_event = epics_channel->monitor();
     if (!received_event->event_data->size() || !handler_broadcaster.targets.size()) return;
-    handler_broadcaster.broadcast(received_event->event_data);
+    handler_broadcaster.broadcast(received_event);
 }
 
 void EpicsServiceManager::task() {

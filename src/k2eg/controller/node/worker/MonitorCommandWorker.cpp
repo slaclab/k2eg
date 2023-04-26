@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <functional>
+#include "k2eg/service/epics/EpicsChannel.h"
 
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::command;
@@ -73,16 +74,15 @@ void MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
     epics_service_manager->monitorChannel(a_ptr->channel_name, activate, a_ptr->protocol);
 }
 
-void MonitorCommandWorker::epicsMonitorEvent(const MonitorEventVecShrdPtr& event_data) {
+void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType event_received) {
 #ifdef __DEBUG__
-    logger->logMessage(STRING_FORMAT("Received epics monitor %1% events", event_data->size()), LogLevel::TRACE);
+    logger->logMessage(STRING_FORMAT("Received epics monitor %1% events data", event_received->event_data->size()), LogLevel::TRACE);
 #endif
     std::shared_lock slock(channel_map_mtx);
     // cache the varius serilized message for each serializaiton type
     std::map<MessageSerType, ConstSerializedMessageShrdPtr> local_serialization_cache;
-    for (auto& event: *event_data) {
+    for (auto& event: *event_received->event_data) {
         // publisher
-        if (event->type != MonitorType::Data) continue;
         for (auto& info_topic: channel_topics_map[event->channel_data.channel_name]) {
             logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", event->channel_data.channel_name % info_topic->dest_topic), LogLevel::TRACE);
             if (!local_serialization_cache.contains(info_topic->ser_type)) {

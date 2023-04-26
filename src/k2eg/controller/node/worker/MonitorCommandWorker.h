@@ -57,7 +57,7 @@ class MonitorCommandWorker : public CommandWorker {
     // Handler's liveness token
     k2eg::common::BroadcastToken handler_token;
 
-    void epicsMonitorEvent(const k2eg::service::epics_impl::MonitorEventVecShrdPtr& event_data);
+    void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
 public:
     MonitorCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     virtual ~MonitorCommandWorker() = default;

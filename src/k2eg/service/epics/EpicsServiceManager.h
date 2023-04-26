@@ -14,8 +14,9 @@
 namespace k2eg::service::epics_impl {
 
 DEFINE_MAP_FOR_TYPE(std::string, EpicsChannelShrdPtr, EpicsChannelMap)
-typedef const MonitorEventVecShrdPtr& EpicsServiceManagerHandlerParamterType;
+typedef const EventReceivedShrdPtr& EpicsServiceManagerHandlerParamterType;
 typedef std::function<void(EpicsServiceManagerHandlerParamterType)> EpicsServiceManagerHandler;
+//typedef std::function<void(EventType, EpicsServiceManagerHandlerParamterType)> EpicsServiceManagerHandler;
 
 class EpicsServiceManager {
     std::mutex channel_map_mutex;

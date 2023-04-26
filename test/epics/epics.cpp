@@ -109,7 +109,7 @@ TEST(Epics, ChannelMonitor) {
     EXPECT_NO_THROW(pc_a->startMonitor(););
     auto fetched = pc_a->monitor();
     EXPECT_EQ(fetched->event_data->size(), 1);
-    EXPECT_EQ(fetched->event_data->at(0)->type, MonitorType::Data);
+    EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
     EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 0);
 
     EXPECT_NO_THROW(put_op = pc_a->put("value", "1"););
@@ -120,18 +120,18 @@ TEST(Epics, ChannelMonitor) {
 
     fetched = pc_a->monitor();
     EXPECT_EQ(fetched->event_data->size(), 2);
-    EXPECT_EQ(fetched->event_data->at(0)->type, MonitorType::Data);
+    EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
     EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 1);
-    EXPECT_EQ(fetched->event_data->at(1)->type, MonitorType::Data);
+    EXPECT_EQ(fetched->event_data->at(1)->type, EventType::Data);
     EXPECT_EQ(fetched->event_data->at(1)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 2);
     EXPECT_NO_THROW(pc_a->stopMonitor(););
 }
 
 MonitorEventVec allEvent;
 std::mutex check_result_mutex;
-void handler(const MonitorEventVecShrdPtr& event_data) {
+void handler(EpicsServiceManagerHandlerParamterType& event_data) {
     std::lock_guard guard(check_result_mutex);
-    allEvent.insert(allEvent.end(), (*event_data).begin(), (*event_data).end());
+    allEvent.insert(allEvent.end(), (*event_data->event_data).begin(), (*event_data->event_data).end());
 }
 
 TEST(Epics, EpicsServiceManager) {

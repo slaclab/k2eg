@@ -15,10 +15,10 @@
 
 namespace k2eg::service::epics_impl {
 
-enum MonitorType { Fail, Cancel, Disconnec, Data };
+enum EventType { Fail, Cancel, Disconnec, Data };
 
 typedef struct {
-  MonitorType       type;
+  EventType         type;
   const std::string message;
   ChannelData       channel_data;
 } MonitorEvent;
