@@ -73,6 +73,7 @@ EpicsChannel::monitor() {
   EventReceivedShrdPtr result = std::make_shared<EventReceived>();
   if (!mon.wait(0.100)) {
     // updates mon.event
+    result->event_timeout->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Timeout, channel_name, "Time out", nullptr}));
     return result;
   }
 

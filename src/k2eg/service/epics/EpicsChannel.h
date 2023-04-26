@@ -15,7 +15,7 @@
 
 namespace k2eg::service::epics_impl {
 
-enum EventType { Fail, Cancel, Disconnec, Data };
+enum EventType { Timeout, Fail, Cancel, Disconnec, Data };
 
 typedef struct {
   EventType         type;
@@ -28,6 +28,7 @@ typedef std::vector<MonitorEventShrdPtr> MonitorEventVec;
 typedef std::shared_ptr<MonitorEventVec> MonitorEventVecShrdPtr;
 
 struct EventReceived {
+  MonitorEventVecShrdPtr event_timeout    = std::make_shared<MonitorEventVec>();
   MonitorEventVecShrdPtr event_data       = std::make_shared<MonitorEventVec>();
   MonitorEventVecShrdPtr event_fail       = std::make_shared<MonitorEventVec>();
   MonitorEventVecShrdPtr event_disconnect = std::make_shared<MonitorEventVec>();

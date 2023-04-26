@@ -8,11 +8,13 @@
 #include <iostream>
 #include <ostream>
 #include <string>
+#include "k2eg/service/metric/IMetricService.h"
 
 using namespace k2eg::common;
 using namespace k2eg::service::log;
 using namespace k2eg::controller::command;
 using namespace k2eg::service::pubsub;
+using namespace k2eg::service::metric;
 
 namespace po = boost::program_options;
 namespace fs = std::filesystem;
@@ -40,7 +42,8 @@ ProgramOptions::ProgramOptions() {
         (SUB_SERVER_ADDRESS, po::value<std::string>(), "Subscriber server address")
         (SUB_GROUP_ID, po::value<std::string>()->default_value("k2eg-default-group"), "Subscriber group id")
         (SUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for subscriber implementation driver")
-        (STORAGE_PATH, po::value<std::string>()->default_value(actual_path), "The path where the storage files are saved");
+        (STORAGE_PATH, po::value<std::string>()->default_value(actual_path), "The path where the storage files are saved")
+        (METRIC_HTTP_PORT, po::value<unsigned int>()->default_value(8080), "The port used for publish the http metric server");
 }
 
 void ProgramOptions::parse(int argc, const char* argv[]) {
@@ -130,7 +133,7 @@ ConstPublisherConfigurationUPtr ProgramOptions::getPublisherConfiguration() {
             parseKVCustomParam(GET_OPTION(PUB_IMPL_KV, std::vector<std::string>, std::vector<std::string>()))});
 }
 
-k2eg::service::pubsub::ConstSubscriberConfigurationUPtr ProgramOptions::getSubscriberConfiguration() {
+ConstSubscriberConfigurationUPtr ProgramOptions::getSubscriberConfiguration() {
     return std::make_unique<const SubscriberConfiguration>(SubscriberConfiguration{
         .server_address = GET_OPTION(SUB_SERVER_ADDRESS, std::string, ""),
         .group_id = GET_OPTION(SUB_GROUP_ID, std::string, ""),
@@ -138,4 +141,9 @@ k2eg::service::pubsub::ConstSubscriberConfigurationUPtr ProgramOptions::getSubsc
             parseKVCustomParam(GET_OPTION(SUB_IMPL_KV, std::vector<std::string>, std::vector<std::string>()))});
 }
 
+ConstMetricConfigurationUPtr ProgramOptions::getMetricConfiguration() {
+    return std::make_unique<const MetricConfiguration>(MetricConfiguration{.tcp_port = GET_OPTION(METRIC_HTTP_PORT, unsigned int, 8080)});
+}
+
 const std::string ProgramOptions::getStoragePath() { return GET_OPTION_NO_DEF(STORAGE_PATH, std::string); }
+

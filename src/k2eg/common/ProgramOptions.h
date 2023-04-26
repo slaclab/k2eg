@@ -8,6 +8,7 @@
 #include <k2eg/controller/command/CMDController.h>
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/pubsub/ISubscriber.h>
+#include <k2eg/service/metric/IMetricService.h>
 
 namespace po = boost::program_options;
 
@@ -38,6 +39,8 @@ static const char* const SUB_IMPL_KV = "sub-impl-kv";
 
 static const char* const STORAGE_PATH = "storage-path";
 
+static const char* const METRIC_HTTP_PORT = "metric-server-http-port";
+
 namespace k2eg
 {
     namespace common
@@ -60,6 +63,7 @@ namespace k2eg
             k2eg::controller::command::ConstCMDControllerConfigUPtr getCMDControllerConfiguration();
             k2eg::service::pubsub::ConstPublisherConfigurationUPtr getPublisherConfiguration();
             k2eg::service::pubsub::ConstSubscriberConfigurationUPtr getSubscriberConfiguration();
+            k2eg::service::metric::ConstMetricConfigurationUPtr getMetricConfiguration();
             const std::string getStoragePath();
             bool optionConfigure(const std::string &name);
 

@@ -122,4 +122,17 @@ TEST(ProgramOptions, SubscriberConfigurationConfFile) {
     EXPECT_STREQ(conf->custom_impl_parameter.at("k1").c_str(), "v1");
     EXPECT_STREQ(conf->custom_impl_parameter.at("k2").c_str(), "v2");
 }
+
+TEST(ProgramOptions, MetricConfiguration) {
+    int argc = 1;
+    const char* argv[1] = {"epics-k2eg-test"};
+    // set environment variable for test
+    clearenv();
+    setenv("EPICS_k2eg_metric-server-http-port", "8888", 1);
+    std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
+    EXPECT_NO_THROW(opt->parse(argc, argv););
+    auto metric_configuration = opt->getMetricConfiguration();
+    EXPECT_EQ(metric_configuration->tcp_port, 8888);
+}
+
 #endif //__linux__
