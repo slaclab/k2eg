@@ -32,7 +32,7 @@ struct EventReceived {
   MonitorEventVecShrdPtr event_data       = std::make_shared<MonitorEventVec>();
   MonitorEventVecShrdPtr event_fail       = std::make_shared<MonitorEventVec>();
   MonitorEventVecShrdPtr event_disconnect = std::make_shared<MonitorEventVec>();
-  MonitorEventVecShrdPtr event_cancell    = std::make_shared<MonitorEventVec>();
+  MonitorEventVecShrdPtr event_cancel     = std::make_shared<MonitorEventVec>();
 };
 DEFINE_PTR_TYPES(EventReceived)
 

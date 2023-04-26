@@ -9,16 +9,19 @@
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/log/impl/BoostLogger.h>
 #include <k2eg/service/pubsub/pubsub.h>
+#include <k2eg/service/metric/impl/PrometheusMetricService.h>
 
 #include <boost/json.hpp>
 #include <chrono>
 #include <ctime>
 #include <filesystem>
 #include <latch>
+#include <memory>
 #include <msgpack.hpp>
 #include <random>
 #include <string>
 #include <thread>
+#include "k2eg/service/metric/IMetricService.h"
 
 #include <k2eg/controller/command/cmd/PutCommand.h>
 #include <k2eg/service/epics/EpicsData.h>
@@ -43,8 +46,13 @@ using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
 
+using namespace k2eg::service::metric;
+using namespace k2eg::service::metric::impl;
+
 #define KAFKA_HOSTNAME         "kafka:9092"
 #define KAFKA_TOPIC_ACQUIRE_IN "acquire_commad_in"
+
+int tcp_port = 9000;
 
 class DummyPublisher : public IPublisher {
   std::latch& lref;
@@ -102,9 +110,11 @@ initBackend(IPublisherShrdPtr pub, bool clear_data = true) {
   const char* argv[1] = {"epics-k2eg-test"};
   clearenv();
   setenv("EPICS_k2eg_log-on-console", "false", 1);
+  setenv("EPICS_k2eg_metric-server-http-port", std::to_string(++tcp_port).c_str(), 1);
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   opt->parse(argc, argv);
   ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
+  ServiceResolver<IMetricService>::registerService(std::make_shared<PrometheusMetricService>(opt->getMetricConfiguration()));
   ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>());
   ServiceResolver<IPublisher>::registerService(pub);
   DataStorageUPtr storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");
@@ -117,6 +127,7 @@ deinitBackend(std::unique_ptr<NodeController> node_controller) {
   node_controller.reset();
   EXPECT_NO_THROW(ServiceResolver<IPublisher>::resolve().reset(););
   EXPECT_NO_THROW(ServiceResolver<EpicsServiceManager>::resolve().reset(););
+  EXPECT_NO_THROW(ServiceResolver<IMetricService>::resolve().reset(););
   EXPECT_NO_THROW(ServiceResolver<ILogger>::resolve().reset(););
 }
 

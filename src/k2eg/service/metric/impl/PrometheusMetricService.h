@@ -21,8 +21,8 @@ class PrometheusEpicsMetric : public IEpicsMetric {
   friend class PrometheusMetricService;
   std::shared_ptr<prometheus::Registry> registry;
   prometheus::Family<prometheus::Counter>& ioc_read_write;
-  prometheus::Counter& read_counter;
-  prometheus::Counter& write_counter;
+  prometheus::Counter& get_ok_counter;
+  prometheus::Counter& put_ok_counter;
   prometheus::Counter& monitor_event_data;
   prometheus::Counter& monitor_event_fail;
   prometheus::Counter& monitor_event_cancel;
@@ -30,7 +30,7 @@ class PrometheusEpicsMetric : public IEpicsMetric {
   PrometheusEpicsMetric();
  public:
   virtual ~PrometheusEpicsMetric() = default;
-  virtual void incrementCounter(IEpicsMetricCounterType type);
+  void incrementCounter(IEpicsMetricCounterType type, double inc_value = 1.0) override final;
 };
 
 // Metric services implementation

@@ -6,6 +6,7 @@
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/pubsub/IPublisher.h>
+#include <k2eg/service/metric/IMetricService.h>
 
 #include <mutex>
 #include <shared_mutex>
@@ -53,6 +54,7 @@ class MonitorCommandWorker : public CommandWorker {
     ChannelTopicsMap channel_topics_map;
     k2eg::service::log::ILoggerShrdPtr logger;
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
+    k2eg::service::metric::IEpicsMetric& metric;
     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
     // Handler's liveness token
     k2eg::common::BroadcastToken handler_token;

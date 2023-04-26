@@ -123,6 +123,7 @@ set(TEST_SOURCE_FILES
   test/common/ProgramOptions.cpp
   test/controller/CMDController.cpp
   test/controller/NodeController.cpp
+  test/metric/metric.cpp
   ${COMMON_SOURCE_FILES}
 )
 
@@ -333,7 +334,7 @@ ADD_DEPENDENCIES(${PROJECT_NAME}-test msgpack)
 # -------- curl -----------
 MESSAGE(STATUS "Configure curl version ${CURL_VERSION}")
 ExternalProject_Add(
-  curl
+  curlsrc
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/curl
   GIT_REPOSITORY https://github.com/curl/curl.git
   GIT_TAG ${CURL_VERSION}
@@ -348,7 +349,7 @@ ExternalProject_Add(
   -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
   -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
 )
-SET(BUILD_LIBRARY ${BUILD_LIBRARY})
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} curl)
 ADD_DEPENDENCIES(${PROJECT_NAME} prometheus)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus)
 
@@ -370,9 +371,9 @@ ExternalProject_Add(
   -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
   -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
 )
-SET(BUILD_LIBRARY ${BUILD_LIBRARY} prometheus-cpp-pull prometheus-cpp-core z)
-ADD_DEPENDENCIES(${PROJECT_NAME} prometheus)
-ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus)
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} z)
+ADD_DEPENDENCIES(${PROJECT_NAME} prometheus curlsrc)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus curlsrc)
 
 # -------- Prometheus -----------
 MESSAGE(STATUS "Configure prometheus version ${PROMETHEUS_VERSION}")
@@ -396,8 +397,8 @@ ExternalProject_Add(
   -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
   -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
 )
-ADD_DEPENDENCIES(prometheus zlib curl)
-SET(BUILD_LIBRARY ${BUILD_LIBRARY} prometheus-cpp-pull prometheus-cpp-core z)
+ADD_DEPENDENCIES(prometheus curlsrc zlib)
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} prometheus-cpp-pull prometheus-cpp-core)
 ADD_DEPENDENCIES(${PROJECT_NAME} prometheus)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus)
 

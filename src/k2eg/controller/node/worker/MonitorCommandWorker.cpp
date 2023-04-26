@@ -5,6 +5,7 @@
 #include <cassert>
 #include <functional>
 #include "k2eg/service/epics/EpicsChannel.h"
+#include "k2eg/service/metric/IMetricService.h"
 
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::command;
@@ -16,6 +17,8 @@ using namespace k2eg::service::log;
 using namespace k2eg::service::epics_impl;
 
 using namespace k2eg::service::pubsub;
+
+using namespace k2eg::service::metric;
 
 #pragma region MonitorMessage
 MonitorMessage::MonitorMessage(const std::string& queue, ConstMonitorEventShrdPtr monitor_event, ConstSerializedMessageShrdPtr message)
@@ -34,6 +37,7 @@ const std::string& MonitorMessage::getReqType() { return request_type; }
 MonitorCommandWorker::MonitorCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager)
     : logger(ServiceResolver<ILogger>::resolve())
     , publisher(ServiceResolver<IPublisher>::resolve())
+    , metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric())
     , epics_service_manager(epics_service_manager) {
     handler_token = epics_service_manager->addHandler(std::bind(&MonitorCommandWorker::epicsMonitorEvent, this, std::placeholders::_1));
 }
@@ -78,6 +82,12 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
 #ifdef __DEBUG__
     logger->logMessage(STRING_FORMAT("Received epics monitor %1% events data", event_received->event_data->size()), LogLevel::TRACE);
 #endif
+    //----------update metric--------
+    metric.incrementCounter(IEpicsMetricCounterType::MonitorData, event_received->event_data->size());
+    metric.incrementCounter(IEpicsMetricCounterType::MonitorCancel, event_received->event_cancel->size());
+    metric.incrementCounter(IEpicsMetricCounterType::MonitorDisconnect, event_received->event_disconnect->size());
+    metric.incrementCounter(IEpicsMetricCounterType::MonitorFail, event_received->event_fail->size());
+
     std::shared_lock slock(channel_map_mtx);
     // cache the varius serilized message for each serializaiton type
     std::map<MessageSerType, ConstSerializedMessageShrdPtr> local_serialization_cache;

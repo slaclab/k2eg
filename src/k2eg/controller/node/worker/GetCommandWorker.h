@@ -6,6 +6,7 @@
 #include <k2eg/service/epics/EpicsGetOperation.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/log/ILogger.h>
+#include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/pubsub/IPublisher.h>
 
 #include <chrono>
@@ -52,6 +53,7 @@ class GetCommandWorker : public CommandWorker {
   std::shared_ptr<BS::thread_pool>                      processing_pool;
   k2eg::service::log::ILoggerShrdPtr                    logger;
   k2eg::service::pubsub::IPublisherShrdPtr              publisher;
+  k2eg::service::metric::IEpicsMetric&                  metric;
   k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
   void                                                  checkGetCompletion(GetOpInfoShrdPtr put_info);
 

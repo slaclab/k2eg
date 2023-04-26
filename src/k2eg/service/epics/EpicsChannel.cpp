@@ -84,7 +84,7 @@ EpicsChannel::monitor() {
       break;
     // explicit call of 'mon.cancel' or subscription dropped
     case pvac::MonitorEvent::Cancel:
-      result->event_cancell->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Cancel, channel_name, mon.event.message, nullptr}));
+      result->event_cancel->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Cancel, channel_name, mon.event.message, nullptr}));
       break;
     // Underlying channel becomes disconnected
     case pvac::MonitorEvent::Disconnect:

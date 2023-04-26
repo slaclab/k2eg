@@ -3,6 +3,7 @@
 
 #include <k2eg/common/types.h>
 
+#include <cstddef>
 #include <memory>
 #include <mutex>
 namespace k2eg::service::metric {
@@ -12,8 +13,9 @@ struct MetricConfiguration {
 DEFINE_PTR_TYPES(MetricConfiguration)
 
 enum class IEpicsMetricCounterType{
-  Read,
-  Write,
+  Get,
+  Put,
+  MonitorTimeout,
   MonitorData,
   MonitorFail,
   MonitorCancel,
@@ -25,7 +27,7 @@ friend class IMetricService;
 public:
   IEpicsMetric()  = default;
   virtual ~IEpicsMetric() = default;
-  virtual void incrementCounter(IEpicsMetricCounterType type) = 0;
+  virtual void incrementCounter(IEpicsMetricCounterType type, double inc_value = 1.0) = 0;
 };
 
 // abstra the metric implementation
@@ -39,6 +41,8 @@ class IMetricService {
 
   virtual IEpicsMetric& getEpicsMetric() = 0;
 };
+DEFINE_PTR_TYPES(IMetricService)
+
 }  // namespace k2eg::service::metric
 
 #endif  // K2EG_SERVICE_METRIC_IMETRICSERVICE_H_

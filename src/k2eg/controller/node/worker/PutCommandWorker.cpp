@@ -1,6 +1,7 @@
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/worker/PutCommandWorker.h>
 #include <k2eg/service/ServiceResolver.h>
+
 #include <memory>
 
 #include "k2eg/controller/command/cmd/Command.h"
@@ -14,17 +15,19 @@ using namespace k2eg::controller::command::cmd;
 using namespace k2eg::service;
 using namespace k2eg::service::log;
 using namespace k2eg::service::pubsub;
+using namespace k2eg::service::metric;
 using namespace k2eg::service::epics_impl;
 
 using namespace k2eg::common;
 
 #pragma region PutCommandWorker
 PutCommandWorker::PutCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager)
-    : processing_pool(std::make_shared<BS::thread_pool>()), logger(ServiceResolver<ILogger>::resolve()), epics_service_manager(epics_service_manager) {}
+    : processing_pool(std::make_shared<BS::thread_pool>()),
+      logger(ServiceResolver<ILogger>::resolve()),
+      metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric()),
+      epics_service_manager(epics_service_manager) {}
 
-PutCommandWorker::~PutCommandWorker() {
-  processing_pool->wait_for_tasks();
-}
+PutCommandWorker::~PutCommandWorker() { processing_pool->wait_for_tasks(); }
 
 void
 PutCommandWorker::processCommand(ConstCommandShrdPtr command) {
@@ -32,21 +35,17 @@ PutCommandWorker::processCommand(ConstCommandShrdPtr command) {
   ConstPutCommandShrdPtr p_ptr = static_pointer_cast<const PutCommand>(command);
   logger->logMessage(STRING_FORMAT("Perform put command for %1%", p_ptr->channel_name), LogLevel::DEBUG);
   auto put_op = epics_service_manager->putChannelData(p_ptr->channel_name, "value", p_ptr->value);
-  processing_pool->push_task(
-      &PutCommandWorker::checkPutCompletion, 
-      this,
-      std::make_shared<PutOpInfo>(p_ptr->channel_name, p_ptr->value, std::move(put_op))
-      );
+  processing_pool->push_task(&PutCommandWorker::checkPutCompletion, this, std::make_shared<PutOpInfo>(p_ptr->channel_name, p_ptr->value, std::move(put_op)));
 }
 
 void
 PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
-    // check for timeout 
-  if(put_info->isTimeout()) {
+  // check for timeout
+  if (put_info->isTimeout()) {
     logger->logMessage(STRING_FORMAT("Timeout put command for %1% and value %2%", put_info->channel_name % put_info->value), LogLevel::ERROR);
     return;
-  } 
-  //give some time of relaxing
+  }
+  // give some time of relaxing
   std::this_thread::sleep_for(std::chrono::milliseconds(20));
   if (!put_info->op->isDone()) {
     // re-enque the op class
@@ -60,6 +59,7 @@ PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
         logger->logMessage(STRING_FORMAT("Cancelled put command for %1% and value %2%", put_info->channel_name % put_info->value), LogLevel::ERROR);
         break;
       case pvac::PutEvent::Success:
+        metric.incrementCounter(IEpicsMetricCounterType::Put);
         logger->logMessage(STRING_FORMAT("Success put command for %1% and value %2%", put_info->channel_name % put_info->value), LogLevel::INFO);
         break;
     }
