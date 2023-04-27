@@ -138,7 +138,7 @@ jobs:
               run: |
                 export DEBIAN_FRONTEND=noninteractive
                 apt update
-                apt install -y build-essential cmake git tclsh ninja-build lcov
+                apt install -y build-essential cmake git tclsh ninja-build lcov libss-dev
             - name: Checkout source code
               uses: actions/checkout@v3
             - name: Restore cached build directory
