@@ -35,7 +35,7 @@ public:
 };
 
 typedef std::unique_ptr<PublishMessage> PublishMessageUniquePtr;
-
+typedef std::shared_ptr<PublishMessage> PublishMessageSharedPtr;
 typedef std::vector<PublishMessageUniquePtr> PublisherMessageVector;
 
 typedef enum EventType { OnDelivery, OnSent, OnError } EventType;

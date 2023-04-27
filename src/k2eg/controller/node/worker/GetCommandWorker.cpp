@@ -92,17 +92,17 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
         // update metric
         metric.incrementCounter(IEpicsMetricCounterType::Get);
         logger->logMessage(STRING_FORMAT("Success get command for %1%", get_info->channel_name), LogLevel::INFO);
-        auto c_data = get_info->op->getChannelData();
-        if (!c_data) {
+        auto channel_data = get_info->op->getChannelData();
+        if (!channel_data) {
           logger->logMessage(STRING_FORMAT("No data received for %1%", get_info->channel_name), LogLevel::ERROR);
           break;
         }
-        auto serialized_message = serialize(*c_data, static_cast<SerializationType>(get_info->serialization));
+        auto serialized_message = serialize(*channel_data, static_cast<SerializationType>(get_info->serialization));
         if (!serialized_message) {
           logger->logMessage("Invalid serilized message", LogLevel::ERROR);
           break;
         }
-        publisher->pushMessage(std::make_unique<GetMessage>(get_info->destination_topic, std::move(get_info->op->getChannelData()), serialized_message));
+        publisher->pushMessage(std::make_unique<GetMessage>(get_info->destination_topic, std::move(channel_data), serialized_message));
         break;
     }
   }
