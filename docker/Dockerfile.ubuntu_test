@@ -1,0 +1,7 @@
+ARG TEST_IMAGE
+FROM $TEST_IMAGE
+COPY docker/build /app/
+COPY test/test-conf-file.conf /app/test/test-conf-file.conf
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt update \
+    &&  apt install -y openssl

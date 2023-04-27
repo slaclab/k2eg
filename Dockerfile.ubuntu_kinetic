@@ -26,7 +26,8 @@ COPY --from=builder /opt/app/build/k2eg-test /opt/app
 COPY --from=builder /opt/app/build/k2eg /opt/app
 ENV PATH="${PATH}:/opt/app:/opt/app/bin"
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/app/lib:/opt/app/lib/linux-x86_64"
-
+RUN  apt update \
+    &&  apt install -y openssl
 # Add docker-compose-wait tool -------------------
 ENV WAIT_VERSION 2.9.0
 ADD https://github.com/ufoscout/docker-compose-wait/releases/download/$WAIT_VERSION/wait /opt/wait

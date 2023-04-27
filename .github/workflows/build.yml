@@ -59,6 +59,7 @@ jobs:
       with:
         build_image: ${{ needs.build_debian_bullseye.outputs.build_image }}
         artifact_name: ${{ needs.build_debian_bullseye.outputs.artifact_name }}
+        docker_compose_profile: app-debian
       secrets: inherit
 
     build_debian_bullseye:
@@ -117,6 +118,7 @@ jobs:
       with:
         build_image: ${{ needs.build_ubuntu_kinetic.outputs.build_image }}
         artifact_name: ${{ needs.build_ubuntu_kinetic.outputs.artifact_name }}
+        docker_compose_profile: app-ubuntu
       secrets: inherit
     build_ubuntu_kinetic:
         name: Build Ubuntu Kinetic
