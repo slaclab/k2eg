@@ -44,7 +44,7 @@ struct ChannelTopicMonitorInfo {
 DEFINE_PTR_TYPES(ChannelTopicMonitorInfo);
 
 // map a channel to the topics where it need to be published
-DEFINE_MAP_FOR_TYPE(std::string, std::vector<ChannelTopicMonitorInfoShrdPtr>, ChannelTopicsMap);
+DEFINE_MAP_FOR_TYPE(std::string, std::vector<ChannelTopicMonitorInfoUPtr>, ChannelTopicsMap);
 
 //
 // ss the command handler for the management of the MonitorCommand

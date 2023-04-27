@@ -40,7 +40,9 @@ NodeController::NodeController(DataStorageUPtr data_storage)
         std::make_shared<PutCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
 }
 
-NodeController::~NodeController() { processing_pool->wait_for_tasks(); }
+NodeController::~NodeController() {
+    processing_pool->wait_for_tasks(); 
+}
 
 void NodeController::reloadPersistentCommand() {
     node_configuration->iterateAllChannelMonitor(

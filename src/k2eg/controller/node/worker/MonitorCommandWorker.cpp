@@ -46,8 +46,9 @@ void MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
     if (command->type != CommandType::monitor) return;
     bool activate = false;
     auto a_ptr = static_pointer_cast<const MonitorCommand>(command);
-    // lock the vector for write
+    // lock the map and contained vector for write
     {
+        std::unique_lock lock(channel_map_mtx);
         logger->logMessage(STRING_FORMAT("%1% monitor on '%2%' for topic '%3%'", (a_ptr->activate ? "Activate" : "Deactivate") % a_ptr->channel_name % a_ptr->destination_topic));
 
         auto& vec_ref = channel_topics_map[a_ptr->channel_name];
@@ -55,9 +56,7 @@ void MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
             // add topic to channel
             // check if the topic is already present[fault tollerant check]
             if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&a_ptr](auto& info_topic) { return info_topic->dest_topic.compare(a_ptr->destination_topic) == 0; }) == std::end(vec_ref)) {
-                std::unique_lock lock(channel_map_mtx);
-                channel_topics_map[a_ptr->channel_name].push_back(MakeChannelTopicMonitorInfoShrdPtr(ChannelTopicMonitorInfo{.dest_topic = a_ptr->destination_topic, .ser_type = a_ptr->serialization})
-
+                    channel_topics_map[a_ptr->channel_name].push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{.dest_topic = a_ptr->destination_topic, .ser_type = a_ptr->serialization})
                 );
             } else {
                 logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated", a_ptr->channel_name % a_ptr->destination_topic));
@@ -66,7 +65,6 @@ void MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
             // remove topic to channel
             auto itr = std::find_if(std::begin(vec_ref), std::end(vec_ref), [&a_ptr](auto& info_topic) { return info_topic->dest_topic.compare(a_ptr->destination_topic) == 0; });
             if (itr != std::end(vec_ref)) {
-                std::unique_lock lock(channel_map_mtx);
                 vec_ref.erase(itr);
             } else {
                 logger->logMessage(STRING_FORMAT("No active monitor on '%1%' for topic '%2%'", a_ptr->channel_name % a_ptr->destination_topic));
