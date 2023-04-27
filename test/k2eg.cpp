@@ -44,11 +44,11 @@ TEST(k2egateway, Default)
     setenv(std::string("EPICS_k2eg_").append(PUB_SERVER_ADDRESS).c_str(), "kafka:9092", 1);
     setenv(std::string("EPICS_k2eg_").append(SUB_SERVER_ADDRESS).c_str(), "kafka:9092", 1);
     setenv(std::string("EPICS_k2eg_").append(STORAGE_PATH).c_str(), storage_db_file.c_str(), 1);
-
+    setenv(std::string("EPICS_k2eg_").append(METRIC_HTTP_PORT).c_str(), "8081", 1);
     // remove possible old file
     std::filesystem::remove(log_file_path);
     auto k2eg = std::make_unique<K2EGateway>();
-     std::thread t([&k2eg = k2eg, &argc = argc, &argv = argv](){
+    std::thread t([&k2eg = k2eg, &argc = argc, &argv = argv](){
          int exit_code = k2eg->run(argc, argv);
          EXPECT_EQ(k2eg->isStopRequested(), true);
          EXPECT_EQ(k2eg->isTerminated(), true);
@@ -72,6 +72,6 @@ TEST(k2egateway, Default)
         }
         ifs.close();
     }
-    EXPECT_NE(full_str.find("Shoutdown compelted"), std::string::npos);
+    EXPECT_NE(full_str.find("Shutdown completed"), std::string::npos);
 }
 #endif //__linux__

@@ -21,6 +21,9 @@ set(LIBRDKAFKA_VERSION v2.0.2)
 set(SQLITE_VERSION version-3.41.2)
 set(SQLITEORM_VERSION v1.8.2)
 set(MSGPACK_VERSION cpp-6.0.0)
+set(CURL_VERSION curl-7_88_1)
+set(ZLIB_VERSION v1.2.13)
+set(PROMETHEUS_VERSION v1.1.0)
 set(GTEST_VERSION 1.8.0)
 
 # set(PROTOBUF_VERSION v22.0)
@@ -70,6 +73,10 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/pubsub/impl/kafka/RDKafkaPublisher.cpp
   src/k2eg/service/pubsub/impl/kafka/RDKafkaSubscriber.cpp
 
+  src/k2eg/service/metric/IMetricService.cpp
+  src/k2eg/service/metric/impl/PrometheusMetricService.cpp
+  src/k2eg/service/metric/impl/DummyMetricService.cpp
+
   src/k2eg/service/log/impl/BoostLogger.cpp
 
   src/k2eg/controller/command/CMDController.cpp
@@ -117,6 +124,7 @@ set(TEST_SOURCE_FILES
   test/common/ProgramOptions.cpp
   test/controller/CMDController.cpp
   test/controller/NodeController.cpp
+  test/metric/metric.cpp
   ${COMMON_SOURCE_FILES}
 )
 
@@ -298,8 +306,8 @@ SET(BUILD_LIBRARY ${BUILD_LIBRARY} sqlite3)
 ADD_DEPENDENCIES(${PROJECT_NAME} sqlite_orm sqlite_dist)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test sqlite_orm sqlite_dist)
 
-# -------- Mesgpack -----------
-MESSAGE(STATUS "Configure messagepack version ${MSGPACK_VERSION}")
+# -------- Msgpack -----------
+MESSAGE(STATUS "Configure msgpack version ${MSGPACK_VERSION}")
 ExternalProject_Add(
   msgpack
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/msgpack
@@ -323,6 +331,77 @@ SET(BUILD_LIBRARY ${BUILD_LIBRARY})
 ADD_DEPENDENCIES(msgpack boost)
 ADD_DEPENDENCIES(${PROJECT_NAME} msgpack)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test msgpack)
+
+# -------- curl -----------
+MESSAGE(STATUS "Configure curl version ${CURL_VERSION}")
+ExternalProject_Add(
+  curlsrc
+  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/curl
+  GIT_REPOSITORY https://github.com/curl/curl.git
+  GIT_TAG ${CURL_VERSION}
+  GIT_PROGRESS 1
+  LOG_DOWNLOAD 1
+  LOG_UPDATE 1
+  LOG_CONFIGURE 1
+  LOG_BUILD 1
+  LOG_INSTALL 1
+  CMAKE_ARGS
+  -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+)
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} curl)
+ADD_DEPENDENCIES(${PROJECT_NAME} prometheus)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus)
+
+# -------- ZLib -----------
+MESSAGE(STATUS "Configure zlib version ${ZLIB_VERSION}")
+ExternalProject_Add(
+  zlib
+  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/zlib
+  GIT_REPOSITORY https://github.com/madler/zlib.git
+  GIT_TAG ${ZLIB_VERSION}
+  GIT_PROGRESS 1
+  LOG_DOWNLOAD 1
+  LOG_UPDATE 1
+  LOG_CONFIGURE 1
+  LOG_BUILD 1
+  LOG_INSTALL 1
+  CMAKE_ARGS
+  -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+)
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} z)
+ADD_DEPENDENCIES(${PROJECT_NAME} prometheus curlsrc)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus curlsrc)
+
+# -------- Prometheus -----------
+MESSAGE(STATUS "Configure prometheus version ${PROMETHEUS_VERSION}")
+ExternalProject_Add(
+  prometheus
+  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/prometheus
+  GIT_REPOSITORY https://github.com/jupp0r/prometheus-cpp.git
+  GIT_TAG ${PROMETHEUS_VERSION}
+  GIT_PROGRESS 1
+  LOG_DOWNLOAD 1
+  LOG_UPDATE 1
+  LOG_CONFIGURE 1
+  LOG_BUILD 1
+  LOG_INSTALL 1
+  CMAKE_ARGS
+  -DENABLE_TESTING=OFF
+  -DENABLE_PUSH=OFF 
+  -DENABLE_COMPRESSION=ON
+  -DBUILD_SHARED_LIBS=ON
+  -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+)
+ADD_DEPENDENCIES(prometheus curlsrc zlib)
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} prometheus-cpp-pull prometheus-cpp-core)
+ADD_DEPENDENCIES(${PROJECT_NAME} prometheus)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus)
 
 # --------Google Test------
 message(STATUS "Setup GTest version ${GTEST_VERSION}")

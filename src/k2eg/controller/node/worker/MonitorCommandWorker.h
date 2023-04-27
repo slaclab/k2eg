@@ -6,6 +6,7 @@
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/pubsub/IPublisher.h>
+#include <k2eg/service/metric/IMetricService.h>
 
 #include <mutex>
 #include <shared_mutex>
@@ -43,7 +44,7 @@ struct ChannelTopicMonitorInfo {
 DEFINE_PTR_TYPES(ChannelTopicMonitorInfo);
 
 // map a channel to the topics where it need to be published
-DEFINE_MAP_FOR_TYPE(std::string, std::vector<ChannelTopicMonitorInfoShrdPtr>, ChannelTopicsMap);
+DEFINE_MAP_FOR_TYPE(std::string, std::vector<ChannelTopicMonitorInfoUPtr>, ChannelTopicsMap);
 
 //
 // ss the command handler for the management of the MonitorCommand
@@ -53,11 +54,12 @@ class MonitorCommandWorker : public CommandWorker {
     ChannelTopicsMap channel_topics_map;
     k2eg::service::log::ILoggerShrdPtr logger;
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
+    k2eg::service::metric::IEpicsMetric& metric;
     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
     // Handler's liveness token
     k2eg::common::BroadcastToken handler_token;
 
-    void epicsMonitorEvent(const k2eg::service::epics_impl::MonitorEventVecShrdPtr& event_data);
+    void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
 public:
     MonitorCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     virtual ~MonitorCommandWorker() = default;

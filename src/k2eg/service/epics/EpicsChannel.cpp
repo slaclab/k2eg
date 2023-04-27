@@ -1,6 +1,7 @@
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <pv/caProvider.h>
 #include <pv/clientFactory.h>
+#include <memory>
 #include "k2eg/service/epics/EpicsGetOperation.h"
 #include "k2eg/service/epics/EpicsPutOperation.h"
 
@@ -67,26 +68,27 @@ EpicsChannel::startMonitor() {
   mon = channel->monitor();
 }
 
-MonitorEventVecShrdPtr
+EventReceivedShrdPtr
 EpicsChannel::monitor() {
-  auto result = std::make_shared<MonitorEventVec>();
+  EventReceivedShrdPtr result = std::make_shared<EventReceived>();
   if (!mon.wait(0.100)) {
     // updates mon.event
+    result->event_timeout->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Timeout, channel_name, "Time out", nullptr}));
     return result;
   }
 
   switch (mon.event.event) {
     // Subscription network/internal error
     case pvac::MonitorEvent::Fail:
-      result->push_back(std::make_shared<MonitorEvent>(MonitorEvent{MonitorType::Fail, channel_name, mon.event.message, nullptr}));
+      result->event_fail->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Fail, channel_name, mon.event.message, nullptr}));
       break;
     // explicit call of 'mon.cancel' or subscription dropped
     case pvac::MonitorEvent::Cancel:
-      result->push_back(std::make_shared<MonitorEvent>(MonitorEvent{MonitorType::Cancel, channel_name, mon.event.message, nullptr}));
+      result->event_cancel->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Cancel, channel_name, mon.event.message, nullptr}));
       break;
     // Underlying channel becomes disconnected
     case pvac::MonitorEvent::Disconnect:
-      result->push_back(std::make_shared<MonitorEvent>(MonitorEvent{MonitorType::Disconnec, channel_name, mon.event.message, nullptr}));
+      result->event_disconnect->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Disconnec, channel_name, mon.event.message, nullptr}));
       break;
     // Data queue becomes not-empty
     case pvac::MonitorEvent::Data:
@@ -94,7 +96,7 @@ EpicsChannel::monitor() {
       while (mon.poll()) {
         auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
         tmp_data->copy(*mon.root);
-        result->push_back(std::make_shared<MonitorEvent>(MonitorEvent{MonitorType::Data, mon.event.message, {channel_name, tmp_data}}));
+        result->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, mon.event.message, {channel_name, tmp_data}}));
       }
       break;
   }

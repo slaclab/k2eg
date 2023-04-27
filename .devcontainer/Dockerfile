@@ -6,7 +6,7 @@ ARG REINSTALL_CMAKE_VERSION_FROM_SOURCE="3.23.5"
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
      && apt-get -y update \
-     && apt-get -y install --no-install-recommends software-properties-common ninja-build tclsh gdb
+     && apt-get -y install --no-install-recommends software-properties-common ninja-build tclsh gdb libssl-dev
 
 COPY ./reinstall-cmake.sh /tmp/
 

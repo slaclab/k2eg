@@ -15,10 +15,10 @@
 
 namespace k2eg::service::epics_impl {
 
-enum MonitorType { Fail, Cancel, Disconnec, Data };
+enum EventType { Timeout, Fail, Cancel, Disconnec, Data };
 
 typedef struct {
-  MonitorType       type;
+  EventType         type;
   const std::string message;
   ChannelData       channel_data;
 } MonitorEvent;
@@ -26,6 +26,15 @@ DEFINE_PTR_TYPES(MonitorEvent)
 
 typedef std::vector<MonitorEventShrdPtr> MonitorEventVec;
 typedef std::shared_ptr<MonitorEventVec> MonitorEventVecShrdPtr;
+
+struct EventReceived {
+  MonitorEventVecShrdPtr event_timeout    = std::make_shared<MonitorEventVec>();
+  MonitorEventVecShrdPtr event_data       = std::make_shared<MonitorEventVec>();
+  MonitorEventVecShrdPtr event_fail       = std::make_shared<MonitorEventVec>();
+  MonitorEventVecShrdPtr event_disconnect = std::make_shared<MonitorEventVec>();
+  MonitorEventVecShrdPtr event_cancel     = std::make_shared<MonitorEventVec>();
+};
+DEFINE_PTR_TYPES(EventReceived)
 
 class EpicsChannel {
   friend class EpicsPutOperation;
@@ -47,7 +56,7 @@ class EpicsChannel {
   ConstPutOperationUPtr                            put(const std::string& field, const std::string& value);
   ConstGetOperationUPtr                            get();
   void                                             startMonitor();
-  MonitorEventVecShrdPtr                           monitor();
+  EventReceivedShrdPtr                             monitor();
   void                                             stopMonitor();
 };
 

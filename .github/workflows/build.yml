@@ -59,6 +59,7 @@ jobs:
       with:
         build_image: ${{ needs.build_debian_bullseye.outputs.build_image }}
         artifact_name: ${{ needs.build_debian_bullseye.outputs.artifact_name }}
+        docker_compose_profile: app-debian
       secrets: inherit
 
     build_debian_bullseye:
@@ -88,7 +89,7 @@ jobs:
             - name: Configure CMake
               # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
               # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-              run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+              run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DENABLE_ASAN=1
             - name: Build
               # Build your program with the given configuration
               run: cmake --build build --config ${{env.BUILD_TYPE}} --target install
@@ -117,6 +118,7 @@ jobs:
       with:
         build_image: ${{ needs.build_ubuntu_kinetic.outputs.build_image }}
         artifact_name: ${{ needs.build_ubuntu_kinetic.outputs.artifact_name }}
+        docker_compose_profile: app-ubuntu
       secrets: inherit
     build_ubuntu_kinetic:
         name: Build Ubuntu Kinetic
@@ -138,7 +140,7 @@ jobs:
               run: |
                 export DEBIAN_FRONTEND=noninteractive
                 apt update
-                apt install -y build-essential cmake git tclsh ninja-build lcov
+                apt install -y build-essential cmake git tclsh ninja-build lcov libssl-dev
             - name: Checkout source code
               uses: actions/checkout@v3
             - name: Restore cached build directory

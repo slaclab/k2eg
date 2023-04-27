@@ -6,6 +6,7 @@
 #include <thread>
 
 #include "client.h"
+#include "k2eg/service/metric/IMetricService.h"
 
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::command;
@@ -18,11 +19,10 @@ using namespace k2eg::service::epics_impl;
 
 using namespace k2eg::service::pubsub;
 
+using namespace k2eg::service::metric;
+
 #pragma region GetMessage
-GetMessage::GetMessage(
-  const std::string& destination_topic, 
-  ConstChannelDataUPtr channel_data, 
-  ConstSerializedMessageShrdPtr message)
+GetMessage::GetMessage(const std::string& destination_topic, ConstChannelDataUPtr channel_data, ConstSerializedMessageShrdPtr message)
     : request_type("get"), destination_topic(destination_topic), channel_data(std::move(channel_data)), message(message) {}
 
 char*
@@ -52,6 +52,7 @@ GetCommandWorker::GetCommandWorker(EpicsServiceManagerShrdPtr epics_service_mana
     : processing_pool(std::make_shared<BS::thread_pool>()),
       logger(ServiceResolver<ILogger>::resolve()),
       publisher(ServiceResolver<IPublisher>::resolve()),
+      metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric()),
       epics_service_manager(epics_service_manager) {}
 
 GetCommandWorker::~GetCommandWorker() { processing_pool->wait_for_tasks(); }
@@ -88,18 +89,20 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
       case pvac::GetEvent::Fail: logger->logMessage(STRING_FORMAT("Failed get command for %1%", get_info->channel_name), LogLevel::ERROR); break;
       case pvac::GetEvent::Cancel: logger->logMessage(STRING_FORMAT("Cancelled get command for %1%", get_info->channel_name), LogLevel::ERROR); break;
       case pvac::GetEvent::Success:
+        // update metric
+        metric.incrementCounter(IEpicsMetricCounterType::Get);
         logger->logMessage(STRING_FORMAT("Success get command for %1%", get_info->channel_name), LogLevel::INFO);
-        auto c_data = get_info->op->getChannelData();
-        if (!c_data) {
+        auto channel_data = get_info->op->getChannelData();
+        if (!channel_data) {
           logger->logMessage(STRING_FORMAT("No data received for %1%", get_info->channel_name), LogLevel::ERROR);
           break;
         }
-        auto serialized_message = serialize(*c_data, static_cast<SerializationType>(get_info->serialization));
+        auto serialized_message = serialize(*channel_data, static_cast<SerializationType>(get_info->serialization));
         if (!serialized_message) {
           logger->logMessage("Invalid serilized message", LogLevel::ERROR);
           break;
         }
-        publisher->pushMessage(std::make_unique<GetMessage>(get_info->destination_topic, std::move(get_info->op->getChannelData()), serialized_message));
+        publisher->pushMessage(std::make_unique<GetMessage>(get_info->destination_topic, std::move(channel_data), serialized_message));
         break;
     }
   }

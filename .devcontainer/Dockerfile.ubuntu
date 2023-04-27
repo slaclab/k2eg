@@ -2,7 +2,7 @@ FROM ubuntu:kinetic
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN     apt update \
-    &&  apt install -y build-essential cmake git tclsh ninja-build gdb lcov
+    &&  apt install -y build-essential cmake git tclsh ninja-build gdb lcov libssl-dev valgrind
 
 #install clang
 RUN apt install -y lsb-release wget software-properties-common gnupg  python3 python3.10-venv

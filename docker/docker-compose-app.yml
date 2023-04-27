@@ -1,9 +1,34 @@
 version: '3.8'
 services:
-  app:
+  app-ubuntu:
+    profiles:
+      - app-ubuntu
     build:
       context: ../
-      dockerfile: docker/Dockerfile.test
+      dockerfile: docker/Dockerfile.ubuntu_test
+    environment:
+      WAIT_HOSTS: kafka:9092
+    working_dir: /app
+    command: 
+        - /bin/bash
+        - -c
+        - |
+          ls -la /app
+          export PATH=$PATH:/app/local/bin
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/app/local/lib:/app/local/lib/linux-x86_64
+          /app/local/bin/wait
+          /app/local/bin/linux-x86_64/pvget channel:ramp:ramp
+          /app/local/bin/k2eg-test
+        
+    depends_on:
+      - epics
+      - kafka
+  app-debian:
+    profiles: 
+      - app-debian
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.debian_test
     environment:
       WAIT_HOSTS: kafka:9092
     working_dir: /app

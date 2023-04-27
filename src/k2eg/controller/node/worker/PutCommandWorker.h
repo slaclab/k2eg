@@ -6,6 +6,7 @@
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/pubsub/IPublisher.h>
+#include <k2eg/service/metric/IMetricService.h>
 
 #include <k2eg/common/BS_thread_pool.hpp>
 
@@ -32,6 +33,7 @@ DEFINE_PTR_TYPES(PutOpInfo)
 class PutCommandWorker : public CommandWorker {
   std::shared_ptr<BS::thread_pool>                      processing_pool;
   k2eg::service::log::ILoggerShrdPtr                    logger;
+    k2eg::service::metric::IEpicsMetric&                  metric;
   k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
   void                                                  checkPutCompletion(PutOpInfoShrdPtr put_info);
 
