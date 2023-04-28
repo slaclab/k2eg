@@ -58,6 +58,11 @@ jobs:
         with:
           path: build
           key: codeql-${{ hashFiles('CMakeLists.txt') }}
+      - name: Add dependencies
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt update
+          apt install -y build-essential cmake git tclsh ninja-build lcov libssl-dev
       - name: Create build directory
         run: mkdir -p build
       - name: Configure CMake
