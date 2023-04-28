@@ -21,6 +21,10 @@ kind: Deployment
 metadata:
   name: k2eg
   namespace: k2eg
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/path: '/metrics'
+    prometheus.io/port: '8080'
 spec:
   selector:
     matchLabels:
@@ -33,8 +37,11 @@ spec:
       containers:
       - name: k2eg
         image: ghcr.io/slaclab/k2eg/ubuntu:latest
-        command: ["k2eg"]
-        args: ["--conf-file", "/etc/config"]
+        command: [k2eg]
+        args: ['--conf-file', 'yes', '--conf-file-name', '/etc/config/k2eg.config']
+        envFrom:
+        - configMapRef:
+            name: epics-config
         volumeMounts:
         - name: config-volume
           mountPath: /etc/config
@@ -44,7 +51,6 @@ spec:
             cpu: 1000m
         ports:
         - containerPort: 8080
-        imagePullSecrets:
       imagePullSecrets:
       - name: github-secret
       volumes:
