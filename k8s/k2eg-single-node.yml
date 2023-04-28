@@ -10,6 +10,7 @@ metadata:
   namespace: k2eg
 data:
   k2eg.config: |
+    log-level=debug
     cmd-input-topic=cmd-in-topic
     sub-server-address=ioc-cluster-kafka-bootstrap.kafka:9092
     sub-group-id=eed-k2eg
