@@ -140,7 +140,7 @@ jobs:
               run: |
                 export DEBIAN_FRONTEND=noninteractive
                 apt update
-                apt install -y build-essential cmake git tclsh ninja-build lcov libssl-dev
+                apt install -y build-essential cmake git tclsh ninja-build lcov libssl-dev curl libcurl4-openssl-dev
             - name: Checkout source code
               uses: actions/checkout@v3
             - name: Restore cached build directory

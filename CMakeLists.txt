@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.2)
 project(k2eg VERSION 0.1.0)
 
+
 IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   SET(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/local CACHE PATH "default install directory" FORCE)
 ENDIF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -17,7 +18,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(BOOST_VERSION 1.77.0)
 set(EPICS_VERSION R7.0.7)
 set(LIBLZ4_VERSION v1.9.2)
-set(LIBRDKAFKA_VERSION v2.0.2)
+set(LIBRDKAFKA_VERSION v2.1.0)
 set(SQLITE_VERSION version-3.41.2)
 set(SQLITEORM_VERSION v1.8.2)
 set(MSGPACK_VERSION cpp-6.0.0)
@@ -249,7 +250,8 @@ ExternalProject_Add(
   GIT_REPOSITORY https://github.com/edenhill/librdkafka.git
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/librdkafa
   CMAKE_ARGS
-    -DWITH_SSL=OFF
+    -DWITH_SSL=ON
+    -DWITH_CURL=ON
     -DRDKAFKA_BUILD_EXAMPLES=OFF
     -DRDKAFKA_BUILD_STATIC=OFF
     -DRDKAFKA_BUILD_TESTS=OFF
@@ -332,28 +334,6 @@ ADD_DEPENDENCIES(msgpack boost)
 ADD_DEPENDENCIES(${PROJECT_NAME} msgpack)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test msgpack)
 
-# -------- curl -----------
-MESSAGE(STATUS "Configure curl version ${CURL_VERSION}")
-ExternalProject_Add(
-  curlsrc
-  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/curl
-  GIT_REPOSITORY https://github.com/curl/curl.git
-  GIT_TAG ${CURL_VERSION}
-  GIT_PROGRESS 1
-  LOG_DOWNLOAD 1
-  LOG_UPDATE 1
-  LOG_CONFIGURE 1
-  LOG_BUILD 1
-  LOG_INSTALL 1
-  CMAKE_ARGS
-  -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
-  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
-  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-)
-SET(BUILD_LIBRARY ${BUILD_LIBRARY} curl)
-ADD_DEPENDENCIES(${PROJECT_NAME} prometheus)
-ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus)
-
 # -------- ZLib -----------
 MESSAGE(STATUS "Configure zlib version ${ZLIB_VERSION}")
 ExternalProject_Add(
@@ -373,8 +353,8 @@ ExternalProject_Add(
   -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
 )
 SET(BUILD_LIBRARY ${BUILD_LIBRARY} z)
-ADD_DEPENDENCIES(${PROJECT_NAME} prometheus curlsrc)
-ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus curlsrc)
+# ADD_DEPENDENCIES(${PROJECT_NAME})
+# ADD_DEPENDENCIES(${PROJECT_NAME}-test)
 
 # -------- Prometheus -----------
 MESSAGE(STATUS "Configure prometheus version ${PROMETHEUS_VERSION}")
@@ -398,8 +378,8 @@ ExternalProject_Add(
   -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
   -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
 )
-ADD_DEPENDENCIES(prometheus curlsrc zlib)
-SET(BUILD_LIBRARY ${BUILD_LIBRARY} prometheus-cpp-pull prometheus-cpp-core)
+ADD_DEPENDENCIES(prometheus zlib)
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} prometheus-cpp-pull prometheus-cpp-core curl)
 ADD_DEPENDENCIES(${PROJECT_NAME} prometheus)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus)
 
