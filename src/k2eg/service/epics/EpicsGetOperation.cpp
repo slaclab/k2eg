@@ -5,8 +5,8 @@
 
 using namespace k2eg::service::epics_impl;
 
-GetOperation::GetOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& channel_name)
-    : channel(channel), channel_name(channel_name), is_done(false) {
+GetOperation::GetOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name)
+    : channel(channel), pv_name(pv_name), is_done(false) {
   channel->addConnectListener(this);
 }
 
@@ -48,5 +48,5 @@ const pvac::GetEvent& GetOperation::getState() const {
 
 ConstChannelDataUPtr
 GetOperation::getChannelData() const {
-  return std::make_unique<ChannelData>(ChannelData{channel_name, evt.value});
+  return std::make_unique<ChannelData>(ChannelData{pv_name, evt.value});
 }

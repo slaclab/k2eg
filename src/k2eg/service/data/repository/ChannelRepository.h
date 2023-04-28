@@ -11,7 +11,7 @@ class DataStorage;
 namespace repository {
 struct ChannelMonitorType {
     int id = -1;
-    std::string channel_name;
+    std::string pv_name;
     std::uint8_t event_serialization;
     std::string channel_protocol;
     std::string channel_destination;
@@ -19,7 +19,7 @@ struct ChannelMonitorType {
 
 inline ChannelMonitorType toChannelMonitor(const k2eg::controller::command::cmd::MonitorCommand& acquire_command) {
     return ChannelMonitorType {
-        .channel_name = acquire_command.channel_name, 
+        .pv_name = acquire_command.pv_name, 
         .event_serialization = static_cast<std::uint8_t>(acquire_command.serialization),
         .channel_protocol = acquire_command.protocol,
         .channel_destination = acquire_command.destination_topic
@@ -31,7 +31,7 @@ inline  k2eg::controller::command::cmd::ConstCommandShrdPtr  fromChannelMonitor(
         k2eg::controller::command::cmd::CommandType::monitor,
          static_cast<k2eg::controller::command::cmd::MessageSerType>(command.event_serialization),
         command.channel_protocol,
-        command.channel_name, 
+        command.pv_name, 
         true,
         command.channel_destination
     });
@@ -52,7 +52,7 @@ public:
     bool isPresent(const ChannelMonitorType& new_cannel) const;
     std::optional<ChannelMonitorTypeUPtr> getChannelMonitor(const ChannelMonitorType& channel_descirption) const;
     ChannelMonitorDistinctResultType getDistinctByNameProtocol() const;
-    void processAllChannelMonitor(const std::string& channel_name,
+    void processAllChannelMonitor(const std::string& pv_name,
                                   const std::string& channel_protocol,
                                   ChannelMonitorTypeProcessHandler handler) const;
     void removeAll();

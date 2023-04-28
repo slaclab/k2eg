@@ -27,19 +27,19 @@ EpicsServiceManager::~EpicsServiceManager() {
 #define SELECT_PROVIDER(p) \
 (protocol.find("pva") == 0?*pva_provider:*ca_provider)
 
-void EpicsServiceManager::addChannel(const std::string& channel_name, const std::string& protocol) {
+void EpicsServiceManager::addChannel(const std::string& pv_name, const std::string& protocol) {
     std::unique_lock guard(channel_map_mutex);
-    if (auto search = channel_map.find(channel_name); search != channel_map.end()) {
+    if (auto search = channel_map.find(pv_name); search != channel_map.end()) {
         return;
     }
     try {
-        channel_map[channel_name] = std::make_shared<EpicsChannel>(SELECT_PROVIDER(protocol), channel_name);
-        channel_map[channel_name]->startMonitor();
+        channel_map[pv_name] = std::make_shared<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
+        channel_map[pv_name]->startMonitor();
     } catch (std::exception& ex) {
-        channel_map.erase(channel_name);
+        channel_map.erase(pv_name);
         throw ex;
     } catch (...) {
-        channel_map.erase(channel_name);
+        channel_map.erase(pv_name);
         throw std::runtime_error("Unknown error during channel registration");
     }
 }
@@ -58,42 +58,42 @@ StringVector EpicsServiceManager::getMonitoredChannels() {
 #endif
 }
 
-void EpicsServiceManager::removeChannel(const std::string& channel_name) {
+void EpicsServiceManager::removeChannel(const std::string& pv_name) {
     std::lock_guard guard(channel_map_mutex);
-    channel_map.erase(channel_name);
+    channel_map.erase(pv_name);
 }
 
-void EpicsServiceManager::monitorChannel(const std::string& channel_name, bool activate, const std::string& protocol) {
+void EpicsServiceManager::monitorChannel(const std::string& pv_name, bool activate, const std::string& protocol) {
     if (activate) {
-        addChannel(channel_name, protocol);
+        addChannel(pv_name, protocol);
     } else {
-        removeChannel(channel_name);
+        removeChannel(pv_name);
     }
 }
 
-ConstGetOperationUPtr EpicsServiceManager::getChannelData(const std::string& channel_name, const std::string& protocol) {
+ConstGetOperationUPtr EpicsServiceManager::getChannelData(const std::string& pv_name, const std::string& protocol) {
     ConstGetOperationUPtr result;
     std::unique_lock guard(channel_map_mutex);
-    if (auto search = channel_map.find(channel_name); search != channel_map.end()) {
+    if (auto search = channel_map.find(pv_name); search != channel_map.end()) {
         // the same channel is in monitor so we can use it
         result = search->second->get();
     } else {
         // allocate channel and return data
-        auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), channel_name);
+        auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
         result = channel->get();
     }
     return result;
 }
 
-ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& channel_name, const std::string& field, const std::string& value, const std::string& protocol) {
+ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_name, const std::string& field, const std::string& value, const std::string& protocol) {
     ConstPutOperationUPtr result;
     std::unique_lock guard(channel_map_mutex);
-    if (auto search = channel_map.find(channel_name); search != channel_map.end()) {
+    if (auto search = channel_map.find(pv_name); search != channel_map.end()) {
         // the same channel is in monitor so we can use it
         result = search->second->put(field, value);
     } else {
         // allocate channel and return data
-        auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), channel_name);
+        auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
         result = channel->put(field, value);
     }
     return result;

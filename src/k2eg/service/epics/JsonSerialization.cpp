@@ -27,7 +27,7 @@ JsonSerializer::serialize(const ChannelData& message) {
   std::stringstream       ss;
   boost::json::object     json_root_object;
   boost::json::serializer sr;
-  processStructure(message.data.get(), message.channel_name, json_root_object);
+  processStructure(message.data.get(), message.pv_name, json_root_object);
   ss << json_root_object;
   return MakeJsonMessageShrdPtr(std::move(ss.str()));
 }

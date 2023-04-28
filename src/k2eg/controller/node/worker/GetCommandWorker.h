@@ -33,16 +33,16 @@ class GetMessage : public k2eg::service::pubsub::PublishMessage {
 
 class GetOpInfo : public WorkerAsyncOperation {
  public:
-  std::string                                channel_name;
+  std::string                                pv_name;
   std::string                                destination_topic;
   command::cmd::MessageSerType               serialization;
   service::epics_impl::ConstGetOperationUPtr op;
-  GetOpInfo(const std::string&                         channel_name,
+  GetOpInfo(const std::string&                         pv_name,
             const std::string&                         destination_topic,
             const command::cmd::MessageSerType&        serialization,
             service::epics_impl::ConstGetOperationUPtr op)
       : WorkerAsyncOperation(std::chrono::milliseconds(3000)),
-        channel_name(channel_name),
+        pv_name(pv_name),
         destination_topic(destination_topic),
         serialization(serialization),
         op(std::move(op)) {}

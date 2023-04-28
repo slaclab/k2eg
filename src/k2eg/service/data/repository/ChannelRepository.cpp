@@ -15,7 +15,7 @@ void ChannelRepository::insert(const ChannelMonitorType& channel_description) {
     auto locked_instance = data_storage.getLockedStorage();
     auto lstorage = locked_instance.get();
     auto found = lstorage->count<ChannelMonitorType>(
-        where(c(&ChannelMonitorType::channel_name) == channel_description.channel_name
+        where(c(&ChannelMonitorType::pv_name) == channel_description.pv_name
               and c(&ChannelMonitorType::channel_destination)
                       == channel_description.channel_destination));
 
@@ -25,14 +25,14 @@ void ChannelRepository::insert(const ChannelMonitorType& channel_description) {
 void ChannelRepository::remove(const ChannelMonitorType& channel_description) {
     auto locked_instance = data_storage.getLockedStorage();
     locked_instance.get()->remove_all<ChannelMonitorType>(
-        where(c(&ChannelMonitorType::channel_name) == channel_description.channel_name
+        where(c(&ChannelMonitorType::pv_name) == channel_description.pv_name
               and c(&ChannelMonitorType::channel_destination)
                       == channel_description.channel_destination));
 }
 
 bool ChannelRepository::isPresent(const ChannelMonitorType& new_cannel) const {
     auto result = data_storage.getLockedStorage().get()->count<ChannelMonitorType>(
-        where(c(&ChannelMonitorType::channel_name) == new_cannel.channel_name
+        where(c(&ChannelMonitorType::pv_name) == new_cannel.pv_name
               and c(&ChannelMonitorType::channel_protocol) == new_cannel.channel_protocol
               and c(&ChannelMonitorType::channel_destination)
                       == new_cannel.channel_destination));
@@ -43,7 +43,7 @@ std::optional<ChannelMonitorTypeUPtr> ChannelRepository::getChannelMonitor(
     const ChannelMonitorType& channel_descirption) const {
     auto result =
         data_storage.getLockedStorage().get()->get_all_pointer<ChannelMonitorType>(
-            where(c(&ChannelMonitorType::channel_name) == channel_descirption.channel_name
+            where(c(&ChannelMonitorType::pv_name) == channel_descirption.pv_name
                 //   and c(&ChannelMonitorType::channel_protocol)
                 //           == channel_descirption.channel_protocol
                   and c(&ChannelMonitorType::channel_destination)
@@ -58,19 +58,19 @@ ChannelRepository::getDistinctByNameProtocol() const {
     auto locked_instance = data_storage.getLockedStorage();
     auto lstorage = locked_instance.get();
     auto result =
-        lstorage->select(distinct(columns(&ChannelMonitorType::channel_name,
+        lstorage->select(distinct(columns(&ChannelMonitorType::pv_name,
                                           &ChannelMonitorType::channel_protocol)));
     return result;
 }
 
 void ChannelRepository::processAllChannelMonitor(
-    const std::string& channel_name,
+    const std::string& pv_name,
     const std::string& channel_protocol,
     ChannelMonitorTypeProcessHandler handler) const {
     auto locked_instance = data_storage.getLockedStorage();
     auto lstorage = locked_instance.get();
     for (uint32_t idx = 0; auto& channel_description: lstorage->iterate<ChannelMonitorType>(
-             where(c(&ChannelMonitorType::channel_name) == channel_name))) {
+             where(c(&ChannelMonitorType::pv_name) == pv_name))) {
         handler(idx++, channel_description);
     }
 }

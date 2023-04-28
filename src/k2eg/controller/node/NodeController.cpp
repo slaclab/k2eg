@@ -66,13 +66,13 @@ void NodeController::submitCommand(ConstCommandShrdPtrVec commands) {
             if (acquire_command_shrd->activate) {
                 // start monitoring
                 node_configuration->addChannelMonitor(
-                    {ChannelMonitorType{.channel_name = acquire_command_shrd->channel_name,
+                    {ChannelMonitorType{.pv_name = acquire_command_shrd->pv_name,
                                         .channel_protocol = acquire_command_shrd->protocol,
                                         .channel_destination = acquire_command_shrd->destination_topic}});
             } else {
                 // stop monitoring
                 node_configuration->removeChannelMonitor(
-                    {ChannelMonitorType{.channel_name = acquire_command_shrd->channel_name,
+                    {ChannelMonitorType{.pv_name = acquire_command_shrd->pv_name,
                                         .channel_destination = acquire_command_shrd->destination_topic}});
             }
             break;

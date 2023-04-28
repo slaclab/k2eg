@@ -32,11 +32,11 @@ class EpicsServiceManager {
 public:
     explicit EpicsServiceManager();
     ~EpicsServiceManager();
-    void addChannel(const std::string& channel_name, const std::string& protocol = "pva");
-    void removeChannel(const std::string& channel_name);
-    void monitorChannel(const std::string& channel_name, bool activate, const std::string& protocol);
-    ConstGetOperationUPtr getChannelData(const std::string& channel_name, const std::string& protocol = "pva");
-    ConstPutOperationUPtr putChannelData(const std::string& channel_name, const std::string& field, const std::string& value, const std::string& protocol = "pva");
+    void addChannel(const std::string& pv_name, const std::string& protocol = "pva");
+    void removeChannel(const std::string& pv_name);
+    void monitorChannel(const std::string& pv_name, bool activate, const std::string& protocol);
+    ConstGetOperationUPtr getChannelData(const std::string& pv_name, const std::string& protocol = "pva");
+    ConstPutOperationUPtr putChannelData(const std::string& pv_name, const std::string& field, const std::string& value, const std::string& protocol = "pva");
     size_t getChannelMonitoredSize();
     /**
      * Register an event handler and return a token. Unitl this token is alive

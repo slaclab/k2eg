@@ -9,7 +9,7 @@ Each command has a minimum set of attributes that are the ones below:
 {
     "command": "command string desceription",
     "serialization": "json|msgpack",
-    "channel_name": "channel description",
+    "pv_name": "channel description",
     "dest_topic": "destination topic"
 }
 ```
@@ -22,7 +22,7 @@ Each epics single value is serialized in different way depending of serializatio
 ## JSON Serialization (json)
 ```json
 {
-    "<channel name>":
+    "<pv name>":
     {
         "value":"< scalar | scalar array>",
         "alarm":{
@@ -67,9 +67,9 @@ Each epics single value is serialized in different way depending of serializatio
 ```
 
 ## MSGPack serialization (msgpack)
-The msgpack serializaion use a map to represent data like a json structure. At level-0 there is a map where the key is the channel name and as value there is another map that contains the sublevel keys value, alarm, timeStamp, display, control, valueAlarm:
+The msgpack serializaion use a map to represent data like a json structure. At level-0 there is a map where the key is the pv name and as value there is another map that contains the sublevel keys value, alarm, timeStamp, display, control, valueAlarm:
 ```
-MAP( "<channel name>", MAP(
+MAP( "<pv name>", MAP(
     "value": scalar | scalar array,
     "alarm" : MAP(
         "severity":0,
@@ -111,26 +111,26 @@ MAP( "<channel name>", MAP(
 ))
 ```
 ## MSGPack Compact serialization (msgpack-compact)
-The msgpack compact, instead of a map, use an array to serialize all the values, leaving out the key. At the first position there is the channel name the other values are positionally equal to the position on the json and msgpack structure.
+The msgpack compact, instead of a map, use an array to serialize all the values, leaving out the key. At the first position there is the pv name the other values are positionally equal to the position on the json and msgpack structure.
 ```
 VECTOR(<channle name>,< scalar | scalar array>, <severity>, <status>, <message>, <secondsPastEpoch>, <nanoseconds>, <userTag>, <limitLow>, <limitHigh>, <description>, <units>, <precision>, <index>, <contorl limitLow>, <constrol limitHigh>, <control minStep>, <active>, <lowAlarmLimit>, <lowWarningLimit>, <highWarningLimit>, <highAlarmLimit>, <lowAlarmSeverity>, <lowWarningSeverity>, <highWarningSeverity>, <highAlarmSeverity>, <hysteresis>)
 ```
 
 # Get Command
-The **get** command permit to retrive the current value of an epics channel, so it generate a single message with the following schema
+The **get** command permit to retrive the current value of an epics pv, so it generate a single message with the following schema
 ## JSON Structure
 ```json
 {
     "command": "get",
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
-    "channel_name": "channel::a",
+    "pv_name": "channel::a",
     "dest_topic": "destination_topic"
 }
 ```
 
 # Monitor Command
-The **monitor** command permits to enable or disable the update notification, for a specific EPICS channel, into a specific kafka topic. K2eg permit to enable the monitoring of the same channel and forward event message on different topics and in different serializaton format for the specific topic. The message received for the event monitor is the same as the **get** command:
+The **monitor** command permits to enable or disable the update notification, for a specific EPICS pv, into a specific kafka topic. K2eg permit to enable the monitoring of the same channel and forward event message on different topics and in different serializaton format for the specific topic. The message received for the event monitor is the same as the **get** command:
 ## JSON Structure
 ### Activation
 ```json
@@ -138,7 +138,7 @@ The **monitor** command permits to enable or disable the update notification, fo
     "command": "monitor",
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
-    "channel_name": "channel name",
+    "pv_name": "pv name",
     "dest_topic": "destination topic",
     "activate": true
 }
@@ -148,19 +148,19 @@ The **monitor** command permits to enable or disable the update notification, fo
 ```json
 {
     "command": "monitor",
-    "channel_name": "channel name",
+    "pv_name": "pv name",
     "dest_topic": "destination topic",
     "activate": false
 }
 ```
 # Put Command
-Put command is ismilar to caput or pvput epics command, it permit to applya a value to a channel. IN case the channel is a scalar array, each value need to be separated by a space, like in the example below.
+Put command is ismilar to caput or pvput epics command, it permit to applya a value to a pv. In case the it is a scalar array, each value need to be separated by a space, like in the example below.
 ## JSON Structure
 ```json
 {
     "command": "put",
     "protocol": "pva|ca",
-    "channel_name": "channel name",
+    "pv_name": "pv name",
     "value": "<value>|<value> <value> <value> <value>"
 }
 ```

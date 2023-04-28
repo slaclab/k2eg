@@ -8,7 +8,7 @@ namespace k2eg::controller::command::cmd {
  *     {
         "command", "put",
         "protocol", "pva|ca",
-        "channel_name", "channel::a"
+        "pv_name", "channel::a"
         "value", value"
         }
 */
@@ -18,7 +18,7 @@ struct PutCommand : public Command {
 DEFINE_PTR_TYPES(PutCommand)
 static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, PutCommand const& c) { 
     jv = {
-        {"channel_name", c.channel_name}, 
+        {"pv_name", c.pv_name}, 
         {"protocol", c.protocol}, 
         {"value", c.value}
         }; 

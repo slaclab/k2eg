@@ -137,7 +137,7 @@ This implemets the base caget|pvaget fucntion of epics command, if possible will
     "command": "get",
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
-    "channel_name": "channel::a",
+    "pv_name": "channel::a",
     "dest_topic": "destination_topic"
 }
 ```
@@ -151,7 +151,7 @@ Monitor Activation
     "command": "monitor",
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
-    "channel_name": "channel name",
+    "pv_name": "channel name",
     "dest_topic": "destination topic",
     "activate": true
 }
@@ -161,7 +161,7 @@ Monitor deactivation
 ```json
 {
     "command": "monitor",
-    "channel_name": "channel name",
+    "pv_name": "channel name",
     "dest_topic": "destination topic",
     "activate": false
 }

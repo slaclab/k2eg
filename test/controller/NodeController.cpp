@@ -492,7 +492,7 @@ TEST(NodeController, RandomCommand) {
       case 2: {
         std::this_thread::sleep_for(std::chrono::microseconds(uniform_dist_sleep(e1)));
         EXPECT_NO_THROW(node_controller->submitCommand(
-            {std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
+            {std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "pva", "variable:b", KAFKA_TOPIC_ACQUIRE_IN})}););
         break;
       }
 

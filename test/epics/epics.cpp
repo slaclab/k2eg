@@ -21,7 +21,7 @@ using namespace k2eg::service::epics_impl;
 TEST(Epics, ChannelFault) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr pc;
-  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "bacd_channel_name"));
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "bacd_pv_name"));
 }
 
 TEST(Epics, ChannelOK) {

@@ -26,17 +26,17 @@ def get(
         "-ct",
         help="Is the k2eg command input topic",
     ),
-    channel_name: str = typer.Option(
+    pv_name: str = typer.Option(
         ...,
-        "--channel-name",
+        "--pv-name",
         "-n",
-        help="Is the name of the channel(pv) target of get operation",
+        help="Is the name of the pv target of get operation",
     ),
-    channel_protocol: str = typer.Option(
+    pv_protocol: str = typer.Option(
         "pva",
-        "--channel-protocol",
+        "--pv-protocol",
         "-p",
-        help="Is the epics protocol of the channel(pv) target of get operation",
+        help="Is the epics protocol of the pv target of get operation",
     ),
     destination_topic: str = typer.Option(
         "data_topic_out",
@@ -56,8 +56,8 @@ def get(
     get_command = {
         "command": "get",
         "serialization": seriailization_type.lower(),
-        "protocol": channel_protocol,
-        "channel_name": channel_name,
+        "protocol": pv_protocol,
+        "pv_name": pv_name,
         "dest_topic": destination_topic
     }
 
@@ -80,17 +80,17 @@ def start_monitor(
         "-ct",
         help="Is the k2eg command input topic",
     ),
-    channel_name: str = typer.Option(
+    pv_name: str = typer.Option(
         ...,
-        "--channel-name",
+        "--pv-name",
         "-n",
-        help="Is the name of the channel(pv) target of monitor operation",
+        help="Is the name of the pv target of monitor operation",
     ),
-    channel_protocol: str = typer.Option(
+    pv_protocol: str = typer.Option(
         "pva",
-        "--channel-protocol",
+        "--pv-protocol",
         "-p",
-        help="Is the epics protocol of the channel(pv) target of monitor operation",
+        help="Is the epics protocol of the pv target of monitor operation",
     ),
     destination_topic: str = typer.Option(
         "data_topic_out",
@@ -110,8 +110,8 @@ def start_monitor(
     start_monitor_command = {
         "command": "monitor",
         "serialization": seriailization_type,
-        "protocol": channel_protocol,
-        "channel_name": channel_name,
+        "protocol": pv_protocol,
+        "pv_name": pv_name,
         "dest_topic": destination_topic,
         "activate": True
     }
@@ -135,13 +135,13 @@ def stop_monitor(
         "-ct",
         help="Is the k2eg command input topic",
     ),
-    channel_name: str = typer.Option(
+    pv_name: str = typer.Option(
         ...,
         "--channel-name",
         "-n",
         help="Is the name of the channel(pv) target of monitor operation",
     ),
-    channel_protocol: str = typer.Option(
+    pv_protocol: str = typer.Option(
         "pva",
         "--channel-protocol",
         "-p",
@@ -158,7 +158,7 @@ def stop_monitor(
     print(f"Using command topic: [bold green]{cmd_topic}[/bold green]")
     start_monitor_command = {
         "command": "monitor",
-        "channel_name": channel_name,
+        "pv_name": pv_name,
         "dest_topic": destination_topic,
         "activate": False
     }

@@ -76,25 +76,25 @@ MapToCommand::parse(const object& obj) {
     case CommandType::monitor: {
       if (auto activation = obj.if_contains(KEY_ACTIVATE); activation != nullptr && activation->is_bool()) {
         if (activation->as_bool()) {
-          if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_CHANNEL_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}});
+          if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}});
               fields != nullptr) {
             MessageSerType ser_type = MessageSerType::json;
             if (auto v = obj.if_contains(KEY_SERIALIZATION)) { ser_type = getSerializationType(*v); }
             result = std::make_shared<MonitorCommand>(MonitorCommand{CommandType::monitor,
                                                                      ser_type,
                                                                      std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
-                                                                     std::any_cast<std::string>(fields->find(KEY_CHANNEL_NAME)->second),
+                                                                     std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
                                                                      true,
                                                                      std::any_cast<std::string>(fields->find(KEY_DEST_TOPIC)->second)});
           } else {
             logger->logMessage("Missing key for the AquireCommand: " + serialize(obj), LogLevel::ERROR);
           }
         } else {
-          if (auto fields = checkFields(obj, {{KEY_CHANNEL_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
+          if (auto fields = checkFields(obj, {{KEY_PV_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
             result = std::make_shared<MonitorCommand>(MonitorCommand{CommandType::monitor,
                                                                      MessageSerType::unknown,
                                                                      "",
-                                                                     std::any_cast<std::string>(fields->find(KEY_CHANNEL_NAME)->second),
+                                                                     std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
                                                                      false,
                                                                      std::any_cast<std::string>(fields->find(KEY_DEST_TOPIC)->second)});
           } else {
@@ -105,13 +105,13 @@ MapToCommand::parse(const object& obj) {
       break;
     }
     case CommandType::get: {
-      if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_CHANNEL_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
+      if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
         MessageSerType ser_type = MessageSerType::json;
         if (auto v = obj.if_contains(KEY_SERIALIZATION)) { ser_type = getSerializationType(*v); }
         result = std::make_shared<GetCommand>(GetCommand{CommandType::get,
                                                          ser_type,
                                                          std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
-                                                         std::any_cast<std::string>(fields->find(KEY_CHANNEL_NAME)->second),
+                                                         std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
                                                          std::any_cast<std::string>(fields->find(KEY_DEST_TOPIC)->second)});
       } else {
         logger->logMessage("Missing key for the GetCommand: " + serialize(obj), LogLevel::ERROR);
@@ -119,12 +119,12 @@ MapToCommand::parse(const object& obj) {
       break;
     }
     case CommandType::put: {
-      if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_CHANNEL_NAME, kind::string}, {KEY_VALUE, kind::string}}); fields != nullptr) {
+      if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_VALUE, kind::string}}); fields != nullptr) {
         MessageSerType ser_type = MessageSerType::json;
         result                  = std::make_shared<PutCommand>(PutCommand{CommandType::put,
                                                          ser_type,
                                                          std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
-                                                         std::any_cast<std::string>(fields->find(KEY_CHANNEL_NAME)->second),
+                                                         std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
                                                          std::any_cast<std::string>(fields->find(KEY_VALUE)->second)});
       } else {
         logger->logMessage("Missing key for the PutCommand: " + serialize(obj), LogLevel::ERROR);
@@ -132,13 +132,13 @@ MapToCommand::parse(const object& obj) {
       break;
     }
     case CommandType::info: {
-      if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_CHANNEL_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
+      if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
         MessageSerType ser_type = MessageSerType::json;
         if (auto v = obj.if_contains(KEY_SERIALIZATION)) { ser_type = getSerializationType(*v); }
         result = std::make_shared<InfoCommand>(InfoCommand{CommandType::info,
                                                            ser_type,
                                                            std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
-                                                           std::any_cast<std::string>(fields->find(KEY_CHANNEL_NAME)->second),
+                                                           std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
                                                            std::any_cast<std::string>(fields->find(KEY_DEST_TOPIC)->second)});
       } else {
         logger->logMessage("Missing key for the InfoCommand: " + serialize(obj), LogLevel::ERROR);

@@ -38,7 +38,7 @@ DEFINE_PTR_TYPES(EventReceived)
 
 class EpicsChannel {
   friend class EpicsPutOperation;
-  const std::string                          channel_name;
+  const std::string                          pv_name;
   const std::string                          address;
   epics::pvData::PVStructure::shared_pointer pvReq = epics::pvData::createRequest("field()");
   // epics::pvAccess::Configuration::shared_pointer conf  = epics::pvAccess::ConfigurationBuilder().push_env().build();
@@ -47,7 +47,7 @@ class EpicsChannel {
   pvac::MonitorSync                    mon;
 
  public:
-  explicit EpicsChannel(pvac::ClientProvider& provider, const std::string& channel_name, const std::string& address = std::string());
+  explicit EpicsChannel(pvac::ClientProvider& provider, const std::string& pv_name, const std::string& address = std::string());
   ~EpicsChannel();
   static void                                      init();
   static void                                      deinit();

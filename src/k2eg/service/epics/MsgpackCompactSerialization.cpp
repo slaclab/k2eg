@@ -31,7 +31,7 @@ MsgpackCompactSerializer::serialize(const ChannelData& message) {
   scannStructure(message.data.get(), values);
 
   packer.pack_array(values.size()+1);
-  packer.pack(message.channel_name);
+  packer.pack(message.pv_name);
   //serialize
   for(auto & f: values) {
     auto type = f->getField()->getType();
