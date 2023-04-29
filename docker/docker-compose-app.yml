@@ -21,7 +21,8 @@ services:
           /app/local/bin/k2eg-test
         
     depends_on:
-      - epics
+      - epics-pva
+      - epics-ca
       - kafka
   app-debian:
     profiles: 
@@ -44,5 +45,6 @@ services:
           /app/local/bin/k2eg-test
         
     depends_on:
-      - epics
+      - epics-pva
+      - epics-ca
       - kafka
