@@ -4,8 +4,8 @@ LABEL maintainer="bisegni@slac.stanford.edu"
 LABEL org.opencontainers.image.description="Kafka To Epics Gateway"
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN     apt-get update \
-    &&  apt-get install -y build-essential cmake git tclsh ninja-build libssl-dev curl libcurl4-openssl-dev
+RUN     apt update \
+    &&  apt install -y build-essential cmake git tclsh ninja-build libssl-dev curl libcurl4-openssl-dev
 
 COPY src /opt/app/src
 COPY test /opt/app/test
@@ -13,8 +13,8 @@ COPY tools /opt/app/tools
 COPY k2eg.h.in /opt/app/
 COPY CMakeLists.txt /opt/app/
 COPY configuration/coverage.cmake /opt/app/configuration/coverage.cmake
-RUN  apt-get update \
-    &&  apt-get install -y openssl curl libcurl4-openssl-dev
+RUN  apt update \
+    &&  apt install -y openssl curl libcurl4-openssl-dev
 RUN mkdir /opt/app/build && cd /opt/app/build && cmake -DCMAKE_BUILD_TYPE=Release .. && make install
 
 from ubuntu:kinetic
@@ -27,8 +27,8 @@ COPY --from=builder /opt/app/build/local/lib /opt/app/lib
 # COPY --from=builder /opt/app/build/k2eg /opt/app
 ENV PATH="${PATH}:/opt/app:/opt/app/bin:/opt/app/bin/linux-x86_64"
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/app/lib:/opt/app/lib/linux-x86_64"
-RUN  apt-get update \
-    &&  apt-get install -y openssl curl libcurl4-openssl-dev
+RUN  apt update \
+    &&  apt install -y openssl curl libcurl4-openssl-dev
 # Add docker-compose-wait tool -------------------
 ENV WAIT_VERSION 2.9.0
 ADD https://github.com/ufoscout/docker-compose-wait/releases/download/$WAIT_VERSION/wait /opt/wait
