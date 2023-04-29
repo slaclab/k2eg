@@ -1,12 +1,12 @@
 #include <k2eg/service/epics/EpicsGetOperation.h>
 #include <pv/createRequest.h>
 #include <pvData.h>
+
 #include "client.h"
 
 using namespace k2eg::service::epics_impl;
 
-GetOperation::GetOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name)
-    : channel(channel), pv_name(pv_name), is_done(false) {
+GetOperation::GetOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name) : channel(channel), pv_name(pv_name), is_done(false) {
   channel->addConnectListener(this);
 }
 
@@ -33,7 +33,7 @@ GetOperation::connectEvent(const pvac::ConnectEvent& evt) {
   if (evt.connected) {
     op = channel->get(this);
   } else {
-    // std::cout << "Disconnect " << name << "\n";
+    is_done = true;
   }
 }
 
@@ -42,11 +42,16 @@ GetOperation::isDone() const {
   return is_done;
 }
 
-const pvac::GetEvent& GetOperation::getState() const {
-    return evt;
+const pvac::GetEvent&
+GetOperation::getState() const {
+  return evt;
 }
 
 ConstChannelDataUPtr
 GetOperation::getChannelData() const {
   return std::make_unique<ChannelData>(ChannelData{pv_name, evt.value});
+}
+bool
+GetOperation::hasData() const {
+  return evt.value != nullptr;
 }

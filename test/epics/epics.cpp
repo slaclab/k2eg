@@ -24,27 +24,7 @@ TEST(Epics, ChannelFault) {
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "bacd_pv_name"));
 }
 
-TEST(Epics, ChannelOK) {
-  INIT_PVA_PROVIDER()
-  EpicsChannelUPtr                                 pc;
-  epics::pvData::PVStructure::const_shared_pointer val;
-  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
-  // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(val = pc->getData(););
-  EXPECT_NE(val, nullptr);
-}
-
-TEST(Epics, ChannelOKWithAddress) {
-  INIT_PVA_PROVIDER()
-  EpicsChannelUPtr                                 pc;
-  epics::pvData::PVStructure::const_shared_pointer val;
-  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum", "epics"););
-  // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(val = pc->getData(););
-  EXPECT_NE(val, nullptr);
-}
-
-TEST(Epics, ChannelGetOpOk) {
+TEST(Epics, ChannelPVAGetOpOk) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr                                 pc;
   ConstGetOperationUPtr                            get_op;
@@ -54,6 +34,43 @@ TEST(Epics, ChannelGetOpOk) {
   EXPECT_NO_THROW(get_op = pc->get(););
   WHILE(get_op->isDone(), false);
   EXPECT_EQ(get_op->getState().event, pvac::GetEvent::Success);
+}
+
+TEST(Epics, ChannelPVAGetCaFail) {
+  INIT_PVA_PROVIDER()
+  EpicsChannelUPtr                                 pc;
+  ConstGetOperationUPtr                            get_op;
+  epics::pvData::PVStructure::const_shared_pointer val;
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "ca:variable:sum"););
+  // EXPECT_NO_THROW(pc->connect());
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_EQ(get_op->hasData(), false);
+}
+
+TEST(Epics, ChannelCAGetOpOk) {
+  INIT_CA_PROVIDER()
+  EpicsChannelUPtr                                 pc;
+  ConstGetOperationUPtr                            get_op;
+  epics::pvData::PVStructure::const_shared_pointer val;
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:variable:sum"););
+  // EXPECT_NO_THROW(pc->connect());
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_EQ(get_op->getState().event, pvac::GetEvent::Success);
+}
+
+TEST(Epics, ChannelCAGetPVAOpOk) {
+  INIT_CA_PROVIDER()
+  EpicsChannelUPtr                                 pc;
+  ConstGetOperationUPtr                            get_op;
+  epics::pvData::PVStructure::const_shared_pointer val;
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:sum"););
+  // EXPECT_NO_THROW(pc->connect());
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_EQ(get_op->getState().event, pvac::GetEvent::Success);
+  EXPECT_EQ(get_op->hasData(), true);
 }
 
 bool

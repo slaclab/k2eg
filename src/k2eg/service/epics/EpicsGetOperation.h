@@ -22,6 +22,7 @@ class GetOperation : public pvac::ClientChannel::GetCallback, public pvac::Clien
   bool                  isDone() const;
   const pvac::GetEvent& getState() const;
   ConstChannelDataUPtr  getChannelData() const;
+  bool                  hasData() const;
 };
 
 DEFINE_PTR_TYPES(GetOperation)
