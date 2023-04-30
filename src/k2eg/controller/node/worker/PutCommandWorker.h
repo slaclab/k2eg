@@ -15,15 +15,15 @@
 namespace k2eg::controller::node::worker {
 
 struct PutOpInfo : public WorkerAsyncOperation {
-  std::string                                channel_name;
+  std::string                                pv_name;
   std::string                                value;
   service::epics_impl::ConstPutOperationUPtr op;
   PutOpInfo(
-    const std::string& channel_name, 
+    const std::string& pv_name, 
     const std::string& value, 
     service::epics_impl::ConstPutOperationUPtr op)
       : WorkerAsyncOperation(std::chrono::milliseconds(3000))
-      , channel_name(channel_name)
+      , pv_name(pv_name)
       , value(value)
       , op(std::move(op)) {}
 };

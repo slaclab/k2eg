@@ -23,9 +23,9 @@ RUN mkdir /opt/app
 WORKDIR /opt/app
 COPY --from=builder /opt/app/build/local/bin /opt/app/bin
 COPY --from=builder /opt/app/build/local/lib /opt/app/lib
-COPY --from=builder /opt/app/build/k2eg-test /opt/app
-COPY --from=builder /opt/app/build/k2eg /opt/app
-ENV PATH="${PATH}:/opt/app:/opt/app/bin"
+# COPY --from=builder /opt/app/build/k2eg-test /opt/app
+# COPY --from=builder /opt/app/build/k2eg /opt/app
+ENV PATH="${PATH}:/opt/app:/opt/app/bin:/opt/app/bin/linux-x86_64"
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/app/lib:/opt/app/lib/linux-x86_64"
 RUN  apt update \
     &&  apt install -y openssl curl libcurl4-openssl-dev

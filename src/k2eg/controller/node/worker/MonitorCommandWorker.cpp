@@ -29,7 +29,7 @@ MonitorMessage::MonitorMessage(const std::string& queue, ConstMonitorEventShrdPt
 char* MonitorMessage::getBufferPtr() { return const_cast<char*>(message->data()); }
 const size_t MonitorMessage::getBufferSize() { return message->size(); }
 const std::string& MonitorMessage::getQueue() { return queue; }
-const std::string& MonitorMessage::getDistributionKey() { return monitor_event->channel_data.channel_name; }
+const std::string& MonitorMessage::getDistributionKey() { return monitor_event->channel_data.pv_name; }
 const std::string& MonitorMessage::getReqType() { return request_type; }
 #pragma endregion MonitorMessage
 
@@ -49,17 +49,17 @@ void MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
     // lock the map and contained vector for write
     {
         std::unique_lock lock(channel_map_mtx);
-        logger->logMessage(STRING_FORMAT("%1% monitor on '%2%' for topic '%3%'", (a_ptr->activate ? "Activate" : "Deactivate") % a_ptr->channel_name % a_ptr->destination_topic));
+        logger->logMessage(STRING_FORMAT("%1% monitor on '%2%' for topic '%3%'", (a_ptr->activate ? "Activate" : "Deactivate") % a_ptr->pv_name % a_ptr->destination_topic));
 
-        auto& vec_ref = channel_topics_map[a_ptr->channel_name];
+        auto& vec_ref = channel_topics_map[a_ptr->pv_name];
         if (a_ptr->activate) {
             // add topic to channel
             // check if the topic is already present[fault tollerant check]
             if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&a_ptr](auto& info_topic) { return info_topic->dest_topic.compare(a_ptr->destination_topic) == 0; }) == std::end(vec_ref)) {
-                    channel_topics_map[a_ptr->channel_name].push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{.dest_topic = a_ptr->destination_topic, .ser_type = a_ptr->serialization})
+                    channel_topics_map[a_ptr->pv_name].push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{.dest_topic = a_ptr->destination_topic, .ser_type = a_ptr->serialization})
                 );
             } else {
-                logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated", a_ptr->channel_name % a_ptr->destination_topic));
+                logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated", a_ptr->pv_name % a_ptr->destination_topic));
             }
         } else {
             // remove topic to channel
@@ -67,13 +67,13 @@ void MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
             if (itr != std::end(vec_ref)) {
                 vec_ref.erase(itr);
             } else {
-                logger->logMessage(STRING_FORMAT("No active monitor on '%1%' for topic '%2%'", a_ptr->channel_name % a_ptr->destination_topic));
+                logger->logMessage(STRING_FORMAT("No active monitor on '%1%' for topic '%2%'", a_ptr->pv_name % a_ptr->destination_topic));
             }
         }
         activate = vec_ref.size();
     }
     // if the vec_ref has size > 0 mean that someone is still needed the channel data in monitor way
-    epics_service_manager->monitorChannel(a_ptr->channel_name, activate, a_ptr->protocol);
+    epics_service_manager->monitorChannel(a_ptr->pv_name, activate, a_ptr->protocol);
 }
 
 void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType event_received) {
@@ -91,8 +91,8 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
     std::map<MessageSerType, ConstSerializedMessageShrdPtr> local_serialization_cache;
     for (auto& event: *event_received->event_data) {
         // publisher
-        for (auto& info_topic: channel_topics_map[event->channel_data.channel_name]) {
-            logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", event->channel_data.channel_name % info_topic->dest_topic), LogLevel::TRACE);
+        for (auto& info_topic: channel_topics_map[event->channel_data.pv_name]) {
+            logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", event->channel_data.pv_name % info_topic->dest_topic), LogLevel::TRACE);
             if (!local_serialization_cache.contains(info_topic->ser_type)) {
                 // cache new serialized message
                 local_serialization_cache[info_topic->ser_type] = serialize(event->channel_data, static_cast<SerializationType>(info_topic->ser_type));

@@ -24,7 +24,7 @@ command_type_to_string(CommandType t) noexcept {
 #define KEY_COMMAND       "command"
 #define KEY_SERIALIZATION "serialization"
 #define KEY_PROTOCOL      "protocol"
-#define KEY_CHANNEL_NAME  "channel_name"
+#define KEY_PV_NAME  "pv_name"
 #define KEY_ACTIVATE      "activate"
 #define KEY_DEST_TOPIC    "dest_topic"
 #define KEY_VALUE         "value"
@@ -46,7 +46,7 @@ struct Command {
   CommandType    type;
   MessageSerType serialization;
   std::string    protocol;
-  std::string    channel_name;
+  std::string    pv_name;
 };
 DEFINE_PTR_TYPES(Command)
 
@@ -64,7 +64,7 @@ tag_invoke(boost::json::value_from_tag, boost::json::value &jv, MessageSerType c
 
 static void
 tag_invoke(boost::json::value_from_tag, boost::json::value &jv, Command const &c) {
-  jv = {{"serialization", serialization_to_string(c.serialization)}, {"channel_name", c.channel_name}, {"protocol", c.protocol}
+  jv = {{"serialization", serialization_to_string(c.serialization)}, {"pv_name", c.pv_name}, {"protocol", c.protocol}
 
   };
 }

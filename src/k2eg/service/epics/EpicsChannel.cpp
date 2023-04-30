@@ -10,12 +10,12 @@ using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;
 namespace pva = epics::pvAccess;
 
-EpicsChannel::EpicsChannel(pvac::ClientProvider& provider, const std::string& channel_name, const std::string& address)
-    : channel_name(channel_name), address(address) {
+EpicsChannel::EpicsChannel(pvac::ClientProvider& provider, const std::string& pv_name, const std::string& address)
+    : pv_name(pv_name), address(address) {
   //provider = std::make_unique<pvac::ClientProvider>(provider_name, conf);
   pvac::ClientChannel::Options opt;
   if (!address.empty()) { opt.address = address; }
-  channel = std::make_shared<pvac::ClientChannel>(provider.connect(channel_name, opt));
+  channel = std::make_shared<pvac::ClientChannel>(provider.connect(pv_name, opt));
 }
 
 EpicsChannel::~EpicsChannel() {
@@ -41,7 +41,7 @@ ConstChannelDataUPtr
 EpicsChannel::getChannelData() const {
   ConstChannelDataUPtr result;
   try {
-    result = std::make_unique<ChannelData>(ChannelData{channel_name, channel->get()});
+    result = std::make_unique<ChannelData>(ChannelData{pv_name, channel->get()});
   } catch (pvac::Timeout to) {
     // ltimeout error
   }
@@ -60,7 +60,7 @@ EpicsChannel::put(const std::string& field, const std::string& value) {
 
 ConstGetOperationUPtr
 EpicsChannel::get() {
-  return MakeGetOperationUPtr(channel, channel_name);
+  return MakeGetOperationUPtr(channel, pv_name);
 }
 
 void
@@ -73,22 +73,22 @@ EpicsChannel::monitor() {
   EventReceivedShrdPtr result = std::make_shared<EventReceived>();
   if (!mon.wait(0.100)) {
     // updates mon.event
-    result->event_timeout->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Timeout, channel_name, "Time out", nullptr}));
+    result->event_timeout->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Timeout, pv_name, "Time out", nullptr}));
     return result;
   }
 
   switch (mon.event.event) {
     // Subscription network/internal error
     case pvac::MonitorEvent::Fail:
-      result->event_fail->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Fail, channel_name, mon.event.message, nullptr}));
+      result->event_fail->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Fail, pv_name, mon.event.message, nullptr}));
       break;
     // explicit call of 'mon.cancel' or subscription dropped
     case pvac::MonitorEvent::Cancel:
-      result->event_cancel->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Cancel, channel_name, mon.event.message, nullptr}));
+      result->event_cancel->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Cancel, pv_name, mon.event.message, nullptr}));
       break;
     // Underlying channel becomes disconnected
     case pvac::MonitorEvent::Disconnect:
-      result->event_disconnect->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Disconnec, channel_name, mon.event.message, nullptr}));
+      result->event_disconnect->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Disconnec, pv_name, mon.event.message, nullptr}));
       break;
     // Data queue becomes not-empty
     case pvac::MonitorEvent::Data:
@@ -96,7 +96,7 @@ EpicsChannel::monitor() {
       while (mon.poll()) {
         auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
         tmp_data->copy(*mon.root);
-        result->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, mon.event.message, {channel_name, tmp_data}}));
+        result->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, mon.event.message, {pv_name, tmp_data}}));
       }
       break;
   }

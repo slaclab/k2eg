@@ -29,7 +29,7 @@ MsgPackSerializer::serialize(const ChannelData& message) {
   msgpack::packer<msgpack::sbuffer> packer(result->buf);
   // add channel message
   packer.pack_map(1);
-  packer.pack(message.channel_name);
+  packer.pack(message.pv_name);
   // process root structure
   processStructure(message.data.get(), packer);
   return result;

@@ -11,7 +11,7 @@ namespace k2eg::service::epics_impl {
 
 // Epics Channel Data
 struct ChannelData {
-    const std::string channel_name;
+    const std::string pv_name;
     epics::pvData::PVStructure::const_shared_pointer data;
 };
 DEFINE_PTR_TYPES(ChannelData)

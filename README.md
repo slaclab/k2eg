@@ -21,20 +21,18 @@ Actual implementation receive command and interpret command and uses only JSON s
 - [X] Put Command
     - Scalar
     - ScalarArray
-- [ ] Inf Command
+- [ ] Info Command
 
 ### Functional Task List
 - [x] JSON Serialization
 - [X] MSGPack Binary serialization
 - [X] MSGPack compact serialization
-- [ ] Filter out the message key
-- [ ] Advanced DAQ Specific logic
 - [ ] Cluster implementation
 - [ ] Multithreading EPICS Monitor
 ```
 For the serialization and message format see documentation [here](doc/message-format.md)
 ## Application Architecture
-<p>The application architecture follow logic designed follow the scheme below. The dotted line boxes represent element not yet developed.</p>
+<p>The application architecture logic is designed following the scheme below. The dotted line boxes represent element not yet developed.</p>
 <p>
 There are two principal layer:
 
@@ -56,7 +54,7 @@ There are two principal layer:
 This project aim to realize an [EPICS](https://epics.anl.gov) gateway for interact with epics IOCs using kafka. It uses a input topic from a kafka cluster for receive json encoded commands that permit to execute IO operation on the IOCs.
 
 ## Parameter
-k2eg rely upon boost rpogram options to manage the startup option configuration. Below the complete list of the parameter:
+k2eg rely upon boost program options to manage the startup option configuration. Below the complete list of the parameter:
 
 ```console
 k2eg --help
@@ -122,7 +120,7 @@ sub-group-id=sub-group-id
 ```
 
 ### Environment variable
-The uses of the environment variable si automatically managed, each variable with the prefix *EPICS_k2eg_* is valuated, for example the enable to use  the config file can be done via ENV variable with:
+The uses of the environment variable si automatically managed, each variable with the prefix *EPICS_k2eg_* is valuated, for example the enable to use the config file can be done via ENV variable with:
 ``` console
 export EPICS_k2eg_conf-file
 export EPICS_k2eg_conf-file-name=<path/to/configuration/file>
@@ -131,13 +129,13 @@ export EPICS_k2eg_conf-file-name=<path/to/configuration/file>
 ## Commands
 
 ### Get Command
-This implemets the base caget|pvaget fucntion of epics command, if possible will use a client from a monitor thread, otherwhise allcoate new client and perform a get operation
+This implemets the base caget|pvaget fucntion of epics command, if possible will use a client from a monitor thread, otherwhise a new client is allcoated to perform a get operation
 ```json
 {
     "command": "get",
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
-    "channel_name": "channel::a",
+    "pv_name": "channel::a",
     "dest_topic": "destination_topic"
 }
 ```
@@ -151,7 +149,7 @@ Monitor Activation
     "command": "monitor",
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
-    "channel_name": "channel name",
+    "pv_name": "channel name",
     "dest_topic": "destination topic",
     "activate": true
 }
@@ -161,7 +159,7 @@ Monitor deactivation
 ```json
 {
     "command": "monitor",
-    "channel_name": "channel name",
+    "pv_name": "channel name",
     "dest_topic": "destination topic",
     "activate": false
 }

@@ -4,16 +4,21 @@ version: '3.8'
 #  redis-data:
 #    null
 services:
-  epics:
+  epics-pva:
     build:
       context: ../
       dockerfile: docker/Dockerfile.epics
-    ports:
-      - 5065:5065/udp
-      - 5065:5065/tcp
     logging:
       driver: none
       
+  epics-ca:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.epics_ca
+    entrypoint: /opt/execute-ca-ioc.sh /db/softioc.db
+    logging:
+      driver: none
+
   zookeeper:
     image: bitnami/zookeeper:3.8.1
     environment:

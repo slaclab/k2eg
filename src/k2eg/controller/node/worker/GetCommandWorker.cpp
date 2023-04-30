@@ -39,7 +39,7 @@ GetMessage::getQueue() {
 }
 const std::string&
 GetMessage::getDistributionKey() {
-  return channel_data->channel_name;
+  return channel_data->pv_name;
 }
 const std::string&
 GetMessage::getReqType() {
@@ -62,20 +62,20 @@ GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
   if (command->type != CommandType::get) return;
   ConstGetCommandShrdPtr g_ptr = static_pointer_cast<const GetCommand>(command);
   logger->logMessage(STRING_FORMAT("Perform get command for %1% on topic %2% with sertype: %3%",
-                                   g_ptr->channel_name % g_ptr->destination_topic % serialization_to_string(g_ptr->serialization)),
+                                   g_ptr->pv_name % g_ptr->destination_topic % serialization_to_string(g_ptr->serialization)),
                      LogLevel::DEBUG);
-  auto channel_data = epics_service_manager->getChannelData(g_ptr->channel_name);
+  auto channel_data = epics_service_manager->getChannelData(g_ptr->pv_name);
   // while(!channel_data->isDone()){std::this_thread::sleep_for(std::chrono::milliseconds(100));}
   processing_pool->push_task(&GetCommandWorker::checkGetCompletion,
                              this,
-                             std::make_shared<GetOpInfo>(g_ptr->channel_name, g_ptr->destination_topic, g_ptr->serialization, std::move(channel_data)));
+                             std::make_shared<GetOpInfo>(g_ptr->pv_name, g_ptr->destination_topic, g_ptr->serialization, std::move(channel_data)));
 }
 
 void
 GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
   // check for timeout
   if (get_info->isTimeout()) {
-    logger->logMessage(STRING_FORMAT("Timeout get command for %1%", get_info->channel_name), LogLevel::ERROR);
+    logger->logMessage(STRING_FORMAT("Timeout get command for %1%", get_info->pv_name), LogLevel::ERROR);
     return;
   }
   // give some time of relaxing
@@ -86,15 +86,15 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
     processing_pool->push_task(&GetCommandWorker::checkGetCompletion, this, get_info);
   } else {
     switch (get_info->op->getState().event) {
-      case pvac::GetEvent::Fail: logger->logMessage(STRING_FORMAT("Failed get command for %1%", get_info->channel_name), LogLevel::ERROR); break;
-      case pvac::GetEvent::Cancel: logger->logMessage(STRING_FORMAT("Cancelled get command for %1%", get_info->channel_name), LogLevel::ERROR); break;
+      case pvac::GetEvent::Fail: logger->logMessage(STRING_FORMAT("Failed get command for %1%", get_info->pv_name), LogLevel::ERROR); break;
+      case pvac::GetEvent::Cancel: logger->logMessage(STRING_FORMAT("Cancelled get command for %1%", get_info->pv_name), LogLevel::ERROR); break;
       case pvac::GetEvent::Success:
         // update metric
         metric.incrementCounter(IEpicsMetricCounterType::Get);
-        logger->logMessage(STRING_FORMAT("Success get command for %1%", get_info->channel_name), LogLevel::INFO);
+        logger->logMessage(STRING_FORMAT("Success get command for %1%", get_info->pv_name), LogLevel::INFO);
         auto channel_data = get_info->op->getChannelData();
         if (!channel_data) {
-          logger->logMessage(STRING_FORMAT("No data received for %1%", get_info->channel_name), LogLevel::ERROR);
+          logger->logMessage(STRING_FORMAT("No data received for %1%", get_info->pv_name), LogLevel::ERROR);
           break;
         }
         auto serialized_message = serialize(*channel_data, static_cast<SerializationType>(get_info->serialization));

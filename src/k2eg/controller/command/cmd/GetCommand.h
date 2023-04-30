@@ -7,7 +7,7 @@ namespace k2eg::controller::command::cmd {
  *     {
         "command", "get",
         "protocol", "pva|ca",
-        "channel_name", "channel::a",
+        "pv_name", "channel::a",
         "dest_topic", "destination_topic"
         }
 */
@@ -18,7 +18,7 @@ DEFINE_PTR_TYPES(GetCommand)
 static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, GetCommand const& c) { 
     jv = {
         {"serialization", c.serialization},
-        {"channel_name", c.channel_name}, 
+        {"pv_name", c.pv_name}, 
         {"protocol", c.protocol}, 
         {"destination_topic", c.destination_topic}};
     }

@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: k2eg
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k2eg-config
+  namespace: k2eg
+data:
+  k2eg.config: |
+    log-level=debug
+    cmd-input-topic=cmd-in-topic
+    sub-server-address=ioc-cluster-kafka-bootstrap.kafka:9092
+    sub-group-id=eed-k2eg
+    pub-server-address=ioc-cluster-kafka-bootstrap.kafka:9092
+    metric-enable=true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k2eg
+  namespace: k2eg
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/path: '/metrics'
+    prometheus.io/port: '8080'
+spec:
+  selector:
+    matchLabels:
+      app: k2eg
+  template:
+    metadata:
+      labels:
+        app: k2eg
+    spec:
+      containers:
+      - name: k2eg
+        image: ghcr.io/slaclab/k2eg/ubuntu:latest
+        command: [k2eg]
+        args: ['--conf-file', 'yes', '--conf-file-name', '/etc/config/k2eg.config']
+        envFrom:
+        - configMapRef:
+            name: epics-config
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: 1000m
+        ports:
+        - containerPort: 8080
+      imagePullSecrets:
+      - name: github-secret
+      volumes:
+      - name: config-volume
+        configMap:
+          name: k2eg-config
