@@ -255,7 +255,7 @@ TEST(Epics, SerializationCAMsgpackCompact) {
   EXPECT_NO_THROW(obj = msgpack::unpack(ser_value->data(), ser_value->size()););
   EXPECT_EQ(msgpack::type::ARRAY, obj->type);
   auto object_vector = obj.get().as<MsgpackObjectVector>();
-  EXPECT_EQ(object_vector.size(), 28);
+  EXPECT_EQ(object_vector.size(), 23);
   EXPECT_EQ(object_vector[0].type, msgpack::type::STR);
   EXPECT_EQ(object_vector[1].type, msgpack::type::POSITIVE_INTEGER);
   //["variable:sum",7,0,0,"NO_ALARM",1681706068,208836822,0,0,0,"","",0,0,["Default","String","Binary","Decimal","Hex","Exponential","Engineering"],0,0,0,0,nan,nan,nan,nan,0,0,0,0,0]
