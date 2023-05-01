@@ -86,8 +86,8 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
     processing_pool->push_task(&GetCommandWorker::checkGetCompletion, this, get_info);
   } else {
     switch (get_info->op->getState().event) {
-      case pvac::GetEvent::Fail: logger->logMessage(STRING_FORMAT("Failed get command for %1%", get_info->pv_name), LogLevel::ERROR); break;
-      case pvac::GetEvent::Cancel: logger->logMessage(STRING_FORMAT("Cancelled get command for %1%", get_info->pv_name), LogLevel::ERROR); break;
+      case pvac::GetEvent::Fail: logger->logMessage(STRING_FORMAT("Failed get command for %1% with message %2%", get_info->pv_name%get_info->op->getState().message), LogLevel::ERROR); break;
+      case pvac::GetEvent::Cancel: logger->logMessage(STRING_FORMAT("Cancelled get command for %1% with message %2%",  get_info->pv_name%get_info->op->getState().message), LogLevel::ERROR); break;
       case pvac::GetEvent::Success:
         // update metric
         metric.incrementCounter(IEpicsMetricCounterType::Get);
