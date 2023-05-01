@@ -21,8 +21,9 @@ struct PutOpInfo : public WorkerAsyncOperation {
   PutOpInfo(
     const std::string& pv_name, 
     const std::string& value, 
-    service::epics_impl::ConstPutOperationUPtr op)
-      : WorkerAsyncOperation(std::chrono::milliseconds(3000))
+    service::epics_impl::ConstPutOperationUPtr op,
+    std::uint32_t tout_msc = 10000)
+      : WorkerAsyncOperation(std::chrono::milliseconds(tout_msc))
       , pv_name(pv_name)
       , value(value)
       , op(std::move(op)) {}
