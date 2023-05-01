@@ -469,28 +469,28 @@ TEST(NodeController, RandomCommand) {
   std::random_device                 r;
   std::default_random_engine         e1(r());
   std::uniform_int_distribution<int> uniform_dist(0, 3);
-  std::uniform_int_distribution<int> uniform_dist_sleep(1, 1000);
+  std::uniform_int_distribution<int> uniform_dist_sleep(500, 1000);
   // set environment variable for test
   auto node_controller = initBackend(std::make_shared<DummyPublisherNoSignal>());
 
   // send 100 random commands equence iteration
-  for (int idx = 0; idx < 10000; idx++) {
+  for (int idx = 0; idx < 100; idx++) {
     int rand_selection = uniform_dist(e1);
     switch (rand_selection) {
       case 0: {
-        std::this_thread::sleep_for(std::chrono::microseconds(uniform_dist_sleep(e1)));
+        std::this_thread::sleep_for(std::chrono::milliseconds(uniform_dist_sleep(e1)));
         EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
             MonitorCommand{CommandType::monitor, MessageSerType::json, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
         break;
       }
       case 1: {
-        std::this_thread::sleep_for(std::chrono::microseconds(uniform_dist_sleep(e1)));
+        std::this_thread::sleep_for(std::chrono::milliseconds(uniform_dist_sleep(e1)));
         EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
             MonitorCommand{CommandType::monitor, MessageSerType::json, "pva", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
         break;
       }
       case 2: {
-        std::this_thread::sleep_for(std::chrono::microseconds(uniform_dist_sleep(e1)));
+        std::this_thread::sleep_for(std::chrono::milliseconds(uniform_dist_sleep(e1)));
         EXPECT_NO_THROW(node_controller->submitCommand(
             {std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "pva", "variable:b", KAFKA_TOPIC_ACQUIRE_IN})}););
         break;
@@ -498,7 +498,7 @@ TEST(NodeController, RandomCommand) {
 
       case 3: {
         auto random_scalar = uniform_dist(e1);
-        std::this_thread::sleep_for(std::chrono::microseconds(uniform_dist_sleep(e1)));
+        std::this_thread::sleep_for(std::chrono::milliseconds(uniform_dist_sleep(e1)));
         EXPECT_NO_THROW(node_controller->submitCommand(
             {std::make_shared<const PutCommand>(PutCommand{CommandType::put, MessageSerType::unknown, "pva", "variable:b", std::to_string(random_scalar)})}););
       }

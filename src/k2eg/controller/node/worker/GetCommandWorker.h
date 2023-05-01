@@ -40,8 +40,9 @@ class GetOpInfo : public WorkerAsyncOperation {
   GetOpInfo(const std::string&                         pv_name,
             const std::string&                         destination_topic,
             const command::cmd::MessageSerType&        serialization,
-            service::epics_impl::ConstGetOperationUPtr op)
-      : WorkerAsyncOperation(std::chrono::milliseconds(3000)),
+            service::epics_impl::ConstGetOperationUPtr op,
+            std::uint32_t                              tout_msc = 10000)
+      : WorkerAsyncOperation(std::chrono::milliseconds(tout_msc)),
         pv_name(pv_name),
         destination_topic(destination_topic),
         serialization(serialization),
