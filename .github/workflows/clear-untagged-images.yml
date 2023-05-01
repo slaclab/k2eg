@@ -1,0 +1,30 @@
+name: Cleanup Untagged Images
+
+on:
+  # or manually
+  workflow_dispatch:
+
+jobs:
+  delete-untagged-images:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: debian
+          - variant: ubuntu
+    steps:
+      - name: Login to GitHub Container Registry with DELETE_PACKAGES_TOKEN
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.DELETE_PACKAGES_TOKEN }}
+      - name: Delete all containers from repository without tags
+        uses: Chizkiyahu/delete-untagged-ghcr-action@v2
+        with:
+            token: ${{ secrets.DELETE_PACKAGES_TOKEN }}
+            repository_owner: ${{ github.repository_owner }}
+            repository: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.variant }} 
+            untagged_only: true
+            owner_type: org # or user

@@ -35,7 +35,7 @@ void PrometheusEpicsMetric::incrementCounter(IEpicsMetricCounterType type, doubl
 }
 
 PrometheusMetricService::PrometheusMetricService(ConstMetricConfigurationUPtr metric_configuration) : IMetricService(std::move(metric_configuration)) {
-  std::string uri = "127.0.0.1:" + std::to_string(this->metric_configuration->tcp_port);
+  std::string uri = "0.0.0.0:" + std::to_string(this->metric_configuration->tcp_port);
   exposer_uptr    = std::make_unique<Exposer>(uri);
 }
 
