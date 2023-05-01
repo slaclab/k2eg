@@ -6,8 +6,8 @@ on:
 
 jobs:
   delete-untagged-images:
+    runs-on: ubuntu-latest
     strategy:
-      runs-on: ubuntu-latest
       fail-fast: false
       matrix:
         include:
