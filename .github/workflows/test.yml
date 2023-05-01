@@ -1,5 +1,5 @@
 name: Testk2eg
-
+concurrency: test_execution
 on:
     workflow_call:
         inputs:
