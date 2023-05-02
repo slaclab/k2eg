@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
-project(k2eg VERSION 0.1.1)
+project(k2eg VERSION 0.1.2)
 
 
 

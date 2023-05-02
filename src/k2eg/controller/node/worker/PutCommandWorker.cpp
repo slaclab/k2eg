@@ -53,14 +53,14 @@ PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
   } else {
     switch (put_info->op->getState().event) {
       case pvac::PutEvent::Fail:
-        logger->logMessage(STRING_FORMAT("Failed put command for %1% and value %2%", put_info->pv_name % put_info->value), LogLevel::ERROR);
+        logger->logMessage(STRING_FORMAT("Failed put command for %1% and message %2%", put_info->pv_name % put_info->op->getState().message), LogLevel::ERROR);
         break;
       case pvac::PutEvent::Cancel:
-        logger->logMessage(STRING_FORMAT("Cancelled put command for %1% and value %2%", put_info->pv_name % put_info->value), LogLevel::ERROR);
+        logger->logMessage(STRING_FORMAT("Cancelled put command for %1% and message %2%", put_info->pv_name % put_info->op->getState().message), LogLevel::ERROR);
         break;
       case pvac::PutEvent::Success:
         metric.incrementCounter(IEpicsMetricCounterType::Put);
-        logger->logMessage(STRING_FORMAT("Success put command for %1% and value %2%", put_info->pv_name % put_info->value), LogLevel::INFO);
+        logger->logMessage(STRING_FORMAT("Success put command for %1%", put_info->pv_name), LogLevel::INFO);
         break;
     }
   }

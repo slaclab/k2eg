@@ -15,6 +15,7 @@
 
 #include <boost/json.hpp>
 #include <chrono>
+#include <cstdint>
 #include <ctime>
 #include <filesystem>
 #include <latch>
@@ -96,6 +97,45 @@ class DummyPublisher : public IPublisher {
   }
 };
 
+class DummyPublisherCounter : public IPublisher {
+  std::uint64_t counter;
+ public:
+  std::latch l;
+  DummyPublisherCounter(unsigned int latch_counter)
+      : IPublisher(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "fake_address"})), l(latch_counter), counter(0){};
+  ~DummyPublisherCounter() = default;
+  void
+  setAutoPoll(bool autopoll) {}
+  int
+  setCallBackForReqType(const std::string req_type, EventCallback eventCallback) {
+    return 0;
+  }
+  int
+  createQueue(const std::string& queue) {
+    return 0;
+  }
+  int
+  flush(const int timeo) {
+    return 0;
+  }
+  int
+  pushMessage(PublishMessageUniquePtr message) {
+    counter++;
+    l.count_down();
+    return 0;
+  }
+  int
+  pushMessages(PublisherMessageVector& messages) {
+    counter +=messages.size();
+    l.count_down(messages.size());
+    return 0;
+  }
+  size_t
+  getQueueMessageSize() {
+    return counter;
+  }
+};
+
 class DummyPublisherNoSignal : public IPublisher {
  public:
   std::vector<PublishMessageSharedPtr> sent_messages;
@@ -135,11 +175,16 @@ class DummyPublisherNoSignal : public IPublisher {
 #ifdef __linux__
 
 std::unique_ptr<NodeController>
-initBackend(IPublisherShrdPtr pub, bool clear_data = true) {
+initBackend(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log = false) {
   int         argc    = 1;
   const char* argv[1] = {"epics-k2eg-test"};
   clearenv();
-  setenv("EPICS_k2eg_log-on-console", "false", 1);
+  if(enable_debug_log) {
+    setenv("EPICS_k2eg_log-on-console", "true", 1);
+    setenv("EPICS_k2eg_log-level", "debug", 1);
+  } else {
+    setenv("EPICS_k2eg_log-on-console", "false", 1);
+  }
   setenv("EPICS_k2eg_metric-server-http-port", std::to_string(++tcp_port).c_str(), 1);
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   opt->parse(argc, argv);
@@ -361,6 +406,37 @@ TEST(NodeController, GetCommandMsgPackCompack) {
   EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
   msgpack_object = msgpack_unpacked.get();
   EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
+inline void wait_latch(std::latch& l) \
+{ \
+ bool w = true; \
+ int counter = 10;
+ while(w && counter > 0) { \
+     if(l.try_wait()) { \
+      w = false;
+     } else {
+      counter--;
+      std::this_thread::sleep_for(std::chrono::milliseconds(250)); 
+     }
+ }
+}
+
+TEST(NodeController, GetCommandCAChannel) {
+  auto publisher = std::make_shared<DummyPublisherCounter>(1);
+  // set environment variable for test
+  auto node_controller = initBackend(publisher);
+
+  EXPECT_NO_THROW(node_controller->submitCommand(
+      {std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "ca", "ca:variable:sum", KAFKA_TOPIC_ACQUIRE_IN})}););
+  // give some time for the timeout
+  wait_latch(publisher->l);
+  // we need to have publish some message
+  size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+  EXPECT_NE(published, 0);
+
   // dispose all
   deinitBackend(std::move(node_controller));
 }
