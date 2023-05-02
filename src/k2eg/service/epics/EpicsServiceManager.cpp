@@ -72,7 +72,7 @@ void EpicsServiceManager::monitorChannel(const std::string& pv_name, bool activa
 }
 
 ConstGetOperationUPtr EpicsServiceManager::getChannelData(const std::string& pv_name, const std::string& protocol) {
-    ConstGetOperationUPtr result;
+`    ConstGetOperationUPtr result;
     std::unique_lock guard(channel_map_mutex);
     if (auto search = channel_map.find(pv_name); search != channel_map.end()) {
         // the same channel is in monitor so we can use it

@@ -32,8 +32,6 @@ void
 GetOperation::connectEvent(const pvac::ConnectEvent& evt) {
   if (evt.connected) {
     op = channel->get(this);
-  } else {
-    is_done = true;
   }
 }
 

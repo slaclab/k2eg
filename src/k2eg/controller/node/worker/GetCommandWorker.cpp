@@ -59,12 +59,15 @@ GetCommandWorker::~GetCommandWorker() { processing_pool->wait_for_tasks(); }
 
 void
 GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
-  if (command->type != CommandType::get) return;
+  if (command->type != CommandType::get) {
+    return;
+  }
+
   ConstGetCommandShrdPtr g_ptr = static_pointer_cast<const GetCommand>(command);
-  logger->logMessage(STRING_FORMAT("Perform get command for %1% on topic %2% with sertype: %3%",
-                                   g_ptr->pv_name % g_ptr->destination_topic % serialization_to_string(g_ptr->serialization)),
+  logger->logMessage(STRING_FORMAT("Perform get command for %1% with protocol %2% on topic %3% with sertype: %4%",
+                                   g_ptr->pv_name % g_ptr->protocol % g_ptr->destination_topic % serialization_to_string(g_ptr->serialization)),
                      LogLevel::DEBUG);
-  auto channel_data = epics_service_manager->getChannelData(g_ptr->pv_name);
+  auto channel_data = epics_service_manager->getChannelData(g_ptr->pv_name, g_ptr->protocol);
   // while(!channel_data->isDone()){std::this_thread::sleep_for(std::chrono::milliseconds(100));}
   processing_pool->push_task(&GetCommandWorker::checkGetCompletion,
                              this,

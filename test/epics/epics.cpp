@@ -18,6 +18,10 @@ using namespace k2eg::service::epics_impl;
 #define WHILE(x, v) \
   do { std::this_thread::sleep_for(std::chrono::milliseconds(250)); } while (x == v)
 
+#define TIMEOUT(x, v, retry, sleep_m_sec) \
+  int r = retry; \
+  do { std::this_thread::sleep_for(std::chrono::milliseconds(sleep_m_sec)); r--;} while (x == v && r > 0)
+
 TEST(Epics, ChannelFault) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr pc;
@@ -30,21 +34,19 @@ TEST(Epics, ChannelPVAGetOpOk) {
   ConstGetOperationUPtr                            get_op;
   epics::pvData::PVStructure::const_shared_pointer val;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
-  // EXPECT_NO_THROW(pc->connect());
   EXPECT_NO_THROW(get_op = pc->get(););
   WHILE(get_op->isDone(), false);
   EXPECT_EQ(get_op->getState().event, pvac::GetEvent::Success);
 }
 
-TEST(Epics, ChannelPVAGetCaFail) {
+TEST(Epics, ChannelPVAGetCAFail) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr                                 pc;
   ConstGetOperationUPtr                            get_op;
   epics::pvData::PVStructure::const_shared_pointer val;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "ca:variable:sum"););
-  // EXPECT_NO_THROW(pc->connect());
   EXPECT_NO_THROW(get_op = pc->get(););
-  WHILE(get_op->isDone(), false);
+  TIMEOUT(get_op->isDone(), false, 5, 1000);
   EXPECT_EQ(get_op->hasData(), false);
 }
 
@@ -54,7 +56,6 @@ TEST(Epics, ChannelCAGetOpOk) {
   ConstGetOperationUPtr                            get_op;
   epics::pvData::PVStructure::const_shared_pointer val;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:variable:sum"););
-  // EXPECT_NO_THROW(pc->connect());
   EXPECT_NO_THROW(get_op = pc->get(););
   WHILE(get_op->isDone(), false);
   EXPECT_EQ(get_op->getState().event, pvac::GetEvent::Success);
@@ -66,7 +67,6 @@ TEST(Epics, ChannelCAGetPVAOpOk) {
   ConstGetOperationUPtr                            get_op;
   epics::pvData::PVStructure::const_shared_pointer val;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:sum"););
-  // EXPECT_NO_THROW(pc->connect());
   EXPECT_NO_THROW(get_op = pc->get(););
   WHILE(get_op->isDone(), false);
   EXPECT_EQ(get_op->getState().event, pvac::GetEvent::Success);

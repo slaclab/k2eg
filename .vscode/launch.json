@@ -12,6 +12,7 @@
             "args": ["--log-on-console","--cmd-input-topic=cmd_topic_in","--log-level=debug","--sub-server-address=kafka:9092","--pub-server-address=kafka:9092"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.vscode/.env",
             "environment": [
                 {
                     "name": "LD_LIBRARY_PATH",
