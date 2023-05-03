@@ -8,7 +8,7 @@ using namespace k2eg::service::metric::impl::prometheus_impl;
 
 PrometheusEpicsMetric::PrometheusEpicsMetric()
     : registry(std::make_shared<Registry>()),
-      ioc_read_write(BuildCounter().Name("epics_ioc_operation").Help("Epics description").Register(*registry)),
+      ioc_read_write(BuildCounter().Name("k2eg_epics_ioc_operation").Help("Metric set for all Operation performed on the IOCs").Register(*registry)),
       get_ok_counter(ioc_read_write.Add({{"op", "get"}})),
       put_ok_counter(ioc_read_write.Add({{"op", "put"}})),
       monitor_event_data(ioc_read_write.Add({{"op", "monitor"}, {"evt_type", "data"}})),
