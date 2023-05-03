@@ -14,3 +14,4 @@ cli/k2egcli/__pycache__
 .cache
 k8s/secret.*
 k8s/epics-config.*
+.vscode/.env
