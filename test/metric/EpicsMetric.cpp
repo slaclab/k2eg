@@ -1,34 +1,13 @@
 #include <gtest/gtest.h>
 #include <k2eg/service/metric/IMetricService.h>
-#include <k2eg/service/metric/impl/PrometheusMetricService.h>
+#include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
 
-#include <curl/curl.h>
+#include "metric.h"
 
 using namespace k2eg::service::metric;
 using namespace k2eg::service::metric::impl;
+using namespace k2eg::service::metric::impl::prometheus_impl;
 
-static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
-{
-    ((std::string*)userp)->append((char*)contents, size * nmemb);
-    return size * nmemb;
-}
-
-
-static std::string getUrl(std::string url) {
-     CURL *curl;
-    CURLcode res;
-    std::string readBuffer;
-
-    curl = curl_easy_init();
-    if(curl) {
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-        res = curl_easy_perform(curl);
-        curl_easy_cleanup(curl);
-    }
-    return readBuffer;
-}
 
 TEST(Metric, MetricService) {
   IMetricServiceUPtr m_uptr;

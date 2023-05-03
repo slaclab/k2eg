@@ -1,16 +1,10 @@
-
-#include <k2eg/service/metric/IMetricService.h>
-#include <k2eg/service/metric/impl/PrometheusMetricService.h>
-#include <prometheus/counter.h>
-#include <prometheus/exposer.h>
-
-#include <algorithm>
-#include <memory>
+#include <k2eg/service/metric/impl/prometheus/PrometheusEpicsMetric.h>
 
 using namespace prometheus;
 
 using namespace k2eg::service::metric;
-using namespace k2eg::service::metric::impl;
+using namespace k2eg::service::metric::impl::prometheus_impl;
+
 
 PrometheusEpicsMetric::PrometheusEpicsMetric()
     : registry(std::make_shared<Registry>()),
@@ -32,21 +26,4 @@ void PrometheusEpicsMetric::incrementCounter(IEpicsMetricCounterType type, doubl
     case IEpicsMetricCounterType::MonitorDisconnect: monitor_event_disconnected.Increment(inc_value); break;
     case IEpicsMetricCounterType::MonitorTimeout: break;
   }
-}
-
-PrometheusMetricService::PrometheusMetricService(ConstMetricConfigurationUPtr metric_configuration) : IMetricService(std::move(metric_configuration)) {
-  std::string uri = "0.0.0.0:" + std::to_string(this->metric_configuration->tcp_port);
-  exposer_uptr    = std::make_unique<Exposer>(uri);
-}
-
-PrometheusMetricService::~PrometheusMetricService() {}
-
-IEpicsMetric&
-PrometheusMetricService::getEpicsMetric() {
-  std::lock_guard<std::mutex> lk(service_mux);
-  if (!epics_metric) { 
-    epics_metric = std::shared_ptr<PrometheusEpicsMetric>(new PrometheusEpicsMetric()); 
-    exposer_uptr->RegisterCollectable(epics_metric->registry);
-  }
-  return *epics_metric;
 }

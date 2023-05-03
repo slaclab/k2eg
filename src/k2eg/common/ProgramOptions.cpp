@@ -36,7 +36,7 @@ ProgramOptions::ProgramOptions() {
         (SYSLOG_PORT, po::value<int>()->default_value(514), "Specify syslog server port")
         (CMD_INPUT_TOPIC, po::value<std::string>(), "Specify the messages bus queue where the k2eg receive the configuration command")
         (CMD_MAX_FECTH_CMD, po::value<unsigned int>()->default_value(10), "The max number of command fetched per consume operation")
-        (CMD_MAX_FETCH_TIME_OUT, po::value<unsigned int>()->default_value(100), "Specify the timeout for waith the command in microseconds")
+        (CMD_MAX_FETCH_TIME_OUT, po::value<unsigned int>()->default_value(250), "Specify the timeout for waith the command in microseconds")
         (PUB_SERVER_ADDRESS, po::value<std::string>(), "Publisher server address")
         (PUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for publisher implementation driver")
         (SUB_SERVER_ADDRESS, po::value<std::string>(), "Subscriber server address")

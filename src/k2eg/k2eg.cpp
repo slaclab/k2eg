@@ -8,7 +8,7 @@
 #include <k2eg/service/log/impl/BoostLogger.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/metric/impl/DummyMetricService.h>
-#include <k2eg/service/metric/impl/PrometheusMetricService.h>
+#include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
 #include <k2eg/service/pubsub/pubsub.h>
 
 #include <cstdlib>
@@ -21,6 +21,7 @@ using namespace k2eg::service::log::impl;
 
 using namespace k2eg::service::metric;
 using namespace k2eg::service::metric::impl;
+using namespace k2eg::service::metric::impl::prometheus_impl;
 
 using namespace k2eg::service::epics_impl;
 
@@ -60,7 +61,7 @@ K2EGateway::setup(int argc, const char* argv[]) {
     ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(po->getPublisherConfiguration()));
     logger->logMessage("Start subscriber service");
     ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(po->getSubscriberConfiguration()));
-    // ServiceResolver<DataStorage>::registerService(std::make_shared<DataStorage>(po->getStoragePath()));
+
     logger->logMessage("Start node controller");
     node_controller = std::make_unique<NodeController>(std::make_unique<DataStorage>(po->getStoragePath()));
     logger->logMessage("Restore persistent command");
