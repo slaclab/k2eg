@@ -26,7 +26,16 @@
 				"ms-vscode.cpptools",
 				"ms-vscode.cpptools-extension-pack",
 				"eamodio.gitlens",
-				"phytolizer.header-guard-generator"
+				"phytolizer.header-guard-generator",
+				"llvm-vs-code-extensions.vscode-clangd",
+				"maziac.binary-file-viewer",
+				"vadimcn.vscode-lldb",
+				"ms-azuretools.vscode-docker",
+				"github.vscode-github-actions",
+				"bierner.github-markdown-preview",
+				"GitHub.vscode-pull-request-github",
+				"Phytolizer.header-guard-generator",
+				"ms-vscode.hexeditor"
 			]
 		  }
 	},
