@@ -25,6 +25,6 @@ jobs:
         with:
             token: ${{ secrets.DELETE_PACKAGES_TOKEN }}
             repository_owner: ${{ github.repository_owner }}
-            repository: ${{ github.repository }}/${{ matrix.variant }} 
+            repository: ${{ github.repository }}
             untagged_only: true
             owner_type: org # or user
