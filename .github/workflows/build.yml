@@ -61,7 +61,6 @@ jobs:
         artifact_name: ${{ needs.build_debian_bullseye.outputs.artifact_name }}
         docker_compose_profile: app-debian
       secrets: inherit
-
     build_debian_bullseye:
         name: Build Bullseye
         needs: check-changed-file
@@ -173,3 +172,10 @@ jobs:
               uses: ouzi-dev/commit-status-updater@v2
               with:
                 status: success
+    write_version:
+      needs: [test_debian_bullseye, test_ubuntu_kinetic]
+      name: Create version
+      runs-on: ubuntu-latest
+      steps:
+        - run: |
+            echo "OK"
