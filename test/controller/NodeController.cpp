@@ -10,7 +10,7 @@
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/log/impl/BoostLogger.h>
-#include <k2eg/service/metric/impl/PrometheusMetricService.h>
+#include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
 #include <k2eg/service/pubsub/pubsub.h>
 
 #include <boost/json.hpp>
@@ -48,7 +48,7 @@ using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
 
 using namespace k2eg::service::metric;
-using namespace k2eg::service::metric::impl;
+using namespace k2eg::service::metric::impl::prometheus_impl;
 
 #define KAFKA_HOSTNAME         "kafka:9092"
 #define KAFKA_TOPIC_ACQUIRE_IN "acquire_commad_in"
