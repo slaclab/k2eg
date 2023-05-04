@@ -144,7 +144,9 @@ EPICS                   %5%
 LibLZ4                  %6%
 Sqlite                  %7%
 SqliteORM               %8%
+MsgPack                 %9%
+Prometheus              %10%
 )VERSION",
                                       k2eg_VERSION_MAJOR % k2eg_VERSION_MINOR % k2eg_VERSION_PATCH % k2eg_BOOST_VERSION % k2eg_EPICS_VERSION %
-                                          k2eg_LIBLZ4_VERSION % k2eg_SQLITE_VERSION % k2eg_SQLITEORM_VERSION);
+                                          k2eg_LIBLZ4_VERSION % k2eg_SQLITE_VERSION % k2eg_SQLITEORM_VERSION % k2eg_MSGPACK_VERSION % k2eg_PROMETHEUS_VERSION);
 }

@@ -354,8 +354,6 @@ ExternalProject_Add(
   -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
 )
 SET(BUILD_LIBRARY ${BUILD_LIBRARY} z)
-# ADD_DEPENDENCIES(${PROJECT_NAME})
-# ADD_DEPENDENCIES(${PROJECT_NAME}-test)
 
 # -------- Prometheus -----------
 MESSAGE(STATUS "Configure prometheus version ${PROMETHEUS_VERSION}")
