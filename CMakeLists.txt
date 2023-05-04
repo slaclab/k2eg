@@ -73,9 +73,10 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/pubsub/impl/kafka/RDKafkaSubscriber.cpp
 
   src/k2eg/service/metric/IMetricService.cpp
-  src/k2eg/service/metric/impl/prometheus/PrometheusMetricService.cpp
   src/k2eg/service/metric/impl/prometheus/PrometheusEpicsMetric.cpp
+  src/k2eg/service/metric/impl/prometheus/PrometheusMetricService.cpp
   src/k2eg/service/metric/impl/prometheus/PrometheusCMDControllerMetric.cpp
+  src/k2eg/service/metric/impl/prometheus/PrometheusNodeControllerMetric.cpp
   src/k2eg/service/metric/impl/DummyMetricService.cpp
 
   src/k2eg/service/log/impl/BoostLogger.cpp
@@ -127,6 +128,7 @@ set(TEST_SOURCE_FILES
   test/controller/NodeController.cpp
   test/metric/EpicsMetric.cpp
   test/metric/CMDMetric.cpp
+  test/metric/NodeControllerMetric.cpp
   ${COMMON_SOURCE_FILES}
 )
 

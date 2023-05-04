@@ -8,6 +8,7 @@
 #include <k2eg/service/ServiceResolver.h>
 
 #include <k2eg/common/utility.h>
+#include "k2eg/service/log/ILogger.h"
 
 using namespace k2eg::controller::node;
 using namespace k2eg::controller::node::worker;
@@ -59,6 +60,7 @@ void NodeController::waitForTaskCompletion() {
 
 void NodeController::submitCommand(ConstCommandShrdPtrVec commands) {
     // scann and process al command
+    // TODO submitted cpmmand metric
     for (auto& c: commands) {
         switch (c->type) {
         case CommandType::monitor: {
@@ -87,7 +89,7 @@ void NodeController::submitCommand(ConstCommandShrdPtrVec commands) {
             logger->logMessage(STRING_FORMAT("Forward command => %1% to worker %2%",to_json_string(c)%std::string(command_type_to_string(c->type))));
             processing_pool->push_task(&CommandWorker::processCommand, worker.get(), c);
         } else {
-            logger->logMessage(STRING_FORMAT("No worker found for command type '%1%'",std::string(command_type_to_string(c->type))));
+            logger->logMessage(STRING_FORMAT("No worker found for command type '%1%'",std::string(command_type_to_string(c->type))), LogLevel::ERROR);
         }
     }
 }
