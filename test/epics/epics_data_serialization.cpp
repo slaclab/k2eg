@@ -5,6 +5,7 @@
 #include <boost/json.hpp>
 #include <cstddef>
 #include <msgpack.hpp>
+#include <ostream>
 #include <sstream>
 
 #include "epics.h"
@@ -15,13 +16,13 @@ using namespace k2eg::service::epics_impl;
 TEST(Epics, SerializationJSON) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr              pc;
-  ConstChannelDataUPtr          value;
   ConstSerializedMessageShrdPtr ser_value;
-
+  ConstGetOperationUPtr         get_op;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(value = pc->getChannelData(););
-  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::JSON););
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::JSON););
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);
@@ -44,13 +45,16 @@ TEST(Epics, SerializationJSON) {
 TEST(Epics, SerializationCAJSON) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr              pc;
-  ConstChannelDataUPtr          value;
   ConstSerializedMessageShrdPtr ser_value;
+  ConstGetOperationUPtr         get_op;
 
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:variable:sum"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(value = pc->getChannelData(););
-  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::JSON););
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_EQ(get_op->getState().event, pvac::GetEvent::Success);
+
+  EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::JSON););
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);
@@ -73,13 +77,14 @@ TEST(Epics, SerializationCAJSON) {
 TEST(Epics, SerializationWaveformJSON) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr              pc;
-  ConstChannelDataUPtr          value;
+  ConstGetOperationUPtr         get_op;
   ConstSerializedMessageShrdPtr ser_value;
 
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "channel:waveform"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(value = pc->getChannelData(););
-  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::JSON););
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::JSON););
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);
@@ -104,13 +109,14 @@ TEST(Epics, SerializationWaveformJSON) {
 TEST(Epics, SerializationCAWaveformJSON) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr              pc;
-  ConstChannelDataUPtr          value;
+  ConstGetOperationUPtr         get_op;
   ConstSerializedMessageShrdPtr ser_value;
 
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:channel:waveform"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(value = pc->getChannelData(););
-  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::JSON););
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::JSON););
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);
@@ -126,22 +132,23 @@ TEST(Epics, SerializationCAWaveformJSON) {
   EXPECT_EQ(sub_obj.contains("value"), true);
   EXPECT_EQ(sub_obj["value"].is_array(), true);
   EXPECT_EQ(sub_obj.contains("alarm"), true);
-  //EXPECT_EQ(sub_obj.contains("timeStamp"), true);
+  // EXPECT_EQ(sub_obj.contains("timeStamp"), true);
   EXPECT_EQ(sub_obj.contains("display"), true);
-  //EXPECT_EQ(sub_obj.contains("control"), true);
-  //EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
+  // EXPECT_EQ(sub_obj.contains("control"), true);
+  // EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
 }
 
 typedef std::map<std::string, msgpack::object> MapStrMsgPackObj;
 TEST(Epics, SerializationMsgpack) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr              pc;
-  ConstChannelDataUPtr          value;
+  ConstGetOperationUPtr         get_op;
   ConstSerializedMessageShrdPtr ser_value;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(value = pc->getChannelData(););
-  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::Msgpack););
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::Msgpack););
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);
@@ -164,12 +171,13 @@ TEST(Epics, SerializationMsgpack) {
 TEST(Epics, SerializationCAMsgpack) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr              pc;
-  ConstChannelDataUPtr          value;
+  ConstGetOperationUPtr         get_op;
   ConstSerializedMessageShrdPtr ser_value;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:variable:sum"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(value = pc->getChannelData(););
-  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::Msgpack););
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::Msgpack););
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);
@@ -181,7 +189,7 @@ TEST(Epics, SerializationCAMsgpack) {
   auto om_sub_1 = om["ca:variable:sum"].as<MapStrMsgPackObj>();
   EXPECT_EQ(om_sub_1.contains("value"), true);
   EXPECT_EQ(om_sub_1.contains("alarm"), true);
-  //EXPECT_EQ(om_sub_1.contains("timeStamp"), true);
+  // EXPECT_EQ(om_sub_1.contains("timeStamp"), true);
   EXPECT_EQ(om_sub_1.contains("display"), true);
   EXPECT_EQ(om_sub_1.contains("control"), true);
   EXPECT_EQ(om_sub_1.contains("valueAlarm"), true);
@@ -191,12 +199,13 @@ TEST(Epics, SerializationCAMsgpack) {
 TEST(Epics, SerializationMsgpackWaveform) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr              pc;
-  ConstChannelDataUPtr          value;
+  ConstGetOperationUPtr         get_op;
   ConstSerializedMessageShrdPtr ser_value;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "channel:waveform"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(value = pc->getChannelData(););
-  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::Msgpack););
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::Msgpack););
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);
@@ -220,12 +229,13 @@ typedef std::vector<msgpack::object> MsgpackObjectVector;
 TEST(Epics, SerializationMsgpackCompact) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr              pc;
-  ConstChannelDataUPtr          value;
+  ConstGetOperationUPtr         get_op;
   ConstSerializedMessageShrdPtr ser_value;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(value = pc->getChannelData(););
-  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::MsgpackCompact););
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::MsgpackCompact););
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);
@@ -242,12 +252,13 @@ TEST(Epics, SerializationMsgpackCompact) {
 TEST(Epics, SerializationCAMsgpackCompact) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr              pc;
-  ConstChannelDataUPtr          value;
+  ConstGetOperationUPtr         get_op;
   ConstSerializedMessageShrdPtr ser_value;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:variable:sum"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(value = pc->getChannelData(););
-  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::MsgpackCompact););
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::MsgpackCompact););
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);
@@ -265,12 +276,13 @@ typedef std::vector<msgpack::object> MsgpackObjectVector;
 TEST(Epics, SerializationMsgpackCompactWaveform) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr              pc;
-  ConstChannelDataUPtr          value;
+  ConstGetOperationUPtr         get_op;
   ConstSerializedMessageShrdPtr ser_value;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "channel:waveform"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(value = pc->getChannelData(););
-  EXPECT_NO_THROW(ser_value = serialize(*value, SerializationType::MsgpackCompact););
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::MsgpackCompact););
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);

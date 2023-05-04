@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.2)
 project(k2eg VERSION 0.1.2)
 
-
-
 IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   SET(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/local CACHE PATH "default install directory" FORCE)
 ENDIF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -43,7 +41,6 @@ if(${ENABLE_ASAN})
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=address -fsanitize=leak -static-libasan")
   set (CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=address -fsanitize=leak -static-libasan")
 endif()
-
 
 configure_file(k2eg.h.in ../src/k2eg/config.h)
 

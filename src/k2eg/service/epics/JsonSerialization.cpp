@@ -3,7 +3,10 @@
 #include <pv/json.h>
 
 #include <sstream>
+
 #include "boost/json/array.hpp"
+#include "pvData.h"
+#include "pvIntrospect.h"
 using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;
 
@@ -95,10 +98,10 @@ JsonSerializer::processScalar(const pvd::PVScalar* scalar, const std::string& ke
     }
   }
 }
-#define TO_JSON_ARRAY(t, arr, json_object)                         \
-    boost::json::array jarr; \
-  auto converted_array = pvd::shared_vector_convert<const t>(arr); \
-  for (auto& e : converted_array) { jarr.emplace_back(e); } \
+#define TO_JSON_ARRAY(t, arr, json_object)                                       \
+  boost::json::array jarr;                                                       \
+  auto               converted_array = pvd::shared_vector_convert<const t>(arr); \
+  for (auto& e : converted_array) { jarr.emplace_back(e); }                      \
   json_object = jarr;
 
 void
@@ -158,6 +161,39 @@ JsonSerializer::processScalarArray(const pvd::PVScalarArray* scalarArray, const 
 }
 
 void
+JsonSerializer::processField(const epics::pvData::PVField* field, const std::string& key, boost::json::object& json_object) {
+  switch (field->getField()->getType()) {
+    case pvd::scalar: {
+      const pvd::PVScalar* scalar = static_cast<const pvd::PVScalar*>(field);
+      processScalar(scalar, key, json_object);
+      break;
+    }
+    case pvd::scalarArray: {
+      const pvd::PVScalarArray* scalarArray = static_cast<const pvd::PVScalarArray*>(field);
+      processScalarArray(scalarArray, key, json_object);
+      break;
+    }
+    case pvd::structure: processStructure(static_cast<const pvd::PVStructure*>(field), key, json_object); break;
+    case pvd::structureArray: {
+      processStructureArray(static_cast<const pvd::PVStructureArray*>(field)->view(), key, json_object);
+      break;
+    }
+    case pvd::union_: {
+      const pvd::PVUnion*                       U = static_cast<const pvd::PVUnion*>(field);
+      const pvd::PVField::const_shared_pointer& sub_field(U->get());
+      processField(sub_field.get(), key, json_object);
+      break;
+    }
+      return;
+    case pvd::unionArray: {
+      const pvd::PVUnionArray*         U = static_cast<const pvd::PVUnionArray*>(field);
+      pvd::PVUnionArray::const_svector arr(U->view());
+      break;
+    }
+  }
+}
+
+void
 JsonSerializer::processStructure(const epics::pvData::PVStructure* structure, const std::string& key, boost::json::object& json_object) {
   const pvd::StructureConstPtr& type     = structure->getStructure();
   const pvd::PVFieldPtrArray&   children = structure->getPVFields();
@@ -183,14 +219,42 @@ JsonSerializer::processStructure(const epics::pvData::PVStructure* structure, co
         processStructureArray(static_cast<const pvd::PVStructureArray*>(fld)->view(), names[i], struct_obj);
         break;
       }
+
+      case pvd::Type::union_: {
+        const pvd::PVUnion*                       union_field = static_cast<const pvd::PVUnion*>(fld);
+        const pvd::PVField::const_shared_pointer& field(union_field->get());
+        if (field) { processField(field.get(), key, json_object); }
+        break;
+      }
+
+      case pvd::Type::unionArray: {
+        const pvd::PVUnionArray*         U = static_cast<const pvd::PVUnionArray*>(fld);
+        pvd::PVUnionArray::const_svector arr(U->view());
+
+        // for(size_t i=0, N=arr.size(); i<N; i++) {
+        //     if(arr[i])
+        //         show_field(A, arr[i].get(), 0);
+        //     else
+        //         yg(yajl_gen_null(A.handle));
+        // }
+
+        // yg(yajl_gen_array_close(A.handle));
+        break;
+      }
     }
   }
-  json_object[key] = struct_obj;
+  if (!key.empty()) { json_object[key] = struct_obj; }
 }
 
 void
 JsonSerializer::processStructureArray(pvd::PVStructureArray::const_svector structure_array, const std::string& key, boost::json::object& json_object) {
-  // for (size_t i = 0, N = structure_array.size(); i < N; i++) { processStructure(structure_array[i].get(), json_object); }
+  boost::json::array array_obj;
+  for (size_t i = 0, N = structure_array.size(); i < N; i++) {
+    boost::json::object arr_element_object;
+    processStructure(structure_array[i].get(), "", arr_element_object);
+    array_obj.push_back(arr_element_object);
+  }
+  json_object[key] = array_obj;
 }
 
 #pragma endregion JsonSerializer
