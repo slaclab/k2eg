@@ -15,13 +15,6 @@
 
 using namespace k2eg::service::epics_impl;
 
-#define WHILE(x, v) \
-  do { std::this_thread::sleep_for(std::chrono::milliseconds(250)); } while (x == v)
-
-#define TIMEOUT(x, v, retry, sleep_m_sec) \
-  int r = retry; \
-  do { std::this_thread::sleep_for(std::chrono::milliseconds(sleep_m_sec)); r--;} while (x == v && r > 0)
-
 TEST(Epics, ChannelFault) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr pc;
@@ -76,8 +69,9 @@ TEST(Epics, ChannelCAGetPVAOpOk) {
 bool
 retry_eq(const EpicsChannel& channel, const std::string& name, double value, int mseconds, int retry_times) {
   for (int times = retry_times; times != 0; times--) {
-    auto val  = channel.getData();
-    auto dval = val->getSubField<epics::pvData::PVDouble>(name)->get();
+    auto val  = channel.get();
+    WHILE(val->isDone(), false);
+    auto dval = val->getChannelData()->data->getSubField<epics::pvData::PVDouble>(name)->get();
     if (dval == value) { return true; }
     std::this_thread::sleep_for(std::chrono::milliseconds(mseconds));
   }

@@ -41,8 +41,6 @@ class EpicsChannel {
   const std::string                          pv_name;
   const std::string                          address;
   epics::pvData::PVStructure::shared_pointer pvReq = epics::pvData::createRequest("field()");
-  // epics::pvAccess::Configuration::shared_pointer conf  = epics::pvAccess::ConfigurationBuilder().push_env().build();
-  // std::unique_ptr<pvac::ClientProvider>          provider;
   std::shared_ptr<pvac::ClientChannel> channel;
   pvac::MonitorSync                    mon;
 
@@ -51,10 +49,8 @@ class EpicsChannel {
   ~EpicsChannel();
   static void                                      init();
   static void                                      deinit();
-  ConstChannelDataUPtr                             getChannelData() const;
-  epics::pvData::PVStructure::const_shared_pointer getData() const;
   ConstPutOperationUPtr                            put(const std::string& field, const std::string& value);
-  ConstGetOperationUPtr                            get();
+  ConstGetOperationUPtr                            get() const;
   void                                             startMonitor();
   EventReceivedShrdPtr                             monitor();
   void                                             stopMonitor();

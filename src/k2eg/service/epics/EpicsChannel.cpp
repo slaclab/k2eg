@@ -37,29 +37,13 @@ EpicsChannel::deinit() {
   pva::ca::CAClientFactory::stop();
 }
 
-ConstChannelDataUPtr
-EpicsChannel::getChannelData() const {
-  ConstChannelDataUPtr result;
-  try {
-    result = std::make_unique<ChannelData>(ChannelData{pv_name, channel->get()});
-  } catch (pvac::Timeout to) {
-    // ltimeout error
-  }
-  return result;
-}
-
-pvd::PVStructure::const_shared_pointer
-EpicsChannel::getData() const {
-  return channel->get();
-}
-
 ConstPutOperationUPtr
 EpicsChannel::put(const std::string& field, const std::string& value) {
   return MakePutOperationUPtr(channel, pvReq, field, value);
 }
 
 ConstGetOperationUPtr
-EpicsChannel::get() {
+EpicsChannel::get() const {
   return MakeGetOperationUPtr(channel, pv_name);
 }
 
