@@ -19,7 +19,7 @@ jobs:
     test_build:
         runs-on: ubuntu-latest
         container: docker:23.0.0-cli
-
+        
         steps:
             # Downloads a copy of the code in your repository before running CI tests
             - name: Check out repository code
@@ -57,3 +57,4 @@ jobs:
             - uses: ouzi-dev/commit-status-updater@v2
               with:
                 status: success
+            
