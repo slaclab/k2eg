@@ -9,6 +9,7 @@
 
 #include <k2eg/common/utility.h>
 #include "k2eg/service/log/ILogger.h"
+#include "k2eg/service/metric/INodeControllerMetric.h"
 
 using namespace k2eg::controller::node;
 using namespace k2eg::controller::node::worker;
@@ -22,10 +23,12 @@ using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
 using namespace k2eg::service::log;
 using namespace k2eg::service::epics_impl;
+using namespace k2eg::service::metric;
 
 NodeController::NodeController(DataStorageUPtr data_storage)
     : node_configuration(std::make_unique<NodeConfiguration>(std::move(data_storage)))
-    , processing_pool(std::make_shared<BS::thread_pool>()) {
+    , processing_pool(std::make_shared<BS::thread_pool>())
+    , metric(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric()) {
     // set logger
     logger = ServiceResolver<ILogger>::resolve();
 
@@ -59,8 +62,10 @@ void NodeController::waitForTaskCompletion() {
 }
 
 void NodeController::submitCommand(ConstCommandShrdPtrVec commands) {
-    // scann and process al command
-    // TODO submitted cpmmand metric
+    // submitted command metric
+    if(commands.size()) {metric.incrementCounter(INodeControllerMetricCounterType::SubmittedCommand, commands.size());}
+
+    // apply all submitted commands
     for (auto& c: commands) {
         switch (c->type) {
         case CommandType::monitor: {
