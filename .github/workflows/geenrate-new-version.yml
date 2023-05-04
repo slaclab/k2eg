@@ -3,7 +3,6 @@ name: Generate new version
 on:
   workflow_run:
     workflows: ["Testk2eg"]
-    branches: [*]
     types: 
       - completed
 
