@@ -212,7 +212,7 @@ jobs:
           with:
             # Optional. Commit message for the created commit.
             # Defaults to "Apply automatic changes"
-            commit_message: Update version header
+            commit_message: Update version header [skip ci]
 
             # Optional glob pattern of files which should be added to the commit
             # Defaults to all (.)
