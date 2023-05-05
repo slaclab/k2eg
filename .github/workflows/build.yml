@@ -180,7 +180,7 @@ jobs:
         - uses: actions/checkout@v3
           with:
             fetch-depth: 0
-        - uses: paulhatch/semantic-version@v5.0.2
+        - uses: paulhatch/semantic-version@v5.0.3
           id: tag_version_develop 
           with:
             # The prefix to use to identify tags
@@ -205,9 +205,6 @@ jobs:
             search_commit_body: false
             # The output method used to generate list of users, 'csv' or 'json'.
             user_format_type: "csv"
-            # Prevents pre-v1.0.0 version from automatically incrementing the major version.
-            # If enabled, when the major version is 0, major releases will be treated as minor and minor as patch. Note that the version_type output is unchanged.
-            enable_prerelease_mode: true
         - run: |
-            echo ${{ steps.tag_version_develop.outputs.version_tag }}
-            echo ${{ steps.tag_version_develop.outputs.version_tag }}
+            echo "${{ steps.tag_version_develop.outputs.major }}/${{ steps.tag_version_develop.outputs.minor }}.${{ steps.tag_version_develop.outputs.patch }}"
+            
