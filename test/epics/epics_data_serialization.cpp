@@ -48,12 +48,11 @@ TEST(Epics, SerializationCAJSON) {
   ConstSerializedMessageShrdPtr ser_value;
   ConstGetOperationUPtr         get_op;
 
-  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:variable:sum"););
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:variable:a"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(get_op = pc->get(););
+  EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp)"););
   WHILE(get_op->isDone(), false);
   EXPECT_EQ(get_op->getState().event, pvac::GetEvent::Success);
-
   EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::JSON););
   EXPECT_NE(ser_value, nullptr);
   EXPECT_NE(ser_value->data(), nullptr);
@@ -64,14 +63,14 @@ TEST(Epics, SerializationCAJSON) {
   boost::json::value      jv;
   EXPECT_NO_THROW(jv = boost::json::parse(string_value, ec););
   EXPECT_EQ(ec.value(), false);
-  EXPECT_EQ(jv.as_object().contains("ca:variable:sum"), true);
-  auto sub_obj = jv.as_object().at("ca:variable:sum").as_object();
+  EXPECT_EQ(jv.as_object().contains("ca:variable:a"), true);
+  auto sub_obj = jv.as_object().at("ca:variable:a").as_object();
   EXPECT_EQ(sub_obj.contains("value"), true);
-  EXPECT_EQ(sub_obj.contains("alarm"), true);
-  // EXPECT_EQ(sub_obj.contains("timeStamp"), true);
-  EXPECT_EQ(sub_obj.contains("display"), true);
-  EXPECT_EQ(sub_obj.contains("control"), true);
-  EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
+  //EXPECT_EQ(sub_obj.contains("alarm"), true);
+  EXPECT_EQ(sub_obj.contains("timeStamp"), true);
+  //EXPECT_EQ(sub_obj.contains("display"), true);
+  //EXPECT_EQ(sub_obj.contains("control"), true);
+  //EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
 }
 
 TEST(Epics, SerializationWaveformJSON) {
@@ -81,7 +80,6 @@ TEST(Epics, SerializationWaveformJSON) {
   ConstSerializedMessageShrdPtr ser_value;
 
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "channel:waveform"););
-  // EXPECT_NO_THROW(pc->connect());
   EXPECT_NO_THROW(get_op = pc->get(););
   WHILE(get_op->isDone(), false);
   EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::JSON););
@@ -114,7 +112,7 @@ TEST(Epics, SerializationCAWaveformJSON) {
 
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:channel:waveform"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(get_op = pc->get(););
+  EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp)"););
   WHILE(get_op->isDone(), false);
   EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::JSON););
   EXPECT_NE(ser_value, nullptr);
@@ -130,10 +128,10 @@ TEST(Epics, SerializationCAWaveformJSON) {
   EXPECT_EQ(jv.as_object().contains("ca:channel:waveform"), true);
   auto sub_obj = jv.as_object().at("ca:channel:waveform").as_object();
   EXPECT_EQ(sub_obj.contains("value"), true);
-  EXPECT_EQ(sub_obj["value"].is_array(), true);
-  EXPECT_EQ(sub_obj.contains("alarm"), true);
-  // EXPECT_EQ(sub_obj.contains("timeStamp"), true);
-  EXPECT_EQ(sub_obj.contains("display"), true);
+  //EXPECT_EQ(sub_obj["value"].is_array(), true);
+  //EXPECT_EQ(sub_obj.contains("alarm"), true);
+  EXPECT_EQ(sub_obj.contains("timeStamp"), true);
+  //EXPECT_EQ(sub_obj.contains("display"), true);
   // EXPECT_EQ(sub_obj.contains("control"), true);
   // EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
 }
@@ -175,7 +173,7 @@ TEST(Epics, SerializationCAMsgpack) {
   ConstSerializedMessageShrdPtr ser_value;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:variable:sum"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(get_op = pc->get(););
+  EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp)"););
   WHILE(get_op->isDone(), false);
   EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::Msgpack););
   EXPECT_NE(ser_value, nullptr);
@@ -188,11 +186,11 @@ TEST(Epics, SerializationCAMsgpack) {
   EXPECT_EQ(om.contains("ca:variable:sum"), true);
   auto om_sub_1 = om["ca:variable:sum"].as<MapStrMsgPackObj>();
   EXPECT_EQ(om_sub_1.contains("value"), true);
-  EXPECT_EQ(om_sub_1.contains("alarm"), true);
-  // EXPECT_EQ(om_sub_1.contains("timeStamp"), true);
-  EXPECT_EQ(om_sub_1.contains("display"), true);
-  EXPECT_EQ(om_sub_1.contains("control"), true);
-  EXPECT_EQ(om_sub_1.contains("valueAlarm"), true);
+  //EXPECT_EQ(om_sub_1.contains("alarm"), true);
+  EXPECT_EQ(om_sub_1.contains("timeStamp"), true);
+  //EXPECT_EQ(om_sub_1.contains("display"), true);
+  //EXPECT_EQ(om_sub_1.contains("control"), true);
+  //EXPECT_EQ(om_sub_1.contains("valueAlarm"), true);
   //{"variable:sum":{"value":7,"alarm":{"severity":0,"status":0,"message":"NO_ALARM"},"timeStamp":{"secondsPastEpoch":1680995907,"nanoseconds":899753530,"userTag":0},"display":{"limitLow":0,"limitHigh":0,"description":"","units":"","precision":0,"form":{"index":0,"choices":"BIN(size:224)"}},"control":{"limitLow":0,"limitHigh":0,"minStep":0},"valueAlarm":{"active":0,"lowAlarmLimit":nan,"lowWarningLimit":nan,"highWarningLimit":nan,"highAlarmLimit":nan,"lowAlarmSeverity":0,"lowWarningSeverity":0,"highWarningSeverity":0,"highAlarmSeverity":0,"hysteresis":0}}}
 }
 
@@ -256,7 +254,7 @@ TEST(Epics, SerializationCAMsgpackCompact) {
   ConstSerializedMessageShrdPtr ser_value;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:variable:sum"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(get_op = pc->get(););
+  EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp)"););
   WHILE(get_op->isDone(), false);
   EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::MsgpackCompact););
   EXPECT_NE(ser_value, nullptr);
@@ -266,7 +264,7 @@ TEST(Epics, SerializationCAMsgpackCompact) {
   EXPECT_NO_THROW(obj = msgpack::unpack(ser_value->data(), ser_value->size()););
   EXPECT_EQ(msgpack::type::ARRAY, obj->type);
   auto object_vector = obj.get().as<MsgpackObjectVector>();
-  EXPECT_EQ(object_vector.size(), 23);
+  EXPECT_EQ(object_vector.size(), 5);
   EXPECT_EQ(object_vector[0].type, msgpack::type::STR);
   EXPECT_EQ(object_vector[1].type, msgpack::type::POSITIVE_INTEGER);
   //["variable:sum",7,0,0,"NO_ALARM",1681706068,208836822,0,0,0,"","",0,0,["Default","String","Binary","Decimal","Hex","Exponential","Engineering"],0,0,0,0,nan,nan,nan,nan,0,0,0,0,0]

@@ -6,7 +6,12 @@
 
 using namespace k2eg::service::epics_impl;
 
-GetOperation::GetOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name) : channel(channel), pv_name(pv_name), is_done(false) {
+namespace pvd = epics::pvData;
+
+GetOperation::GetOperation(
+  std::shared_ptr<pvac::ClientChannel> channel, 
+  const std::string& pv_name,
+  const std::string& field) : channel(channel), pv_name(pv_name), field(field), is_done(false) {
   channel->addConnectListener(this);
 }
 
@@ -31,7 +36,7 @@ GetOperation::getDone(const pvac::GetEvent& event) {
 void
 GetOperation::connectEvent(const pvac::ConnectEvent& evt) {
   if (evt.connected) {
-    op = channel->get(this);
+    op = channel->get(this, pvd::createRequest(field));
   }
 }
 

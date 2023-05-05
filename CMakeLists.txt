@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
-project(k2eg VERSION 0.1.2)
+project(k2eg)
 
 IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   SET(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/local CACHE PATH "default install directory" FORCE)
@@ -73,9 +73,10 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/pubsub/impl/kafka/RDKafkaSubscriber.cpp
 
   src/k2eg/service/metric/IMetricService.cpp
-  src/k2eg/service/metric/impl/prometheus/PrometheusMetricService.cpp
   src/k2eg/service/metric/impl/prometheus/PrometheusEpicsMetric.cpp
+  src/k2eg/service/metric/impl/prometheus/PrometheusMetricService.cpp
   src/k2eg/service/metric/impl/prometheus/PrometheusCMDControllerMetric.cpp
+  src/k2eg/service/metric/impl/prometheus/PrometheusNodeControllerMetric.cpp
   src/k2eg/service/metric/impl/DummyMetricService.cpp
 
   src/k2eg/service/log/impl/BoostLogger.cpp
@@ -127,6 +128,7 @@ set(TEST_SOURCE_FILES
   test/controller/NodeController.cpp
   test/metric/EpicsMetric.cpp
   test/metric/CMDMetric.cpp
+  test/metric/NodeControllerMetric.cpp
   ${COMMON_SOURCE_FILES}
 )
 
@@ -354,8 +356,6 @@ ExternalProject_Add(
   -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
 )
 SET(BUILD_LIBRARY ${BUILD_LIBRARY} z)
-# ADD_DEPENDENCIES(${PROJECT_NAME})
-# ADD_DEPENDENCIES(${PROJECT_NAME}-test)
 
 # -------- Prometheus -----------
 MESSAGE(STATUS "Configure prometheus version ${PROMETHEUS_VERSION}")
