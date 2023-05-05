@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
-project(k2eg VERSION 0.1.2)
+project(k2eg)
 
 IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   SET(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/local CACHE PATH "default install directory" FORCE)

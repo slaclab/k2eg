@@ -205,6 +205,25 @@ jobs:
             search_commit_body: false
             # The output method used to generate list of users, 'csv' or 'json'.
             user_format_type: "csv"
-        - run: |
-            echo "${{ steps.tag_version_develop.outputs.major }}/${{ steps.tag_version_develop.outputs.minor }}.${{ steps.tag_version_develop.outputs.patch }}"
+        - name: Patch version.h
+          run: |
+            echo $'#ifndef K2EG_VERSION_H_\n#define K2EG_VERSION_H_\n#define k2eg_VERSION "v${{ steps.tag_version_develop.outputs.major }}.${{ steps.tag_version_develop.outputs.minor }}.${{ steps.tag_version_develop.outputs.patch }}"\n#endif' > src/k2eg/version.h
+        - uses: stefanzweifel/git-auto-commit-action@v4
+          with:
+            # Optional. Commit message for the created commit.
+            # Defaults to "Apply automatic changes"
+            commit_message: Update version header
+
+            # Optional glob pattern of files which should be added to the commit
+            # Defaults to all (.)
+            # See the `pathspec`-documentation for git
+            # - https://git-scm.com/docs/git-add#Documentation/git-add.txt-ltpathspecgt82308203
+            # - https://git-scm.com/docs/gitglossary#Documentation/gitglossary.txt-aiddefpathspecapathspec
+            file_pattern: 'src/k2eg/version.h'
             
+            # Optional. Skip internal call to `git checkout`
+            skip_checkout: true
+
+            # Optional. Prevents the shell from expanding filenames. 
+            # Details: https://www.gnu.org/software/bash/manual/html_node/Filename-Expansion.html
+            disable_globbing: true
