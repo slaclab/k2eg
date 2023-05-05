@@ -8,6 +8,8 @@
 #include <k2eg/service/ServiceResolver.h>
 
 #include <k2eg/common/utility.h>
+#include "k2eg/service/log/ILogger.h"
+#include "k2eg/service/metric/INodeControllerMetric.h"
 
 using namespace k2eg::controller::node;
 using namespace k2eg::controller::node::worker;
@@ -21,10 +23,12 @@ using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
 using namespace k2eg::service::log;
 using namespace k2eg::service::epics_impl;
+using namespace k2eg::service::metric;
 
 NodeController::NodeController(DataStorageUPtr data_storage)
     : node_configuration(std::make_unique<NodeConfiguration>(std::move(data_storage)))
-    , processing_pool(std::make_shared<BS::thread_pool>()) {
+    , processing_pool(std::make_shared<BS::thread_pool>())
+    , metric(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric()) {
     // set logger
     logger = ServiceResolver<ILogger>::resolve();
 
@@ -58,7 +62,10 @@ void NodeController::waitForTaskCompletion() {
 }
 
 void NodeController::submitCommand(ConstCommandShrdPtrVec commands) {
-    // scann and process al command
+    // submitted command metric
+    if(commands.size()) {metric.incrementCounter(INodeControllerMetricCounterType::SubmittedCommand, commands.size());}
+
+    // apply all submitted commands
     for (auto& c: commands) {
         switch (c->type) {
         case CommandType::monitor: {
@@ -87,7 +94,7 @@ void NodeController::submitCommand(ConstCommandShrdPtrVec commands) {
             logger->logMessage(STRING_FORMAT("Forward command => %1% to worker %2%",to_json_string(c)%std::string(command_type_to_string(c->type))));
             processing_pool->push_task(&CommandWorker::processCommand, worker.get(), c);
         } else {
-            logger->logMessage(STRING_FORMAT("No worker found for command type '%1%'",std::string(command_type_to_string(c->type))));
+            logger->logMessage(STRING_FORMAT("No worker found for command type '%1%'",std::string(command_type_to_string(c->type))), LogLevel::ERROR);
         }
     }
 }

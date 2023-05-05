@@ -1,5 +1,6 @@
 #include <k2eg/common/utility.h>
 #include <k2eg/config.h>
+#include <k2eg/version.h>
 #include <k2eg/k2eg.h>
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/data/DataStorage.h>
@@ -61,7 +62,6 @@ K2EGateway::setup(int argc, const char* argv[]) {
     ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(po->getPublisherConfiguration()));
     logger->logMessage("Start subscriber service");
     ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(po->getSubscriberConfiguration()));
-
     logger->logMessage("Start node controller");
     node_controller = std::make_unique<NodeController>(std::make_unique<DataStorage>(po->getStoragePath()));
     logger->logMessage("Restore persistent command");
@@ -137,14 +137,16 @@ K2EGateway::commandReceived(k2eg::controller::command::cmd::ConstCommandShrdPtrV
 
 const std::string
 K2EGateway::getTextVersion(bool long_version) {
-  return long_version ? STRING_FORMAT(R"VERSION(k2eg Epics Kafka Gateway %1%.%2%.%3%)VERSION", k2eg_VERSION_MAJOR % k2eg_VERSION_MINOR % k2eg_VERSION_PATCH)
-                      : STRING_FORMAT(R"VERSION(k2eg Epics Kafka Gateway %1%.%2%.%3%
-Boost                   %4%
-EPICS                   %5%
-LibLZ4                  %6%
-Sqlite                  %7%
-SqliteORM               %8%
+  return long_version ? STRING_FORMAT(R"VERSION(k2eg Epics Kafka Gateway %1%)VERSION", k2eg_VERSION)
+                      : STRING_FORMAT(R"VERSION(k2eg Epics Kafka Gateway %1%
+Boost                     %2%
+EPICS                     %3%
+LibLZ4                    %4%
+Sqlite                    %5%
+SqliteORM                 %6%
+MsgPack                   %7%
+Prometheus                %8%
 )VERSION",
-                                      k2eg_VERSION_MAJOR % k2eg_VERSION_MINOR % k2eg_VERSION_PATCH % k2eg_BOOST_VERSION % k2eg_EPICS_VERSION %
-                                          k2eg_LIBLZ4_VERSION % k2eg_SQLITE_VERSION % k2eg_SQLITEORM_VERSION);
+                                      k2eg_VERSION % k2eg_BOOST_VERSION % k2eg_EPICS_VERSION %
+                                          k2eg_LIBLZ4_VERSION % k2eg_SQLITE_VERSION % k2eg_SQLITEORM_VERSION % k2eg_MSGPACK_VERSION % k2eg_PROMETHEUS_VERSION);
 }

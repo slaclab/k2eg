@@ -61,7 +61,6 @@ jobs:
         artifact_name: ${{ needs.build_debian_bullseye.outputs.artifact_name }}
         docker_compose_profile: app-debian
       secrets: inherit
-
     build_debian_bullseye:
         name: Build Bullseye
         needs: check-changed-file
@@ -173,3 +172,58 @@ jobs:
               uses: ouzi-dev/commit-status-updater@v2
               with:
                 status: success
+    manage_version:
+      needs: [test_debian_bullseye, test_ubuntu_kinetic]
+      name: Manage version
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v3
+          with:
+            fetch-depth: 0
+        - uses: paulhatch/semantic-version@v5.0.3
+          id: tag_version_develop 
+          with:
+            # The prefix to use to identify tags
+            tag_prefix: "v"
+            # A string which, if present in a git commit, indicates that a change represents a
+            # major (breaking) change, supports regular expressions wrapped with '/'
+            major_pattern: "(MAJOR)"
+            # A string which indicates the flags used by the `major_pattern` regular expression. Supported flags: idgs
+            major_regexp_flags: ""
+            # Same as above except indicating a minor change, supports regular expressions wrapped with '/'
+            minor_pattern: "(MINOR)"
+            # A string which indicates the flags used by the `minor_pattern` regular expression. Supported flags: idgs
+            minor_regexp_flags: ""
+            # A string to determine the format of the version output
+            version_format: "${major}.${minor}.${patch}-prerelease${increment}"
+            # Optional path to check for changes. If any changes are detected in the path the
+            # 'changed' output will true. Enter multiple paths separated by spaces.
+            change_path: "src"
+            # If this is set to true, *every* commit will be treated as a new version.
+            bump_each_commit: true
+            # If true, the body of commits will also be searched for major/minor patterns to determine the version type.
+            search_commit_body: false
+            # The output method used to generate list of users, 'csv' or 'json'.
+            user_format_type: "csv"
+        - name: Patch version.h
+          run: |
+            echo $'#ifndef K2EG_VERSION_H_\n#define K2EG_VERSION_H_\n#define k2eg_VERSION "v${{ steps.tag_version_develop.outputs.major }}.${{ steps.tag_version_develop.outputs.minor }}.${{ steps.tag_version_develop.outputs.patch }}"\n#endif' > src/k2eg/version.h
+        - uses: stefanzweifel/git-auto-commit-action@v4
+          with:
+            # Optional. Commit message for the created commit.
+            # Defaults to "Apply automatic changes"
+            commit_message: Update version header
+
+            # Optional glob pattern of files which should be added to the commit
+            # Defaults to all (.)
+            # See the `pathspec`-documentation for git
+            # - https://git-scm.com/docs/git-add#Documentation/git-add.txt-ltpathspecgt82308203
+            # - https://git-scm.com/docs/gitglossary#Documentation/gitglossary.txt-aiddefpathspecapathspec
+            file_pattern: 'src/k2eg/version.h'
+            
+            # Optional. Skip internal call to `git checkout`
+            skip_checkout: true
+
+            # Optional. Prevents the shell from expanding filenames. 
+            # Details: https://www.gnu.org/software/bash/manual/html_node/Filename-Expansion.html
+            disable_globbing: true

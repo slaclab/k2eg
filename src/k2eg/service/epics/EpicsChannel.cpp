@@ -12,7 +12,6 @@ namespace pva = epics::pvAccess;
 
 EpicsChannel::EpicsChannel(pvac::ClientProvider& provider, const std::string& pv_name, const std::string& address)
     : pv_name(pv_name), address(address) {
-  //provider = std::make_unique<pvac::ClientProvider>(provider_name, conf);
   pvac::ClientChannel::Options opt;
   if (!address.empty()) { opt.address = address; }
   channel = std::make_shared<pvac::ClientChannel>(provider.connect(pv_name, opt));
@@ -43,13 +42,13 @@ EpicsChannel::put(const std::string& field, const std::string& value) {
 }
 
 ConstGetOperationUPtr
-EpicsChannel::get() const {
-  return MakeGetOperationUPtr(channel, pv_name);
+EpicsChannel::get(const std::string& field) const {
+  return MakeGetOperationUPtr(channel, pv_name, field);
 }
 
 void
-EpicsChannel::startMonitor() {
-  mon = channel->monitor();
+EpicsChannel::startMonitor(const std::string& field) {
+  mon = channel->monitor(pvd::createRequest(field));
 }
 
 EventReceivedShrdPtr

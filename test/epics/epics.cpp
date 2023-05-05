@@ -137,6 +137,37 @@ TEST(Epics, ChannelMonitor) {
   EXPECT_NO_THROW(pc_a->stopMonitor(););
 }
 
+TEST(Epics, ChannelCAMonitor) {
+  INIT_CA_PROVIDER()
+  EpicsChannelUPtr                                 pc_a;
+  ConstPutOperationUPtr                            put_op;
+  epics::pvData::PVStructure::const_shared_pointer val;
+  EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:variable:a"););
+  // enable monitor
+  EXPECT_NO_THROW(put_op = pc_a->put("value", "0"););
+  WHILE(put_op->isDone(), false);
+  EXPECT_EQ(retry_eq(*pc_a, "value", 0, 500, 3), true);
+
+  EXPECT_NO_THROW(pc_a->startMonitor("field(value,timeStamp)"););
+  auto fetched = pc_a->monitor();
+  EXPECT_EQ(fetched->event_data->size(), 1);
+  EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
+  EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 0);
+  EXPECT_NO_THROW(put_op = pc_a->put("value", "1"););
+  WHILE(put_op->isDone(), false);
+  EXPECT_NO_THROW(put_op = pc_a->put("value", "2"););
+  WHILE(put_op->isDone(), false);
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+
+  fetched = pc_a->monitor();
+  EXPECT_EQ(fetched->event_data->size(), 2);
+  EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
+  EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 1);
+  EXPECT_EQ(fetched->event_data->at(1)->type, EventType::Data);
+  EXPECT_EQ(fetched->event_data->at(1)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 2);
+  EXPECT_NO_THROW(pc_a->stopMonitor(););
+}
+
 struct HandlerClass {
   std::latch           work_done;
   EventReceivedShrdPtr event_received;

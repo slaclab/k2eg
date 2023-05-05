@@ -14,8 +14,8 @@ record(ao, "ca:variable:b")
 record(calc, "ca:variable:sum")
 {
     field(SCAN, "1 second")
-    field(INPA, "variable:a")
-    field(INPB, "variable:b")
+    field(INPA, "ca:variable:a")
+    field(INPB, "ca:variable:b")
     field(CALC, "A+B")
 }
 
@@ -31,8 +31,8 @@ record(ao, "ca:channel:ramp:limit")
 record(calc, "ca:channel:ramp:ramp")
 {
     field(SCAN, "1 second")
-    field(INPA, "channel:ramp:ramp")
-    field(INPB, "channel:ramp:limit")
+    field(INPA, "ca:channel:ramp:ramp")
+    field(INPB, "ca:channel:ramp:limit")
     field(CALC, "A<B ? A+1 : 0")
     field(HIGH, "90")
     field(HSV, "MAJOR")
