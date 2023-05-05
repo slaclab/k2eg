@@ -10,12 +10,13 @@ namespace k2eg::service::epics_impl {
 class GetOperation : public pvac::ClientChannel::GetCallback, public pvac::ClientChannel::ConnectCallback {
   std::shared_ptr<pvac::ClientChannel> channel;
   const std::string                    pv_name;
+  const std::string                    field;
   pvac::Operation                      op;
   pvac::GetEvent                       evt;
   bool                                 is_done;
 
  public:
-  GetOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name);
+  GetOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field = "field()");
   virtual ~GetOperation();
   virtual void          getDone(const pvac::GetEvent& event) OVERRIDE FINAL;
   virtual void          connectEvent(const pvac::ConnectEvent& evt) OVERRIDE FINAL;

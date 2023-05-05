@@ -50,8 +50,8 @@ class EpicsChannel {
   static void                                      init();
   static void                                      deinit();
   ConstPutOperationUPtr                            put(const std::string& field, const std::string& value);
-  ConstGetOperationUPtr                            get() const;
-  void                                             startMonitor();
+  ConstGetOperationUPtr                            get(const std::string& field = "field()") const;
+  void                                             startMonitor(const std::string& field = "field()");
   EventReceivedShrdPtr                             monitor();
   void                                             stopMonitor();
 };
