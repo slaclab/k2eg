@@ -7,6 +7,13 @@ ENDIF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 
 include(ExternalProject)
 
+
+EXECUTE_PROCESS (
+    COMMAND bash -c "../tools/manage-version.sh ../src/k2eg/version.h"
+    OUTPUT_VARIABLE outVar
+)
+message(STATUS "Update version ${outVar}")
+
 set(IS_DEBUG_BUILD CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 find_package(Git)
