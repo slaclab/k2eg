@@ -1,12 +1,14 @@
 FROM ubuntu:kinetic
-
 ENV DEBIAN_FRONTEND=noninteractive
+ENV GITVERSION_VERSION=5.12.0
 RUN     apt update \
-    &&  apt install -y build-essential cmake git tclsh ninja-build gdb lcov libssl-dev curl libcurl4-openssl-dev valgrind
+    &&  apt install -y build-essential cmake git tclsh ninja-build gdb lcov libssl-dev curl libcurl4-openssl-dev valgrind libicu-dev jq
 
 #install clang
 RUN apt install -y lsb-release wget software-properties-common gnupg python3 python3.10-venv
 RUN bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+ADD https://github.com/GitTools/GitVersion/releases/download/$GITVERSION_VERSION/gitversion-linux-x64-$GITVERSION_VERSION.tar.gz /opt
+RUN cd /opt && tar zxvf gitversion-linux-x64-$GITVERSION_VERSION.tar.gz && mv gitversion /usr/local/bin && chmod 755 /usr/local/bin/gitversion && rm gitversion-linux-x64-$GITVERSION_VERSION.tar.gz
 
 RUN update-alternatives --install /usr/bin/cc cc /usr/bin/clang-15 100
 RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-15 100
