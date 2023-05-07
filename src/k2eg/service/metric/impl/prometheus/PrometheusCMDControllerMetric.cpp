@@ -8,7 +8,7 @@ using namespace k2eg::service::metric::impl::prometheus_impl;
 PrometheusCMDControllerMetric::PrometheusCMDControllerMetric()
     : registry(std::make_shared<Registry>()),
       command_received_counters(
-          BuildCounter().Name("k2eg_cmd_reception_management").Help("Contains the metric for the command reception management").Register(*registry)),
+          BuildCounter().Name("k2eg_command_controller").Help("Is the metric set for the reception and decode of the command").Register(*registry)),
       received(command_received_counters.Add({{"op", "received"}})),
       bad_parsed(command_received_counters.Add({{"op", "bad_command"}})),
       fault_processed(command_received_counters.Add({{"op", "fault_processed"}})) {}

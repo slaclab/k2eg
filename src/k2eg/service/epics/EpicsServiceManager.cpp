@@ -13,8 +13,7 @@ using namespace k2eg::service::epics_impl;
 EpicsServiceManager::EpicsServiceManager() {
   run          = true;
   pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
-  ca_provider  = std::make_unique<pvac::ClientProvider>(
-      "ca", epics::pvAccess::ConfigurationBuilder().add("PATH", "build/local/bin/linux-x86_64").push_map().push_env().build());
+  ca_provider  = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
   scheduler_thread = std::make_unique<std::thread>(&EpicsServiceManager::task, this);
 }
 EpicsServiceManager::~EpicsServiceManager() {
@@ -31,7 +30,12 @@ EpicsServiceManager::addChannel(const std::string& pv_name, const std::string& p
   std::unique_lock guard(channel_map_mutex);
   if (auto search = channel_map.find(pv_name); search != channel_map.end()) { return; }
   try {
-    channel_map[pv_name] = std::make_shared<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
+    if(protocol.find("pva") == 0) {
+      channel_map[pv_name] = std::make_shared<EpicsChannel>(*pva_provider, pv_name);
+    } else {
+      channel_map[pv_name] = std::make_shared<EpicsChannel>(*ca_provider, pv_name);
+    }
+    //channel_map[pv_name] = std::make_shared<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
     channel_map[pv_name]->startMonitor();
   } catch (std::exception& ex) {
     channel_map.erase(pv_name);

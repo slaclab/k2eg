@@ -7,16 +7,12 @@
 #include <algorithm>
 #include <memory>
 
+#include "k2eg/service/metric/INodeControllerMetric.h"
+
 using namespace prometheus;
 
 using namespace k2eg::service::metric;
 using namespace k2eg::service::metric::impl;
-
-void
-DummyEpicsMetric::incrementCounter(IEpicsMetricCounterType type, double inc_value) {}
-
-void
-DummyCMDControllerMetric::incrementCounter(ICMDControllerMetricCounterType type, double inc_value) {}
 
 DummyMetricService::DummyMetricService(ConstMetricConfigurationUPtr metric_configuration) : IMetricService(std::move(metric_configuration)) {}
 
@@ -25,13 +21,20 @@ DummyMetricService::~DummyMetricService() {}
 IEpicsMetric&
 DummyMetricService::getEpicsMetric() {
   std::lock_guard<std::mutex> lk(service_mux);
-  if (!epics_metric) { epics_metric = std::shared_ptr<DummyEpicsMetric>(new DummyEpicsMetric()); }
+  if (!epics_metric) { epics_metric = std::shared_ptr<DummyIEpicsMetric>(new DummyIEpicsMetric()); }
   return *epics_metric;
 }
 
 ICMDControllerMetric&
 DummyMetricService::getCMDControllerMetric() {
   std::lock_guard<std::mutex> lk(service_mux);
-  if (!cmd_controller_metric) { cmd_controller_metric = std::shared_ptr<DummyCMDControllerMetric>(new DummyCMDControllerMetric()); }
+  if (!cmd_controller_metric) { cmd_controller_metric = std::shared_ptr<DummyICMDControllerMetric>(new DummyICMDControllerMetric()); }
   return *cmd_controller_metric;
+}
+
+INodeControllerMetric&
+DummyMetricService::getNodeControllerMetric() {
+  std::lock_guard<std::mutex> lk(service_mux);
+  if (!node_controller_metric) { node_controller_metric = std::shared_ptr<DummyINodeControllerMetric>(new DummyINodeControllerMetric()); }
+  return *node_controller_metric;
 }

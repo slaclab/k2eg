@@ -4,11 +4,13 @@
 #include <k2eg/common/types.h>
 
 #include <k2eg/service/metric/IEpicsMetric.h>
+#include <k2eg/service/metric/ICMDControllerMetric.h>
+#include <k2eg/service/metric/INodeControllerMetric.h>
 
 #include <cstddef>
 #include <memory>
 #include <mutex>
-#include "k2eg/service/metric/ICMDControllerMetric.h"
+
 namespace k2eg::service::metric {
 struct MetricConfiguration {
   bool enable;
@@ -27,6 +29,7 @@ class IMetricService {
 
   virtual IEpicsMetric& getEpicsMetric() = 0;
   virtual ICMDControllerMetric& getCMDControllerMetric() = 0;
+  virtual INodeControllerMetric& getNodeControllerMetric() = 0;
 };
 DEFINE_PTR_TYPES(IMetricService)
 
