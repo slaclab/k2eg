@@ -1,6 +1,5 @@
 ARG TEST_IMAGE
 FROM ubuntu:kinetic as builder
-ENV GITVERSION_VERSION=5.12.0
 LABEL maintainer="bisegni@slac.stanford.edu"
 LABEL org.opencontainers.image.description="Kafka To Epics Gateway"
 
