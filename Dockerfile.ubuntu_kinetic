@@ -6,12 +6,8 @@ LABEL org.opencontainers.image.description="Kafka To Epics Gateway"
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN     apt update \
-    &&  apt install -y build-essential cmake git tclsh ninja-build libssl-dev curl libcurl4-openssl-dev libicu-dev jq
+    &&  apt install -y build-essential cmake git tclsh ninja-build libssl-dev curl libcurl4-openssl-dev
 
-ADD https://github.com/GitTools/GitVersion/releases/download/$GITVERSION_VERSION/gitversion-linux-x64-$GITVERSION_VERSION.tar.gz /opt
-RUN cd /opt && tar zxvf gitversion-linux-x64-$GITVERSION_VERSION.tar.gz
-ENV PATH="${PATH}:/opt"
-COPY .git /opt/app/.git
 COPY src /opt/app/src
 COPY test /opt/app/test
 COPY tools /opt/app/tools
