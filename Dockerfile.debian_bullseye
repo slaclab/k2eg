@@ -1,11 +1,15 @@
 ARG TEST_IMAGE
 FROM scr.svc.stanford.edu/eed-public/build-image/cpp-build-image/gcc-debian:12.2.0-bullseye as builder
+ENV GITVERSION_VERSION=5.12.0
 LABEL maintainer="bisegni@slac.stanford.edu"
 LABEL org.opencontainers.image.description="Kafka To Epics Gateway"
 
 RUN apt update && \
-    apt install -y libssl-dev
+    apt install -y libssl-dev libicu-dev
 
+ADD https://github.com/GitTools/GitVersion/releases/download/$GITVERSION_VERSION/gitversion-linux-x64-$GITVERSION_VERSION.tar.gz /opt
+RUN cd /opt && tar zxvf gitversion-linux-x64-$GITVERSION_VERSION.tar.gz
+ENV PATH="${PATH}:/opt"
 COPY src /opt/app/src
 COPY test /opt/app/test
 COPY tools /opt/app/tools
