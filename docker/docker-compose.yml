@@ -11,13 +11,13 @@ services:
     logging:
       driver: none
       
-  epics-ca:
-    build:
-      context: ../
-      dockerfile: docker/Dockerfile.epics_ca
-    entrypoint: /opt/execute-ca-ioc.sh /db/softioc.db
-    logging:
-      driver: none
+  # epics-ca:
+  #   build:
+  #     context: ../
+  #     dockerfile: docker/Dockerfile.epics_ca
+  #   entrypoint: /opt/execute-ca-ioc.sh /db/softioc.db
+  #   logging:
+  #     driver: none
 
   zookeeper:
     image: bitnami/zookeeper:3.8.1

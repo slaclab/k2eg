@@ -430,7 +430,7 @@ TEST(NodeController, GetCommandCAChannel) {
   auto node_controller = initBackend(publisher);
 
   EXPECT_NO_THROW(node_controller->submitCommand(
-      {std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "ca", "ca:variable:sum", KAFKA_TOPIC_ACQUIRE_IN})}););
+      {std::make_shared<const GetCommand>(GetCommand{CommandType::get, MessageSerType::json, "ca", "variable:sum", KAFKA_TOPIC_ACQUIRE_IN})}););
   // give some time for the timeout
   wait_latch(publisher->l);
   // we need to have publish some message
