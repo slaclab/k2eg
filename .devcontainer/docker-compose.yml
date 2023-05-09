@@ -37,12 +37,12 @@ services:
     volumes:
       - ../test/epics-test.db:/db/softioc.db
 
-  epics_ca:
-    image: ghcr.io/bisegni/epics-base-docker-image:main
-    entrypoint: /opt/execute-ca-ioc.sh /db/softioc.db
-    volumes:
-      - ../test/epics-test-ca.db:/db/softioc.db
-      - ../test/execute-ca-ioc.sh:/opt/execute-ca-ioc.sh
+  # epics_ca:
+  #   image: ghcr.io/bisegni/epics-base-docker-image:main
+  #   entrypoint: /opt/execute-ca-ioc.sh /db/softioc.db
+  #   volumes:
+  #     - ../test/epics-test-ca.db:/db/softioc.db
+  #     - ../test/execute-ca-ioc.sh:/opt/execute-ca-ioc.sh
 
   zookeeper:
     image: bitnami/zookeeper:3.8.1

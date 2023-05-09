@@ -48,7 +48,7 @@ TEST(Epics, SerializationCAJSON) {
   ConstSerializedMessageShrdPtr ser_value;
   ConstGetOperationUPtr         get_op;
 
-  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:variable:a"););
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:a"););
   // EXPECT_NO_THROW(pc->connect());
   EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp)"););
   WHILE(get_op->isDone(), false);
@@ -63,8 +63,8 @@ TEST(Epics, SerializationCAJSON) {
   boost::json::value      jv;
   EXPECT_NO_THROW(jv = boost::json::parse(string_value, ec););
   EXPECT_EQ(ec.value(), false);
-  EXPECT_EQ(jv.as_object().contains("ca:variable:a"), true);
-  auto sub_obj = jv.as_object().at("ca:variable:a").as_object();
+  EXPECT_EQ(jv.as_object().contains("variable:a"), true);
+  auto sub_obj = jv.as_object().at("variable:a").as_object();
   EXPECT_EQ(sub_obj.contains("value"), true);
   //EXPECT_EQ(sub_obj.contains("alarm"), true);
   EXPECT_EQ(sub_obj.contains("timeStamp"), true);
@@ -110,7 +110,7 @@ TEST(Epics, SerializationCAWaveformJSON) {
   ConstGetOperationUPtr         get_op;
   ConstSerializedMessageShrdPtr ser_value;
 
-  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:channel:waveform"););
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "channel:waveform"););
   // EXPECT_NO_THROW(pc->connect());
   EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp)"););
   WHILE(get_op->isDone(), false);
@@ -125,8 +125,8 @@ TEST(Epics, SerializationCAWaveformJSON) {
   boost::json::value      jv;
   EXPECT_NO_THROW(jv = boost::json::parse(string_value, ec););
   EXPECT_EQ(ec.value(), false);
-  EXPECT_EQ(jv.as_object().contains("ca:channel:waveform"), true);
-  auto sub_obj = jv.as_object().at("ca:channel:waveform").as_object();
+  EXPECT_EQ(jv.as_object().contains("channel:waveform"), true);
+  auto sub_obj = jv.as_object().at("channel:waveform").as_object();
   EXPECT_EQ(sub_obj.contains("value"), true);
   //EXPECT_EQ(sub_obj["value"].is_array(), true);
   //EXPECT_EQ(sub_obj.contains("alarm"), true);
@@ -171,7 +171,7 @@ TEST(Epics, SerializationCAMsgpack) {
   EpicsChannelUPtr              pc;
   ConstGetOperationUPtr         get_op;
   ConstSerializedMessageShrdPtr ser_value;
-  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:variable:sum"););
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:sum"););
   // EXPECT_NO_THROW(pc->connect());
   EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp)"););
   WHILE(get_op->isDone(), false);
@@ -183,8 +183,8 @@ TEST(Epics, SerializationCAMsgpack) {
   EXPECT_NO_THROW(msgpack::unpack(obj, ser_value->data(), ser_value->size()););
   EXPECT_EQ(msgpack::type::MAP, obj->type);
   auto om = obj.get().as<MapStrMsgPackObj>();
-  EXPECT_EQ(om.contains("ca:variable:sum"), true);
-  auto om_sub_1 = om["ca:variable:sum"].as<MapStrMsgPackObj>();
+  EXPECT_EQ(om.contains("variable:sum"), true);
+  auto om_sub_1 = om["variable:sum"].as<MapStrMsgPackObj>();
   EXPECT_EQ(om_sub_1.contains("value"), true);
   //EXPECT_EQ(om_sub_1.contains("alarm"), true);
   EXPECT_EQ(om_sub_1.contains("timeStamp"), true);
@@ -252,7 +252,7 @@ TEST(Epics, SerializationCAMsgpackCompact) {
   EpicsChannelUPtr              pc;
   ConstGetOperationUPtr         get_op;
   ConstSerializedMessageShrdPtr ser_value;
-  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "ca:variable:sum"););
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:sum"););
   // EXPECT_NO_THROW(pc->connect());
   EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp)"););
   WHILE(get_op->isDone(), false);
