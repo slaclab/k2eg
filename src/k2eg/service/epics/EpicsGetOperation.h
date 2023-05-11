@@ -7,7 +7,36 @@
 
 namespace k2eg::service::epics_impl {
 
-class GetOperation : public pvac::ClientChannel::GetCallback, public pvac::ClientChannel::ConnectCallback {
+// abstract get operation
+class GetOperation {
+ public:
+  GetOperation()                                       = default;
+  virtual ~GetOperation()                              = default;
+  virtual bool                  isDone() const         = 0;
+  virtual const pvac::GetEvent& getState() const       = 0;
+  virtual ConstChannelDataUPtr  getChannelData() const = 0;
+  virtual bool                  hasData() const        = 0;
+};
+DEFINE_PTR_TYPES(GetOperation)
+
+// combined get operation
+class CombinedGetOperation : public GetOperation {
+  GetOperationShrdPtr get_op_a;
+  GetOperationShrdPtr get_op_b;
+  void                copyStructure(epics::pvData::FieldBuilderPtr, const epics::pvData::PVStructure* structure) const;
+  void                copyValue(epics::pvData::PVStructure* dest_structure, const epics::pvData::PVStructure* src_structure) const;
+
+ public:
+  CombinedGetOperation(GetOperationShrdPtr get_op_a, GetOperationShrdPtr get_op_b);
+  virtual ~CombinedGetOperation() = default;
+  bool                  isDone() const OVERRIDE FINAL;
+  const pvac::GetEvent& getState() const OVERRIDE FINAL;
+  ConstChannelDataUPtr  getChannelData() const OVERRIDE FINAL;
+  bool                  hasData() const OVERRIDE FINAL;
+};
+DEFINE_PTR_TYPES(CombinedGetOperation)
+// Get operation
+class SingleGetOperation : public GetOperation, public pvac::ClientChannel::GetCallback, public pvac::ClientChannel::ConnectCallback {
   std::shared_ptr<pvac::ClientChannel> channel;
   const std::string                    pv_name;
   const std::string                    field;
@@ -16,17 +45,17 @@ class GetOperation : public pvac::ClientChannel::GetCallback, public pvac::Clien
   bool                                 is_done;
 
  public:
-  GetOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field = "field()");
-  virtual ~GetOperation();
+  SingleGetOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field = "field()");
+  virtual ~SingleGetOperation();
   virtual void          getDone(const pvac::GetEvent& event) OVERRIDE FINAL;
   virtual void          connectEvent(const pvac::ConnectEvent& evt) OVERRIDE FINAL;
-  bool                  isDone() const;
-  const pvac::GetEvent& getState() const;
-  ConstChannelDataUPtr  getChannelData() const;
-  bool                  hasData() const;
+  bool                  isDone() const OVERRIDE FINAL;
+  const pvac::GetEvent& getState() const OVERRIDE FINAL;
+  ConstChannelDataUPtr  getChannelData() const OVERRIDE FINAL;
+  bool                  hasData() const OVERRIDE FINAL;
 };
 
-DEFINE_PTR_TYPES(GetOperation)
+DEFINE_PTR_TYPES(SingleGetOperation)
 }  // namespace k2eg::service::epics_impl
 
 #endif  // K2EG_SERVICE_EPICS_EPICSGETOPERATION_H_

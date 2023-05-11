@@ -73,6 +73,39 @@ TEST(Epics, SerializationCAJSON) {
   //EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
 }
 
+TEST(Epics, SerializationCACompleteJSON) {
+  INIT_CA_PROVIDER()
+  EpicsChannelUPtr              pc;
+  ConstSerializedMessageShrdPtr ser_value;
+  ConstGetOperationUPtr         get_op;
+
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:a"););
+  // EXPECT_NO_THROW(pc->connect());
+  EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp,alarm)", "field(display,control,valueAlarm)"););
+
+  WHILE(get_op->isDone(), false);
+  EXPECT_EQ(get_op->getState().event, pvac::GetEvent::Success);
+  auto data = get_op->getChannelData();
+  EXPECT_NO_THROW(ser_value = serialize(*data, SerializationType::JSON););
+  EXPECT_NE(ser_value, nullptr);
+  EXPECT_NE(ser_value->data(), nullptr);
+  EXPECT_NE(ser_value->size(), 0);
+  std::string string_value(ser_value->data(), ser_value->size());
+  // {"variable:sum":{"value":7E0,"alarm":{"severity":0,"status":0,"message":"NO_ALARM"},"timeStamp":{"secondsPastEpoch":1681018040,"nanoseconds":899757791,"userTag":0},"display":{"limitLow":0E0,"limitHigh":0E0,"description":"","units":"","precision":0,"form":{"index":0}},"control":{"limitLow":0E0,"limitHigh":0E0,"minStep":0E0},"valueAlarm":{"active":0,"lowAlarmLimit":"NaN","lowWarningLimit":"NaN","highWarningLimit":"NaN","highAlarmLimit":"NaN","lowAlarmSeverity":0,"lowWarningSeverity":0,"highWarningSeverity":0,"highAlarmSeverity":0,"hysteresis":0}}}
+  boost::json::error_code ec;
+  boost::json::value      jv;
+  EXPECT_NO_THROW(jv = boost::json::parse(string_value, ec););
+  EXPECT_EQ(ec.value(), false);
+  EXPECT_EQ(jv.as_object().contains("variable:a"), true);
+  auto sub_obj = jv.as_object().at("variable:a").as_object();
+  EXPECT_EQ(sub_obj.contains("value"), true);
+  EXPECT_EQ(sub_obj.contains("alarm"), true);
+  EXPECT_EQ(sub_obj.contains("timeStamp"), true);
+  EXPECT_EQ(sub_obj.contains("display"), true);
+  EXPECT_EQ(sub_obj.contains("control"), true);
+  EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
+}
+
 TEST(Epics, SerializationWaveformJSON) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr              pc;
