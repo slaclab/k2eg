@@ -1,7 +1,9 @@
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <pv/caProvider.h>
 #include <pv/clientFactory.h>
+
 #include <memory>
+
 #include "k2eg/service/epics/EpicsGetOperation.h"
 #include "k2eg/service/epics/EpicsPutOperation.h"
 
@@ -10,16 +12,15 @@ using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;
 namespace pva = epics::pvAccess;
 
-EpicsChannel::EpicsChannel(pvac::ClientProvider& provider, const std::string& pv_name, const std::string& address)
-    : pv_name(pv_name), address(address) {
+EpicsChannel::EpicsChannel(pvac::ClientProvider& provider, const std::string& pv_name, const std::string& address) : pv_name(pv_name), address(address) {
   pvac::ClientChannel::Options opt;
   if (!address.empty()) { opt.address = address; }
   channel = std::make_shared<pvac::ClientChannel>(provider.connect(pv_name, opt));
 }
 
 EpicsChannel::~EpicsChannel() {
-  //if (channel) { channel->reset(); }
-  //if (provider) { provider->disconnect(); }
+  // if (channel) { channel->reset(); }
+  // if (provider) { provider->disconnect(); }
 }
 
 void
@@ -42,8 +43,14 @@ EpicsChannel::put(const std::string& field, const std::string& value) {
 }
 
 ConstGetOperationUPtr
-EpicsChannel::get(const std::string& field) const {
-  return MakeGetOperationUPtr(channel, pv_name, field);
+EpicsChannel::get(const std::string& field, const std::string& additional_filed) const {
+  if (additional_filed.empty())
+    return MakeSingleGetOperationUPtr(channel, pv_name, field);
+  else
+    return MakeCombinedGetOperationUPtr(
+      MakeSingleGetOperationShrdPtr(channel, pv_name, field), 
+      MakeSingleGetOperationShrdPtr(channel, pv_name, additional_filed)
+    );
 }
 
 void
