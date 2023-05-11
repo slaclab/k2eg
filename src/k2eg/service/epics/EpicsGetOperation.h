@@ -10,6 +10,8 @@ namespace k2eg::service::epics_impl {
 // abstract get operation
 class GetOperation {
  public:
+  GetOperation()                                       = default;
+  virtual ~GetOperation()                              = default;
   virtual bool                  isDone() const         = 0;
   virtual const pvac::GetEvent& getState() const       = 0;
   virtual ConstChannelDataUPtr  getChannelData() const = 0;
@@ -21,10 +23,12 @@ DEFINE_PTR_TYPES(GetOperation)
 class CombinedGetOperation : public GetOperation {
   GetOperationShrdPtr get_op_a;
   GetOperationShrdPtr get_op_b;
-  void copyStructure(epics::pvData::FieldBuilderPtr, const epics::pvData::PVStructure* structure) const;
-  void copyValue(epics::pvData::PVStructure* dest_structure, const epics::pvData::PVStructure* src_structure) const;
+  void                copyStructure(epics::pvData::FieldBuilderPtr, const epics::pvData::PVStructure* structure) const;
+  void                copyValue(epics::pvData::PVStructure* dest_structure, const epics::pvData::PVStructure* src_structure) const;
+
  public:
   CombinedGetOperation(GetOperationShrdPtr get_op_a, GetOperationShrdPtr get_op_b);
+  virtual ~CombinedGetOperation() = default;
   bool                  isDone() const OVERRIDE FINAL;
   const pvac::GetEvent& getState() const OVERRIDE FINAL;
   ConstChannelDataUPtr  getChannelData() const OVERRIDE FINAL;
