@@ -99,11 +99,11 @@ TEST(Epics, SerializationCACompleteJSON) {
   EXPECT_EQ(jv.as_object().contains("variable:a"), true);
   auto sub_obj = jv.as_object().at("variable:a").as_object();
   EXPECT_EQ(sub_obj.contains("value"), true);
-  //EXPECT_EQ(sub_obj.contains("alarm"), true);
+  EXPECT_EQ(sub_obj.contains("alarm"), true);
   EXPECT_EQ(sub_obj.contains("timeStamp"), true);
-  //EXPECT_EQ(sub_obj.contains("display"), true);
-  //EXPECT_EQ(sub_obj.contains("control"), true);
-  //EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
+  EXPECT_EQ(sub_obj.contains("display"), true);
+  EXPECT_EQ(sub_obj.contains("control"), true);
+  EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
 }
 
 TEST(Epics, SerializationWaveformJSON) {

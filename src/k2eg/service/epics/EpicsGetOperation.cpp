@@ -41,10 +41,11 @@ CombinedGetOperation::getChannelData() const {
   auto builder = pvd::getFieldCreate()->createFieldBuilder();
   copyStructure(builder, get_op_a->getChannelData()->data.get());
   copyStructure(builder, get_op_b->getChannelData()->data.get());
+
+  //build the sglobal structure
   auto pvStructure = builder->createStructure()->build();
-  std::cout << pvStructure << std::endl;
-  std::cout << get_op_a->getChannelData()->data << std::endl;
-  std::cout << get_op_b->getChannelData()->data << std::endl;
+
+  //copy the values
   copyValue(pvStructure.get(), get_op_a->getChannelData()->data.get());
   copyValue(pvStructure.get(), get_op_b->getChannelData()->data.get());
   return MakeChannelDataUPtr(get_op_a->getChannelData()->pv_name, pvStructure);
@@ -57,17 +58,24 @@ CombinedGetOperation::copyValue(epics::pvData::PVStructure* dest_structure, cons
   const pvd::PVFieldPtrArray&   children = src_structure->getPVFields();
   const pvd::StringArray&       names    = type->getFieldNames();
   for (size_t i = 0, N = names.size(); i < N; i++) {
-    auto const& fld  = children[i].get();
-    auto        type = fld->getField()->getType();
-    switch (dest_structure->getField()->getType()) {
+    auto const& src_fld        = children[i].get();
+    auto        src_type       = src_fld->getField()->getType();
+    auto        dest_field = dest_structure->getSubField(names[i]).get();
+    auto        dest_type = dest_field->getField()->getType();
+    if (src_type != dest_type) throw std::invalid_argument("filed of different type");
+    switch (src_type) {
       case pvd::scalar: {
-        auto de_filed = dest_structure->getSubField(names[i]);
+        dest_field->copyUnchecked(*src_fld);
         break;
       }
       case pvd::scalarArray: {
+        auto dest_scalar_array = static_cast<pvd::PVScalarArray*>(dest_field);
+        dest_scalar_array->copyUnchecked(*static_cast<const pvd::PVScalarArray*>(src_fld));
         break;
       }
       case pvd::structure: {
+        auto dest_structure = static_cast<pvd::PVStructure*>(dest_field);
+        copyValue(dest_structure, static_cast<const pvd::PVStructure*>(src_fld));
         break;
       }
       case pvd::structureArray: {
