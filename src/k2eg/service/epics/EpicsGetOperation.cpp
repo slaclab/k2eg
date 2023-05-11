@@ -1,9 +1,8 @@
-#include <k2eg/service/epics/EpicsGetOperation.h>
+#include <client.h>
 #include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/epics/EpicsGetOperation.h>
 #include <pv/createRequest.h>
 #include <pvData.h>
-
-#include <client.h>
 #include <pvIntrospect.h>
 
 using namespace k2eg::service::epics_impl;
@@ -39,62 +38,83 @@ CombinedGetOperation::getChannelData() const {
   if (getState().event != pvac::PutEvent::Success) return result;
 
   // we have data so combine it
-auto                          builder  = pvd::getFieldCreate()->createFieldBuilder();
-copyStructure(builder, get_op_a->getChannelData()->data.get());
-copyStructure(builder, get_op_b->getChannelData()->data.get());
-auto pvStructure = builder->createStructure()->build();
-std::cout << pvStructure << std::endl;
-std::cout << get_op_a->getChannelData()->data << std::endl;
-std::cout << get_op_b->getChannelData()->data << std::endl;
-pvStructure->copyUnchecked(*get_op_a->getChannelData()->data);
-pvStructure->copyUnchecked(*get_op_b->getChannelData()->data);
-return MakeChannelDataUPtr(
-  get_op_a->getChannelData()->pv_name,
-  pvStructure
-);
+  auto builder = pvd::getFieldCreate()->createFieldBuilder();
+  copyStructure(builder, get_op_a->getChannelData()->data.get());
+  copyStructure(builder, get_op_b->getChannelData()->data.get());
+  auto pvStructure = builder->createStructure()->build();
+  std::cout << pvStructure << std::endl;
+  std::cout << get_op_a->getChannelData()->data << std::endl;
+  std::cout << get_op_b->getChannelData()->data << std::endl;
+  copyValue(pvStructure.get(), get_op_a->getChannelData()->data.get());
+  copyValue(pvStructure.get(), get_op_b->getChannelData()->data.get());
+  return MakeChannelDataUPtr(get_op_a->getChannelData()->pv_name, pvStructure);
 }
 
-void 
-CombinedGetOperation::copyStructure(pvd::FieldBuilderPtr builder, const pvd::PVStructure* structure) const {
-const pvd::StructureConstPtr& type     = structure->getStructure();
-const pvd::PVFieldPtrArray&   children = structure->getPVFields();
-const pvd::StringArray&       names    = type->getFieldNames();
-for (size_t i = 0, N = names.size(); i < N; i++) {
+void
+CombinedGetOperation::copyValue(epics::pvData::PVStructure* dest_structure, const epics::pvData::PVStructure* src_structure) const {
+  if (dest_structure->isImmutable()) throw std::invalid_argument("destination is immutable");
+  const pvd::StructureConstPtr& type     = src_structure->getStructure();
+  const pvd::PVFieldPtrArray&   children = src_structure->getPVFields();
+  const pvd::StringArray&       names    = type->getFieldNames();
+  for (size_t i = 0, N = names.size(); i < N; i++) {
     auto const& fld  = children[i].get();
     auto        type = fld->getField()->getType();
-    switch(type) {
-      case epics::pvData::scalar:
-      builder->add( names[i], static_cast<const pvd::PVScalar*>(fld)->getScalar()->getScalarType());
-      break;
-      case epics::pvData::scalarArray:
-      builder->addArray(names[i], static_cast<const pvd::PVScalarArray*>(fld)->getScalarArray()->getElementType());
-      break;
-      case epics::pvData::structure:{
+    switch (dest_structure->getField()->getType()) {
+      case pvd::scalar: {
+        auto de_filed = dest_structure->getSubField(names[i]);
+        break;
+      }
+      case pvd::scalarArray: {
+        break;
+      }
+      case pvd::structure: {
+        break;
+      }
+      case pvd::structureArray: {
+        break;
+      }
+      case pvd::union_: {
+        break;
+      }
+      case pvd::unionArray: {
+        break;
+      }
+      default: {
+        throw std::logic_error("PVField::copy unknown type");
+      }
+    }
+  }
+}
+
+void
+CombinedGetOperation::copyStructure(pvd::FieldBuilderPtr builder, const pvd::PVStructure* structure) const {
+  const pvd::StructureConstPtr& type     = structure->getStructure();
+  const pvd::PVFieldPtrArray&   children = structure->getPVFields();
+  const pvd::StringArray&       names    = type->getFieldNames();
+  for (size_t i = 0, N = names.size(); i < N; i++) {
+    auto const& fld  = children[i].get();
+    auto        type = fld->getField()->getType();
+    switch (type) {
+      case epics::pvData::scalar: builder->add(names[i], static_cast<const pvd::PVScalar*>(fld)->getScalar()->getScalarType()); break;
+      case epics::pvData::scalarArray: builder->addArray(names[i], static_cast<const pvd::PVScalarArray*>(fld)->getScalarArray()->getElementType()); break;
+      case epics::pvData::structure: {
         auto nested_buider = builder->addNestedStructure(names[i]);
         copyStructure(nested_buider, static_cast<const pvd::PVStructure*>(fld));
         nested_buider->endNested();
         break;
       }
-      case epics::pvData::structureArray:{
+      case epics::pvData::structureArray: {
         int a = 0;
         break;
       }
-      case epics::pvData::union_:{
+      case epics::pvData::union_: {
         int a = 0;
         break;
       }
-      case epics::pvData::unionArray:{
+      case epics::pvData::unionArray: {
         int a = 0;
         break;
       }
-    }
-    if (type == pvd::Type::scalar) {
-      
-    } else if (type == pvd::Type::scalarArray) {
-      
-    } else if (type == pvd::Type::structure) {
-      // const pv::StructureConstPtr& structType = std::dynamic_pointer_cast<const pv::Structure>(field->getType());
-      // builder.add(fieldName, structType);
     }
   }
 }

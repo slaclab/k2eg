@@ -22,6 +22,7 @@ class CombinedGetOperation : public GetOperation {
   GetOperationShrdPtr get_op_a;
   GetOperationShrdPtr get_op_b;
   void copyStructure(epics::pvData::FieldBuilderPtr, const epics::pvData::PVStructure* structure) const;
+  void copyValue(epics::pvData::PVStructure* dest_structure, const epics::pvData::PVStructure* src_structure) const;
  public:
   CombinedGetOperation(GetOperationShrdPtr get_op_a, GetOperationShrdPtr get_op_b);
   bool                  isDone() const OVERRIDE FINAL;
