@@ -57,7 +57,6 @@ TEST(Epics, SerializationCAJSON) {
   EXPECT_NE(ser_value->data(), nullptr);
   EXPECT_NE(ser_value->size(), 0);
   std::string string_value(ser_value->data(), ser_value->size());
-  std::cout << string_value << std::endl;
   // {"variable:sum":{"value":7E0,"alarm":{"severity":0,"status":0,"message":"NO_ALARM"},"timeStamp":{"secondsPastEpoch":1681018040,"nanoseconds":899757791,"userTag":0},"display":{"limitLow":0E0,"limitHigh":0E0,"description":"","units":"","precision":0,"form":{"index":0}},"control":{"limitLow":0E0,"limitHigh":0E0,"minStep":0E0},"valueAlarm":{"active":0,"lowAlarmLimit":"NaN","lowWarningLimit":"NaN","highWarningLimit":"NaN","highAlarmLimit":"NaN","lowAlarmSeverity":0,"lowWarningSeverity":0,"highWarningSeverity":0,"highAlarmSeverity":0,"hysteresis":0}}}
   boost::json::error_code ec;
   boost::json::value      jv;
