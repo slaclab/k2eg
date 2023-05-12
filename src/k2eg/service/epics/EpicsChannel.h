@@ -31,10 +31,7 @@ class EpicsChannel {
   static void                  deinit();
   ConstPutOperationUPtr        put(const std::string& field, const std::string& value);
   ConstGetOperationUPtr        get(const std::string& field = "field()", const std::string& additional_filed = "") const;
-  ConstMonitorOperationShrdPtr asyncMonitor(const std::string& fastUpdateField = "field()", const std::string& slowField = "") const;
-  void                         startMonitor(const std::string& field = "field()");
-  EventReceivedShrdPtr         monitor();
-  void                         stopMonitor();
+  ConstMonitorOperationShrdPtr monitor(const std::string& fastUpdateField = "field()", const std::string& slowField = "") const;
 };
 
 DEFINE_PTR_TYPES(EpicsChannel)

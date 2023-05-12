@@ -1,15 +1,12 @@
 #include <k2eg/service/epics/EpicsChannel.h>
-#include <k2eg/service/epics/EpicsGetOperation.h>
-#include <k2eg/service/epics/EpicsPutOperation.h>
+
 #include <pv/caProvider.h>
 #include <pv/clientFactory.h>
 
 #include <memory>
-#include "k2eg/service/epics/EpicsMonitorOperation.h"
 
 using namespace k2eg::service::epics_impl;
 
-namespace pvd = epics::pvData;
 namespace pva = epics::pvAccess;
 
 EpicsChannel::EpicsChannel(pvac::ClientProvider& provider, const std::string& pv_name, const std::string& address) : pv_name(pv_name), address(address) {
@@ -47,51 +44,6 @@ EpicsChannel::get(const std::string& field, const std::string& additional_filed)
 }
 
 ConstMonitorOperationShrdPtr
-EpicsChannel::asyncMonitor(const std::string& fastUpdateField, const std::string& slowField ) const {
+EpicsChannel::monitor(const std::string& fastUpdateField, const std::string& slowField ) const {
   return MakeMonitorOperationShrdPtr(channel, pv_name, fastUpdateField);
-}
-
-void
-EpicsChannel::startMonitor(const std::string& field) {
-  mon = channel->monitor(pvd::createRequest(field));
-}
-
-EventReceivedShrdPtr
-EpicsChannel::monitor() {
-  EventReceivedShrdPtr result = std::make_shared<EventReceived>();
-  if (!mon.wait(0.100)) {
-    // updates mon.event
-    result->event_timeout->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Timeout, pv_name, "Time out", nullptr}));
-    return result;
-  }
-
-  switch (mon.event.event) {
-    // Subscription network/internal error
-    case pvac::MonitorEvent::Fail:
-      result->event_fail->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Fail, pv_name, mon.event.message, nullptr}));
-      break;
-    // explicit call of 'mon.cancel' or subscription dropped
-    case pvac::MonitorEvent::Cancel:
-      result->event_cancel->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Cancel, pv_name, mon.event.message, nullptr}));
-      break;
-    // Underlying channel becomes disconnected
-    case pvac::MonitorEvent::Disconnect:
-      result->event_disconnect->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Disconnec, pv_name, mon.event.message, nullptr}));
-      break;
-    // Data queue becomes not-empty
-    case pvac::MonitorEvent::Data:
-      // We drain event FIFO completely
-      while (mon.poll()) {
-        auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
-        tmp_data->copy(*mon.root);
-        result->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, mon.event.message, {pv_name, tmp_data}}));
-      }
-      break;
-  }
-  return result;
-}
-
-void
-EpicsChannel::stopMonitor() {
-  if (mon) { mon.cancel(); }
 }

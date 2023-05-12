@@ -37,7 +37,7 @@ EpicsServiceManager::addChannel(const std::string& pv_name, const std::string& p
   if (auto search = channel_map.find(pv_name); search != channel_map.end()) { return; }
   try {
     channel_map[pv_name] = std::make_shared<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
-    auto monitor_handler = channel_map[pv_name]->asyncMonitor();
+    auto monitor_handler = channel_map[pv_name]->monitor();
     // lock and insert in queue
     std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
     monitor_op_queue.push(ConstMonitorOperationShrdPtr(monitor_handler));
