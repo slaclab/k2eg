@@ -1,24 +1,30 @@
 #include <k2eg/service/epics/EpicsServiceManager.h>
 
+#include <algorithm>
 #include <chrono>
+#include <mutex>
 #include <ranges>
 
 #include "k2eg/service/epics/EpicsChannel.h"
 #include "k2eg/service/epics/EpicsGetOperation.h"
+#include "k2eg/service/epics/EpicsMonitorOperation.h"
 #include "k2eg/service/epics/EpicsPutOperation.h"
 
 using namespace k2eg::common;
 using namespace k2eg::service::epics_impl;
 
 EpicsServiceManager::EpicsServiceManager() {
-  run          = true;
-  pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
-  ca_provider  = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
+  run              = true;
+  pva_provider     = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
+  ca_provider      = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
   scheduler_thread = std::make_unique<std::thread>(&EpicsServiceManager::task, this);
 }
 EpicsServiceManager::~EpicsServiceManager() {
   run = false;
   scheduler_thread->join();
+  // remove all monitor handler
+  std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
+  while (!monitor_op_queue.empty()) { monitor_op_queue.pop(); };
   pva_provider->reset();
   ca_provider->reset();
 }
@@ -30,13 +36,11 @@ EpicsServiceManager::addChannel(const std::string& pv_name, const std::string& p
   std::unique_lock guard(channel_map_mutex);
   if (auto search = channel_map.find(pv_name); search != channel_map.end()) { return; }
   try {
-    if(protocol.find("pva") == 0) {
-      channel_map[pv_name] = std::make_shared<EpicsChannel>(*pva_provider, pv_name);
-    } else {
-      channel_map[pv_name] = std::make_shared<EpicsChannel>(*ca_provider, pv_name);
-    }
-    //channel_map[pv_name] = std::make_shared<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
-    channel_map[pv_name]->startMonitor();
+    channel_map[pv_name] = std::make_shared<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
+    auto monitor_handler = channel_map[pv_name]->asyncMonitor();
+    // lock and insert in queue
+    std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
+    monitor_op_queue.push(ConstMonitorOperationShrdPtr(monitor_handler));
   } catch (std::exception& ex) {
     channel_map.erase(pv_name);
     throw ex;
@@ -63,6 +67,9 @@ void
 EpicsServiceManager::removeChannel(const std::string& pv_name) {
   std::lock_guard guard(channel_map_mutex);
   channel_map.erase(pv_name);
+
+  std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
+  pv_to_remove.insert(pv_name);
 }
 
 void
@@ -122,22 +129,42 @@ EpicsServiceManager::getHandlerSize() {
   handler_broadcaster.purge();
   return handler_broadcaster.targets.size();
 }
-void
-EpicsServiceManager::processIterator(const std::shared_ptr<EpicsChannel>& epics_channel) {
-  EventReceivedShrdPtr received_event = epics_channel->monitor();
-  if (!handler_broadcaster.targets.size()) return;
-  handler_broadcaster.broadcast(received_event);
-}
 
 void
 EpicsServiceManager::task() {
-  std::shared_ptr<EpicsChannel> current_channel;
+  ConstMonitorOperationShrdPtr cur_monitor_op;
   while (run) {
-    // lock and scan opened channel
+    // fetch op to manage
+    std::this_thread::sleep_for(std::chrono::microseconds(250));
     {
-      std::unique_lock guard(channel_map_mutex);
-      for (auto& [key, value] : channel_map) { processIterator(value); }
+      std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
+      if (monitor_op_queue.size() == 0) continue;
+      cur_monitor_op = monitor_op_queue.front();
+      monitor_op_queue.pop();
+
+      // check if we need to remove th emonitor for the specific pv owned by cur_monitor_op
+      auto found = std::find_if(
+          std::begin(pv_to_remove), std::end(pv_to_remove), [&cur_monitor_op](auto& pv_name) { return cur_monitor_op->getPVName().compare(pv_name) == 0; });
+      if (found != std::end(pv_to_remove)) {
+        // i need to remove this monitor
+        pv_to_remove.erase(found);
+        cur_monitor_op.reset();
+        continue;
+      }
     }
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
+
+    // manage monitor op
+    {
+      std::lock_guard guard(channel_map_mutex);
+      if (cur_monitor_op->hasData() && handler_broadcaster.targets.size()) { 
+        handler_broadcaster.broadcast(cur_monitor_op->getEventData()); 
+      }
+    }
+
+    // add monitor op to the tail
+    {
+      std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
+      monitor_op_queue.push(cur_monitor_op);
+    }
   }
 }

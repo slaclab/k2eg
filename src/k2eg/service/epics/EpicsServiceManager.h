@@ -7,10 +7,11 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <mutex>
+#include <shared_mutex>
 #include <thread>
 #include <vector>
-
+#include <queue>
+#include "k2eg/service/epics/EpicsMonitorOperation.h"
 namespace k2eg::service::epics_impl {
 
 DEFINE_MAP_FOR_TYPE(std::string, EpicsChannelShrdPtr, EpicsChannelMap)
@@ -25,10 +26,13 @@ class EpicsServiceManager {
     k2eg::common::broadcaster<EpicsServiceManagerHandlerParamterType> handler_broadcaster;
     std::unique_ptr<pvac::ClientProvider> pva_provider;
     std::unique_ptr<pvac::ClientProvider> ca_provider;
+    
+    // monitor handler queue
+    std::mutex monitor_op_queue_mutx;
+    std::queue<ConstMonitorOperationShrdPtr> monitor_op_queue;
+    std::set<std::string> pv_to_remove;
     bool run = false;
     void task();
-    void processIterator(const std::shared_ptr<EpicsChannel>& epics_channel);
-
 public:
     explicit EpicsServiceManager();
     ~EpicsServiceManager();

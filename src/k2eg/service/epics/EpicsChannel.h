@@ -5,6 +5,7 @@
 #include <k2eg/common/types.h>
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
+#include <k2eg/service/epics/EpicsMonitorOperation.h>
 #include <k2eg/service/epics/EpicsPutOperation.h>
 #include <pv/configuration.h>
 #include <pv/createRequest.h>
@@ -20,19 +21,20 @@ class EpicsChannel {
   const std::string                          pv_name;
   const std::string                          address;
   epics::pvData::PVStructure::shared_pointer pvReq = epics::pvData::createRequest("field()");
-  std::shared_ptr<pvac::ClientChannel> channel;
-  pvac::MonitorSync                    mon;
+  std::shared_ptr<pvac::ClientChannel>       channel;
+  pvac::MonitorSync                          mon;
 
  public:
   explicit EpicsChannel(pvac::ClientProvider& provider, const std::string& pv_name, const std::string& address = std::string());
   ~EpicsChannel();
-  static void                                      init();
-  static void                                      deinit();
-  ConstPutOperationUPtr                            put(const std::string& field, const std::string& value);
-  ConstGetOperationUPtr                            get(const std::string& field = "field()", const std::string& additional_filed = "") const;
-  void                                             startMonitor(const std::string& field = "field()");
-  EventReceivedShrdPtr                             monitor();
-  void                                             stopMonitor();
+  static void                  init();
+  static void                  deinit();
+  ConstPutOperationUPtr        put(const std::string& field, const std::string& value);
+  ConstGetOperationUPtr        get(const std::string& field = "field()", const std::string& additional_filed = "") const;
+  ConstMonitorOperationShrdPtr asyncMonitor(const std::string& fastUpdateField = "field()", const std::string& slowField = "") const;
+  void                         startMonitor(const std::string& field = "field()");
+  EventReceivedShrdPtr         monitor();
+  void                         stopMonitor();
 };
 
 DEFINE_PTR_TYPES(EpicsChannel)

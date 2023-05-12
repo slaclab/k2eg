@@ -1,11 +1,11 @@
 #include <k2eg/service/epics/EpicsChannel.h>
+#include <k2eg/service/epics/EpicsGetOperation.h>
+#include <k2eg/service/epics/EpicsPutOperation.h>
 #include <pv/caProvider.h>
 #include <pv/clientFactory.h>
 
 #include <memory>
-
-#include "k2eg/service/epics/EpicsGetOperation.h"
-#include "k2eg/service/epics/EpicsPutOperation.h"
+#include "k2eg/service/epics/EpicsMonitorOperation.h"
 
 using namespace k2eg::service::epics_impl;
 
@@ -18,10 +18,7 @@ EpicsChannel::EpicsChannel(pvac::ClientProvider& provider, const std::string& pv
   channel = std::make_shared<pvac::ClientChannel>(provider.connect(pv_name, opt));
 }
 
-EpicsChannel::~EpicsChannel() {
-  // if (channel) { channel->reset(); }
-  // if (provider) { provider->disconnect(); }
-}
+EpicsChannel::~EpicsChannel() {}
 
 void
 EpicsChannel::init() {
@@ -32,8 +29,6 @@ EpicsChannel::init() {
 
 void
 EpicsChannel::deinit() {
-  // "pva" provider automatically in registry
-  // add "ca" provider to registry
   pva::ca::CAClientFactory::stop();
 }
 
@@ -47,10 +42,13 @@ EpicsChannel::get(const std::string& field, const std::string& additional_filed)
   if (additional_filed.empty())
     return MakeSingleGetOperationUPtr(channel, pv_name, field);
   else
-    return MakeCombinedGetOperationUPtr(
-      MakeSingleGetOperationShrdPtr(channel, pv_name, field), 
-      MakeSingleGetOperationShrdPtr(channel, pv_name, additional_filed)
-    );
+    return MakeCombinedGetOperationUPtr(MakeSingleGetOperationShrdPtr(channel, pv_name, field),
+                                        MakeSingleGetOperationShrdPtr(channel, pv_name, additional_filed));
+}
+
+ConstMonitorOperationShrdPtr
+EpicsChannel::asyncMonitor(const std::string& fastUpdateField, const std::string& slowField ) const {
+  return MakeMonitorOperationShrdPtr(channel, pv_name, fastUpdateField);
 }
 
 void
