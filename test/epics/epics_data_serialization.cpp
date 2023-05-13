@@ -49,8 +49,7 @@ TEST(Epics, SerializationCAJSON) {
   ConstGetOperationUPtr         get_op;
 
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:a"););
-  // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp)"););
+  EXPECT_NO_THROW(get_op = pc->get("field(value, timeStamp, alarm)"););
   WHILE(get_op->isDone(), false);
   EXPECT_EQ(get_op->getState().event, pvac::GetEvent::Success);
   EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::JSON););
@@ -66,7 +65,7 @@ TEST(Epics, SerializationCAJSON) {
   EXPECT_EQ(jv.as_object().contains("variable:a"), true);
   auto sub_obj = jv.as_object().at("variable:a").as_object();
   EXPECT_EQ(sub_obj.contains("value"), true);
-  //EXPECT_EQ(sub_obj.contains("alarm"), true);
+  EXPECT_EQ(sub_obj.contains("alarm"), true);
   EXPECT_EQ(sub_obj.contains("timeStamp"), true);
   //EXPECT_EQ(sub_obj.contains("display"), true);
   //EXPECT_EQ(sub_obj.contains("control"), true);

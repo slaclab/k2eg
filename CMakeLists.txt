@@ -66,6 +66,7 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/epics/EpicsChannel.cpp
   src/k2eg/service/epics/EpicsPutOperation.cpp
   src/k2eg/service/epics/EpicsGetOperation.cpp
+  src/k2eg/service/epics/EpicsMonitorOperation.cpp
   src/k2eg/service/epics/EpicsServiceManager.cpp
   src/k2eg/service/epics/JsonSerialization.cpp
   src/k2eg/service/epics/MsgPackSerialization.cpp

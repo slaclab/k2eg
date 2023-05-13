@@ -5,6 +5,7 @@
 #include <k2eg/common/types.h>
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
+#include <k2eg/service/epics/EpicsMonitorOperation.h>
 #include <k2eg/service/epics/EpicsPutOperation.h>
 #include <pv/configuration.h>
 #include <pv/createRequest.h>
@@ -15,45 +16,22 @@
 
 namespace k2eg::service::epics_impl {
 
-enum EventType { Timeout, Fail, Cancel, Disconnec, Data };
-
-typedef struct {
-  EventType         type;
-  const std::string message;
-  ChannelData       channel_data;
-} MonitorEvent;
-DEFINE_PTR_TYPES(MonitorEvent)
-
-typedef std::vector<MonitorEventShrdPtr> MonitorEventVec;
-typedef std::shared_ptr<MonitorEventVec> MonitorEventVecShrdPtr;
-
-struct EventReceived {
-  MonitorEventVecShrdPtr event_timeout    = std::make_shared<MonitorEventVec>();
-  MonitorEventVecShrdPtr event_data       = std::make_shared<MonitorEventVec>();
-  MonitorEventVecShrdPtr event_fail       = std::make_shared<MonitorEventVec>();
-  MonitorEventVecShrdPtr event_disconnect = std::make_shared<MonitorEventVec>();
-  MonitorEventVecShrdPtr event_cancel     = std::make_shared<MonitorEventVec>();
-};
-DEFINE_PTR_TYPES(EventReceived)
-
 class EpicsChannel {
   friend class EpicsPutOperation;
   const std::string                          pv_name;
   const std::string                          address;
   epics::pvData::PVStructure::shared_pointer pvReq = epics::pvData::createRequest("field()");
-  std::shared_ptr<pvac::ClientChannel> channel;
-  pvac::MonitorSync                    mon;
+  std::shared_ptr<pvac::ClientChannel>       channel;
+  pvac::MonitorSync                          mon;
 
  public:
   explicit EpicsChannel(pvac::ClientProvider& provider, const std::string& pv_name, const std::string& address = std::string());
   ~EpicsChannel();
-  static void                                      init();
-  static void                                      deinit();
-  ConstPutOperationUPtr                            put(const std::string& field, const std::string& value);
-  ConstGetOperationUPtr                            get(const std::string& field = "field()", const std::string& additional_filed = "") const;
-  void                                             startMonitor(const std::string& field = "field()");
-  EventReceivedShrdPtr                             monitor();
-  void                                             stopMonitor();
+  static void                  init();
+  static void                  deinit();
+  ConstPutOperationUPtr        put(const std::string& field, const std::string& value);
+  ConstGetOperationUPtr        get(const std::string& field = "field()", const std::string& additional_filed = "") const;
+  ConstMonitorOperationShrdPtr monitor(const std::string& fastUpdateField = "field()", const std::string& slowField = "") const;
 };
 
 DEFINE_PTR_TYPES(EpicsChannel)

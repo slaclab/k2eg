@@ -10,6 +10,7 @@
 #include <thread>
 
 #include "k2eg/service/epics/EpicsGetOperation.h"
+#include "k2eg/service/epics/EpicsMonitorOperation.h"
 #include "k2eg/service/epics/EpicsPutOperation.h"
 #include "pvData.h"
 
@@ -46,7 +47,7 @@ TEST(Epics, ChannelCAGetOpOk) {
 bool
 retry_eq(const EpicsChannel& channel, const std::string& name, double value, int mseconds, int retry_times) {
   for (int times = retry_times; times != 0; times--) {
-    auto val  = channel.get();
+    auto val = channel.get();
     WHILE(val->isDone(), false);
     auto dval = val->getChannelData()->data->getSubField<epics::pvData::PVDouble>(name)->get();
     if (dval == value) { return true; }
@@ -86,6 +87,7 @@ TEST(Epics, ChannelMonitor) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr                                 pc_a;
   ConstPutOperationUPtr                            put_op;
+  ConstMonitorOperationShrdPtr                     monitor_op;
   epics::pvData::PVStructure::const_shared_pointer val;
   EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:a"););
   // enable monitor
@@ -93,8 +95,9 @@ TEST(Epics, ChannelMonitor) {
   WHILE(put_op->isDone(), false);
   EXPECT_EQ(retry_eq(*pc_a, "value", 0, 500, 3), true);
 
-  EXPECT_NO_THROW(pc_a->startMonitor(););
-  auto fetched = pc_a->monitor();
+  EXPECT_NO_THROW(monitor_op = pc_a->monitor(););
+  WHILE(monitor_op->hasData(), false);
+  auto fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 1);
   EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
   EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 0);
@@ -105,19 +108,21 @@ TEST(Epics, ChannelMonitor) {
   WHILE(put_op->isDone(), false);
   std::this_thread::sleep_for(std::chrono::seconds(1));
 
-  fetched = pc_a->monitor();
+  WHILE(monitor_op->hasData(), false);
+  fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 2);
   EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
   EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 1);
   EXPECT_EQ(fetched->event_data->at(1)->type, EventType::Data);
   EXPECT_EQ(fetched->event_data->at(1)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 2);
-  EXPECT_NO_THROW(pc_a->stopMonitor(););
+  EXPECT_NO_THROW(monitor_op.reset(););
 }
 
 TEST(Epics, ChannelCAMonitor) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr                                 pc_a;
   ConstPutOperationUPtr                            put_op;
+  ConstMonitorOperationShrdPtr                     monitor_op;
   epics::pvData::PVStructure::const_shared_pointer val;
   EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:a"););
   // enable monitor
@@ -125,8 +130,9 @@ TEST(Epics, ChannelCAMonitor) {
   WHILE(put_op->isDone(), false);
   EXPECT_EQ(retry_eq(*pc_a, "value", 0, 500, 3), true);
 
-  EXPECT_NO_THROW(pc_a->startMonitor("field(value,timeStamp)"););
-  auto fetched = pc_a->monitor();
+  EXPECT_NO_THROW(monitor_op = pc_a->monitor("field(value,timeStamp)"););
+  WHILE(monitor_op->hasData(), false);
+  auto fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 1);
   EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
   EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 0);
@@ -136,18 +142,19 @@ TEST(Epics, ChannelCAMonitor) {
   WHILE(put_op->isDone(), false);
   std::this_thread::sleep_for(std::chrono::seconds(1));
 
-  fetched = pc_a->monitor();
+  WHILE(monitor_op->hasData(), false);
+  fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 2);
   EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
   EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 1);
   EXPECT_EQ(fetched->event_data->at(1)->type, EventType::Data);
   EXPECT_EQ(fetched->event_data->at(1)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 2);
-  EXPECT_NO_THROW(pc_a->stopMonitor(););
+  EXPECT_NO_THROW(monitor_op.reset(););
 }
 
 struct HandlerClass {
   std::latch           work_done;
-  EventReceivedShrdPtr event_received;
+  EventReceivedShrdPtr event_received = std::make_shared<EventReceived>();
   HandlerClass(int event_size) : work_done(event_size) {}
   void
   handler(EpicsServiceManagerHandlerParamterType event) {
@@ -168,13 +175,13 @@ TEST(Epics, EpicsServiceManagerMonitorOk) {
 }
 
 TEST(Epics, EpicsServiceManagerWrongMonitoredDevices) {
-  HandlerClass                         handler(1);
+  HandlerClass                         handler(0);
   k2eg::common::BroadcastToken         handler_tok;
   std::unique_ptr<EpicsServiceManager> monitor = std::make_unique<EpicsServiceManager>();
   EXPECT_NO_THROW(handler_tok = monitor->addHandler(std::bind(&HandlerClass::handler, &handler, std::placeholders::_1)););
   EXPECT_NO_THROW(monitor->addChannel("ca", "wrong::device"););
-  handler.work_done.wait();
-  EXPECT_EQ(handler.event_received->event_timeout->size() > 0, true);
+  std::this_thread::sleep_for(std::chrono::milliseconds(250));
+  EXPECT_EQ(handler.event_received->event_timeout->size() == 0, true);
   monitor.reset();
 }
 
