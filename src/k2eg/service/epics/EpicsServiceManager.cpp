@@ -13,18 +13,13 @@
 using namespace k2eg::common;
 using namespace k2eg::service::epics_impl;
 
-EpicsServiceManager::EpicsServiceManager() {
-  run              = true;
+EpicsServiceManager::EpicsServiceManager() : processing_pool(2) {
   pva_provider     = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
   ca_provider      = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
-  scheduler_thread = std::make_unique<std::thread>(&EpicsServiceManager::task, this);
 }
 EpicsServiceManager::~EpicsServiceManager() {
-  run = false;
-  scheduler_thread->join();
   // remove all monitor handler
-  std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
-  while (!monitor_op_queue.empty()) { monitor_op_queue.pop(); };
+  processing_pool.wait_for_tasks();
   pva_provider->reset();
   ca_provider->reset();
 }
@@ -36,11 +31,10 @@ EpicsServiceManager::addChannel(const std::string& pv_name, const std::string& p
   std::unique_lock guard(channel_map_mutex);
   if (auto search = channel_map.find(pv_name); search != channel_map.end()) { return; }
   try {
-    channel_map[pv_name] = std::make_shared<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
-    auto monitor_handler = channel_map[pv_name]->monitor();
+    channel_map[pv_name]                         = std::make_shared<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
+    ConstMonitorOperationShrdPtr monitor_operation = channel_map[pv_name]->monitor();
     // lock and insert in queue
-    std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
-    monitor_op_queue.push(ConstMonitorOperationShrdPtr(monitor_handler));
+    processing_pool.push_task(&EpicsServiceManager::task, this, monitor_operation);
   } catch (std::exception& ex) {
     channel_map.erase(pv_name);
     throw ex;
@@ -131,40 +125,25 @@ EpicsServiceManager::getHandlerSize() {
 }
 
 void
-EpicsServiceManager::task() {
-  ConstMonitorOperationShrdPtr cur_monitor_op;
-  while (run) {
-    // fetch op to manage
-    std::this_thread::sleep_for(std::chrono::microseconds(250));
-    {
-      std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
-      if (monitor_op_queue.size() == 0) continue;
-      cur_monitor_op = monitor_op_queue.front();
-      monitor_op_queue.pop();
-
-      // check if we need to remove th emonitor for the specific pv owned by cur_monitor_op
-      auto found = std::find_if(
-          std::begin(pv_to_remove), std::end(pv_to_remove), [&cur_monitor_op](auto& pv_name) { return cur_monitor_op->getPVName().compare(pv_name) == 0; });
-      if (found != std::end(pv_to_remove)) {
-        // i need to remove this monitor
-        pv_to_remove.erase(found);
-        cur_monitor_op.reset();
-        continue;
-      }
-    }
-
-    // manage monitor op
-    {
-      std::lock_guard guard(channel_map_mutex);
-      if (cur_monitor_op->hasData() && handler_broadcaster.targets.size()) { 
-        handler_broadcaster.broadcast(cur_monitor_op->getEventData()); 
-      }
-    }
-
-    // add monitor op to the tail
-    {
-      std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
-      monitor_op_queue.push(cur_monitor_op);
+EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op) {
+  // fetch op to manage
+  std::this_thread::sleep_for(std::chrono::microseconds(250));
+  {
+    // check if we need to remove th emonitor for the specific pv owned by cur_monitor_op
+    std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
+    auto                        found = std::find_if(std::begin(pv_to_remove), std::end(pv_to_remove), [&monitor_op](auto& pv_name) { return monitor_op->getPVName().compare(pv_name) == 0; });
+    if (found != std::end(pv_to_remove)) {
+      // i need to remove this monitor
+      pv_to_remove.erase(found);
+      return;
     }
   }
+
+  // manage monitor op
+
+  std::lock_guard guard(channel_map_mutex);
+  if (monitor_op->hasData() && handler_broadcaster.targets.size()) { handler_broadcaster.broadcast(monitor_op->getEventData()); }
+
+  //re-enque
+  processing_pool.push_task(&EpicsServiceManager::task, this, monitor_op);
 }

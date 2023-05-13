@@ -1,9 +1,12 @@
 #ifndef EpicsServiceManager_H
 #define EpicsServiceManager_H
+
 #include <k2eg/common/types.h>
 #include <k2eg/common/broadcaster.h>
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/Serialization.h>
+#include <k2eg/common/BS_thread_pool.hpp>
+
 #include <functional>
 #include <map>
 #include <memory>
@@ -11,7 +14,8 @@
 #include <thread>
 #include <vector>
 #include <queue>
-#include "k2eg/service/epics/EpicsMonitorOperation.h"
+
+
 namespace k2eg::service::epics_impl {
 
 DEFINE_MAP_FOR_TYPE(std::string, EpicsChannelShrdPtr, EpicsChannelMap)
@@ -22,17 +26,15 @@ typedef std::function<void(EpicsServiceManagerHandlerParamterType)> EpicsService
 class EpicsServiceManager {
     std::mutex channel_map_mutex;
     std::map<std::string, std::shared_ptr<EpicsChannel>> channel_map;
-    std::unique_ptr<std::thread> scheduler_thread;
     k2eg::common::broadcaster<EpicsServiceManagerHandlerParamterType> handler_broadcaster;
     std::unique_ptr<pvac::ClientProvider> pva_provider;
     std::unique_ptr<pvac::ClientProvider> ca_provider;
-    
+
+    BS::thread_pool processing_pool;
     // monitor handler queue
     std::mutex monitor_op_queue_mutx;
-    std::queue<ConstMonitorOperationShrdPtr> monitor_op_queue;
     std::set<std::string> pv_to_remove;
-    bool run = false;
-    void task();
+    void task(ConstMonitorOperationShrdPtr monitor_op);
 public:
     explicit EpicsServiceManager();
     ~EpicsServiceManager();
