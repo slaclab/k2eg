@@ -13,12 +13,13 @@
 using namespace k2eg::common;
 using namespace k2eg::service::epics_impl;
 
-EpicsServiceManager::EpicsServiceManager() : processing_pool(2) {
+EpicsServiceManager::EpicsServiceManager() : end_processing(false),processing_pool(2) {
   pva_provider     = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
   ca_provider      = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
 }
 EpicsServiceManager::~EpicsServiceManager() {
   // remove all monitor handler
+  end_processing = true;
   processing_pool.wait_for_tasks();
   pva_provider->reset();
   ca_provider->reset();
@@ -126,8 +127,9 @@ EpicsServiceManager::getHandlerSize() {
 
 void
 EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op) {
+  if(end_processing) return;
   // fetch op to manage
-  std::this_thread::sleep_for(std::chrono::microseconds(250));
+  //std::this_thread::sleep_for(std::chrono::microseconds(100));
   {
     // check if we need to remove th emonitor for the specific pv owned by cur_monitor_op
     std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
@@ -140,7 +142,6 @@ EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op) {
   }
 
   // manage monitor op
-
   std::lock_guard guard(channel_map_mutex);
   if (monitor_op->hasData() && handler_broadcaster.targets.size()) { handler_broadcaster.broadcast(monitor_op->getEventData()); }
 

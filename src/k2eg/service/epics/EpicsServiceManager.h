@@ -29,7 +29,7 @@ class EpicsServiceManager {
     k2eg::common::broadcaster<EpicsServiceManagerHandlerParamterType> handler_broadcaster;
     std::unique_ptr<pvac::ClientProvider> pva_provider;
     std::unique_ptr<pvac::ClientProvider> ca_provider;
-
+    bool end_processing;
     BS::thread_pool processing_pool;
     // monitor handler queue
     std::mutex monitor_op_queue_mutx;
