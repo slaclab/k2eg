@@ -11,17 +11,11 @@ namespace pvd = epics::pvData;
 
 MonitorOperation::MonitorOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field)
     : channel(channel), pv_name(pv_name), field(field), received_event(std::make_shared<EventReceived>()) {
-  channel->addConnectListener(this);
+  mon = channel->monitor(this, pvd::createRequest(field));
 }
 
 MonitorOperation::~MonitorOperation() {
   if (mon) { mon.cancel(); }
-  channel->removeConnectListener(this);
-}
-
-void
-MonitorOperation::connectEvent(const pvac::ConnectEvent& evt) {
-  if (evt.connected) { mon = channel->monitor(this, pvd::createRequest(field)); }
 }
 
 void
@@ -37,7 +31,10 @@ MonitorOperation::monitorEvent(const pvac::MonitorEvent& evt) {
       break;
     // explicit call of 'mon.cancel' or subscription dropped
     case pvac::MonitorEvent::Cancel:
-      received_event->event_cancel->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Cancel, pv_name, evt.message, nullptr}));
+      // if (mon.valid()) {
+      //   //mon is valid so we can continnue because this class is valid
+      //   received_event->event_cancel->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Cancel, pv_name, evt.message, nullptr}));
+      // }
       break;
     // Underlying channel becomes disconnected
     case pvac::MonitorEvent::Disconnect:

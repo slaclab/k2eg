@@ -10,7 +10,7 @@
 
 namespace k2eg::service::epics_impl {
 // async monitor operation
-class MonitorOperation : public pvac::ClientChannel::MonitorCallback, pvac::ClientChannel::ConnectCallback  {
+class MonitorOperation : public pvac::ClientChannel::MonitorCallback {
   const std::string                    field;
   const std::string                    pv_name;
   pvac::Monitor                        mon;
@@ -23,7 +23,6 @@ class MonitorOperation : public pvac::ClientChannel::MonitorCallback, pvac::Clie
   virtual ~MonitorOperation();
 
   virtual void         monitorEvent(const pvac::MonitorEvent& evt) OVERRIDE FINAL;
-  virtual void connectEvent(const pvac::ConnectEvent& evt) OVERRIDE FINAL;
   EventReceivedShrdPtr getEventData() const;
   bool                 hasData() const;
   const std::string&   getPVName() const;
