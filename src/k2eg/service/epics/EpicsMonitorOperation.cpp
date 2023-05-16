@@ -5,21 +5,22 @@
 #include <mutex>
 
 #include "k2eg/service/epics/EpicsData.h"
+#include "k2eg/service/epics/EpicsGetOperation.h"
 
 using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;
 
-MonitorOperation::MonitorOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field)
+MonitorOperationImpl::MonitorOperationImpl(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field)
     : channel(channel), pv_name(pv_name), field(field), received_event(std::make_shared<EventReceived>()) {
   mon = channel->monitor(this, pvd::createRequest(field));
 }
 
-MonitorOperation::~MonitorOperation() {
+MonitorOperationImpl::~MonitorOperationImpl() {
   if (mon) { mon.cancel(); }
 }
 
 void
-MonitorOperation::monitorEvent(const pvac::MonitorEvent& evt) {
+MonitorOperationImpl::monitorEvent(const pvac::MonitorEvent& evt) {
   // running on internal provider worker thread
   // minimize work here.
   unsigned                    fetched = 0;
@@ -53,7 +54,7 @@ MonitorOperation::monitorEvent(const pvac::MonitorEvent& evt) {
 }
 
 EventReceivedShrdPtr
-MonitorOperation::getEventData() const {
+MonitorOperationImpl::getEventData() const {
   std::lock_guard<std::mutex> l(ce_mtx);
   auto                        resutl = received_event;
   received_event                     = std::make_shared<EventReceived>();
@@ -61,13 +62,35 @@ MonitorOperation::getEventData() const {
 }
 
 bool
-MonitorOperation::hasData() const {
+MonitorOperationImpl::hasData() const {
   std::lock_guard<std::mutex> l(ce_mtx);
   return received_event->event_data->size() > 0 || received_event->event_cancel->size() > 0 || received_event->event_disconnect->size() > 0 ||
          received_event->event_fail->size() > 0 || received_event->event_timeout->size() > 0;
 }
 
 const std::string&
-MonitorOperation::getPVName() const {
+MonitorOperationImpl::getPVName() const {
   return pv_name;
+}
+
+//----------------------------- CombinedMonitorOperation --------------------------------
+CombinedMonitorOperation::CombinedMonitorOperation(std::shared_ptr<pvac::ClientChannel> channel,
+                                                   const std::string&                   pv_name,
+                                                   const std::string&                   principal_request,
+                                                   const std::string&                   additional_request)
+    : monitor_principal_request(MakeMonitorOperationImplUPtr(channel, pv_name, principal_request))
+    ,monitor_additional_request(MakeMonitorOperationImplUPtr(channel, pv_name, additional_request)) {}
+
+EventReceivedShrdPtr
+CombinedMonitorOperation::getEventData() const {
+  // TODO-make the structure recombinaiton from the two monitored structure
+  return EventReceivedShrdPtr();
+}
+bool
+CombinedMonitorOperation::hasData() const {
+  return true;
+}
+const std::string&
+CombinedMonitorOperation::getPVName() const {
+  return monitor_principal_request->getPVName();
 }

@@ -45,5 +45,5 @@ EpicsChannel::get(const std::string& field, const std::string& additional_filed)
 
 ConstMonitorOperationShrdPtr
 EpicsChannel::monitor(const std::string& fastUpdateField, const std::string& slowField ) const {
-  return MakeMonitorOperationShrdPtr(channel, pv_name, fastUpdateField);
+  return std::make_shared<MonitorOperationImpl>(channel, pv_name, fastUpdateField);
 }
