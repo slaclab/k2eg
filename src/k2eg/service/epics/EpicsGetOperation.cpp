@@ -13,7 +13,7 @@ namespace pvd = epics::pvData;
 CombinedGetOperation::CombinedGetOperation(GetOperationShrdPtr get_op_a, GetOperationShrdPtr get_op_b) 
 : get_op_a(get_op_a)
 , get_op_b(get_op_b)
-, structure_merger(std::make_shared<PVStructureMerger>()) {}
+, structure_merger(std::make_unique<PVStructureMerger>()) {}
 
 bool
 CombinedGetOperation::isDone() const {
@@ -42,12 +42,12 @@ CombinedGetOperation::getChannelData() const {
   if (getState().event != pvac::PutEvent::Success) return result;
 
   // we have data so combine it
-  structure_merger->mergeStructureAndValue(
+  auto merged_result = structure_merger->mergeStructureAndValue(
     {get_op_a->getChannelData()->data, get_op_b->getChannelData()->data}
   );
 
   //copy the values
-  return MakeChannelDataUPtr(get_op_a->getChannelData()->pv_name, structure_merger->getStructure());
+  return MakeChannelDataUPtr(get_op_a->getChannelData()->pv_name, merged_result);
 }
 
 bool

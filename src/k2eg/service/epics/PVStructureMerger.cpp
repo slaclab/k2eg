@@ -5,10 +5,10 @@ using namespace k2eg::service::epics_impl;
 
 PVStructureMerger::PVStructureMerger():root_builder(pvd::getFieldCreate()->createFieldBuilder()){}
 
-void 
+epics::pvData::PVStructure::const_shared_pointer 
 PVStructureMerger::mergeStructureAndValue(std::vector<epics::pvData::PVStructure::const_shared_pointer> struct_ptr_vec) {
   appendFieldFromStruct(struct_ptr_vec, true);
-  copyValue(struct_ptr_vec);
+  return copyValue(struct_ptr_vec);
 }
 
 void
@@ -19,19 +19,16 @@ PVStructureMerger::appendFieldFromStruct(std::vector<pvd::PVStructure::const_sha
     if (!s) continue;
     copyStructure(root_builder, s.get());
   }
-  structure = root_builder->createStructure()->build();
 }
 
-void
+epics::pvData::PVStructure::const_shared_pointer
 PVStructureMerger::copyValue(std::vector<epics::pvData::PVStructure::const_shared_pointer> struct_ptr_vec) {
+  auto structure = root_builder->createStructure()->build();
   for (auto& s : struct_ptr_vec) {
     if (!s) continue;
     copyValue(structure.get(), s.get());
   }
-}
-
-epics::pvData::PVStructure::const_shared_pointer 
-PVStructureMerger::getStructure() const {
+  structure->setImmutable();
   return structure;
 }
 

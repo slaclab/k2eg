@@ -1,9 +1,10 @@
 #include <k2eg/service/epics/EpicsChannel.h>
-
 #include <pv/caProvider.h>
 #include <pv/clientFactory.h>
 
 #include <memory>
+
+#include "k2eg/service/epics/EpicsMonitorOperation.h"
 
 using namespace k2eg::service::epics_impl;
 
@@ -44,6 +45,12 @@ EpicsChannel::get(const std::string& field, const std::string& additional_filed)
 }
 
 ConstMonitorOperationShrdPtr
-EpicsChannel::monitor(const std::string& fastUpdateField, const std::string& slowField ) const {
-  return std::make_shared<MonitorOperationImpl>(channel, pv_name, fastUpdateField);
+EpicsChannel::monitor(const std::string& field, const std::string& additional_filed) const {
+  ConstMonitorOperationShrdPtr result;
+  if (additional_filed.empty()) {
+    result = MakeMonitorOperationImplShrdPtr(channel, pv_name, field);
+  } else {
+    result = MakeCombinedMonitorOperationShrdPtr(channel, pv_name, field, additional_filed);
+  }
+  return result;
 }

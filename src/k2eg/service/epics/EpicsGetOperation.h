@@ -22,9 +22,10 @@ DEFINE_PTR_TYPES(GetOperation)
 
 // combined get operation
 class CombinedGetOperation : public GetOperation {
-  GetOperationShrdPtr      get_op_a;
-  GetOperationShrdPtr      get_op_b;
-  PVStructureMergerShrdPtr structure_merger;
+  GetOperationShrdPtr   get_op_a;
+  GetOperationShrdPtr   get_op_b;
+  PVStructureMergerUPtr structure_merger;
+
  public:
   CombinedGetOperation(GetOperationShrdPtr get_op_a, GetOperationShrdPtr get_op_b);
   virtual ~CombinedGetOperation() = default;

@@ -23,6 +23,7 @@ class MonitorOperation {
   virtual ~MonitorOperation()                       = default;
   virtual EventReceivedShrdPtr getEventData() const = 0;
   virtual bool                 hasData() const      = 0;
+  virtual bool                 hasEvents() const    = 0;
   virtual const std::string&   getPVName() const    = 0;
 };
 DEFINE_PTR_TYPES(MonitorOperation)
@@ -43,6 +44,7 @@ class MonitorOperationImpl : public pvac::ClientChannel::MonitorCallback, public
   virtual void         monitorEvent(const pvac::MonitorEvent& evt) OVERRIDE FINAL;
   EventReceivedShrdPtr getEventData() const OVERRIDE FINAL;
   bool                 hasData() const OVERRIDE FINAL;
+  bool                 hasEvents() const OVERRIDE FINAL;
   const std::string&   getPVName() const OVERRIDE FINAL;
 };
 
@@ -51,13 +53,22 @@ DEFINE_PTR_TYPES(MonitorOperationImpl)
 // combine two async monitor operation together
 class CombinedMonitorOperation : public MonitorOperation {
   MonitorOperationImplUPtr monitor_principal_request;
+  mutable bool             structure_a_received;
   MonitorOperationImplUPtr monitor_additional_request;
+  mutable bool             structure_b_received;
+  PVStructureMergerUPtr    structure_merger;
+  EventReceivedShrdPtr     evt_received;
+  mutable std::mutex       evt_mtx;
 
  public:
-  CombinedMonitorOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& principal_request, const std::string& additional_request);
+  CombinedMonitorOperation(std::shared_ptr<pvac::ClientChannel> channel,
+                           const std::string&                   pv_name,
+                           const std::string&                   principal_request,
+                           const std::string&                   additional_request);
   virtual ~CombinedMonitorOperation() = default;
   EventReceivedShrdPtr getEventData() const OVERRIDE FINAL;
   bool                 hasData() const OVERRIDE FINAL;
+  bool                 hasEvents() const OVERRIDE FINAL;
   const std::string&   getPVName() const OVERRIDE FINAL;
 };
 DEFINE_PTR_TYPES(CombinedMonitorOperation)
