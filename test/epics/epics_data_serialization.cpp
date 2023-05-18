@@ -49,7 +49,7 @@ TEST(Epics, SerializationCAJSON) {
   ConstGetOperationUPtr         get_op;
 
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:a"););
-  EXPECT_NO_THROW(get_op = pc->get("field(value, timeStamp, alarm)"););
+  EXPECT_NO_THROW(get_op = pc->get("field(value, timeStamp, alarm)", "field(display,control,valueAlarm)"););
   WHILE(get_op->isDone(), false);
   EXPECT_EQ(get_op->getState().event, pvac::GetEvent::Success);
   EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::JSON););
@@ -67,9 +67,9 @@ TEST(Epics, SerializationCAJSON) {
   EXPECT_EQ(sub_obj.contains("value"), true);
   EXPECT_EQ(sub_obj.contains("alarm"), true);
   EXPECT_EQ(sub_obj.contains("timeStamp"), true);
-  //EXPECT_EQ(sub_obj.contains("display"), true);
-  //EXPECT_EQ(sub_obj.contains("control"), true);
-  //EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
+  EXPECT_EQ(sub_obj.contains("display"), true);
+  EXPECT_EQ(sub_obj.contains("control"), true);
+  EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
 }
 
 TEST(Epics, SerializationCACompleteJSON) {
@@ -144,7 +144,7 @@ TEST(Epics, SerializationCAWaveformJSON) {
 
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "channel:waveform"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp)"););
+  EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp,alarm)", "field(display,control,valueAlarm)"););
   WHILE(get_op->isDone(), false);
   EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::JSON););
   EXPECT_NE(ser_value, nullptr);
@@ -160,12 +160,12 @@ TEST(Epics, SerializationCAWaveformJSON) {
   EXPECT_EQ(jv.as_object().contains("channel:waveform"), true);
   auto sub_obj = jv.as_object().at("channel:waveform").as_object();
   EXPECT_EQ(sub_obj.contains("value"), true);
-  //EXPECT_EQ(sub_obj["value"].is_array(), true);
-  //EXPECT_EQ(sub_obj.contains("alarm"), true);
+  EXPECT_EQ(sub_obj["value"].is_array(), true);
+  EXPECT_EQ(sub_obj.contains("alarm"), true);
   EXPECT_EQ(sub_obj.contains("timeStamp"), true);
-  //EXPECT_EQ(sub_obj.contains("display"), true);
-  // EXPECT_EQ(sub_obj.contains("control"), true);
-  // EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
+  EXPECT_EQ(sub_obj.contains("display"), true);
+  //EXPECT_EQ(sub_obj.contains("control"), true);
+  //EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
 }
 
 typedef std::map<std::string, msgpack::object> MapStrMsgPackObj;
@@ -205,7 +205,7 @@ TEST(Epics, SerializationCAMsgpack) {
   ConstSerializedMessageShrdPtr ser_value;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:sum"););
   // EXPECT_NO_THROW(pc->connect());
-  EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp)"););
+  EXPECT_NO_THROW(get_op = pc->get("field(value,timeStamp, alarm)", "field(display,control,valueAlarm)"););
   WHILE(get_op->isDone(), false);
   EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::Msgpack););
   EXPECT_NE(ser_value, nullptr);
@@ -218,11 +218,11 @@ TEST(Epics, SerializationCAMsgpack) {
   EXPECT_EQ(om.contains("variable:sum"), true);
   auto om_sub_1 = om["variable:sum"].as<MapStrMsgPackObj>();
   EXPECT_EQ(om_sub_1.contains("value"), true);
-  //EXPECT_EQ(om_sub_1.contains("alarm"), true);
+  EXPECT_EQ(om_sub_1.contains("alarm"), true);
   EXPECT_EQ(om_sub_1.contains("timeStamp"), true);
-  //EXPECT_EQ(om_sub_1.contains("display"), true);
-  //EXPECT_EQ(om_sub_1.contains("control"), true);
-  //EXPECT_EQ(om_sub_1.contains("valueAlarm"), true);
+  EXPECT_EQ(om_sub_1.contains("display"), true);
+  EXPECT_EQ(om_sub_1.contains("control"), true);
+  EXPECT_EQ(om_sub_1.contains("valueAlarm"), true);
   //{"variable:sum":{"value":7,"alarm":{"severity":0,"status":0,"message":"NO_ALARM"},"timeStamp":{"secondsPastEpoch":1680995907,"nanoseconds":899753530,"userTag":0},"display":{"limitLow":0,"limitHigh":0,"description":"","units":"","precision":0,"form":{"index":0,"choices":"BIN(size:224)"}},"control":{"limitLow":0,"limitHigh":0,"minStep":0},"valueAlarm":{"active":0,"lowAlarmLimit":nan,"lowWarningLimit":nan,"highWarningLimit":nan,"highAlarmLimit":nan,"lowAlarmSeverity":0,"lowWarningSeverity":0,"highWarningSeverity":0,"highAlarmSeverity":0,"hysteresis":0}}}
 }
 
