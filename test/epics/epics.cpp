@@ -118,19 +118,19 @@ TEST(Epics, ChannelMonitor) {
   EXPECT_NO_THROW(monitor_op.reset(););
 }
 
-TEST(Epics, ChannelMonitorCombinedRequestPVA) {
-  INIT_PVA_PROVIDER()
+TEST(Epics, ChannelMonitorCombinedRequestCA) {
+  INIT_CA_PROVIDER()
   EpicsChannelUPtr                                 pc_a;
   ConstPutOperationUPtr                            put_op;
   ConstMonitorOperationShrdPtr                     monitor_op;
   epics::pvData::PVStructure::const_shared_pointer val;
-  EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:a"););
+  EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:a"););
   // enable monitor
   EXPECT_NO_THROW(put_op = pc_a->put("value", "0"););
   WHILE(put_op->isDone(), false);
   EXPECT_EQ(retry_eq(*pc_a, "value", 0, 500, 3), true);
 
-  monitor_op = pc_a->monitor("filed(value, timeStamp, Alarm)", "field(display,control,valueAlarm)");
+  EXPECT_NO_THROW(monitor_op = pc_a->monitor("field(value, timeStamp, alarm)", "field(display,control,valueAlarm)"););
   WHILE(monitor_op->hasData(), false);
   auto fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 1);
@@ -166,7 +166,7 @@ TEST(Epics, ChannelCAMonitor) {
   WHILE(put_op->isDone(), false);
   EXPECT_EQ(retry_eq(*pc_a, "value", 0, 500, 3), true);
 
-  EXPECT_NO_THROW(monitor_op = pc_a->monitor("field(value,timeStamp)"););
+  EXPECT_NO_THROW(monitor_op = pc_a->monitor("field(value,timeStamp,alarm)"););
   WHILE(monitor_op->hasData(), false);
   auto fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 1);

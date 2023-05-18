@@ -52,13 +52,14 @@ DEFINE_PTR_TYPES(MonitorOperationImpl)
 
 // combine two async monitor operation together
 class CombinedMonitorOperation : public MonitorOperation {
-  MonitorOperationImplUPtr monitor_principal_request;
-  mutable bool             structure_a_received;
-  MonitorOperationImplUPtr monitor_additional_request;
-  mutable bool             structure_b_received;
-  PVStructureMergerUPtr    structure_merger;
-  EventReceivedShrdPtr     evt_received;
-  mutable std::mutex       evt_mtx;
+  MonitorOperationImplUPtr    monitor_principal_request;
+  mutable MonitorEventShrdPtr last_principal_evt_received;
+  MonitorOperationImplUPtr    monitor_additional_request;
+  mutable MonitorEventShrdPtr last_additional_evt_received;
+  PVStructureMergerUPtr       structure_merger;
+  EventReceivedShrdPtr        evt_received;
+  mutable std::mutex          evt_mtx;
+  mutable bool                structure_initilized;
 
  public:
   CombinedMonitorOperation(std::shared_ptr<pvac::ClientChannel> channel,
