@@ -143,7 +143,9 @@ EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op) {
 
   // manage monitor op
   std::lock_guard guard(channel_map_mutex);
-  if (monitor_op->hasData() && handler_broadcaster.targets.size()) { handler_broadcaster.broadcast(monitor_op->getEventData()); }
+  //try to fetch a specific number of 'data' event only
+  monitor_op->poll();
+  if (monitor_op->hasEvents() && handler_broadcaster.targets.size()) { handler_broadcaster.broadcast(monitor_op->getEventData()); }
 
   //re-enque
   processing_pool.push_task(&EpicsServiceManager::task, this, monitor_op);

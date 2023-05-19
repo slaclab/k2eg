@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <mutex>
+#include <ostream>
 
 #include "k2eg/service/epics/EpicsData.h"
 #include "k2eg/service/epics/EpicsGetOperation.h"
@@ -11,12 +12,23 @@ using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;
 
 MonitorOperationImpl::MonitorOperationImpl(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field)
-    : channel(channel), pv_name(pv_name), field(field), received_event(std::make_shared<EventReceived>()) {
+    : channel(channel), pv_name(pv_name), field(field), received_event(std::make_shared<EventReceived>()), has_data(false) {
   mon = channel->monitor(this, pvd::createRequest(field));
 }
 
 MonitorOperationImpl::~MonitorOperationImpl() {
   if (mon) { mon.cancel(); }
+}
+void
+MonitorOperationImpl::poll(uint element_to_fetch) const {
+  if (!has_data) return;
+  int fetched = 0;
+  while (mon.poll() && (++fetched <= element_to_fetch)) {
+    auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
+    tmp_data->copy(*mon.root);
+    received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, "", {pv_name, tmp_data}}));
+  }
+  has_data = !mon.complete();
 }
 
 void
@@ -43,12 +55,13 @@ MonitorOperationImpl::monitorEvent(const pvac::MonitorEvent& evt) {
       break;
     // Data queue becomes not-empty
     case pvac::MonitorEvent::Data:
+      has_data = true;
       // We drain event FIFO completely
-      while (mon.poll()) {
-        auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
-        tmp_data->copy(*mon.root);
-        received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, evt.message, {pv_name, tmp_data}}));
-      }
+      // while (mon.poll()) {
+      //   auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
+      //   tmp_data->copy(*mon.root);
+      //   received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, evt.message, {pv_name, tmp_data}}));
+      // }
       break;
   }
 }
@@ -69,6 +82,7 @@ MonitorOperationImpl::hasData() const {
 
 bool
 MonitorOperationImpl::hasEvents() const {
+  // try to check if we need to fetch somenthing
   std::lock_guard<std::mutex> l(ce_mtx);
   return received_event->event_data->size() > 0 || received_event->event_cancel->size() > 0 || received_event->event_disconnect->size() > 0 ||
          received_event->event_fail->size() > 0 || received_event->event_timeout->size() > 0;
@@ -88,6 +102,12 @@ CombinedMonitorOperation::CombinedMonitorOperation(std::shared_ptr<pvac::ClientC
       monitor_additional_request(MakeMonitorOperationImplUPtr(channel, pv_name, additional_request)),
       structure_merger(std::make_unique<PVStructureMerger>()),
       evt_received(std::make_shared<EventReceived>()) {}
+
+void
+CombinedMonitorOperation::poll(uint element_to_fetch) const {
+  monitor_principal_request->poll(element_to_fetch);
+  monitor_additional_request->poll(element_to_fetch);
+}
 
 EventReceivedShrdPtr
 CombinedMonitorOperation::getEventData() const {
@@ -109,12 +129,16 @@ CombinedMonitorOperation::getEventData() const {
   joined_evt->event_cancel     = a_evt_received->event_cancel;
   joined_evt->event_disconnect = a_evt_received->event_disconnect;
   joined_evt->event_fail       = a_evt_received->event_fail;
+  std::cout << "before loop" << std::endl;
   // merge all data from principal request to the last event
   for (auto& a_data : *a_evt_received->event_data) {
     // join all the event data from the principal request, with the last from additional request
     // event from principal are more important than from additional one request
+    std::cout << "loop 1" << std::endl;
     auto merge_event_data = structure_merger->mergeStructureAndValue({a_data->channel_data.data, last_additional_evt_received->channel_data.data});
+    std::cout << "loop 2" << std::endl;
     joined_evt->event_data->push_back(MakeMonitorEventShrdPtr(a_data->type, "", ChannelData(a_data->channel_data.pv_name, merge_event_data)));
+    std::cout << "loop 3" << std::endl;
     last_principal_evt_received = a_data;
   }
   return joined_evt;

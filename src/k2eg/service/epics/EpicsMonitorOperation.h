@@ -6,6 +6,7 @@
 #include <k2eg/service/epics/PVStructureMerger.h>
 #include <pvData.h>
 #include <pva/client.h>
+#include <sys/types.h>
 
 #include <mutex>
 
@@ -18,13 +19,13 @@ class MonitorOperation {
   friend class CombinedMonitorOperation;
 
   MonitorOperation() = default;
-
  public:
-  virtual ~MonitorOperation()                       = default;
-  virtual EventReceivedShrdPtr getEventData() const = 0;
-  virtual bool                 hasData() const      = 0;
-  virtual bool                 hasEvents() const    = 0;
-  virtual const std::string&   getPVName() const    = 0;
+  virtual ~MonitorOperation()                                    = default;
+  virtual void                 poll(uint element_to_fetch = 2) const = 0;
+  virtual EventReceivedShrdPtr getEventData() const              = 0;
+  virtual bool                 hasData() const                   = 0;
+  virtual bool                 hasEvents() const                 = 0;
+  virtual const std::string&   getPVName() const                 = 0;
 };
 DEFINE_PTR_TYPES(MonitorOperation)
 
@@ -32,16 +33,17 @@ DEFINE_PTR_TYPES(MonitorOperation)
 class MonitorOperationImpl : public pvac::ClientChannel::MonitorCallback, public MonitorOperation {
   const std::string                    field;
   const std::string                    pv_name;
-  pvac::Monitor                        mon;
+  mutable pvac::Monitor                mon;
   std::shared_ptr<pvac::ClientChannel> channel;
   mutable EventReceivedShrdPtr         received_event;
   mutable std::mutex                   ce_mtx;
+  mutable bool                         has_data;
 
  public:
   MonitorOperationImpl(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field = "field()");
   virtual ~MonitorOperationImpl();
-
   virtual void         monitorEvent(const pvac::MonitorEvent& evt) OVERRIDE FINAL;
+  virtual void         poll(uint element_to_fetch = 2) const OVERRIDE FINAL;
   EventReceivedShrdPtr getEventData() const OVERRIDE FINAL;
   bool                 hasData() const OVERRIDE FINAL;
   bool                 hasEvents() const OVERRIDE FINAL;
@@ -67,6 +69,7 @@ class CombinedMonitorOperation : public MonitorOperation {
                            const std::string&                   principal_request,
                            const std::string&                   additional_request);
   virtual ~CombinedMonitorOperation() = default;
+  virtual void         poll(uint element_to_fetch = 2) const OVERRIDE FINAL;
   EventReceivedShrdPtr getEventData() const OVERRIDE FINAL;
   bool                 hasData() const OVERRIDE FINAL;
   bool                 hasEvents() const OVERRIDE FINAL;
