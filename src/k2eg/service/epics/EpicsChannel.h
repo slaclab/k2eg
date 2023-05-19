@@ -13,6 +13,7 @@
 #include <pva/client.h>
 
 #include <memory>
+#include <string>
 
 namespace k2eg::service::epics_impl {
 
@@ -20,6 +21,8 @@ class EpicsChannel {
   friend class EpicsPutOperation;
   const std::string                          pv_name;
   const std::string                          address;
+  const std::string                          fetch_principal_field;
+  const std::string                          fetch_additional_field;
   epics::pvData::PVStructure::shared_pointer pvReq = epics::pvData::createRequest("field()");
   std::shared_ptr<pvac::ClientChannel>       channel;
   pvac::MonitorSync                          mon;
@@ -30,8 +33,8 @@ class EpicsChannel {
   static void                  init();
   static void                  deinit();
   ConstPutOperationUPtr        put(const std::string& field, const std::string& value);
-  ConstGetOperationUPtr        get(const std::string& field = "field()", const std::string& additional_filed = "") const;
-  ConstMonitorOperationShrdPtr monitor(const std::string& field = "field()", const std::string& additional_filed = "") const;
+  ConstGetOperationUPtr        get() const;
+  ConstMonitorOperationShrdPtr monitor() const;
 };
 
 DEFINE_PTR_TYPES(EpicsChannel)

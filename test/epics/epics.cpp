@@ -130,7 +130,7 @@ TEST(Epics, ChannelMonitorCombinedRequestCA) {
   WHILE(put_op->isDone(), false);
   EXPECT_EQ(retry_eq(*pc_a, "value", 0, 500, 3), true);
 
-  EXPECT_NO_THROW(monitor_op = pc_a->monitor("field(value, timeStamp, alarm)", "field(display,control,valueAlarm)"););
+  EXPECT_NO_THROW(monitor_op = pc_a->monitor(););
   WHILE(monitor_op->hasData(), false);
   auto fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 1);
@@ -166,7 +166,7 @@ TEST(Epics, ChannelCAMonitor) {
   WHILE(put_op->isDone(), false);
   EXPECT_EQ(retry_eq(*pc_a, "value", 0, 500, 3), true);
 
-  EXPECT_NO_THROW(monitor_op = pc_a->monitor("field(value,timeStamp,alarm)"););
+  EXPECT_NO_THROW(monitor_op = pc_a->monitor(););
   WHILE(monitor_op->hasData(), false);
   auto fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 1);
