@@ -3,6 +3,7 @@
 
 #include <k2eg/common/types.h>
 #include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/epics/PVStructureMerger.h>
 #include <pva/client.h>
 
 namespace k2eg::service::epics_impl {
@@ -21,10 +22,9 @@ DEFINE_PTR_TYPES(GetOperation)
 
 // combined get operation
 class CombinedGetOperation : public GetOperation {
-  GetOperationShrdPtr get_op_a;
-  GetOperationShrdPtr get_op_b;
-  void                copyStructure(epics::pvData::FieldBuilderPtr, const epics::pvData::PVStructure* structure) const;
-  void                copyValue(epics::pvData::PVStructure* dest_structure, const epics::pvData::PVStructure* src_structure) const;
+  GetOperationShrdPtr   get_op_a;
+  GetOperationShrdPtr   get_op_b;
+  PVStructureMergerUPtr structure_merger;
 
  public:
   CombinedGetOperation(GetOperationShrdPtr get_op_a, GetOperationShrdPtr get_op_b);
