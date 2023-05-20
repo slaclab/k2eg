@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <mutex>
+#include <ostream>
 
 #include "k2eg/service/epics/EpicsData.h"
 #include "k2eg/service/epics/EpicsGetOperation.h"
@@ -11,12 +12,23 @@ using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;
 
 MonitorOperationImpl::MonitorOperationImpl(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field)
-    : channel(channel), pv_name(pv_name), field(field), received_event(std::make_shared<EventReceived>()) {
+    : channel(channel), pv_name(pv_name), field(field), received_event(std::make_shared<EventReceived>()), has_data(false) {
   mon = channel->monitor(this, pvd::createRequest(field));
 }
 
 MonitorOperationImpl::~MonitorOperationImpl() {
   if (mon) { mon.cancel(); }
+}
+void
+MonitorOperationImpl::poll(uint element_to_fetch) const {
+  if (!has_data) return;
+  int fetched = 0;
+  while (mon.poll() && (++fetched <= element_to_fetch)) {
+    auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
+    tmp_data->copy(*mon.root);
+    received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, "", {pv_name, tmp_data}}));
+  }
+  has_data = !mon.complete();
 }
 
 void
@@ -43,12 +55,13 @@ MonitorOperationImpl::monitorEvent(const pvac::MonitorEvent& evt) {
       break;
     // Data queue becomes not-empty
     case pvac::MonitorEvent::Data:
+      has_data = true;
       // We drain event FIFO completely
-      while (mon.poll()) {
-        auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
-        tmp_data->copy(*mon.root);
-        received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, evt.message, {pv_name, tmp_data}}));
-      }
+      // while (mon.poll()) {
+      //   auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
+      //   tmp_data->copy(*mon.root);
+      //   received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, evt.message, {pv_name, tmp_data}}));
+      // }
       break;
   }
 }
@@ -69,6 +82,7 @@ MonitorOperationImpl::hasData() const {
 
 bool
 MonitorOperationImpl::hasEvents() const {
+  // try to check if we need to fetch somenthing
   std::lock_guard<std::mutex> l(ce_mtx);
   return received_event->event_data->size() > 0 || received_event->event_cancel->size() > 0 || received_event->event_disconnect->size() > 0 ||
          received_event->event_fail->size() > 0 || received_event->event_timeout->size() > 0;
@@ -89,6 +103,12 @@ CombinedMonitorOperation::CombinedMonitorOperation(std::shared_ptr<pvac::ClientC
       structure_merger(std::make_unique<PVStructureMerger>()),
       evt_received(std::make_shared<EventReceived>()) {}
 
+void
+CombinedMonitorOperation::poll(uint element_to_fetch) const {
+  monitor_principal_request->poll(element_to_fetch);
+  monitor_additional_request->poll(element_to_fetch);
+}
+
 EventReceivedShrdPtr
 CombinedMonitorOperation::getEventData() const {
   std::lock_guard<std::mutex> l(evt_mtx);
@@ -99,7 +119,10 @@ CombinedMonitorOperation::getEventData() const {
   // get last event from additional data
   if (monitor_additional_request->hasData()) {
     // in this case if principal request has not produced data i put the last one received
-    if (!a_evt_received->event_data->size()) { a_evt_received->event_data->push_back(last_additional_evt_received); }
+    if (!a_evt_received->event_data->size() && last_principal_evt_received) {
+      // add last record received from principal request
+      a_evt_received->event_data->push_back(last_additional_evt_received);
+    }
     // get received additional data and take the only last
     auto add_evt_data            = monitor_additional_request->getEventData();
     last_additional_evt_received = add_evt_data->event_data->at(add_evt_data->event_data->size() - 1);
@@ -122,12 +145,12 @@ CombinedMonitorOperation::getEventData() const {
 
 bool
 CombinedMonitorOperation::hasData() const {
-  return monitor_principal_request->hasData() && (monitor_principal_request->hasData() || last_additional_evt_received);
+  return monitor_principal_request->hasData() && (monitor_additional_request->hasData() || last_additional_evt_received);
 }
 
 bool
 CombinedMonitorOperation::hasEvents() const {
-  return monitor_principal_request->hasEvents() && (monitor_principal_request->hasData() || last_additional_evt_received);
+  return monitor_principal_request->hasEvents() && (monitor_additional_request->hasData() || last_additional_evt_received);
 }
 
 const std::string&

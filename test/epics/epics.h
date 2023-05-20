@@ -10,6 +10,9 @@
 #define WHILE(x, v) \
   do { std::this_thread::sleep_for(std::chrono::milliseconds(250)); } while (x == v)
 
+#define WHILE_MONITOR(monitor_op, cond) \
+ do { monitor_op->poll(); } while (cond)
+
 #define TIMEOUT(x, v, retry, sleep_m_sec) \
   int r = retry; \
   do { std::this_thread::sleep_for(std::chrono::milliseconds(sleep_m_sec)); r--;} while (x == v && r > 0)

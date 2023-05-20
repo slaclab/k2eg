@@ -115,7 +115,7 @@ TEST(Epics, SerializationCACompleteJSONOnMonitor) {
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:a"););
   // EXPECT_NO_THROW(pc->connect());
   EXPECT_NO_THROW(mon_op = pc->monitor(););
-  WHILE(mon_op->hasEvents(), false);
+  WHILE_MONITOR(mon_op, !mon_op->hasData());
   auto evt_data = mon_op->getEventData();
   EXPECT_NO_THROW(ser_value = serialize(evt_data->event_data->at(0)->channel_data, SerializationType::JSON););
   EXPECT_NE(ser_value, nullptr);

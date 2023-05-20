@@ -96,7 +96,7 @@ TEST(Epics, ChannelMonitor) {
   EXPECT_EQ(retry_eq(*pc_a, "value", 0, 500, 3), true);
 
   EXPECT_NO_THROW(monitor_op = pc_a->monitor(););
-  WHILE(monitor_op->hasData(), false);
+  WHILE_MONITOR(monitor_op, !monitor_op->hasData());
   auto fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 1);
   EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
@@ -108,7 +108,7 @@ TEST(Epics, ChannelMonitor) {
   WHILE(put_op->isDone(), false);
   std::this_thread::sleep_for(std::chrono::seconds(1));
 
-  WHILE(monitor_op->hasData(), false);
+  WHILE_MONITOR(monitor_op, !monitor_op->hasData());
   fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 2);
   EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
@@ -131,7 +131,7 @@ TEST(Epics, ChannelMonitorCombinedRequestCA) {
   EXPECT_EQ(retry_eq(*pc_a, "value", 0, 500, 3), true);
 
   EXPECT_NO_THROW(monitor_op = pc_a->monitor(););
-  WHILE(monitor_op->hasData(), false);
+  WHILE_MONITOR(monitor_op, !monitor_op->hasData());
   auto fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 1);
   EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
@@ -143,7 +143,7 @@ TEST(Epics, ChannelMonitorCombinedRequestCA) {
   WHILE(put_op->isDone(), false);
   std::this_thread::sleep_for(std::chrono::seconds(1));
 
-  WHILE(monitor_op->hasData(), false);
+  WHILE_MONITOR(monitor_op,! monitor_op->hasData());
   fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 2);
   EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
@@ -152,7 +152,6 @@ TEST(Epics, ChannelMonitorCombinedRequestCA) {
   EXPECT_EQ(fetched->event_data->at(1)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 2);
   EXPECT_NO_THROW(monitor_op.reset(););
 }
-
 
 TEST(Epics, ChannelCAMonitor) {
   INIT_CA_PROVIDER()
@@ -167,7 +166,7 @@ TEST(Epics, ChannelCAMonitor) {
   EXPECT_EQ(retry_eq(*pc_a, "value", 0, 500, 3), true);
 
   EXPECT_NO_THROW(monitor_op = pc_a->monitor(););
-  WHILE(monitor_op->hasData(), false);
+  WHILE_MONITOR(monitor_op, !monitor_op->hasData());
   auto fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 1);
   EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
@@ -178,7 +177,7 @@ TEST(Epics, ChannelCAMonitor) {
   WHILE(put_op->isDone(), false);
   std::this_thread::sleep_for(std::chrono::seconds(1));
 
-  WHILE(monitor_op->hasData(), false);
+  WHILE_MONITOR(monitor_op, !monitor_op->hasData());
   fetched = monitor_op->getEventData();
   EXPECT_EQ(fetched->event_data->size(), 2);
   EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
