@@ -119,7 +119,10 @@ CombinedMonitorOperation::getEventData() const {
   // get last event from additional data
   if (monitor_additional_request->hasData()) {
     // in this case if principal request has not produced data i put the last one received
-    if (!a_evt_received->event_data->size()) { a_evt_received->event_data->push_back(last_additional_evt_received); }
+    if (!a_evt_received->event_data->size() && last_principal_evt_received) {
+      // add last record received from principal request
+      a_evt_received->event_data->push_back(last_additional_evt_received);
+    }
     // get received additional data and take the only last
     auto add_evt_data            = monitor_additional_request->getEventData();
     last_additional_evt_received = add_evt_data->event_data->at(add_evt_data->event_data->size() - 1);
@@ -129,16 +132,12 @@ CombinedMonitorOperation::getEventData() const {
   joined_evt->event_cancel     = a_evt_received->event_cancel;
   joined_evt->event_disconnect = a_evt_received->event_disconnect;
   joined_evt->event_fail       = a_evt_received->event_fail;
-  std::cout << "before loop" << std::endl;
   // merge all data from principal request to the last event
   for (auto& a_data : *a_evt_received->event_data) {
     // join all the event data from the principal request, with the last from additional request
     // event from principal are more important than from additional one request
-    std::cout << "loop 1" << std::endl;
     auto merge_event_data = structure_merger->mergeStructureAndValue({a_data->channel_data.data, last_additional_evt_received->channel_data.data});
-    std::cout << "loop 2" << std::endl;
     joined_evt->event_data->push_back(MakeMonitorEventShrdPtr(a_data->type, "", ChannelData(a_data->channel_data.pv_name, merge_event_data)));
-    std::cout << "loop 3" << std::endl;
     last_principal_evt_received = a_data;
   }
   return joined_evt;
@@ -146,12 +145,12 @@ CombinedMonitorOperation::getEventData() const {
 
 bool
 CombinedMonitorOperation::hasData() const {
-  return monitor_principal_request->hasData() && (monitor_principal_request->hasData() || last_additional_evt_received);
+  return monitor_principal_request->hasData() && (monitor_additional_request->hasData() || last_additional_evt_received);
 }
 
 bool
 CombinedMonitorOperation::hasEvents() const {
-  return monitor_principal_request->hasEvents() && (monitor_principal_request->hasData() || last_additional_evt_received);
+  return monitor_principal_request->hasEvents() && (monitor_additional_request->hasData() || last_additional_evt_received);
 }
 
 const std::string&
