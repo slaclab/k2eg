@@ -96,45 +96,48 @@ int RDKafkaPublisher::createQueue(const std::string& queue) {
     return 0;
 }
 
-int RDKafkaPublisher::pushMessage(PublishMessageUniquePtr message) {
+int RDKafkaPublisher::pushMessage(PublishMessageUniquePtr message, const std::map<std::string,std::string>& headers) {
     RdKafka::ErrorCode resp = RdKafka::ERR_NO_ERROR;
-    RdKafka::Headers* headers = RdKafka::Headers::create();
+    RdKafka::Headers* kafka_headers = RdKafka::Headers::create();
+    for(auto& kv: headers) {
+        kafka_headers->add(kv.first, kv.second);
+    }
     const std::string distribution_key = message->getDistributionKey();
-    // headers->add("packet_num", std::to_string(idx));
-    resp = producer->produce(message->getQueue(),
+    auto msg_ptr = message.release();
+    resp = producer->produce(msg_ptr->getQueue(),
                              RdKafka::Topic::PARTITION_UA,
                              0 /* zero copy management */,
                              /* Value */
-                             (void*)message->getBufferPtr(),
-                             message->getBufferSize(),
+                             (void*)msg_ptr->getBufferPtr(),
+                             msg_ptr->getBufferSize(),
                              /* Key */
                              distribution_key.c_str(),
                              distribution_key.size(),
                              /* Timestamp (defaults to now) */
                              0,
                              /* Message headers, if any */
-                             headers,
+                             kafka_headers,
                              /* pass PublishMessage instance to opaque information */
-                             message.get());
+                             msg_ptr);
     if (resp != RdKafka::ERR_NO_ERROR) {
         std::cerr << RdKafka::err2str(resp) << std::endl;
-        // RDK_PUB_ERR_ << "Producer failed: " << ;
-        delete headers; /* Headers are automatically deleted on produce() success. */
+        /* Headers are automatically deleted on produce() success. */
+        delete kafka_headers;
+        delete msg_ptr;
         return -1;
     } else {
         // whe need to release the message memory becaus is not more owned by this
         // instance
-        message.release();
         return 0;
     }
 }
 
-int RDKafkaPublisher::pushMessages(PublisherMessageVector& messages) {
+int RDKafkaPublisher::pushMessages(PublisherMessageVector& messages, const std::map<std::string,std::string>& headers) {
     int err = 0;
     auto message = messages.begin();
 
     while (message != messages.end()) {
-        if (!(err = pushMessage(std::move(*message))))
+        if (!(err = pushMessage(std::move(*message), headers)))
             message = messages.erase(message);
         else
             break;

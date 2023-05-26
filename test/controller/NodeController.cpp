@@ -78,13 +78,13 @@ class DummyPublisher : public IPublisher {
     return 0;
   }
   int
-  pushMessage(PublishMessageUniquePtr message) {
+  pushMessage(PublishMessageUniquePtr message,  const PublisherHeaders& header = PublisherHeaders()) {
     sent_messages.push_back(std::move(message));
     lref.count_down();
     return 0;
   }
   int
-  pushMessages(PublisherMessageVector& messages) {
+  pushMessages(PublisherMessageVector& messages,  const PublisherHeaders& header = PublisherHeaders()) {
     for (auto& uptr : messages) {
       sent_messages.push_back(std::move(uptr));
       lref.count_down();
@@ -119,13 +119,13 @@ class DummyPublisherCounter : public IPublisher {
     return 0;
   }
   int
-  pushMessage(PublishMessageUniquePtr message) {
+  pushMessage(PublishMessageUniquePtr message,  const PublisherHeaders& header = PublisherHeaders()) {
     counter++;
     l.count_down();
     return 0;
   }
   int
-  pushMessages(PublisherMessageVector& messages) {
+  pushMessages(PublisherMessageVector& messages,  const PublisherHeaders& header = PublisherHeaders()) {
     counter +=messages.size();
     l.count_down(messages.size());
     return 0;
@@ -157,12 +157,12 @@ class DummyPublisherNoSignal : public IPublisher {
     return 0;
   }
   int
-  pushMessage(PublishMessageUniquePtr message) {
+  pushMessage(PublishMessageUniquePtr message,  const PublisherHeaders& header = PublisherHeaders()) {
     PublishMessageUniquePtr tmp_ptr_for_clean_data = std::move(message);
     return 0;
   }
   int
-  pushMessages(PublisherMessageVector& messages) {
+  pushMessages(PublisherMessageVector& messages,  const PublisherHeaders& header = PublisherHeaders()) {
     messages.clear();
     return 0;
   }
