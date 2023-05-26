@@ -23,10 +23,10 @@ struct SubscriberConfiguration {
 };
 DEFINE_PTR_TYPES(SubscriberConfiguration)
 
+DEFINE_MAP_FOR_TYPE(std::string, std::string, SubscriberHeaders)
 typedef struct SubscriberInterfaceElement {
+    SubscriberHeaders header;
     const std::string key;
-    // const int64_t off;
-    // const int32_t par;
     const size_t data_len;
     std::unique_ptr<const char[]> data;
 } SubscriberInterfaceElement;
@@ -36,6 +36,7 @@ DEFINE_VECTOR_FOR_TYPE(std::shared_ptr<const SubscriberInterfaceElement>, Subscr
 typedef std::function<void(SubscriberInterfaceElement&)> SubscriberInterfaceHandler;
 
 typedef enum ConsumerInterfaceEventType { ONDELIVERY, ONARRIVE, ONERROR } ConsumerInterfaceEventType;
+
 /*
 
  */
