@@ -6,6 +6,7 @@
 #include <functional>
 #include "k2eg/service/epics/EpicsChannel.h"
 #include "k2eg/service/metric/IMetricService.h"
+#include "k2eg/service/pubsub/IPublisher.h"
 
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::command;
@@ -87,7 +88,7 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
     metric.incrementCounter(IEpicsMetricCounterType::MonitorFail, event_received->event_fail->size());
 
     std::shared_lock slock(channel_map_mtx);
-    // cache the varius serilized message for each serializaiton type
+    // cache the various serilized message for each serializaiton type
     std::map<MessageSerType, ConstSerializedMessageShrdPtr> local_serialization_cache;
     for (auto& event: *event_received->event_data) {
         // publisher
@@ -102,7 +103,13 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
                 MakeMonitorMessageUPtr(
                     info_topic->dest_topic, event, 
                     local_serialization_cache[info_topic->ser_type]
-                    )
+                    ),
+                    {
+                        {
+                        "k2eg-ser-type",
+                        serialization_to_string(info_topic->ser_type)
+                        }
+                    }
            );
         }
     }
