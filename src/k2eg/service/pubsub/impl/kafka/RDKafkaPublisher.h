@@ -28,8 +28,8 @@ namespace k2eg::service::pubsub::impl::kafka
         virtual int createQueue(const std::string &queue);
         virtual void setAutoPoll(bool autopoll);
         virtual int flush(const int timeo = 10000);
-        virtual int pushMessage(PublishMessageUniquePtr message);
-        virtual int pushMessages(PublisherMessageVector &messages);
+        virtual int pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& headers = PublisherHeaders());
+        virtual int pushMessages(PublisherMessageVector &messages, const PublisherHeaders& headers = PublisherHeaders());
         virtual size_t getQueueMessageSize();
     };
 }

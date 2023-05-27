@@ -44,6 +44,7 @@ typedef enum EventType { OnDelivery, OnSent, OnError } EventType;
 typedef std::function<void(EventType, PublishMessage* const)> EventCallback;
 typedef std::map<std::string, EventCallback> MapEvtHndlrForReqType;
 typedef std::pair<std::string, EventCallback> MapEvtHndlrForReqTypePair;
+typedef std::map<std::string,std::string> PublisherHeaders;
 
 class IPublisher {
 protected:
@@ -61,8 +62,8 @@ public:
     virtual int setCallBackForReqType(const std::string req_type, EventCallback eventCallback);
     virtual int createQueue(const std::string& queue) = 0;
     virtual int flush(const int timeo) = 0;
-    virtual int pushMessage(PublishMessageUniquePtr message) = 0;
-    virtual int pushMessages(PublisherMessageVector& messages) = 0;
+    virtual int pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& headers = PublisherHeaders()) = 0;
+    virtual int pushMessages(PublisherMessageVector& messages, const PublisherHeaders& headers = PublisherHeaders()) = 0;
     virtual size_t getQueueMessageSize() = 0;
 };
 DEFINE_PTR_TYPES(IPublisher)
