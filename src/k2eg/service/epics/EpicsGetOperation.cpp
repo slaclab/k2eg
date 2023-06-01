@@ -58,11 +58,10 @@ CombinedGetOperation::hasData() const {
 //----------------- SingleGetOperation  ------------------
 SingleGetOperation::SingleGetOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field)
     : channel(channel), pv_name(pv_name), field(field), is_done(false) {
-  channel->addConnectListener(this);
+  op = channel->get(this, pvd::createRequest(field));
 }
 
 SingleGetOperation::~SingleGetOperation() {
-  channel->removeConnectListener(this);
   op.cancel();
 }
 
@@ -81,7 +80,7 @@ SingleGetOperation::getDone(const pvac::GetEvent& event) {
 
 void
 SingleGetOperation::connectEvent(const pvac::ConnectEvent& evt) {
-  if (evt.connected) { op = channel->get(this, pvd::createRequest(field)); }
+  //if (evt.connected) { op = channel->get(this, pvd::createRequest(field)); }
 }
 
 bool

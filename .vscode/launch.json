@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg",
-            "args": ["--log-on-console","--cmd-input-topic=cmd_topic_in","--log-level=debug","--sub-server-address=kafka:9092","--pub-server-address=kafka:9092"],
+            "args": ["--log-on-console","--cmd-input-topic=cmd-topic-in","--log-level=debug","--sub-server-address=kafka:9092","--pub-server-address=kafka:9092"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.vscode/.env",
