@@ -3,10 +3,13 @@
 #include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusEpicsMetric.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusCMDControllerMetric.h>
+#include <k2eg/service/metric/INodeControllerMetric.h>
+#include <k2eg/service/metric/impl/prometheus/PrometheusNodeControllerMetric.h>
+
 #include <algorithm>
 #include <memory>
-#include "k2eg/service/metric/INodeControllerMetric.h"
-#include "k2eg/service/metric/impl/prometheus/PrometheusNodeControllerMetric.h"
+#include <cassert>
+
 
 using namespace prometheus;
 
@@ -31,23 +34,26 @@ PrometheusMetricService::getEpicsMetric() {
   if (!epics_metric) {
     INSTANTIATE_METRIC(PrometheusEpicsMetric, exposer_uptr, epics_metric)
   }
+  assert(epics_metric);
   return *epics_metric;
 }
 
 ICMDControllerMetric&
 PrometheusMetricService::getCMDControllerMetric() {
   std::lock_guard<std::mutex> lk(service_mux);
-  if (!epics_metric) {
+  if (!cmd_controller_metric) {
     INSTANTIATE_METRIC(PrometheusCMDControllerMetric, exposer_uptr, cmd_controller_metric)
   }
+  assert(cmd_controller_metric);
   return *cmd_controller_metric;
 }
 
 INodeControllerMetric&
 PrometheusMetricService::getNodeControllerMetric() {
   std::lock_guard<std::mutex> lk(service_mux);
-  if (!epics_metric) {
+  if (!node_controller_metric) {
     INSTANTIATE_METRIC(PrometheusNodeControllerMetric, exposer_uptr, node_controller_metric)
   }
+  assert(node_controller_metric);
   return *node_controller_metric;
 }

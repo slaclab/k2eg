@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
+#include <cstddef>
 
 #include "metric.h"
 
