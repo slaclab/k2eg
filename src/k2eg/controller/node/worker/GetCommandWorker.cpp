@@ -59,9 +59,7 @@ GetCommandWorker::~GetCommandWorker() { processing_pool->wait_for_tasks(); }
 
 void
 GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
-  if (command->type != CommandType::get) {
-    return;
-  }
+  if (command->type != CommandType::get) { return; }
 
   ConstGetCommandShrdPtr g_ptr = static_pointer_cast<const GetCommand>(command);
   logger->logMessage(STRING_FORMAT("Perform get command for %1% with protocol %2% on topic %3% with sertype: %4%",
@@ -89,8 +87,13 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
     processing_pool->push_task(&GetCommandWorker::checkGetCompletion, this, get_info);
   } else {
     switch (get_info->op->getState().event) {
-      case pvac::GetEvent::Fail: logger->logMessage(STRING_FORMAT("Failed get command for %1% with message %2%", get_info->pv_name%get_info->op->getState().message), LogLevel::ERROR); break;
-      case pvac::GetEvent::Cancel: logger->logMessage(STRING_FORMAT("Cancelled get command for %1% with message %2%",  get_info->pv_name%get_info->op->getState().message), LogLevel::ERROR); break;
+      case pvac::GetEvent::Fail:
+        logger->logMessage(STRING_FORMAT("Failed get command for %1% with message %2%", get_info->pv_name % get_info->op->getState().message), LogLevel::ERROR);
+        break;
+      case pvac::GetEvent::Cancel:
+        logger->logMessage(STRING_FORMAT("Cancelled get command for %1% with message %2%", get_info->pv_name % get_info->op->getState().message),
+                           LogLevel::ERROR);
+        break;
       case pvac::GetEvent::Success:
         // update metric
         metric.incrementCounter(IEpicsMetricCounterType::Get);
@@ -105,7 +108,9 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
           logger->logMessage("Invalid serilized message", LogLevel::ERROR);
           break;
         }
-        publisher->pushMessage(std::make_unique<GetMessage>(get_info->destination_topic, std::move(channel_data), serialized_message));
+        publisher->pushMessage(
+          std::make_unique<GetMessage>(get_info->destination_topic, std::move(channel_data), serialized_message),
+          {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
         break;
     }
   }
