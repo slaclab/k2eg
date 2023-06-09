@@ -55,7 +55,6 @@ DEFINE_PTR_TYPES(MonitorOperationImpl)
 // combine two async monitor operation together
 class CombinedMonitorOperation : public MonitorOperation {
   MonitorOperationImplUPtr    monitor_principal_request;
-  mutable MonitorEventShrdPtr last_principal_evt_received;
   MonitorOperationImplUPtr    monitor_additional_request;
   mutable MonitorEventShrdPtr last_additional_evt_received;
   PVStructureMergerUPtr       structure_merger;
@@ -70,6 +69,11 @@ class CombinedMonitorOperation : public MonitorOperation {
                            const std::string&                   additional_request);
   virtual ~CombinedMonitorOperation() = default;
   virtual void         poll(uint element_to_fetch = 2) const OVERRIDE FINAL;
+  /*
+  Return alway the princiapl latest data 
+  merged with at least the last received 
+  addiotnal info
+  */
   EventReceivedShrdPtr getEventData() const OVERRIDE FINAL;
   bool                 hasData() const OVERRIDE FINAL;
   bool                 hasEvents() const OVERRIDE FINAL;

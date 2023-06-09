@@ -118,11 +118,6 @@ CombinedMonitorOperation::getEventData() const {
   auto a_evt_received = monitor_principal_request->getEventData();
   // get last event from additional data
   if (monitor_additional_request->hasData()) {
-    // in this case if principal request has not produced data i put the last one received
-    if (!a_evt_received->event_data->size() && last_principal_evt_received) {
-      // add last record received from principal request
-      a_evt_received->event_data->push_back(last_additional_evt_received);
-    }
     // get received additional data and take the only last
     auto add_evt_data            = monitor_additional_request->getEventData();
     last_additional_evt_received = add_evt_data->event_data->at(add_evt_data->event_data->size() - 1);
@@ -138,7 +133,6 @@ CombinedMonitorOperation::getEventData() const {
     // event from principal are more important than from additional one request
     auto merge_event_data = structure_merger->mergeStructureAndValue({a_data->channel_data.data, last_additional_evt_received->channel_data.data});
     joined_evt->event_data->push_back(MakeMonitorEventShrdPtr(a_data->type, "", ChannelData(a_data->channel_data.pv_name, merge_event_data)));
-    last_principal_evt_received = a_data;
   }
   return joined_evt;
 }
