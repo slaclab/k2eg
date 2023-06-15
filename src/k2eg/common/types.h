@@ -48,6 +48,7 @@ inline x##ShrdPtr Make##x##ShrdPtr(_Args&&... __args) \
 
     DEFINE_MAP_FOR_TYPE(std::string, std::string, MapStrKV);
 
+enum class SerializationType: std::uint8_t { Unknown, JSON, Msgpack, MsgpackCompact };
 
 class SerializedMessage {
     public:

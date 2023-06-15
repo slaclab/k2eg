@@ -15,6 +15,7 @@
 
 namespace k2eg::controller::node::worker {
 
+
 struct PutOpInfo : public WorkerAsyncOperation {
   std::string                                pv_name;
   std::string                                value;
@@ -42,7 +43,7 @@ class PutCommandWorker : public CommandWorker {
   k2eg::service::metric::IEpicsMetric&                  metric;
   k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
   void                                                  checkPutCompletion(PutOpInfoShrdPtr put_info);
-  
+  k2eg::common::ConstSerializedMessageShrdPtr           getReply(PutOpInfoShrdPtr put_info);
  public:
   PutCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
   virtual ~PutCommandWorker();

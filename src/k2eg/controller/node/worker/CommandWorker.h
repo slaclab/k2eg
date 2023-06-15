@@ -3,10 +3,19 @@
 #include <k2eg/common/types.h>
 #include <k2eg/controller/command/CMDCommand.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
-
-#include <chrono>
 #include <k2eg/common/BS_thread_pool.hpp>
+
+#include <boost/json.hpp>
+#include <chrono>
 namespace k2eg::controller::node::worker {
+
+class ReplySerializer {
+  protected:
+  std::shared_ptr<boost::json::object> reply_content; 
+  k2eg::common::SerializationType ser_type;
+public:
+  ReplySerializer(std::shared_ptr<boost::json::object> reply_content, k2eg::common::SerializationType ser_type);
+};
 
 class WorkerAsyncOperation {
   const std::chrono::milliseconds       timeout_ms;

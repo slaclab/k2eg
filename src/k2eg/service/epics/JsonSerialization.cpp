@@ -31,7 +31,7 @@ SerializedMessageShrdPtr
 JsonSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
   std::stringstream       ss;
   boost::json::object     json_root_object;
-  boost::json::serializer sr;
+  // boost::json::serializer sr;
   processStructure(message.data.get(), message.pv_name, json_root_object);
   if(!reply_id.empty()){json_root_object[KEY_REPLY_ID] = reply_id;}
   ss << json_root_object;

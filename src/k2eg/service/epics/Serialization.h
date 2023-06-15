@@ -4,7 +4,7 @@
 #include <k2eg/common/types.h>
 namespace k2eg::service::epics_impl {
 // define the type of the supported serailization
-enum class SerializationType: std::uint8_t { Unknown, JSON, Msgpack, MsgpackCompact };
+
 
 // base serializer class
 class Serializer {
@@ -14,10 +14,10 @@ public:
 DEFINE_PTR_TYPES(Serializer)
 
 // define the single instance of epics serializer factory
-inline k2eg::common::ObjectByTypeFactory<SerializationType, Serializer> epics_serializer_factory;
+inline k2eg::common::ObjectByTypeFactory<k2eg::common::SerializationType, Serializer> epics_serializer_factory;
 
 // serilizer entry point
-inline k2eg::common::ConstSerializedMessageShrdPtr serialize(const ChannelData& message, SerializationType type, const std::string& reply_id = "") {
+inline k2eg::common::ConstSerializedMessageShrdPtr serialize(const ChannelData& message, k2eg::common::SerializationType type, const std::string& reply_id = "") {
     // check if serilizer is present
     if (!epics_serializer_factory.hasType(type)) {
         return k2eg::common::ConstSerializedMessageShrdPtr();
@@ -26,7 +26,7 @@ inline k2eg::common::ConstSerializedMessageShrdPtr serialize(const ChannelData& 
 }
 
 // check for a serializer for a specific type
-inline bool has_serialization_for_type(SerializationType type) { 
+inline bool has_serialization_for_type(k2eg::common::SerializationType type) { 
     return epics_serializer_factory.hasType(type);
 }
 

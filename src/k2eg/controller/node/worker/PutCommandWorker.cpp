@@ -68,4 +68,9 @@ PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
     }
   }
 }
+
+k2eg::common::ConstSerializedMessageShrdPtr
+PutCommandWorker::getReply(PutOpInfoShrdPtr put_info) {
+return ConstSerializedMessageShrdPtr();
+}
 #pragma endregion PutCommandWorker
