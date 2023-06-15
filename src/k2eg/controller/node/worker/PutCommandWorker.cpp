@@ -4,9 +4,9 @@
 
 #include <memory>
 
-#include "k2eg/controller/command/cmd/Command.h"
-#include "k2eg/controller/command/cmd/PutCommand.h"
-#include "k2eg/service/epics/EpicsPutOperation.h"
+#include <k2eg/controller/command/cmd/Command.h>
+#include <k2eg/controller/command/cmd/PutCommand.h>
+#include <k2eg/service/epics/EpicsPutOperation.h>
 
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::command;

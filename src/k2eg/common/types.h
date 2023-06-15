@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <msgpack.hpp>
 namespace k2eg::common
 {
 #define DEFINE_PTR_TYPES(x) \
@@ -58,6 +59,44 @@ class SerializedMessage {
     virtual const char * data()const = 0;
 };
 DEFINE_PTR_TYPES(SerializedMessage);
+
+/**
+*/
+class JsonMessage : public k2eg::common::SerializedMessage {
+    std::string json_object;
+    public:
+    JsonMessage(std::string& json_object): json_object(std::move(json_object)) {}
+    JsonMessage() = delete;
+    ~JsonMessage()=default;
+    const size_t
+    size() const {
+    return json_object.size();
+    }
+    const char*
+    data() const {
+    return json_object.c_str();
+    }
+};
+DEFINE_PTR_TYPES(JsonMessage)
+
+/**
+*/
+class MsgpackMessage : public k2eg::common::SerializedMessage {
+    public:
+    msgpack::sbuffer buf;
+    MsgpackMessage() = default;
+    ~MsgpackMessage()=default;
+    const size_t
+    size() const {
+    return buf.size();
+    }
+    const char*
+    data() const {
+    return buf.data();
+    }
+};
+DEFINE_PTR_TYPES(MsgpackMessage)
+
 }
 
 #endif // __TYPES_H__

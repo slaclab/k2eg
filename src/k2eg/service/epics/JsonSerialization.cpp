@@ -8,22 +8,9 @@
 #include <boost/json/array.hpp>
 #include <pvData.h>
 #include <pvIntrospect.h>
-using namespace k2eg::service::epics_impl;
 using namespace k2eg::common;
+using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;
-
-#pragma region JsonMessage
-JsonMessage::JsonMessage(std::string& json_object) : json_object(std::move(json_object)) {}
-
-const size_t
-JsonMessage::size() const {
-  return json_object.size();
-}
-const char*
-JsonMessage::data() const {
-  return json_object.c_str();
-}
-#pragma endregion JsonMessage
 
 #pragma region JsonSerializer
 REGISTER_SERIALIZER(SerializationType::JSON, JsonSerializer)

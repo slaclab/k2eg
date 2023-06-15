@@ -280,11 +280,11 @@
                 }
             ]
         },{
-            "name": "Test NodeController",
+            "name": "Test NodeControllerReply",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=NodeController.*"],
+            "args": ["--gtest_filter=NodeControllerReply.*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

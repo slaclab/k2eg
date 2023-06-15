@@ -20,19 +20,6 @@ public:
     k2eg::common::SerializedMessageShrdPtr serialize(const ChannelData& message, const std::string& reply_id = "");
 };
 DEFINE_PTR_TYPES(JsonSerializer)
-// Serialization message for json encoding
-class JsonMessage : public k2eg::common::SerializedMessage {
-    friend class JsonSerializer;
-    std::string json_object;
-    public:
-    JsonMessage(std::string& json_object);
-    JsonMessage() = delete;
-    ~JsonMessage()=default;
-    const size_t size() const;
-    const char* data() const;
-};
-DEFINE_PTR_TYPES(JsonMessage)
-
 } // namespace k2eg::service::epics_impl
 
 #endif // K2EG_SERVICE_EPICS_JSONSERIALIZATION_H_

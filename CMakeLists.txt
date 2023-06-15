@@ -135,6 +135,7 @@ set(TEST_SOURCE_FILES
   test/common/ProgramOptions.cpp
   test/controller/CMDController.cpp
   test/controller/NodeController.cpp
+  test/controller/NodeControllerReply.cpp
   test/metric/EpicsMetric.cpp
   test/metric/CMDMetric.cpp
   test/metric/NodeControllerMetric.cpp
