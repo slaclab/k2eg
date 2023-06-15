@@ -22,7 +22,7 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Moni
     jv = {
         {"serialization", serialization_to_string(c.serialization)},
         {"pv_name", c.pv_name}, 
-        {"protocol", c.protocol}, 
+        {"protocol", c.protocol},
         {"activate", c.activate}, 
         {"destination_topic", c.destination_topic}
         };

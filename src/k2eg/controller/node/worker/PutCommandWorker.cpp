@@ -24,6 +24,7 @@ using namespace k2eg::common;
 PutCommandWorker::PutCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager)
     : processing_pool(std::make_shared<BS::thread_pool>()),
       logger(ServiceResolver<ILogger>::resolve()),
+      publisher(ServiceResolver<IPublisher>::resolve()),
       metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric()),
       epics_service_manager(epics_service_manager) {}
 
@@ -35,7 +36,8 @@ PutCommandWorker::processCommand(ConstCommandShrdPtr command) {
   ConstPutCommandShrdPtr p_ptr = static_pointer_cast<const PutCommand>(command);
   logger->logMessage(STRING_FORMAT("Perform put command for %1%", p_ptr->pv_name), LogLevel::DEBUG);
   auto put_op = epics_service_manager->putChannelData(p_ptr->pv_name, "value", p_ptr->value);
-  processing_pool->push_task(&PutCommandWorker::checkPutCompletion, this, std::make_shared<PutOpInfo>(p_ptr->pv_name, p_ptr->value, std::move(put_op)));
+  processing_pool->push_task(
+      &PutCommandWorker::checkPutCompletion, this, std::make_shared<PutOpInfo>(p_ptr->pv_name, p_ptr->value, p_ptr->reply_id, std::move(put_op)));
 }
 
 void
@@ -56,7 +58,8 @@ PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
         logger->logMessage(STRING_FORMAT("Failed put command for %1% and message %2%", put_info->pv_name % put_info->op->getState().message), LogLevel::ERROR);
         break;
       case pvac::PutEvent::Cancel:
-        logger->logMessage(STRING_FORMAT("Cancelled put command for %1% and message %2%", put_info->pv_name % put_info->op->getState().message), LogLevel::ERROR);
+        logger->logMessage(STRING_FORMAT("Cancelled put command for %1% and message %2%", put_info->pv_name % put_info->op->getState().message),
+                           LogLevel::ERROR);
         break;
       case pvac::PutEvent::Success:
         metric.incrementCounter(IEpicsMetricCounterType::Put);

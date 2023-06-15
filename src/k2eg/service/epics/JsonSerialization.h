@@ -17,11 +17,11 @@ class JsonSerializer : public Serializer {
 public:
     JsonSerializer() = default;
     virtual ~JsonSerializer() = default;
-    SerializedMessageShrdPtr serialize(const ChannelData& message);
+    k2eg::common::SerializedMessageShrdPtr serialize(const ChannelData& message, const std::string& reply_id = "");
 };
 DEFINE_PTR_TYPES(JsonSerializer)
 // Serialization message for json encoding
-class JsonMessage : public SerializedMessage {
+class JsonMessage : public k2eg::common::SerializedMessage {
     friend class JsonSerializer;
     std::string json_object;
     public:

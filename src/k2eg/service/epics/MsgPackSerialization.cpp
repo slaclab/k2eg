@@ -1,12 +1,13 @@
 #include <k2eg/service/epics/MsgPackSerialization.h>
+#include <k2eg/controller/command/cmd/Command.h>
 #include <pv/bitSet.h>
 
 #include <sstream>
 
-#include "pvType.h"
+#include <pvType.h>
 
 using namespace k2eg::service::epics_impl;
-
+using namespace k2eg::common;
 namespace pvd = epics::pvData;
 
 #pragma region MsgPackMessage
@@ -24,11 +25,17 @@ MsgPackMessage::data() const {
 #pragma region MsgPackSerializer
 REGISTER_SERIALIZER(SerializationType::Msgpack, MsgPackSerializer)
 SerializedMessageShrdPtr
-MsgPackSerializer::serialize(const ChannelData& message) {
+MsgPackSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
   auto                              result = MakeMsgPackMessageShrdPtr(message.data);
   msgpack::packer<msgpack::sbuffer> packer(result->buf);
   // add channel message
-  packer.pack_map(1);
+  if(reply_id.empty()) {
+    packer.pack_map(2);
+    packer.pack(KEY_REPLY_ID);
+    packer.pack(reply_id);
+  } else {
+    packer.pack_map(1);
+  }
   packer.pack(message.pv_name);
   // process root structure
   processStructure(message.data.get(), packer);

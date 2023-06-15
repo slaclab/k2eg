@@ -14,12 +14,12 @@ class MsgpackCompactSerializer : public Serializer {
 public:
     MsgpackCompactSerializer() = default;
     virtual ~MsgpackCompactSerializer() = default;
-    SerializedMessageShrdPtr serialize(const ChannelData& message);
+    k2eg::common::SerializedMessageShrdPtr serialize(const ChannelData& message, const std::string& reply_id = "");
 };
 DEFINE_PTR_TYPES(MsgpackCompactSerializer)
 
 // Message for msgpack compact encoding
-class MsgpackCompactMessage : public SerializedMessage {
+class MsgpackCompactMessage : public k2eg::common::SerializedMessage {
     friend class MsgpackCompactSerializer;
     msgpack::sbuffer buf;
     epics::pvData::PVStructure::const_shared_pointer epics_pv_struct;

@@ -33,10 +33,6 @@ inline x##ShrdPtr Make##x##ShrdPtr(_Args&&... __args) \
     return std::make_shared<x>(__args...); \
 }
 
-
-
-
-
 #define DEFINE_VECTOR_FOR_TYPE(t, n)              \
     typedef std::vector<t> n;                     \
     typedef std::vector<t>::iterator n##Iterator; \
@@ -51,5 +47,16 @@ inline x##ShrdPtr Make##x##ShrdPtr(_Args&&... __args) \
     DEFINE_VECTOR_FOR_TYPE(std::string, StringVector);
 
     DEFINE_MAP_FOR_TYPE(std::string, std::string, MapStrKV);
+
+
+class SerializedMessage {
+    public:
+    SerializedMessage()=default;
+    virtual ~SerializedMessage()=default;
+    virtual const size_t size() const = 0;
+    virtual const char * data()const = 0;
+};
+DEFINE_PTR_TYPES(SerializedMessage);
 }
+
 #endif // __TYPES_H__

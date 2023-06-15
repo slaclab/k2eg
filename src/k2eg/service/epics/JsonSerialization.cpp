@@ -1,13 +1,15 @@
 #include <k2eg/service/epics/JsonSerialization.h>
+#include <k2eg/controller/command/cmd/Command.h>
 #include <pv/bitSet.h>
 #include <pv/json.h>
 
 #include <sstream>
 
-#include "boost/json/array.hpp"
-#include "pvData.h"
-#include "pvIntrospect.h"
+#include <boost/json/array.hpp>
+#include <pvData.h>
+#include <pvIntrospect.h>
 using namespace k2eg::service::epics_impl;
+using namespace k2eg::common;
 namespace pvd = epics::pvData;
 
 #pragma region JsonMessage
@@ -26,11 +28,12 @@ JsonMessage::data() const {
 #pragma region JsonSerializer
 REGISTER_SERIALIZER(SerializationType::JSON, JsonSerializer)
 SerializedMessageShrdPtr
-JsonSerializer::serialize(const ChannelData& message) {
+JsonSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
   std::stringstream       ss;
   boost::json::object     json_root_object;
   boost::json::serializer sr;
   processStructure(message.data.get(), message.pv_name, json_root_object);
+  if(!reply_id.empty()){json_root_object[KEY_REPLY_ID] = reply_id;}
   ss << json_root_object;
   return MakeJsonMessageShrdPtr(std::move(ss.str()));
 }

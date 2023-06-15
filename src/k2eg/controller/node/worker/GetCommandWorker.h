@@ -11,18 +11,19 @@
 
 #include <chrono>
 #include <k2eg/common/BS_thread_pool.hpp>
+#include <string>
 namespace k2eg::controller::node::worker {
 
 class GetMessage : public k2eg::service::pubsub::PublishMessage {
-  const std::string                                              request_type;
-  const std::string                                              destination_topic;
-  k2eg::service::epics_impl::ConstChannelDataUPtr                channel_data;
-  const k2eg::service::epics_impl::ConstSerializedMessageShrdPtr message;
+  const std::string                                 request_type;
+  const std::string                                 destination_topic;
+  k2eg::service::epics_impl::ConstChannelDataUPtr   channel_data;
+  const k2eg::common::ConstSerializedMessageShrdPtr message;
 
  public:
-  GetMessage(const std::string&                                       destination_topic,
-             k2eg::service::epics_impl::ConstChannelDataUPtr          channel_data,
-             k2eg::service::epics_impl::ConstSerializedMessageShrdPtr message);
+  GetMessage(const std::string&                              destination_topic,
+             k2eg::service::epics_impl::ConstChannelDataUPtr channel_data,
+             k2eg::common::ConstSerializedMessageShrdPtr     message);
   virtual ~GetMessage() = default;
   char*              getBufferPtr();
   const size_t       getBufferSize();
@@ -36,16 +37,19 @@ class GetOpInfo : public WorkerAsyncOperation {
   std::string                                pv_name;
   std::string                                destination_topic;
   command::cmd::MessageSerType               serialization;
+  std::string                                reply_id;
   service::epics_impl::ConstGetOperationUPtr op;
   GetOpInfo(const std::string&                         pv_name,
             const std::string&                         destination_topic,
             const command::cmd::MessageSerType&        serialization,
+            std::string                                reply_id,
             service::epics_impl::ConstGetOperationUPtr op,
             std::uint32_t                              tout_msc = 10000)
       : WorkerAsyncOperation(std::chrono::milliseconds(tout_msc)),
         pv_name(pv_name),
         destination_topic(destination_topic),
         serialization(serialization),
+        reply_id(reply_id),
         op(std::move(op)) {}
 };
 DEFINE_PTR_TYPES(GetOpInfo)

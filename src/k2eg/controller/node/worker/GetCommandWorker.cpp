@@ -8,6 +8,8 @@
 #include "client.h"
 #include "k2eg/service/metric/IMetricService.h"
 
+using namespace k2eg::common;
+
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::command;
 using namespace k2eg::controller::command::cmd;
@@ -66,10 +68,14 @@ GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
                                    g_ptr->pv_name % g_ptr->protocol % g_ptr->destination_topic % serialization_to_string(g_ptr->serialization)),
                      LogLevel::DEBUG);
   auto channel_data = epics_service_manager->getChannelData(g_ptr->pv_name, g_ptr->protocol);
-  // while(!channel_data->isDone()){std::this_thread::sleep_for(std::chrono::milliseconds(100));}
   processing_pool->push_task(&GetCommandWorker::checkGetCompletion,
                              this,
-                             std::make_shared<GetOpInfo>(g_ptr->pv_name, g_ptr->destination_topic, g_ptr->serialization, std::move(channel_data)));
+                             std::make_shared<GetOpInfo>(
+                              g_ptr->pv_name, 
+                              g_ptr->destination_topic, 
+                              g_ptr->serialization, 
+                              g_ptr->reply_id,
+                              std::move(channel_data)));
 }
 
 void
@@ -103,7 +109,7 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
           logger->logMessage(STRING_FORMAT("No data received for %1%", get_info->pv_name), LogLevel::ERROR);
           break;
         }
-        auto serialized_message = serialize(*channel_data, static_cast<SerializationType>(get_info->serialization));
+        auto serialized_message = serialize(*channel_data, static_cast<SerializationType>(get_info->serialization), get_info->reply_id);
         if (!serialized_message) {
           logger->logMessage("Invalid serilized message", LogLevel::ERROR);
           break;

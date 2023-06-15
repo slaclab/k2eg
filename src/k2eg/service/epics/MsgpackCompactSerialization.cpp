@@ -1,10 +1,11 @@
 #include <k2eg/service/epics/MsgpackCompactSerializion.h>
-#include "pvType.h"
+#include <k2eg/controller/command/cmd/Command.h>
+#include <pvType.h>
 #include <vector>
 #include <any>
 
 using namespace k2eg::service::epics_impl;
-
+using namespace k2eg::common;
 namespace pvd = epics::pvData;
 
 #pragma region MsgpackCompactMessage
@@ -22,7 +23,7 @@ MsgpackCompactMessage::data() const {
 #pragma region MsgPackSerializer
 REGISTER_SERIALIZER(SerializationType::MsgpackCompact, MsgpackCompactSerializer)
 SerializedMessageShrdPtr
-MsgpackCompactSerializer::serialize(const ChannelData& message) {
+MsgpackCompactSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
   std::vector<const pvd::PVField*> values;
   auto                              result = MakeMsgpackCompactMessageShrdPtr(message.data);
   msgpack::packer<msgpack::sbuffer> packer(result->buf);
@@ -30,7 +31,14 @@ MsgpackCompactSerializer::serialize(const ChannelData& message) {
   // process root structure
   scannStructure(message.data.get(), values);
 
-  packer.pack_array(values.size()+1);
+  // check if we need to add the reply id
+  if(reply_id.empty()) {
+    packer.pack_array(values.size()+1);
+  } else {
+    packer.pack_array(values.size()+2);
+    //pack reply id before the name
+    packer.pack(reply_id);
+  }
   packer.pack(message.pv_name);
   //serialize
   for(auto & f: values) {

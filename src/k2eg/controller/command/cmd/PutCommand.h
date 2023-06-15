@@ -14,13 +14,15 @@ namespace k2eg::controller::command::cmd {
 */
 struct PutCommand : public Command {
     std::string value;
+    std::string reply_id;
 };
 DEFINE_PTR_TYPES(PutCommand)
 static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, PutCommand const& c) { 
     jv = {
         {"pv_name", c.pv_name}, 
-        {"protocol", c.protocol}, 
-        {"value", c.value}
+        {"protocol", c.protocol},
+        {"value", c.value},
+        {"reply_id", c.reply_id}
         }; 
     }
 } // namespace k2eg::controller::command::cmd

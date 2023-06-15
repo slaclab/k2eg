@@ -8,6 +8,8 @@
 #include "k2eg/service/metric/IMetricService.h"
 #include "k2eg/service/pubsub/IPublisher.h"
 
+using namespace k2eg::common;
+
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::command;
 using namespace k2eg::controller::command::cmd;

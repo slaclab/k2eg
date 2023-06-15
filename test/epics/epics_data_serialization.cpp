@@ -12,6 +12,7 @@
 #include "k2eg/service/epics/EpicsMonitorOperation.h"
 #include "msgpack/v3/object_fwd_decl.hpp"
 
+using namespace k2eg::common;
 using namespace k2eg::service::epics_impl;
 
 TEST(Epics, SerializationJSON) {

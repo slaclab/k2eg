@@ -24,10 +24,11 @@ command_type_to_string(CommandType t) noexcept {
 #define KEY_COMMAND       "command"
 #define KEY_SERIALIZATION "serialization"
 #define KEY_PROTOCOL      "protocol"
-#define KEY_PV_NAME  "pv_name"
+#define KEY_PV_NAME       "pv_name"
 #define KEY_ACTIVATE      "activate"
 #define KEY_DEST_TOPIC    "dest_topic"
 #define KEY_VALUE         "value"
+#define KEY_REPLY_ID      "reply_id"
 
 // is the type of the serialization
 enum class MessageSerType : std::uint8_t { unknown, json, msgpack, msgpack_compact };
