@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include <k2eg/common/ProgramOptions.h>
 #include <k2eg/common/utility.h>
+#include <k2eg/controller/command/cmd/Command.h>
 #include <k2eg/controller/command/cmd/PutCommand.h>
 #include <k2eg/controller/node/NodeController.h>
 #include <k2eg/service/ServiceResolver.h>
@@ -21,11 +22,13 @@
 #include <latch>
 #include <memory>
 #include <msgpack.hpp>
+#include <ostream>
 #include <random>
 #include <string>
 #include <thread>
 
 #include "k2eg/service/metric/IMetricService.h"
+#include "msgpack/v3/object_fwd_decl.hpp"
 
 namespace bj = boost::json;
 
@@ -364,6 +367,28 @@ TEST(NodeController, GetCommandJson) {
   deinitBackend(std::move(node_controller));
 }
 
+TEST(NodeController, GetCommandJsonWithReplyID) {
+  boost::json::object json_obj;
+  std::latch                      work_done{1};
+  std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
+  // set environment variable for test
+  auto node_controller = initBackend(publisher);
+
+  EXPECT_NO_THROW(node_controller->submitCommand(
+      {std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::JSON, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN, "REP_ID_JSON"})}););
+
+  work_done.wait();
+  // we need to have publish some message
+  size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+  EXPECT_NE(published, 0);
+  // check for json forward
+  EXPECT_NO_THROW(json_obj = getJsonObject(*publisher->sent_messages[0]););
+  EXPECT_EQ(json_obj.contains(KEY_REPLY_ID), true);
+  EXPECT_STREQ(json_obj[KEY_REPLY_ID].as_string().c_str(), "REP_ID_JSON");
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
 TEST(NodeController, GetCommandMsgPack) {
   std::latch                      work_done{1};
   std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
@@ -382,6 +407,33 @@ TEST(NodeController, GetCommandMsgPack) {
   msgpack::object   msgpack_object;
   EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
   msgpack_object = msgpack_unpacked.get();
+  EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
+TEST(NodeController, GetCommandMsgPackReplyID) {
+  typedef std::map<std::string, msgpack::object> MapTest;
+  std::latch                      work_done{1};
+  std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
+  // set environment variable for test
+  auto node_controller = initBackend(publisher);
+
+  EXPECT_NO_THROW(node_controller->submitCommand(
+      {std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::Msgpack, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN, "REPLY_ID_MSGPACK"})}););
+
+  work_done.wait();
+  // we need to have publish some message
+  size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+  EXPECT_NE(published, 0);
+  // check for msgpack map
+  msgpack::unpacked msgpack_unpacked;
+  msgpack::object   msgpack_object;
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+  msgpack_object = msgpack_unpacked.get();
+  auto mt = msgpack_object.as<MapTest>();
+  EXPECT_EQ(mt.contains(KEY_REPLY_ID), true);
+  EXPECT_STREQ(mt[KEY_REPLY_ID].as<std::string>().c_str(), "REPLY_ID_MSGPACK");
   EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
   // dispose all
   deinitBackend(std::move(node_controller));
@@ -406,6 +458,33 @@ TEST(NodeController, GetCommandMsgPackCompack) {
   EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
   msgpack_object = msgpack_unpacked.get();
   EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
+TEST(NodeController, GetCommandMsgPackCompackWithReplyID) {
+  typedef std::vector<msgpack::object> VecTest;
+  std::latch                      work_done{1};
+  std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
+  // set environment variable for test
+  auto node_controller = initBackend(publisher);
+
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(
+      GetCommand{CommandType::get, SerializationType::MsgpackCompact, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN, "REPLY_ID_MSGPACK_COMPACT"})}););
+
+  work_done.wait();
+  // we need to have publish some message
+  size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+  EXPECT_NE(published, 0);
+  // check for masgpack compact array
+  msgpack::unpacked msgpack_unpacked;
+  msgpack::object   msgpack_object;
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+  msgpack_object = msgpack_unpacked.get();
+  EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
+  auto res_vec = msgpack_object.as<VecTest>();
+  EXPECT_EQ(res_vec[0].type, msgpack::type::STR);
+  EXPECT_STREQ(res_vec[0].as<std::string>().c_str(), "REPLY_ID_MSGPACK_COMPACT");
   // dispose all
   deinitBackend(std::move(node_controller));
 }

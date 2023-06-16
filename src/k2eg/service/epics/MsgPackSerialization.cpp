@@ -28,13 +28,13 @@ SerializedMessageShrdPtr
 MsgPackSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
   auto                              result = MakeMsgPackMessageShrdPtr(message.data);
   msgpack::packer<msgpack::sbuffer> packer(result->buf);
-  // add channel message
   if(reply_id.empty()) {
+    packer.pack_map(1);
+  } else {
+    // add reply id at the beginning  
     packer.pack_map(2);
     packer.pack(KEY_REPLY_ID);
     packer.pack(reply_id);
-  } else {
-    packer.pack_map(1);
   }
   packer.pack(message.pv_name);
   // process root structure

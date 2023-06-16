@@ -22,7 +22,7 @@ inline k2eg::common::ConstSerializedMessageShrdPtr serialize(const ChannelData& 
     if (!epics_serializer_factory.hasType(type)) {
         return k2eg::common::ConstSerializedMessageShrdPtr();
     }
-    return epics_serializer_factory.resolve(type)->serialize(message) ;
+    return epics_serializer_factory.resolve(type)->serialize(message, reply_id) ;
 }
 
 // check for a serializer for a specific type
