@@ -27,21 +27,6 @@ MapToCommand::getCMDType(const object& obj) {
   return CommandType::unknown;
 }
 
-SerializationType
-MapToCommand::getSerializationType(const boost::json::value& v) {
-  SerializationType result = SerializationType::Unknown;
-  auto           cmd    = v.as_string();
-  std::transform(cmd.begin(), cmd.end(), cmd.begin(), [](unsigned char c) { return std::tolower(c); }  // correct
-  );
-  if (cmd.compare("json") == 0)
-    result = SerializationType::JSON;
-  else if (cmd.compare("msgpack") == 0)
-    result = SerializationType::Msgpack;
-  else if (cmd.compare("msgpack-compact") == 0)
-    result = SerializationType::MsgpackCompact;
-  return result;
-}
-
 FieldValuesMapUPtr
 MapToCommand::checkFields(const object& obj, const std::vector<std::tuple<std::string, kind>>& fields) {
   FieldValuesMapUPtr result;
@@ -80,9 +65,7 @@ MapToCommand::parse(const object& obj) {
       if (auto activation = obj.if_contains(KEY_ACTIVATE); activation != nullptr && activation->is_bool()) {
         if (activation->as_bool()) {
           if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
-            SerializationType ser_type = SerializationType::JSON;
-            if (auto v = obj.if_contains(KEY_SERIALIZATION)) { ser_type = getSerializationType(*v); }
-            if (auto v = obj.if_contains(KEY_SERIALIZATION)) { ser_type = getSerializationType(*v); }
+            SerializationType ser_type = check_for_serialization(obj, SerializationType::JSON, logger);
             result = std::make_shared<MonitorCommand>(MonitorCommand{CommandType::monitor,
                                                                      ser_type,
                                                                      std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
@@ -109,10 +92,8 @@ MapToCommand::parse(const object& obj) {
     }
     case CommandType::get: {
       if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
-        SerializationType ser_type = SerializationType::JSON;
-        std::string    reply_id = "";
-        if (auto v = obj.if_contains(KEY_SERIALIZATION)) { ser_type = getSerializationType(*v); }
-        if (auto v = obj.if_contains(KEY_REPLY_ID)) { reply_id = v->is_string() ? v->as_string() : ""; }
+        std::string    reply_id = check_for_reply_id(obj, logger);
+        SerializationType ser_type = check_for_serialization(obj, SerializationType::JSON, logger);
         result = std::make_shared<GetCommand>(GetCommand{CommandType::get,
                                                          ser_type,
                                                          std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
@@ -126,9 +107,8 @@ MapToCommand::parse(const object& obj) {
     }
     case CommandType::put: {
       if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_VALUE, kind::string}}); fields != nullptr) {
-        SerializationType ser_type = SerializationType::JSON;
-        std::string    reply_id = "";
-        if (auto v = obj.if_contains(KEY_REPLY_ID)) { reply_id = v->is_string() ? v->as_string() : ""; }
+        std::string    reply_id = check_for_reply_id(obj, logger);
+        SerializationType ser_type = check_for_serialization(obj, SerializationType::JSON, logger);
         result = std::make_shared<PutCommand>(PutCommand{CommandType::put,
                                                          ser_type,
                                                          std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
@@ -142,10 +122,8 @@ MapToCommand::parse(const object& obj) {
     }
     case CommandType::info: {
       if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
-        SerializationType ser_type = SerializationType::JSON;
-        std::string    reply_id = "";
-        if (auto v = obj.if_contains(KEY_SERIALIZATION)) { ser_type = getSerializationType(*v); }
-        if (auto v = obj.if_contains(KEY_REPLY_ID)) { reply_id = v->is_string() ? v->as_string() : ""; }
+        std::string    reply_id = check_for_reply_id(obj, logger);
+        SerializationType ser_type = check_for_serialization(obj, SerializationType::JSON, logger);
         result = std::make_shared<InfoCommand>(InfoCommand{CommandType::info,
                                                            ser_type,
                                                            std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),

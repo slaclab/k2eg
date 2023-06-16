@@ -144,6 +144,7 @@ class CMDControllerCommandTestParametrized : public ::testing::TestWithParam<std
     setenv("EPICS_k2eg_cmd-max-fecth-element", "100", 1);
     setenv("EPICS_k2eg_cmd-max-fecth-time-out", "100", 1);
     setenv("EPICS_k2eg_sub-server-address", KAFKA_ADDR, 1);
+    setenv("EPICS_k2eg_sub-group-id", "", 1);
     opt = std::make_unique<ProgramOptions>();
     opt->parse(argc, argv);
     ServiceResolver<IMetricService>::registerService(std::make_shared<DummyMetricService>(opt->getMetricConfiguration()));

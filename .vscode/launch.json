@@ -256,7 +256,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=CMDController.*"],
+            "args": ["--gtest_filter=CMDController*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
