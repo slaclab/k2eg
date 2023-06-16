@@ -15,6 +15,11 @@
 #include <string>
 namespace k2eg::controller::node::worker {
 
+// struct GetCommandReply : public k2eg::controller::command::cmd::CommandReply {
+//   k2eg::service::epics_impl::ConstChannelDataUPtr  pv_data;
+// };
+// DEFINE_PTR_TYPES(GetCommandReply)
+
 class GetMessage : public k2eg::service::pubsub::PublishMessage {
   const std::string                                 request_type;
   const std::string                                 destination_topic;

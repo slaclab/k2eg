@@ -16,6 +16,7 @@ struct PutCommand : public Command {
     std::string value;
     std::string reply_id;
 };
+
 DEFINE_PTR_TYPES(PutCommand)
 static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, PutCommand const& c) { 
     jv = {

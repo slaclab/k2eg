@@ -15,6 +15,9 @@
 
 namespace k2eg::controller::node::worker {
 
+struct PuCommandReply : public k2eg::controller::command::cmd::CommandReply {
+
+};
 
 struct PutOpInfo : public WorkerAsyncOperation {
   std::string                                pv_name;
