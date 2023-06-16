@@ -1,6 +1,7 @@
 #ifndef K2EG_SERVICE_EPICS_SERIALIZATION_H_
 #define K2EG_SERVICE_EPICS_SERIALIZATION_H_
 #include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/common/serialization.h>
 #include <k2eg/common/types.h>
 namespace k2eg::service::epics_impl {
 // define the type of the supported serailization
