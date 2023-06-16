@@ -8,9 +8,10 @@
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/pubsub/IPublisher.h>
+#include <k2eg/common/BS_thread_pool.hpp>
+#include <k2eg/common/types.h>
 
 #include <chrono>
-#include <k2eg/common/BS_thread_pool.hpp>
 #include <string>
 namespace k2eg::controller::node::worker {
 
@@ -36,12 +37,12 @@ class GetOpInfo : public WorkerAsyncOperation {
  public:
   std::string                                pv_name;
   std::string                                destination_topic;
-  command::cmd::MessageSerType               serialization;
+  k2eg::common::SerializationType               serialization;
   std::string                                reply_id;
   service::epics_impl::ConstGetOperationUPtr op;
   GetOpInfo(const std::string&                         pv_name,
             const std::string&                         destination_topic,
-            const command::cmd::MessageSerType&        serialization,
+            const k2eg::common::SerializationType&        serialization,
             std::string                                reply_id,
             service::epics_impl::ConstGetOperationUPtr op,
             std::uint32_t                              tout_msc = 10000)

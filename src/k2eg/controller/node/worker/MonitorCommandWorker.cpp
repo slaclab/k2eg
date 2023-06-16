@@ -91,7 +91,7 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
 
     std::shared_lock slock(channel_map_mtx);
     // cache the various serilized message for each serializaiton type
-    std::map<MessageSerType, ConstSerializedMessageShrdPtr> local_serialization_cache;
+    std::map<SerializationType, ConstSerializedMessageShrdPtr> local_serialization_cache;
     for (auto& event: *event_received->event_data) {
         // publisher
         for (auto& info_topic: channel_topics_map[event->channel_data.pv_name]) {

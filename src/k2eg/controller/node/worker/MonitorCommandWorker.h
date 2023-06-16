@@ -39,7 +39,7 @@ DEFINE_PTR_TYPES(MonitorMessage)
 // of the monitor data to a topic
 struct ChannelTopicMonitorInfo {
     std::string dest_topic;
-    k2eg::controller::command::cmd::MessageSerType ser_type;
+    k2eg::common::SerializationType ser_type;
 };
 DEFINE_PTR_TYPES(ChannelTopicMonitorInfo);
 

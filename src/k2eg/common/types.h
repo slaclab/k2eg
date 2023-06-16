@@ -6,6 +6,8 @@
 #include <map>
 #include <memory>
 #include <msgpack.hpp>
+#include <boost/json.hpp>
+
 namespace k2eg::common
 {
 #define DEFINE_PTR_TYPES(x) \
@@ -50,6 +52,22 @@ inline x##ShrdPtr Make##x##ShrdPtr(_Args&&... __args) \
     DEFINE_MAP_FOR_TYPE(std::string, std::string, MapStrKV);
 
 enum class SerializationType: std::uint8_t { Unknown, JSON, Msgpack, MsgpackCompact };
+inline constexpr const char *
+serialization_to_string(SerializationType t) noexcept {
+  switch (t) {
+    case SerializationType::JSON: return "Json";
+    case SerializationType::Msgpack: return "Msgpack";
+    case SerializationType::MsgpackCompact: return "Msgpack-Compact";
+    case SerializationType::Unknown: return "unknown";
+  }
+  return "undefined";
+}
+
+static void
+tag_invoke(boost::json::value_from_tag, boost::json::value &jv, k2eg::common::SerializationType const &ser) {
+  jv = {{"type", serialization_to_string(ser)}};
+}
+
 
 class SerializedMessage {
     public:

@@ -1,9 +1,10 @@
 #ifndef K2EG_CONTROLLER_COMMAND_CMD_COMMAND_H_
 #define K2EG_CONTROLLER_COMMAND_CMD_COMMAND_H_
 
+#include <k2eg/common/types.h>
+
 #include <boost/json.hpp>
 #include <string>
-#include <k2eg/common/types.h>
 
 namespace k2eg::controller::command::cmd {
 
@@ -30,24 +31,11 @@ command_type_to_string(CommandType t) noexcept {
 #define KEY_VALUE         "value"
 #define KEY_REPLY_ID      "reply_id"
 
-// is the type of the serialization
-enum class MessageSerType : std::uint8_t { unknown, json, msgpack, msgpack_compact };
-constexpr const char *
-serialization_to_string(MessageSerType t) noexcept {
-  switch (t) {
-    case MessageSerType::json: return "json";
-    case MessageSerType::msgpack: return "msgpack";
-    case MessageSerType::msgpack_compact: return "msgpack-compact";
-    case MessageSerType::unknown: return "unknown";
-  }
-  return "undefined";
-}
-
 struct Command {
-  CommandType    type;
-  MessageSerType serialization;
-  std::string    protocol;
-  std::string    pv_name;
+  CommandType       type;
+  k2eg::common::SerializationType serialization;
+  std::string       protocol;
+  std::string       pv_name;
 };
 DEFINE_PTR_TYPES(Command)
 
@@ -58,10 +46,6 @@ tag_invoke(boost::json::value_from_tag, boost::json::value &jv, CommandType cons
   jv = {{"type", command_type_to_string(cfg)}};
 }
 
-static void
-tag_invoke(boost::json::value_from_tag, boost::json::value &jv, MessageSerType const &ser) {
-  jv = {{"type", serialization_to_string(ser)}};
-}
 
 static void
 tag_invoke(boost::json::value_from_tag, boost::json::value &jv, Command const &c) {

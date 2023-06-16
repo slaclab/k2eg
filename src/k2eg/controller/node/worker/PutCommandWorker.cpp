@@ -8,6 +8,8 @@
 #include <k2eg/controller/command/cmd/PutCommand.h>
 #include <k2eg/service/epics/EpicsPutOperation.h>
 
+#include <boost/json.hpp>
+
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::command;
 using namespace k2eg::controller::command::cmd;
