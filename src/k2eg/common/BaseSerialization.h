@@ -21,14 +21,21 @@ tag_invoke(boost::json::value_from_tag, boost::json::value &jv, k2eg::common::Se
   jv = {{"type", serialization_to_string(ser)}};
 }
 
+class Data {
+ public:
+  Data()                            = default;
+  virtual ~Data()                   = default;
+  virtual const size_t size() const = 0;
+  virtual const char  *data() const = 0;
+};
+DEFINE_PTR_TYPES(Data)
 /**
  */
 class SerializedMessage {
  public:
-  SerializedMessage()               = default;
-  virtual ~SerializedMessage()      = default;
-  virtual const size_t size() const = 0;
-  virtual const char  *data() const = 0;
+  SerializedMessage()                = default;
+  virtual ~SerializedMessage()       = default;
+  virtual ConstDataUPtr data() const = 0;
 };
 DEFINE_PTR_TYPES(SerializedMessage);
 }  // namespace k2eg::common

@@ -1,32 +1,22 @@
 #include <k2eg/service/epics/MsgpackCompactSerializion.h>
 #include <k2eg/controller/command/cmd/Command.h>
 #include <pvType.h>
+#include <memory>
 #include <vector>
 #include <any>
+#include "k2eg/common/MsgpackSerialization.h"
 
 using namespace k2eg::service::epics_impl;
 using namespace k2eg::common;
 namespace pvd = epics::pvData;
-
-#pragma region MsgpackCompactMessage
-MsgpackCompactMessage::MsgpackCompactMessage(epics::pvData::PVStructure::const_shared_pointer epics_pv_struct) : epics_pv_struct(epics_pv_struct) {}
-const size_t
-MsgpackCompactMessage::size() const {
-  return buf.size();
-}
-const char*
-MsgpackCompactMessage::data() const {
-  return buf.data();
-}
-#pragma endregion MsgpackCompactMessage
 
 #pragma region MsgPackSerializer
 REGISTER_SERIALIZER(SerializationType::MsgpackCompact, MsgpackCompactSerializer)
 SerializedMessageShrdPtr
 MsgpackCompactSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
   std::vector<const pvd::PVField*> values;
-  auto                              result = MakeMsgpackCompactMessageShrdPtr(message.data);
-  msgpack::packer<msgpack::sbuffer> packer(result->buf);
+  auto                              result = std::make_shared<MsgpackMessage>();
+  msgpack::packer<msgpack::sbuffer> packer(result->getBuffer());
  
   // process root structure
   scannStructure(message.data.get(), values);

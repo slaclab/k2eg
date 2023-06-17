@@ -1,28 +1,57 @@
 #ifndef k2eg_CONTROLLER_NODE_WORKER_COMMANDWORKER_H_
 #define k2eg_CONTROLLER_NODE_WORKER_COMMANDWORKER_H_
 #include <k2eg/common/types.h>
+#include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/controller/command/CMDCommand.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
 
 #include <chrono>
 #include <k2eg/common/BS_thread_pool.hpp>
+#include "k2eg/common/BaseSerialization.h"
 namespace k2eg::controller::node::worker {
 
 /**
+Base command reply structure
+
+Some command cand send a reply as result of operation,
+thi class represent the base information for a reply
 */
-class ReplySerializer {
- protected:
-  std::shared_ptr<boost::json::value>     reply_content;
-  k2eg::common::ConstSerializedMessageUPtr toJson();
-  k2eg::common::ConstSerializedMessageUPtr toMsgpack();
-  k2eg::common::ConstSerializedMessageUPtr toMsgpackCompact();
-  void makeMsgpack(boost::json::value const& jv, msgpack::packer<msgpack::sbuffer>& packer);
-  void makeMsgpackCompact(boost::json::value const& jv, msgpack::packer<msgpack::sbuffer>& packer);
- public:
-  ReplySerializer(std::shared_ptr<boost::json::value> reply_content);
-  k2eg::common::ConstSerializedMessageUPtr serialize(k2eg::common::SerializationType ser_type);
+struct CommandReply {
+  //[mandatory] si the error code of the operation done by the command
+  const std::int8_t error_code;
+  //[mandatory] is the request id found on the command that has generated the reply
+  const std::string reply_id;
 };
 
+static void
+tag_invoke(boost::json::value_from_tag, boost::json::value &jv, CommandReply const &reply) {
+  jv = {{"error_code", reply.error_code}, {KEY_REPLY_ID, reply.reply_id}};
+}
+
+/**
+Pushable reply message
+*/
+class ReplyPushableMessage : public k2eg::service::pubsub::PublishMessage {
+    const std::string queue;
+    const std::string& type;
+    const std::string request_type;
+    const std::string distribution_key;
+    k2eg::common::ConstSerializedMessageShrdPtr message;
+    k2eg::common::ConstDataUPtr message_data;
+public:
+    ReplyPushableMessage(
+        const std::string& queue, 
+        const std::string& type,
+        const std::string& distribution_key, 
+        k2eg::common::ConstSerializedMessageShrdPtr  message);
+    virtual ~ReplyPushableMessage() = default;
+    char* getBufferPtr();
+    const size_t getBufferSize();
+    const std::string& getQueue();
+    const std::string& getDistributionKey();
+    const std::string& getReqType();
+};
+DEFINE_PTR_TYPES(ReplyPushableMessage)
 /**
 */
 class WorkerAsyncOperation {

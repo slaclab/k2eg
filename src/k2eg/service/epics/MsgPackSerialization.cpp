@@ -2,7 +2,9 @@
 #include <k2eg/controller/command/cmd/Command.h>
 #include <pv/bitSet.h>
 
+#include <memory>
 #include <sstream>
+#include "k2eg/common/MsgpackSerialization.h"
 
 #include <pvType.h>
 
@@ -10,24 +12,12 @@ using namespace k2eg::service::epics_impl;
 using namespace k2eg::common;
 namespace pvd = epics::pvData;
 
-#pragma region MsgPackMessage
-MsgPackMessage::MsgPackMessage(epics::pvData::PVStructure::const_shared_pointer epics_pv_struct) : epics_pv_struct(epics_pv_struct) {}
-const size_t
-MsgPackMessage::size() const {
-  return buf.size();
-}
-const char*
-MsgPackMessage::data() const {
-  return buf.data();
-}
-#pragma endregion MsgPackMessage
-
 #pragma region MsgPackSerializer
 REGISTER_SERIALIZER(SerializationType::Msgpack, MsgPackSerializer)
 SerializedMessageShrdPtr
 MsgPackSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
-  auto                              result = MakeMsgPackMessageShrdPtr(message.data);
-  msgpack::packer<msgpack::sbuffer> packer(result->buf);
+  auto                              result = std::make_shared<MsgpackMessage>();
+  msgpack::packer<msgpack::sbuffer> packer(result->getBuffer());
   if(reply_id.empty()) {
     packer.pack_map(1);
   } else {

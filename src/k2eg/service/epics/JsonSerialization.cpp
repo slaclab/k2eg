@@ -3,9 +3,11 @@
 #include <pv/bitSet.h>
 #include <pv/json.h>
 
+#include <memory>
 #include <sstream>
 
 #include <boost/json/array.hpp>
+#include "k2eg/common/JsonSerialization.h"
 #include <pvData.h>
 #include <pvIntrospect.h>
 using namespace k2eg::common;
@@ -16,13 +18,11 @@ namespace pvd = epics::pvData;
 REGISTER_SERIALIZER(SerializationType::JSON, JsonSerializer)
 SerializedMessageShrdPtr
 JsonSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
-  std::stringstream       ss;
-  boost::json::object     json_root_object;
+  auto json_message = std::make_shared<JsonMessage>();
   // boost::json::serializer sr;
-  processStructure(message.data.get(), message.pv_name, json_root_object);
-  if(!reply_id.empty()){json_root_object[KEY_REPLY_ID] = reply_id;}
-  ss << json_root_object;
-  return MakeJsonMessageShrdPtr(std::move(ss.str()));
+  processStructure(message.data.get(), message.pv_name, json_message->getJsonObject());
+  if(!reply_id.empty()){json_message->getJsonObject()[KEY_REPLY_ID] = reply_id;}
+  return json_message;
 }
 
 void

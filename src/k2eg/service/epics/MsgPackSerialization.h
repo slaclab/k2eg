@@ -18,18 +18,7 @@ public:
 };
 DEFINE_PTR_TYPES(MsgPackSerializer)
 // Serialization message for json encoding
-class MsgPackMessage : public k2eg::common::SerializedMessage {
-    friend class MsgPackSerializer;
-    msgpack::sbuffer buf;
-    epics::pvData::PVStructure::const_shared_pointer epics_pv_struct;
-public:
-    MsgPackMessage(epics::pvData::PVStructure::const_shared_pointer epics_pv_struct);
-    MsgPackMessage() = default;
-    ~MsgPackMessage() = default;
-    const size_t size() const;
-    const char* data() const;
-};
-DEFINE_PTR_TYPES(MsgPackMessage)
+
 } // namespace k2eg::service::epics_impl
 
 #endif // K2EG_SERVICE_EPICS_MSGPACKSERIALIZATION_H_

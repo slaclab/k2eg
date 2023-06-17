@@ -13,6 +13,7 @@
 
 #include <chrono>
 #include <string>
+#include "k2eg/common/BaseSerialization.h"
 namespace k2eg::controller::node::worker {
 
 // struct GetCommandReply : public k2eg::controller::command::cmd::CommandReply {
@@ -20,23 +21,20 @@ namespace k2eg::controller::node::worker {
 // };
 // DEFINE_PTR_TYPES(GetCommandReply)
 
-class GetMessage : public k2eg::service::pubsub::PublishMessage {
-  const std::string                                 request_type;
-  const std::string                                 destination_topic;
-  k2eg::service::epics_impl::ConstChannelDataUPtr   channel_data;
-  const k2eg::common::ConstSerializedMessageShrdPtr message;
-
- public:
-  GetMessage(const std::string&                              destination_topic,
-             k2eg::service::epics_impl::ConstChannelDataUPtr channel_data,
-             k2eg::common::ConstSerializedMessageShrdPtr     message);
-  virtual ~GetMessage() = default;
-  char*              getBufferPtr();
-  const size_t       getBufferSize();
-  const std::string& getQueue();
-  const std::string& getDistributionKey();
-  const std::string& getReqType();
-};
+/**
+Reply serialization
+*/
+// inline void serialize(
+//   const GetCommandReply& reply, 
+//   k2eg::common::SerializationType ser_type, 
+//   common::ConstSerializedMessageShrdPtr serialized_msg) {
+//   switch (ser_type) {
+//     case common::SerializationType::Unknown:
+//     case common::SerializationType::JSON:
+//     case common::SerializationType::Msgpack:
+//     case common::SerializationType::MsgpackCompact: break;
+//   }
+// }
 
 class GetOpInfo : public WorkerAsyncOperation {
  public:

@@ -6,6 +6,7 @@
 #include <thread>
 
 #include "client.h"
+#include "k2eg/controller/node/worker/CommandWorker.h"
 #include "k2eg/service/metric/IMetricService.h"
 
 using namespace k2eg::common;
@@ -22,32 +23,6 @@ using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::pubsub;
 
 using namespace k2eg::service::metric;
-
-#pragma region GetMessage
-GetMessage::GetMessage(const std::string& destination_topic, ConstChannelDataUPtr channel_data, ConstSerializedMessageShrdPtr message)
-    : request_type("get"), destination_topic(destination_topic), channel_data(std::move(channel_data)), message(message) {}
-
-char*
-GetMessage::getBufferPtr() {
-  return const_cast<char*>(message->data());
-}
-const size_t
-GetMessage::getBufferSize() {
-  return message->size();
-}
-const std::string&
-GetMessage::getQueue() {
-  return destination_topic;
-}
-const std::string&
-GetMessage::getDistributionKey() {
-  return channel_data->pv_name;
-}
-const std::string&
-GetMessage::getReqType() {
-  return request_type;
-}
-#pragma endregion GetMessage
 
 #pragma region GetCommandWorker
 GetCommandWorker::GetCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager)
@@ -68,14 +43,10 @@ GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
                                    g_ptr->pv_name % g_ptr->protocol % g_ptr->destination_topic % serialization_to_string(g_ptr->serialization)),
                      LogLevel::DEBUG);
   auto channel_data = epics_service_manager->getChannelData(g_ptr->pv_name, g_ptr->protocol);
-  processing_pool->push_task(&GetCommandWorker::checkGetCompletion,
-                             this,
-                             std::make_shared<GetOpInfo>(
-                              g_ptr->pv_name, 
-                              g_ptr->destination_topic, 
-                              g_ptr->serialization, 
-                              g_ptr->reply_id,
-                              std::move(channel_data)));
+  processing_pool->push_task(
+      &GetCommandWorker::checkGetCompletion,
+      this,
+      std::make_shared<GetOpInfo>(g_ptr->pv_name, g_ptr->destination_topic, g_ptr->serialization, g_ptr->reply_id, std::move(channel_data)));
 }
 
 void
@@ -114,9 +85,8 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
           logger->logMessage("Invalid serilized message", LogLevel::ERROR);
           break;
         }
-        publisher->pushMessage(
-          std::make_unique<GetMessage>(get_info->destination_topic, std::move(channel_data), serialized_message),
-          {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
+        publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->destination_topic, "get-operation", get_info->pv_name, serialized_message),
+                               {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
         break;
     }
   }

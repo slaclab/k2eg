@@ -60,25 +60,6 @@ tag_invoke(boost::json::value_from_tag, boost::json::value &jv, Command const &c
   };
 }
 
-/**
-Base command reply structure
-
-Some command cand send a reply as result of operation,
-thi class represent the base information for a reply
-*/
-struct CommandReply {
-  //[mandatory] si the error code of the operation done by the command
-  const std::int8_t error_code;
-  //[mandatory] is the request id found on the command that has generated the reply
-  const std::string reply_id;
-};
-
-static void
-tag_invoke(boost::json::value_from_tag, boost::json::value &jv, CommandReply const &reply) {
-  jv = {{"error_code", reply.error_code}, {KEY_REPLY_ID, reply.reply_id}};
-}
-
-
 }  // namespace k2eg::controller::command::cmd
 
 #endif  // K2EG_CONTROLLER_COMMAND_CMD_COMMAND_H_
