@@ -312,11 +312,11 @@
                 }
             ]
         },{
-            "name": "Test NodeControllerReply",
+            "name": "Test NodeControllerReplyMessages",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=NodeControllerReply.*"],
+            "args": ["--gtest_filter=NodeControllerReplyMessages.*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

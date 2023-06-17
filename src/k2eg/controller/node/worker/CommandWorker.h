@@ -6,7 +6,11 @@
 
 #include <chrono>
 #include <k2eg/common/BS_thread_pool.hpp>
-#include "k2eg/common/BaseSerialization.h"
+#include <memory>
+#include "k2eg/common/JsonSerialization.h"
+#include "k2eg/common/MsgpackSerialization.h"
+#include <k2eg/common/serialization.h>
+
 namespace k2eg::controller::node::worker {
 
 /**
@@ -29,15 +33,15 @@ tag_invoke(boost::json::value_from_tag, boost::json::value &jv, CommandReply con
 
 inline common::SerializedMessageShrdPtr 
 serializeJson(const CommandReply& reply){
-  return common::SerializedMessageShrdPtr();
+  return std::make_shared<k2eg::common::JsonMessage>();
 }
 inline common::SerializedMessageShrdPtr 
 serializeMsgpack(const CommandReply& reply){
-  return common::SerializedMessageShrdPtr();
+  return std::make_shared<k2eg::common::MsgpackMessage>();
 }
 inline common::SerializedMessageShrdPtr 
 serializeMsgpackCompact(const CommandReply& reply){
-  return common::SerializedMessageShrdPtr();
+  return std::make_shared<k2eg::common::MsgpackMessage>();
 }
 
 inline common::SerializedMessageShrdPtr 
