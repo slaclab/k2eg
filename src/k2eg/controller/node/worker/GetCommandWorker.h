@@ -1,6 +1,7 @@
 #ifndef k2eg_CONTROLLER_NODE_WORKER_GETCOMMANDWORKER_H_
 #define k2eg_CONTROLLER_NODE_WORKER_GETCOMMANDWORKER_H_
 
+#include <k2eg/common/types.h>
 #include <k2eg/controller/command/cmd/Command.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
@@ -9,43 +10,41 @@
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/common/BS_thread_pool.hpp>
-#include <k2eg/common/types.h>
+#include <k2eg/common/BaseSerialization.h>
 
 #include <chrono>
 #include <string>
-#include "k2eg/common/BaseSerialization.h"
+
 namespace k2eg::controller::node::worker {
 
-// struct GetCommandReply : public k2eg::controller::command::cmd::CommandReply {
-//   k2eg::service::epics_impl::ConstChannelDataUPtr  pv_data;
-// };
-// DEFINE_PTR_TYPES(GetCommandReply)
+struct GetCommandReply : public k2eg::controller::node::worker::CommandReply {
+  k2eg::service::epics_impl::ConstChannelDataUPtr pv_data;
+};
+DEFINE_PTR_TYPES(GetCommandReply)
 
-/**
-Reply serialization
-*/
-// inline void serialize(
-//   const GetCommandReply& reply, 
-//   k2eg::common::SerializationType ser_type, 
-//   common::ConstSerializedMessageShrdPtr serialized_msg) {
-//   switch (ser_type) {
-//     case common::SerializationType::Unknown:
-//     case common::SerializationType::JSON:
-//     case common::SerializationType::Msgpack:
-//     case common::SerializationType::MsgpackCompact: break;
-//   }
-// }
+inline common::SerializedMessageShrdPtr 
+serializeJson(const GetCommandReply& reply){
+  return serializeJson(static_cast<CommandReply>(reply));
+}
+inline common::SerializedMessageShrdPtr 
+serializeMsgpack(const GetCommandReply& reply){
+  return serializeMsgpack(static_cast<CommandReply>(reply));
+}
+inline common::SerializedMessageShrdPtr 
+serializeMsgpackCompact(const GetCommandReply& reply){
+  return serializeMsgpackCompact(static_cast<CommandReply>(reply));
+}
 
 class GetOpInfo : public WorkerAsyncOperation {
  public:
   std::string                                pv_name;
   std::string                                destination_topic;
-  k2eg::common::SerializationType               serialization;
+  k2eg::common::SerializationType            serialization;
   std::string                                reply_id;
   service::epics_impl::ConstGetOperationUPtr op;
   GetOpInfo(const std::string&                         pv_name,
             const std::string&                         destination_topic,
-            const k2eg::common::SerializationType&        serialization,
+            const k2eg::common::SerializationType&     serialization,
             std::string                                reply_id,
             service::epics_impl::ConstGetOperationUPtr op,
             std::uint32_t                              tout_msc = 10000)

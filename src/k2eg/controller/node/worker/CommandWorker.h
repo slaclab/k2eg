@@ -3,7 +3,6 @@
 #include <k2eg/common/types.h>
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/controller/command/CMDCommand.h>
-#include <k2eg/controller/node/worker/CommandWorker.h>
 
 #include <chrono>
 #include <k2eg/common/BS_thread_pool.hpp>
@@ -27,6 +26,33 @@ static void
 tag_invoke(boost::json::value_from_tag, boost::json::value &jv, CommandReply const &reply) {
   jv = {{"error_code", reply.error_code}, {KEY_REPLY_ID, reply.reply_id}};
 }
+
+inline common::SerializedMessageShrdPtr 
+serializeJson(const CommandReply& reply){
+  return common::SerializedMessageShrdPtr();
+}
+inline common::SerializedMessageShrdPtr 
+serializeMsgpack(const CommandReply& reply){
+  return common::SerializedMessageShrdPtr();
+}
+inline common::SerializedMessageShrdPtr 
+serializeMsgpackCompact(const CommandReply& reply){
+  return common::SerializedMessageShrdPtr();
+}
+
+inline common::SerializedMessageShrdPtr 
+serialize(const CommandReply& reply, k2eg::common::SerializationType ser_type) {
+  common::SerializedMessageShrdPtr result;
+  switch (ser_type) {
+    case common::SerializationType::Unknown: return common::SerializedMessageShrdPtr();
+    case common::SerializationType::JSON: return serializeJson(reply);
+    case common::SerializationType::Msgpack: return serializeMsgpack(reply);
+    case common::SerializationType::MsgpackCompact: return serializeMsgpackCompact(reply);
+  }
+  return result;
+}
+
+
 
 /**
 Pushable reply message
