@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <sstream>
+#include "k2eg/common/JsonSerialization.h"
 #include "k2eg/common/MsgpackSerialization.h"
 
 #include <pvType.h>
@@ -12,7 +13,15 @@ using namespace k2eg::service::epics_impl;
 using namespace k2eg::common;
 namespace pvd = epics::pvData;
 
-#pragma region MsgPackSerializer
+void 
+MsgPackSerializer::serialize(const ChannelData& message, SerializedMessage& serialized_message) {
+  MsgpackMessage& mp_msg = dynamic_cast<MsgpackMessage&>(serialized_message);
+  msgpack::packer<msgpack::sbuffer> packer(mp_msg.getBuffer());
+  packer.pack(message.pv_name);
+  // process root structure
+  processStructure(message.data.get(), packer);
+}
+
 REGISTER_SERIALIZER(SerializationType::Msgpack, MsgPackSerializer)
 SerializedMessageShrdPtr
 MsgPackSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
@@ -189,5 +198,3 @@ MsgPackSerializer::processStructureArray(pvd::PVStructureArray::const_svector st
   packer.pack_array(structure_array.size());
   for (size_t i = 0, N = structure_array.size(); i < N; i++) { processStructure(structure_array[i].get(), packer); }
 }
-
-#pragma endregion MsgPackSerializer

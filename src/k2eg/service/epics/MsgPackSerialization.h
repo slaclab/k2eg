@@ -14,6 +14,7 @@ class MsgPackSerializer : public Serializer {
 public:
     MsgPackSerializer() = default;
     virtual ~MsgPackSerializer() = default;
+    void serialize(const ChannelData& message, common::SerializedMessage& serialized_message);
     k2eg::common::SerializedMessageShrdPtr serialize(const ChannelData& message, const std::string& reply_id = "");
 };
 DEFINE_PTR_TYPES(MsgPackSerializer)

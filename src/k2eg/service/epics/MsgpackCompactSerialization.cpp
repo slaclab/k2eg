@@ -10,7 +10,32 @@ using namespace k2eg::service::epics_impl;
 using namespace k2eg::common;
 namespace pvd = epics::pvData;
 
-#pragma region MsgPackSerializer
+void 
+MsgpackCompactSerializer::serialize(const ChannelData& message, SerializedMessage& serialized_message) {
+  std::vector<const pvd::PVField*> values;
+  MsgpackMessage& mp_msg = dynamic_cast<MsgpackMessage&>(serialized_message);
+  msgpack::packer<msgpack::sbuffer> packer(mp_msg.getBuffer());
+  scannStructure(message.data.get(), values);
+  packer.pack(message.pv_name);
+  packer.pack_array(values.size());
+  //serialize
+  for(auto & f: values) {
+    auto type = f->getField()->getType();
+    switch (type) {
+      case pvd::Type::scalar: {
+        processScalar(static_cast<const pvd::PVScalar*>(f), packer);
+        break;
+      }
+      case pvd::Type::scalarArray: {
+        processScalarArray(static_cast<const pvd::PVScalarArray*>(f), packer);
+        break;
+      }
+
+      default: break;
+    }
+  }
+}
+
 REGISTER_SERIALIZER(SerializationType::MsgpackCompact, MsgpackCompactSerializer)
 SerializedMessageShrdPtr
 MsgpackCompactSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
@@ -203,5 +228,3 @@ void
 MsgpackCompactSerializer::scannStructureArray(pvd::PVStructureArray::const_svector structure_array, std::vector<const epics::pvData::PVField*>& values) {
   for (size_t i = 0, N = structure_array.size(); i < N; i++) { scannStructure(structure_array[i].get(), values); }
 }
-
-#pragma endregion MsgPackSerializer

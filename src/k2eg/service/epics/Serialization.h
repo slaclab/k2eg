@@ -3,6 +3,8 @@
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/common/serialization.h>
 #include <k2eg/common/types.h>
+#include "k2eg/common/BaseSerialization.h"
+#include "k2eg/common/JsonSerialization.h"
 namespace k2eg::service::epics_impl {
 // define the type of the supported serailization
 
@@ -11,6 +13,7 @@ namespace k2eg::service::epics_impl {
 class Serializer {
 public:
     virtual k2eg::common::SerializedMessageShrdPtr serialize(const ChannelData& message, const std::string& reply_id = "") = 0;
+    virtual void serialize(const ChannelData& message, common::SerializedMessage& serialized_message) = 0;
 };
 DEFINE_PTR_TYPES(Serializer)
 
@@ -23,7 +26,7 @@ inline k2eg::common::ConstSerializedMessageShrdPtr serialize(const ChannelData& 
     if (!epics_serializer_factory.hasType(type)) {
         return k2eg::common::ConstSerializedMessageShrdPtr();
     }
-    return epics_serializer_factory.resolve(type)->serialize(message, reply_id) ;
+    return epics_serializer_factory.resolve(type)->serialize(message, reply_id);
 }
 
 // check for a serializer for a specific type

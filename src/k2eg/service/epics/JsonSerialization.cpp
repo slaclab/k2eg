@@ -16,6 +16,13 @@ namespace pvd = epics::pvData;
 
 #pragma region JsonSerializer
 REGISTER_SERIALIZER(SerializationType::JSON, JsonSerializer)
+
+void
+JsonSerializer::serialize(const ChannelData& message, SerializedMessage& serialized_message){
+  JsonMessage& js_msg = dynamic_cast<JsonMessage&>(serialized_message);
+  processStructure(message.data.get(), message.pv_name, js_msg.getJsonObject());
+}
+
 SerializedMessageShrdPtr
 JsonSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
   auto json_message = std::make_shared<JsonMessage>();

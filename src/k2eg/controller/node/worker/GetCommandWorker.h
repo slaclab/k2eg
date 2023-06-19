@@ -1,6 +1,7 @@
 #ifndef k2eg_CONTROLLER_NODE_WORKER_GETCOMMANDWORKER_H_
 #define k2eg_CONTROLLER_NODE_WORKER_GETCOMMANDWORKER_H_
 
+#include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/types.h>
 #include <k2eg/controller/command/cmd/Command.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
@@ -9,10 +10,9 @@
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/pubsub/IPublisher.h>
-#include <k2eg/common/BS_thread_pool.hpp>
-#include <k2eg/common/BaseSerialization.h>
 
 #include <chrono>
+#include <k2eg/common/BS_thread_pool.hpp>
 #include <string>
 
 namespace k2eg::controller::node::worker {
@@ -22,17 +22,20 @@ struct GetCommandReply : public k2eg::controller::node::worker::CommandReply {
 };
 DEFINE_PTR_TYPES(GetCommandReply)
 
-inline common::SerializedMessageShrdPtr 
-serializeJson(const GetCommandReply& reply){
-  return serializeJson(static_cast<CommandReply>(reply));
+inline void
+serializeJson(const GetCommandReply& reply, common::JsonMessage& json_message) {
+  serializeJson(static_cast<CommandReply>(reply), json_message);
+  service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::JSON)->serialize(*reply.pv_data, json_message);
 }
-inline common::SerializedMessageShrdPtr 
-serializeMsgpack(const GetCommandReply& reply){
-  return serializeMsgpack(static_cast<CommandReply>(reply));
+inline void
+serializeMsgpack(const GetCommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0) {
+  serializeMsgpack(static_cast<CommandReply>(reply), msgpack_message, map_size + 1);
+  service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::Msgpack)->serialize(*reply.pv_data, msgpack_message);
 }
-inline common::SerializedMessageShrdPtr 
-serializeMsgpackCompact(const GetCommandReply& reply){
-  return serializeMsgpackCompact(static_cast<CommandReply>(reply));
+inline void
+serializeMsgpackCompact(const GetCommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0) {
+  serializeMsgpackCompact(static_cast<CommandReply>(reply), msgpack_message, map_size + 1);
+  service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::MsgpackCompact)->serialize(*reply.pv_data, msgpack_message);
 }
 
 class GetOpInfo : public WorkerAsyncOperation {
