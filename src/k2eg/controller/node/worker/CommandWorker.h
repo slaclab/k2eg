@@ -26,27 +26,27 @@ thi class represent the base information for a reply
 */
 struct CommandReply {
   //[mandatory] si the error code of the operation done by the command
-  const std::int8_t error_code;
+  const std::int8_t error;
   //[mandatory] is the request id found on the command that has generated the reply
   const std::string reply_id;
 };
 
 static void
 tag_invoke(boost::json::value_from_tag, boost::json::value& jv, CommandReply const& reply) {
-  jv = {{"error_code", reply.error_code}, {KEY_REPLY_ID, reply.reply_id}};
+  jv = {{"error", reply.error}, {KEY_REPLY_ID, reply.reply_id}};
 }
 
 inline void
 serializeJson(const CommandReply& reply, common::JsonMessage& json_message) {
-  json_message.getJsonObject()["error_code"] = reply.error_code;
+  json_message.getJsonObject()["error"] = reply.error;
   json_message.getJsonObject()[KEY_REPLY_ID] = reply.reply_id;
 }
 inline void
 serializeMsgpack(const CommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0) {
   msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
   packer.pack_map(map_size + 2);
-  packer.pack("error_code");
-  packer.pack(reply.error_code);
+  packer.pack("error");
+  packer.pack(reply.error);
   packer.pack(KEY_REPLY_ID);
   packer.pack(reply.reply_id);
 }
@@ -54,8 +54,8 @@ inline void
 serializeMsgpackCompact(const CommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0) {
   msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
   packer.pack_map(map_size + 2);
-  packer.pack("error_code");
-  packer.pack(reply.error_code);
+  packer.pack("error");
+  packer.pack(reply.error);
   packer.pack(KEY_REPLY_ID);
   packer.pack(reply.reply_id);
 }

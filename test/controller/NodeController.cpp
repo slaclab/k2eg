@@ -27,6 +27,7 @@
 #include <string>
 #include <thread>
 
+#include "boost/json/object.hpp"
 #include "k2eg/service/metric/IMetricService.h"
 #include "msgpack/v3/object_fwd_decl.hpp"
 
@@ -81,13 +82,13 @@ class DummyPublisher : public IPublisher {
     return 0;
   }
   int
-  pushMessage(PublishMessageUniquePtr message,  const PublisherHeaders& header = PublisherHeaders()) {
+  pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& header = PublisherHeaders()) {
     sent_messages.push_back(std::move(message));
     lref.count_down();
     return 0;
   }
   int
-  pushMessages(PublisherMessageVector& messages,  const PublisherHeaders& header = PublisherHeaders()) {
+  pushMessages(PublisherMessageVector& messages, const PublisherHeaders& header = PublisherHeaders()) {
     for (auto& uptr : messages) {
       sent_messages.push_back(std::move(uptr));
       lref.count_down();
@@ -102,6 +103,7 @@ class DummyPublisher : public IPublisher {
 
 class DummyPublisherCounter : public IPublisher {
   std::uint64_t counter;
+
  public:
   std::latch l;
   DummyPublisherCounter(unsigned int latch_counter)
@@ -122,14 +124,14 @@ class DummyPublisherCounter : public IPublisher {
     return 0;
   }
   int
-  pushMessage(PublishMessageUniquePtr message,  const PublisherHeaders& header = PublisherHeaders()) {
+  pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& header = PublisherHeaders()) {
     counter++;
     l.count_down();
     return 0;
   }
   int
-  pushMessages(PublisherMessageVector& messages,  const PublisherHeaders& header = PublisherHeaders()) {
-    counter +=messages.size();
+  pushMessages(PublisherMessageVector& messages, const PublisherHeaders& header = PublisherHeaders()) {
+    counter += messages.size();
     l.count_down(messages.size());
     return 0;
   }
@@ -142,8 +144,7 @@ class DummyPublisherCounter : public IPublisher {
 class DummyPublisherNoSignal : public IPublisher {
  public:
   std::vector<PublishMessageSharedPtr> sent_messages;
-  DummyPublisherNoSignal()
-      : IPublisher(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "fake_address"})){};
+  DummyPublisherNoSignal() : IPublisher(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "fake_address"})){};
   ~DummyPublisherNoSignal() = default;
   void
   setAutoPoll(bool autopoll) {}
@@ -160,12 +161,12 @@ class DummyPublisherNoSignal : public IPublisher {
     return 0;
   }
   int
-  pushMessage(PublishMessageUniquePtr message,  const PublisherHeaders& header = PublisherHeaders()) {
+  pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& header = PublisherHeaders()) {
     PublishMessageUniquePtr tmp_ptr_for_clean_data = std::move(message);
     return 0;
   }
   int
-  pushMessages(PublisherMessageVector& messages,  const PublisherHeaders& header = PublisherHeaders()) {
+  pushMessages(PublisherMessageVector& messages, const PublisherHeaders& header = PublisherHeaders()) {
     messages.clear();
     return 0;
   }
@@ -182,7 +183,7 @@ initBackend(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   int         argc    = 1;
   const char* argv[1] = {"epics-k2eg-test"};
   clearenv();
-  if(enable_debug_log) {
+  if (enable_debug_log) {
     setenv("EPICS_k2eg_log-on-console", "true", 1);
     setenv("EPICS_k2eg_log-level", "debug", 1);
   } else {
@@ -268,8 +269,8 @@ TEST(NodeController, MonitorCommandMsgPackSer) {
   EXPECT_NE(published, 0);
 
   // stop acquire
-  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{
-      CommandType::monitor, SerializationType::Msgpack, "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
+      MonitorCommand{CommandType::monitor, SerializationType::Msgpack, "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
 
   sleep(1);
   EXPECT_NO_THROW(published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(););
@@ -301,8 +302,8 @@ TEST(NodeController, MonitorCommandMsgPackCompactSer) {
   EXPECT_NE(published, 0);
 
   // stop acquire
-  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{
-      CommandType::monitor, k2eg::common::SerializationType::MsgpackCompact, "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
+      MonitorCommand{CommandType::monitor, k2eg::common::SerializationType::MsgpackCompact, "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
 
   sleep(1);
   EXPECT_NO_THROW(published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(););
@@ -349,6 +350,7 @@ TEST(NodeController, MonitorCommandAfterReboot) {
 }
 
 TEST(NodeController, GetCommandJson) {
+  boost::json::object             json_object;
   std::latch                      work_done{1};
   std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
   // set environment variable for test
@@ -362,20 +364,24 @@ TEST(NodeController, GetCommandJson) {
   size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
   EXPECT_NE(published, 0);
   // check for json forward
-  EXPECT_NO_THROW(auto json_object = getJsonObject(*publisher->sent_messages[0]););
+  EXPECT_NO_THROW(json_object = getJsonObject(*publisher->sent_messages[0]););
+  std::cout << json_object << std::endl;
+  EXPECT_NE(json_object.if_contains("error"), nullptr);
+  EXPECT_NE(json_object.if_contains(KEY_REPLY_ID), nullptr);
+  EXPECT_NE(json_object.if_contains("channel:ramp:ramp"), nullptr);
   // dispose all
   deinitBackend(std::move(node_controller));
 }
 
 TEST(NodeController, GetCommandJsonWithReplyID) {
-  boost::json::object json_obj;
+  boost::json::object             json_obj;
   std::latch                      work_done{1};
   std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
   // set environment variable for test
   auto node_controller = initBackend(publisher);
 
-  EXPECT_NO_THROW(node_controller->submitCommand(
-      {std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::JSON, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN, "REP_ID_JSON"})}););
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(
+      GetCommand{CommandType::get, SerializationType::JSON, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN, "REP_ID_JSON"})}););
 
   work_done.wait();
   // we need to have publish some message
@@ -414,13 +420,13 @@ TEST(NodeController, GetCommandMsgPack) {
 
 TEST(NodeController, GetCommandMsgPackReplyID) {
   typedef std::map<std::string, msgpack::object> MapTest;
-  std::latch                      work_done{1};
-  std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
+  std::latch                                     work_done{1};
+  std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
   // set environment variable for test
   auto node_controller = initBackend(publisher);
 
-  EXPECT_NO_THROW(node_controller->submitCommand(
-      {std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::Msgpack, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN, "REPLY_ID_MSGPACK"})}););
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(
+      GetCommand{CommandType::get, SerializationType::Msgpack, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN, "REPLY_ID_MSGPACK"})}););
 
   work_done.wait();
   // we need to have publish some message
@@ -431,7 +437,7 @@ TEST(NodeController, GetCommandMsgPackReplyID) {
   msgpack::object   msgpack_object;
   EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
   msgpack_object = msgpack_unpacked.get();
-  auto mt = msgpack_object.as<MapTest>();
+  auto mt        = msgpack_object.as<MapTest>();
   EXPECT_EQ(mt.contains(KEY_REPLY_ID), true);
   EXPECT_STREQ(mt[KEY_REPLY_ID].as<std::string>().c_str(), "REPLY_ID_MSGPACK");
   EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
@@ -456,7 +462,7 @@ TEST(NodeController, GetCommandMsgPackCompack) {
   msgpack::unpacked msgpack_unpacked;
   msgpack::object   msgpack_object;
   EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
-  msgpack_object = msgpack_unpacked.get();
+  EXPECT_NO_THROW(msgpack_object = msgpack_unpacked.get(););
   EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
   // dispose all
   deinitBackend(std::move(node_controller));
@@ -464,8 +470,8 @@ TEST(NodeController, GetCommandMsgPackCompack) {
 
 TEST(NodeController, GetCommandMsgPackCompackWithReplyID) {
   typedef std::vector<msgpack::object> VecTest;
-  std::latch                      work_done{1};
-  std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
+  std::latch                           work_done{1};
+  std::shared_ptr<DummyPublisher>      publisher = std::make_shared<DummyPublisher>(work_done);
   // set environment variable for test
   auto node_controller = initBackend(publisher);
 
@@ -489,18 +495,18 @@ TEST(NodeController, GetCommandMsgPackCompackWithReplyID) {
   deinitBackend(std::move(node_controller));
 }
 
-inline void wait_latch(std::latch& l) \
-{ \
- bool w = true; \
- int counter = 10;
- while(w && counter > 0) { \
-     if(l.try_wait()) { \
+inline void
+wait_latch(std::latch& l) {
+  bool w       = true;
+  int  counter = 10;
+  while (w && counter > 0) {
+    if (l.try_wait()) {
       w = false;
-     } else {
+    } else {
       counter--;
-      std::this_thread::sleep_for(std::chrono::milliseconds(250)); 
-     }
- }
+      std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    }
+  }
 }
 
 TEST(NodeController, GetCommandCAChannel) {
@@ -597,8 +603,8 @@ TEST(NodeController, PutCommandScalarArray) {
   // give some time for the timeout
   // sleep(2);
 
-  EXPECT_NO_THROW(node_controller->submitCommand(
-      {std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, "pva", "channel:waveform", KAFKA_TOPIC_ACQUIRE_IN})}););
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(
+      GetCommand{CommandType::get, SerializationType::MsgpackCompact, "pva", "channel:waveform", KAFKA_TOPIC_ACQUIRE_IN})}););
 
   // wait for the result of get command
   work_done.wait();
@@ -654,8 +660,8 @@ TEST(NodeController, RandomCommand) {
       case 3: {
         auto random_scalar = uniform_dist(e1);
         std::this_thread::sleep_for(std::chrono::milliseconds(uniform_dist_sleep(e1)));
-        EXPECT_NO_THROW(node_controller->submitCommand(
-            {std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::Unknown, "pva", "variable:b", std::to_string(random_scalar)})}););
+        EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(
+            PutCommand{CommandType::put, SerializationType::Unknown, "pva", "variable:b", std::to_string(random_scalar)})}););
       }
     }
   }

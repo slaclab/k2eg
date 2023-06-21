@@ -80,7 +80,7 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
           logger->logMessage(STRING_FORMAT("No data received for %1%", get_info->pv_name), LogLevel::ERROR);
           break;
         }
-        auto serialized_message = serialize(*channel_data, get_info->serialization, get_info->reply_id);
+        auto serialized_message = serialize(GetCommandReply{0, get_info->reply_id, get_info->op->getChannelData()}, get_info->serialization);
         if (!serialized_message) {
           logger->logMessage("Invalid serilized message", LogLevel::ERROR);
           break;

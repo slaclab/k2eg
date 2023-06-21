@@ -17,21 +17,35 @@
 
 namespace k2eg::controller::node::worker {
 
+/**
+Get reply message
+*/
 struct GetCommandReply : public k2eg::controller::node::worker::CommandReply {
   k2eg::service::epics_impl::ConstChannelDataUPtr pv_data;
 };
 DEFINE_PTR_TYPES(GetCommandReply)
 
+/**
+Get reply message json serialization
+*/
 inline void
 serializeJson(const GetCommandReply& reply, common::JsonMessage& json_message) {
   serializeJson(static_cast<CommandReply>(reply), json_message);
   service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::JSON)->serialize(*reply.pv_data, json_message);
 }
+
+/**
+Get reply message msgpack serialization
+*/
 inline void
 serializeMsgpack(const GetCommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0) {
   serializeMsgpack(static_cast<CommandReply>(reply), msgpack_message, map_size + 1);
   service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::Msgpack)->serialize(*reply.pv_data, msgpack_message);
 }
+
+/**
+Get reply message msgpack compact serialization
+*/
 inline void
 serializeMsgpackCompact(const GetCommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0) {
   serializeMsgpackCompact(static_cast<CommandReply>(reply), msgpack_message, map_size + 1);
