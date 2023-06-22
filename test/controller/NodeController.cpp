@@ -24,6 +24,7 @@
 #include <msgpack.hpp>
 #include <ostream>
 #include <random>
+#include <ratio>
 #include <string>
 #include <thread>
 
@@ -162,7 +163,7 @@ class DummyPublisherNoSignal : public IPublisher {
   }
   int
   pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& header = PublisherHeaders()) {
-    PublishMessageUniquePtr tmp_ptr_for_clean_data = std::move(message);
+    sent_messages.push_back(std::move(message));
     return 0;
   }
   int
@@ -175,6 +176,21 @@ class DummyPublisherNoSignal : public IPublisher {
     return sent_messages.size();
   }
 };
+
+inline void
+wait_forPublished_message_size(DummyPublisherNoSignal& publisher, unsigned int requested_size, unsigned int timeout_ms) {
+  auto                                    start_time = std::chrono::steady_clock::now();
+  auto                                    end_time   = std::chrono::steady_clock::now();
+  std::chrono::duration<long, std::milli> tout       = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+  bool                                    waiting    = true;
+  while (waiting) {
+    waiting = publisher.getQueueMessageSize() <= requested_size;
+    waiting = waiting && (tout.count() <= timeout_ms);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    end_time = std::chrono::steady_clock::now();
+    tout     = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+  }
+}
 
 #ifdef __linux__
 
@@ -365,10 +381,9 @@ TEST(NodeController, GetCommandJson) {
   EXPECT_NE(published, 0);
   // check for json forward
   EXPECT_NO_THROW(json_object = getJsonObject(*publisher->sent_messages[0]););
-  std::cout << json_object << std::endl;
-  EXPECT_NE(json_object.if_contains("error"), nullptr);
-  EXPECT_NE(json_object.if_contains(KEY_REPLY_ID), nullptr);
-  EXPECT_NE(json_object.if_contains("channel:ramp:ramp"), nullptr);
+  EXPECT_EQ(json_object.contains("error"), true);
+  EXPECT_EQ(json_object.contains(KEY_REPLY_ID), true);
+  EXPECT_EQ(json_object.contains("channel:ramp:ramp"), true);
   // dispose all
   deinitBackend(std::move(node_controller));
 }
@@ -389,15 +404,18 @@ TEST(NodeController, GetCommandJsonWithReplyID) {
   EXPECT_NE(published, 0);
   // check for json forward
   EXPECT_NO_THROW(json_obj = getJsonObject(*publisher->sent_messages[0]););
+  EXPECT_EQ(json_obj.contains("error"), true);
   EXPECT_EQ(json_obj.contains(KEY_REPLY_ID), true);
+  EXPECT_EQ(json_obj.contains("channel:ramp:ramp"), true);
   EXPECT_STREQ(json_obj[KEY_REPLY_ID].as_string().c_str(), "REP_ID_JSON");
   // dispose all
   deinitBackend(std::move(node_controller));
 }
 
 TEST(NodeController, GetCommandMsgPack) {
-  std::latch                      work_done{1};
-  std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
+  typedef std::map<std::string, msgpack::object> Map;
+  std::latch                                     work_done{1};
+  std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
   // set environment variable for test
   auto node_controller = initBackend(publisher);
 
@@ -412,21 +430,25 @@ TEST(NodeController, GetCommandMsgPack) {
   msgpack::unpacked msgpack_unpacked;
   msgpack::object   msgpack_object;
   EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
-  msgpack_object = msgpack_unpacked.get();
+  EXPECT_NO_THROW(msgpack_object = msgpack_unpacked.get(););
   EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
+  auto map_reply = msgpack_object.as<Map>();
+  EXPECT_EQ(map_reply.contains("error"), true);
+  EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
+  EXPECT_EQ(map_reply.contains("channel:ramp:ramp"), true);
   // dispose all
   deinitBackend(std::move(node_controller));
 }
 
 TEST(NodeController, GetCommandMsgPackReplyID) {
-  typedef std::map<std::string, msgpack::object> MapTest;
+  typedef std::map<std::string, msgpack::object> Map;
   std::latch                                     work_done{1};
   std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
   // set environment variable for test
   auto node_controller = initBackend(publisher);
 
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(
-      GetCommand{CommandType::get, SerializationType::Msgpack, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN, "REPLY_ID_MSGPACK"})}););
+      GetCommand{CommandType::get, SerializationType::MsgpackCompact, "pva", "channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN, "REPLY_ID_MSGPACK"})}););
 
   work_done.wait();
   // we need to have publish some message
@@ -436,18 +458,22 @@ TEST(NodeController, GetCommandMsgPackReplyID) {
   msgpack::unpacked msgpack_unpacked;
   msgpack::object   msgpack_object;
   EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
-  msgpack_object = msgpack_unpacked.get();
-  auto mt        = msgpack_object.as<MapTest>();
-  EXPECT_EQ(mt.contains(KEY_REPLY_ID), true);
-  EXPECT_STREQ(mt[KEY_REPLY_ID].as<std::string>().c_str(), "REPLY_ID_MSGPACK");
+  EXPECT_NO_THROW(msgpack_object = msgpack_unpacked.get(););
   EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
+  auto map_reply = msgpack_object.as<Map>();
+  EXPECT_EQ(map_reply.contains("error"), true);
+  EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
+  EXPECT_EQ(map_reply.contains("channel:ramp:ramp"), true);
+  EXPECT_EQ(map_reply.at("channel:ramp:ramp").type, msgpack::type::ARRAY);
+  EXPECT_STREQ(map_reply[KEY_REPLY_ID].as<std::string>().c_str(), "REPLY_ID_MSGPACK");
   // dispose all
   deinitBackend(std::move(node_controller));
 }
 
 TEST(NodeController, GetCommandMsgPackCompack) {
-  std::latch                      work_done{1};
-  std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
+  typedef std::map<std::string, msgpack::object> Map;
+  std::latch                                     work_done{1};
+  std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
   // set environment variable for test
   auto node_controller = initBackend(publisher);
 
@@ -463,15 +489,21 @@ TEST(NodeController, GetCommandMsgPackCompack) {
   msgpack::object   msgpack_object;
   EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
   EXPECT_NO_THROW(msgpack_object = msgpack_unpacked.get(););
-  EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
+  EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
+  auto map_reply = msgpack_object.as<Map>();
+  EXPECT_EQ(map_reply.contains("error"), true);
+  EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
+  EXPECT_EQ(map_reply.contains("channel:ramp:ramp"), true);
+  EXPECT_EQ(map_reply.at("channel:ramp:ramp").type, msgpack::type::ARRAY);
   // dispose all
   deinitBackend(std::move(node_controller));
 }
 
 TEST(NodeController, GetCommandMsgPackCompackWithReplyID) {
-  typedef std::vector<msgpack::object> VecTest;
-  std::latch                           work_done{1};
-  std::shared_ptr<DummyPublisher>      publisher = std::make_shared<DummyPublisher>(work_done);
+  typedef std::map<std::string, msgpack::object> Map;
+  typedef std::vector<msgpack::object>           VecTest;
+  std::latch                                     work_done{1};
+  std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
   // set environment variable for test
   auto node_controller = initBackend(publisher);
 
@@ -487,10 +519,13 @@ TEST(NodeController, GetCommandMsgPackCompackWithReplyID) {
   msgpack::object   msgpack_object;
   EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
   msgpack_object = msgpack_unpacked.get();
-  EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
-  auto res_vec = msgpack_object.as<VecTest>();
-  EXPECT_EQ(res_vec[0].type, msgpack::type::STR);
-  EXPECT_STREQ(res_vec[0].as<std::string>().c_str(), "REPLY_ID_MSGPACK_COMPACT");
+  EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
+  auto map_reply = msgpack_object.as<Map>();
+  EXPECT_EQ(map_reply.contains("error"), true);
+  EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
+  EXPECT_EQ(map_reply.contains("channel:ramp:ramp"), true);
+  EXPECT_EQ(map_reply.at("channel:ramp:ramp").type, msgpack::type::ARRAY);
+  EXPECT_STREQ(map_reply[KEY_REPLY_ID].as<std::string>().c_str(), "REPLY_ID_MSGPACK_COMPACT");
   // dispose all
   deinitBackend(std::move(node_controller));
 }
@@ -557,70 +592,92 @@ TEST(NodeController, PutCommandBadChannel) {
   deinitBackend(std::move(node_controller));
 }
 
-typedef std::vector<msgpack::object> MsgpackObjectVector;
 TEST(NodeController, PutCommandScalar) {
-  std::random_device                 r;
-  std::default_random_engine         e1(r());
-  std::uniform_int_distribution<int> uniform_dist(1, 100);
-  std::latch                         work_done{1};
-  ConstChannelDataUPtr               value_readout;
-  std::shared_ptr<DummyPublisher>    publisher = std::make_shared<DummyPublisher>(work_done);
+  typedef std::map<std::string, msgpack::object> Map;
+  typedef std::vector<msgpack::object>           Vec;
+  std::random_device                             r;
+  std::default_random_engine                     e1(r());
+  std::uniform_int_distribution<int>             uniform_dist(1, 100);
+  ConstChannelDataUPtr                           value_readout;
+  msgpack::unpacked                              msgpack_unpacked;
+  msgpack::object                                msgpack_object;
+  auto                                           publisher = std::make_shared<DummyPublisherNoSignal>();
   // set environment variable for test
   auto node_controller = initBackend(publisher);
   auto random_scalar   = uniform_dist(e1);
-  EXPECT_NO_THROW(node_controller->submitCommand(
-      {std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::Unknown, "pva", "variable:b", std::to_string(random_scalar)})}););
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(
+      PutCommand{CommandType::put, SerializationType::Msgpack, "pva", "variable:b", "reply-topic", std::to_string(random_scalar), "PUT_REPLY_ID"})}););
   // give some time for the timeout
-  // sleep(2);
+  wait_forPublished_message_size(*publisher, 1, 2000);
+
+  // check for put reply
+  EXPECT_EQ(publisher->sent_messages.size(), 1);
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+  msgpack_object = msgpack_unpacked.get();
+  EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
+  auto map_reply = msgpack_object.as<Map>();
+  EXPECT_EQ(map_reply.contains("error"), true);
+  EXPECT_EQ(map_reply["error"].as<int>(), 0);
+  EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
+  EXPECT_STREQ(map_reply[KEY_REPLY_ID].as<std::string>().c_str(), "PUT_REPLY_ID");
 
   EXPECT_NO_THROW(node_controller->submitCommand(
       {std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, "pva", "variable:b", KAFKA_TOPIC_ACQUIRE_IN})}););
+  wait_forPublished_message_size(*publisher, 2, 2000);
+  EXPECT_EQ(publisher->sent_messages.size(), 2);
 
-  // wait for the result of get command
-  work_done.wait();
-  msgpack::unpacked msgpack_unpacked;
-  msgpack::object   msgpack_object;
-  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+  // check for get reply
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[1]););
   msgpack_object = msgpack_unpacked.get();
-  EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
-
-  auto vec = msgpack_object.as<MsgpackObjectVector>();
-  EXPECT_EQ(vec[1].type, msgpack::type::POSITIVE_INTEGER);
-  EXPECT_EQ(vec[1].as<int>(), random_scalar);
+  EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
+  map_reply = msgpack_object.as<Map>();
+  EXPECT_EQ(map_reply.contains("variable:b"), true);
+  EXPECT_EQ(map_reply["variable:b"].type, msgpack::type::ARRAY);
+  auto vec_reply = map_reply["variable:b"].as<Vec>();
+  EXPECT_EQ(vec_reply[0].type, msgpack::type::POSITIVE_INTEGER);
+  EXPECT_EQ(vec_reply[0].as<int>(), random_scalar);
   // dispose all
   deinitBackend(std::move(node_controller));
 }
 
 TEST(NodeController, PutCommandScalarArray) {
-  std::latch                      work_done{1};
-  ConstChannelDataUPtr            value_readout;
-  std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
+  typedef std::map<std::string, msgpack::object> Map;
+  typedef std::vector<msgpack::object>           Vec;
+  msgpack::unpacked                              msgpack_unpacked;
+  msgpack::object                                msgpack_object;
+  ConstChannelDataUPtr                           value_readout;
+  auto                                           publisher = std::make_shared<DummyPublisherNoSignal>();
   // set environment variable for test
   auto node_controller = initBackend(publisher);
 
-  EXPECT_NO_THROW(node_controller->submitCommand(
-      {std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::Unknown, "pva", "channel:waveform", "8 0 0 0 0 0 0 0 0"})}););
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(
+      PutCommand{CommandType::put, SerializationType::MsgpackCompact, "pva", "channel:waveform", "DESTINATION_TOPIC", "8 0 0 0 0 0 0 0 0", "PUT_REPLY_ID"})}););
   // give some time for the timeout
-  // sleep(2);
+  wait_forPublished_message_size(*publisher, 1, 2000);
+  EXPECT_EQ(publisher->sent_messages.size(), 1);
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+  msgpack_object = msgpack_unpacked.get();
+  EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
+  auto map_reply = msgpack_object.as<Map>();
+  EXPECT_EQ(map_reply.contains("error"), true);
+  EXPECT_EQ(map_reply["error"].as<int>(), 0);
+  EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
+  EXPECT_STREQ(map_reply[KEY_REPLY_ID].as<std::string>().c_str(), "PUT_REPLY_ID");
 
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(
       GetCommand{CommandType::get, SerializationType::MsgpackCompact, "pva", "channel:waveform", KAFKA_TOPIC_ACQUIRE_IN})}););
-
+  wait_forPublished_message_size(*publisher, 2, 2000);
+  EXPECT_EQ(publisher->sent_messages.size(), 2);
   // wait for the result of get command
-  work_done.wait();
-  msgpack::unpacked msgpack_unpacked;
-  msgpack::object   msgpack_object;
-  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[1]););
   msgpack_object = msgpack_unpacked.get();
-  EXPECT_EQ(msgpack_object.type, msgpack::type::ARRAY);
-
-  auto vec = msgpack_object.as<MsgpackObjectVector>();
-  EXPECT_EQ(vec[1].type, msgpack::type::ARRAY);
-
-  auto value_vec = vec[1].as<MsgpackObjectVector>();
-  EXPECT_EQ(value_vec[0].type, msgpack::type::POSITIVE_INTEGER);
-  ;
-
+  EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
+  map_reply = msgpack_object.as<Map>();
+  EXPECT_EQ(map_reply.contains("channel:waveform"), true);
+  EXPECT_EQ(map_reply["channel:waveform"].type, msgpack::type::ARRAY);
+  auto vec_reply = map_reply["channel:waveform"].as<Vec>();
+  EXPECT_EQ(vec_reply[0].type, msgpack::type::ARRAY);
   // dispose all
   deinitBackend(std::move(node_controller));
 }

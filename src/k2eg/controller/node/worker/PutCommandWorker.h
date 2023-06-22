@@ -15,21 +15,62 @@
 
 namespace k2eg::controller::node::worker {
 
+/**
+Put reply message
+*/
+struct PutCommandReply : public k2eg::controller::node::worker::CommandReply {
+  //k2eg::service::epics_impl::ConstChannelDataUPtr pv_data;
+};
+DEFINE_PTR_TYPES(PutCommandReply)
+
+/**
+Put reply message json serialization
+*/
+inline void
+serializeJson(const PutCommandReply& reply, common::JsonMessage& json_message) {
+  serializeJson(static_cast<CommandReply>(reply), json_message);
+  //service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::JSON)->serialize(*reply.pv_data, json_message);
+}
+
+/**
+Put reply message msgpack serialization
+*/
+inline void
+serializeMsgpack(const PutCommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0) {
+  serializeMsgpack(static_cast<CommandReply>(reply), msgpack_message, map_size);
+  //service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::Msgpack)->serialize(*reply.pv_data, msgpack_message);
+}
+
+/**
+Put reply message msgpack compact serialization
+*/
+inline void
+serializeMsgpackCompact(const PutCommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0) {
+  serializeMsgpackCompact(static_cast<CommandReply>(reply), msgpack_message, map_size);
+  //service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::MsgpackCompact)->serialize(*reply.pv_data, msgpack_message);
+}
+
 struct PutOpInfo : public WorkerAsyncOperation {
   std::string                                pv_name;
+  std::string                                destination_topic;
   std::string                                value;
   std::string                                reply_id;
+  k2eg::common::SerializationType            serialization;
   service::epics_impl::ConstPutOperationUPtr op;
   PutOpInfo(
     const std::string& pv_name, 
+    const std::string& destination_topic, 
     const std::string& value, 
     const std::string& reply_id, 
+    const k2eg::common::SerializationType&     serialization,
     service::epics_impl::ConstPutOperationUPtr op,
     std::uint32_t tout_msc = 10000)
       : WorkerAsyncOperation(std::chrono::milliseconds(tout_msc))
+      , destination_topic(destination_topic)
       , pv_name(pv_name)
       , value(value)
       , reply_id(reply_id)
+      , serialization(serialization)
       , op(std::move(op)) {}
 };
 DEFINE_PTR_TYPES(PutOpInfo)

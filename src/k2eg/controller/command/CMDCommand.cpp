@@ -109,10 +109,12 @@ MapToCommand::parse(const object& obj) {
       if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_VALUE, kind::string}}); fields != nullptr) {
         std::string    reply_id = check_for_reply_id(obj, logger);
         SerializationType ser_type = check_for_serialization(obj, SerializationType::JSON, logger);
+        const std::string destination_topic = check_destnation_topic(obj, logger);
         result = std::make_shared<PutCommand>(PutCommand{CommandType::put,
                                                          ser_type,
                                                          std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
                                                          std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
+                                                         destination_topic,
                                                          std::any_cast<std::string>(fields->find(KEY_VALUE)->second),
                                                          reply_id});
       } else {

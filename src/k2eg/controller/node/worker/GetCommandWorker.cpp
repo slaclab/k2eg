@@ -82,7 +82,7 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
         }
         auto serialized_message = serialize(GetCommandReply{0, get_info->reply_id, get_info->op->getChannelData()}, get_info->serialization);
         if (!serialized_message) {
-          logger->logMessage("Invalid serilized message", LogLevel::ERROR);
+          logger->logMessage("Invalid serialized message", LogLevel::FATAL);
           break;
         }
         publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->destination_topic, "get-operation", get_info->pv_name, serialized_message),
