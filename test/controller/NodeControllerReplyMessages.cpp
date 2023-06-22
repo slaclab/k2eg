@@ -51,7 +51,6 @@ TEST(NodeControllerReplyMessages, GetCommandReplyMsgpack) {
   EXPECT_NE(serialization, nullptr);
   auto msg = getMsgPackObject(*serialization);
   auto msgpack_object = msg.get();
-  std::cout << msgpack_object << std::endl;
 };
 
 TEST(NodeControllerReplyMessages, GetCommandReplyMsgpackCompact) {
@@ -106,6 +105,21 @@ TEST(NodeControllerReplyMessages, PutCommandReplyMsgpackCompact) {
   EXPECT_NO_THROW(get_op = pc->get(););
   WHILE(get_op->isDone(), false);
   PutCommandReply cr            = {0, "rep_id"};
+  auto            serialization = serialize(cr, SerializationType::MsgpackCompact);
+  EXPECT_NE(serialization, nullptr);
+  auto msg = getMsgPackObject(*serialization);
+  auto msgpack_object = msg.get();
+};
+
+TEST(NodeControllerReplyMessages, PutCommandReplyWithMessage) {
+  INIT_PVA_PROVIDER()
+  EpicsChannelUPtr      pc;
+  ConstDataUPtr         ser_value;
+  ConstGetOperationUPtr get_op;
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  PutCommandReply cr            = {0, "rep_id", "error-message"};
   auto            serialization = serialize(cr, SerializationType::MsgpackCompact);
   EXPECT_NE(serialization, nullptr);
   auto msg = getMsgPackObject(*serialization);

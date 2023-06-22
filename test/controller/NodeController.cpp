@@ -682,6 +682,35 @@ TEST(NodeController, PutCommandScalarArray) {
   deinitBackend(std::move(node_controller));
 }
 
+TEST(NodeController, PutCommandOnWronPVCheckReply) {
+  typedef std::map<std::string, msgpack::object> Map;
+  typedef std::vector<msgpack::object>           Vec;
+  msgpack::unpacked                              msgpack_unpacked;
+  msgpack::object                                msgpack_object;
+  ConstChannelDataUPtr                           value_readout;
+  auto                                           publisher = std::make_shared<DummyPublisherNoSignal>();
+  // set environment variable for test
+  auto node_controller = initBackend(publisher);
+
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(
+      PutCommand{CommandType::put, SerializationType::MsgpackCompact, "pva", "channel:wrong-pv-name", "DESTINATION_TOPIC", "8 0 0 0 0 0 0 0 0", "PUT_REPLY_ID"})}););
+  // give some time for the timeout
+  wait_forPublished_message_size(*publisher, 1, 10000);
+  EXPECT_EQ(publisher->sent_messages.size(), 1);
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+  msgpack_object = msgpack_unpacked.get();
+  EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
+  auto map_reply = msgpack_object.as<Map>();
+  EXPECT_EQ(map_reply.contains("error"), true);
+  EXPECT_EQ(map_reply["error"].as<int>(), -3);
+  EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
+  EXPECT_STREQ(map_reply[KEY_REPLY_ID].as<std::string>().c_str(), "PUT_REPLY_ID");
+  EXPECT_EQ(map_reply.contains("message"), true);
+  EXPECT_NE(map_reply["message"].as<std::string>().size(), 0);
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
 #endif  // __linux__
 TEST(NodeController, RandomCommand) {
   std::random_device                 r;
