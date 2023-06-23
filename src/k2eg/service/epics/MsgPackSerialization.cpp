@@ -1,34 +1,40 @@
 #include <k2eg/service/epics/MsgPackSerialization.h>
+#include <k2eg/controller/command/cmd/Command.h>
 #include <pv/bitSet.h>
 
+#include <memory>
 #include <sstream>
+#include "k2eg/common/JsonSerialization.h"
+#include "k2eg/common/MsgpackSerialization.h"
 
-#include "pvType.h"
+#include <pvType.h>
 
 using namespace k2eg::service::epics_impl;
-
+using namespace k2eg::common;
 namespace pvd = epics::pvData;
 
-#pragma region MsgPackMessage
-MsgPackMessage::MsgPackMessage(epics::pvData::PVStructure::const_shared_pointer epics_pv_struct) : epics_pv_struct(epics_pv_struct) {}
-const size_t
-MsgPackMessage::size() const {
-  return buf.size();
+void 
+MsgPackSerializer::serialize(const ChannelData& message, SerializedMessage& serialized_message) {
+  MsgpackMessage& mp_msg = dynamic_cast<MsgpackMessage&>(serialized_message);
+  msgpack::packer<msgpack::sbuffer> packer(mp_msg.getBuffer());
+  packer.pack(message.pv_name);
+  // process root structure
+  processStructure(message.data.get(), packer);
 }
-const char*
-MsgPackMessage::data() const {
-  return buf.data();
-}
-#pragma endregion MsgPackMessage
 
-#pragma region MsgPackSerializer
 REGISTER_SERIALIZER(SerializationType::Msgpack, MsgPackSerializer)
 SerializedMessageShrdPtr
-MsgPackSerializer::serialize(const ChannelData& message) {
-  auto                              result = MakeMsgPackMessageShrdPtr(message.data);
-  msgpack::packer<msgpack::sbuffer> packer(result->buf);
-  // add channel message
-  packer.pack_map(1);
+MsgPackSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
+  auto                              result = std::make_shared<MsgpackMessage>();
+  msgpack::packer<msgpack::sbuffer> packer(result->getBuffer());
+  if(reply_id.empty()) {
+    packer.pack_map(1);
+  } else {
+    // add reply id at the beginning  
+    packer.pack_map(2);
+    packer.pack(KEY_REPLY_ID);
+    packer.pack(reply_id);
+  }
   packer.pack(message.pv_name);
   // process root structure
   processStructure(message.data.get(), packer);
@@ -192,5 +198,3 @@ MsgPackSerializer::processStructureArray(pvd::PVStructureArray::const_svector st
   packer.pack_array(structure_array.size());
   for (size_t i = 0, N = structure_array.size(); i < N; i++) { processStructure(structure_array[i].get(), packer); }
 }
-
-#pragma endregion MsgPackSerializer

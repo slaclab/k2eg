@@ -29,7 +29,7 @@ inline ChannelMonitorType toChannelMonitor(const k2eg::controller::command::cmd:
 inline  k2eg::controller::command::cmd::ConstCommandShrdPtr  fromChannelMonitor(const ChannelMonitorType& command) {
     return std::make_shared<k2eg::controller::command::cmd::MonitorCommand>(k2eg::controller::command::cmd::MonitorCommand {
         k2eg::controller::command::cmd::CommandType::monitor,
-         static_cast<k2eg::controller::command::cmd::MessageSerType>(command.event_serialization),
+         static_cast<k2eg::common::SerializationType>(command.event_serialization),
         command.channel_protocol,
         command.pv_name, 
         true,

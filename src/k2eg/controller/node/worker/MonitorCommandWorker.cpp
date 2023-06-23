@@ -4,9 +4,12 @@
 
 #include <cassert>
 #include <functional>
+#include "k2eg/controller/node/worker/CommandWorker.h"
 #include "k2eg/service/epics/EpicsChannel.h"
 #include "k2eg/service/metric/IMetricService.h"
 #include "k2eg/service/pubsub/IPublisher.h"
+
+using namespace k2eg::common;
 
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::command;
@@ -20,19 +23,6 @@ using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::pubsub;
 
 using namespace k2eg::service::metric;
-
-#pragma region MonitorMessage
-MonitorMessage::MonitorMessage(const std::string& queue, ConstMonitorEventShrdPtr monitor_event, ConstSerializedMessageShrdPtr message)
-    : request_type("monitor")
-    , monitor_event(monitor_event)
-    , queue(queue)
-    , message(message) {}
-char* MonitorMessage::getBufferPtr() { return const_cast<char*>(message->data()); }
-const size_t MonitorMessage::getBufferSize() { return message->size(); }
-const std::string& MonitorMessage::getQueue() { return queue; }
-const std::string& MonitorMessage::getDistributionKey() { return monitor_event->channel_data.pv_name; }
-const std::string& MonitorMessage::getReqType() { return request_type; }
-#pragma endregion MonitorMessage
 
 #pragma region MonitorCommandWorker
 MonitorCommandWorker::MonitorCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager)
@@ -89,7 +79,7 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
 
     std::shared_lock slock(channel_map_mtx);
     // cache the various serilized message for each serializaiton type
-    std::map<MessageSerType, ConstSerializedMessageShrdPtr> local_serialization_cache;
+    std::map<SerializationType, ConstSerializedMessageShrdPtr> local_serialization_cache;
     for (auto& event: *event_received->event_data) {
         // publisher
         for (auto& info_topic: channel_topics_map[event->channel_data.pv_name]) {
@@ -98,13 +88,14 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
                 // cache new serialized message
                 local_serialization_cache[info_topic->ser_type] = serialize(event->channel_data, static_cast<SerializationType>(info_topic->ser_type));
             }
-
             publisher->pushMessage(
-                MakeMonitorMessageUPtr(
-                    info_topic->dest_topic, event, 
+                MakeReplyPushableMessageUPtr(
+                    info_topic->dest_topic,
+                    "monitor-message",
+                    event->channel_data.pv_name,
                     local_serialization_cache[info_topic->ser_type]
                     ),
-                    {
+                    {// add header
                         {
                         "k2eg-ser-type",
                         serialization_to_string(info_topic->ser_type)

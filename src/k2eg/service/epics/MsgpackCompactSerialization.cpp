@@ -1,36 +1,59 @@
 #include <k2eg/service/epics/MsgpackCompactSerializion.h>
-#include "pvType.h"
+#include <k2eg/controller/command/cmd/Command.h>
+#include <pvType.h>
+#include <memory>
 #include <vector>
 #include <any>
+#include "k2eg/common/MsgpackSerialization.h"
 
 using namespace k2eg::service::epics_impl;
-
+using namespace k2eg::common;
 namespace pvd = epics::pvData;
 
-#pragma region MsgpackCompactMessage
-MsgpackCompactMessage::MsgpackCompactMessage(epics::pvData::PVStructure::const_shared_pointer epics_pv_struct) : epics_pv_struct(epics_pv_struct) {}
-const size_t
-MsgpackCompactMessage::size() const {
-  return buf.size();
-}
-const char*
-MsgpackCompactMessage::data() const {
-  return buf.data();
-}
-#pragma endregion MsgpackCompactMessage
+void 
+MsgpackCompactSerializer::serialize(const ChannelData& message, SerializedMessage& serialized_message) {
+  std::vector<const pvd::PVField*> values;
+  MsgpackMessage& mp_msg = dynamic_cast<MsgpackMessage&>(serialized_message);
+  msgpack::packer<msgpack::sbuffer> packer(mp_msg.getBuffer());
+  scannStructure(message.data.get(), values);
+  packer.pack(message.pv_name);
+  packer.pack_array(values.size());
+  //serialize
+  for(auto & f: values) {
+    auto type = f->getField()->getType();
+    switch (type) {
+      case pvd::Type::scalar: {
+        processScalar(static_cast<const pvd::PVScalar*>(f), packer);
+        break;
+      }
+      case pvd::Type::scalarArray: {
+        processScalarArray(static_cast<const pvd::PVScalarArray*>(f), packer);
+        break;
+      }
 
-#pragma region MsgPackSerializer
+      default: break;
+    }
+  }
+}
+
 REGISTER_SERIALIZER(SerializationType::MsgpackCompact, MsgpackCompactSerializer)
 SerializedMessageShrdPtr
-MsgpackCompactSerializer::serialize(const ChannelData& message) {
+MsgpackCompactSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
   std::vector<const pvd::PVField*> values;
-  auto                              result = MakeMsgpackCompactMessageShrdPtr(message.data);
-  msgpack::packer<msgpack::sbuffer> packer(result->buf);
+  auto                              result = std::make_shared<MsgpackMessage>();
+  msgpack::packer<msgpack::sbuffer> packer(result->getBuffer());
  
   // process root structure
   scannStructure(message.data.get(), values);
 
-  packer.pack_array(values.size()+1);
+  // check if we need to add the reply id
+  if(reply_id.empty()) {
+    packer.pack_array(values.size()+1);
+  } else {
+    packer.pack_array(values.size()+2);
+    //pack reply id before the name
+    packer.pack(reply_id);
+  }
   packer.pack(message.pv_name);
   //serialize
   for(auto & f: values) {
@@ -205,5 +228,3 @@ void
 MsgpackCompactSerializer::scannStructureArray(pvd::PVStructureArray::const_svector structure_array, std::vector<const epics::pvData::PVField*>& values) {
   for (size_t i = 0, N = structure_array.size(); i < N; i++) { scannStructure(structure_array[i].get(), values); }
 }
-
-#pragma endregion MsgPackSerializer

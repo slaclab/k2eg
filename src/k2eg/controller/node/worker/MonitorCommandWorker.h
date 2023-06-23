@@ -14,32 +14,11 @@
 #include <vector>
 namespace k2eg::controller::node::worker {
 
-// Message structure for publisher
-class MonitorMessage : public k2eg::service::pubsub::PublishMessage {
-    const std::string request_type;
-    k2eg::service::epics_impl::ConstMonitorEventShrdPtr monitor_event;
-    const std::string queue;
-    k2eg::service::epics_impl::ConstSerializedMessageShrdPtr message;
-public:
-    MonitorMessage(
-        const std::string& queue, 
-        k2eg::service::epics_impl::ConstMonitorEventShrdPtr monitor_event,
-        k2eg::service::epics_impl::ConstSerializedMessageShrdPtr message);
-    virtual ~MonitorMessage() = default;
-    char* getBufferPtr();
-    const size_t getBufferSize();
-    const std::string& getQueue();
-    const std::string& getDistributionKey();
-    const std::string& getReqType();
-};
-// define the base ptr types
-DEFINE_PTR_TYPES(MonitorMessage)
-
 // contains the information for the forward
 // of the monitor data to a topic
 struct ChannelTopicMonitorInfo {
     std::string dest_topic;
-    k2eg::controller::command::cmd::MessageSerType ser_type;
+    k2eg::common::SerializationType ser_type;
 };
 DEFINE_PTR_TYPES(ChannelTopicMonitorInfo);
 

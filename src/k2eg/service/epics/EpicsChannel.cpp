@@ -4,7 +4,7 @@
 
 #include <memory>
 
-#include "k2eg/service/epics/EpicsMonitorOperation.h"
+#include <k2eg/service/epics/EpicsMonitorOperation.h>
 
 using namespace k2eg::service::epics_impl;
 

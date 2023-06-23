@@ -14,22 +14,12 @@ class MsgPackSerializer : public Serializer {
 public:
     MsgPackSerializer() = default;
     virtual ~MsgPackSerializer() = default;
-    SerializedMessageShrdPtr serialize(const ChannelData& message);
+    void serialize(const ChannelData& message, common::SerializedMessage& serialized_message);
+    k2eg::common::SerializedMessageShrdPtr serialize(const ChannelData& message, const std::string& reply_id = "");
 };
 DEFINE_PTR_TYPES(MsgPackSerializer)
 // Serialization message for json encoding
-class MsgPackMessage : public SerializedMessage {
-    friend class MsgPackSerializer;
-    msgpack::sbuffer buf;
-    epics::pvData::PVStructure::const_shared_pointer epics_pv_struct;
-public:
-    MsgPackMessage(epics::pvData::PVStructure::const_shared_pointer epics_pv_struct);
-    MsgPackMessage() = default;
-    ~MsgPackMessage() = default;
-    const size_t size() const;
-    const char* data() const;
-};
-DEFINE_PTR_TYPES(MsgPackMessage)
+
 } // namespace k2eg::service::epics_impl
 
 #endif // K2EG_SERVICE_EPICS_MSGPACKSERIALIZATION_H_

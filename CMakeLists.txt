@@ -94,6 +94,7 @@ set(COMMON_SOURCE_FILES
 
   src/k2eg/controller/node/NodeController.cpp
   src/k2eg/controller/node/configuration/NodeConfiguration.cpp
+  src/k2eg/controller/node/worker/CommandWorker.cpp
   src/k2eg/controller/node/worker/MonitorCommandWorker.cpp
   src/k2eg/controller/node/worker/GetCommandWorker.cpp
   src/k2eg/controller/node/worker/PutCommandWorker.cpp
@@ -134,6 +135,7 @@ set(TEST_SOURCE_FILES
   test/common/ProgramOptions.cpp
   test/controller/CMDController.cpp
   test/controller/NodeController.cpp
+  test/controller/NodeControllerReplyMessages.cpp
   test/metric/EpicsMetric.cpp
   test/metric/CMDMetric.cpp
   test/metric/NodeControllerMetric.cpp

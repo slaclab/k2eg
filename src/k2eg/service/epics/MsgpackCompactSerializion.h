@@ -14,22 +14,9 @@ class MsgpackCompactSerializer : public Serializer {
 public:
     MsgpackCompactSerializer() = default;
     virtual ~MsgpackCompactSerializer() = default;
-    SerializedMessageShrdPtr serialize(const ChannelData& message);
+    void serialize(const ChannelData& message, k2eg::common::SerializedMessage& serialized_message);
+    k2eg::common::SerializedMessageShrdPtr serialize(const ChannelData& message, const std::string& reply_id = "");
 };
 DEFINE_PTR_TYPES(MsgpackCompactSerializer)
-
-// Message for msgpack compact encoding
-class MsgpackCompactMessage : public SerializedMessage {
-    friend class MsgpackCompactSerializer;
-    msgpack::sbuffer buf;
-    epics::pvData::PVStructure::const_shared_pointer epics_pv_struct;
-public:
-    MsgpackCompactMessage(epics::pvData::PVStructure::const_shared_pointer epics_pv_struct);
-    MsgpackCompactMessage() = default;
-    ~MsgpackCompactMessage() = default;
-    const size_t size() const;
-    const char* data() const;
-};
-DEFINE_PTR_TYPES(MsgpackCompactMessage)
 }
 #endif  // K2EG_SERVICE_EPICS_MSGPACKCOMPACTSERIALIZER_H_

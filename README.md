@@ -129,14 +129,15 @@ export EPICS_k2eg_conf-file-name=<path/to/configuration/file>
 ## Commands
 
 ### Get Command
-This implemets the base caget|pvaget fucntion of epics command, if possible will use a client from a monitor thread, otherwhise a new client is allcoated to perform a get operation
+This implemets the base caget|pvaget fucntion of epics command, if possible will use a client from a monitor thread, otherwhise a new client is allcoated to perform a get operation. The ***reply_id*** field is nto mandatory and it is forwarded, into the reply message.
 ```json
 {
     "command": "get",
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
     "pv_name": "channel::a",
-    "dest_topic": "destination_topic"
+    "dest_topic": "destination_topic",
+    "reply_id": "random custom string"
 }
 ```
 
@@ -149,7 +150,7 @@ Monitor Activation
     "command": "monitor",
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
-    "pv_name": "channel name",
+    "pv_name": "pv name",
     "dest_topic": "destination topic",
     "activate": true
 }
@@ -159,8 +160,21 @@ Monitor deactivation
 ```json
 {
     "command": "monitor",
-    "pv_name": "channel name",
+    "pv_name": "pv name",
     "dest_topic": "destination topic",
     "activate": false
+}
+```
+### Put command
+Put comamdn permit to change the value field of a PV. The value need to be string that will be automatically converted to the type of the
+PV. The put command can send a reply with the result of the put operation, in this case the ***dest_topic*** field si mandatory and the ***reply_id*** field is nto mandatory and it is forwarded, into the reply message.
+```json
+{
+    "command": "monitor",
+    "pv_name": "pv name",
+    "protocol": "pva|ca",
+    "dest_topic": "destination topic",
+    "value": "pv new value",
+    "reply_id": "random custom string"
 }
 ```

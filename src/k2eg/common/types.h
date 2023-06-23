@@ -5,6 +5,9 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <msgpack.hpp>
+#include <boost/json.hpp>
+
 namespace k2eg::common
 {
 #define DEFINE_PTR_TYPES(x) \
@@ -32,10 +35,6 @@ inline x##ShrdPtr Make##x##ShrdPtr(_Args&&... __args) \
 { \
     return std::make_shared<x>(__args...); \
 }
-
-
-
-
 
 #define DEFINE_VECTOR_FOR_TYPE(t, n)              \
     typedef std::vector<t> n;                     \

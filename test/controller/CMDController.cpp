@@ -6,6 +6,8 @@
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/log/impl/BoostLogger.h>
 #include <k2eg/service/pubsub/pubsub.h>
+#include <k2eg/service/metric/IEpicsMetric.h>
+#include <k2eg/service/metric/impl/DummyMetricService.h>
 
 #include <algorithm>
 #include <boost/json.hpp>
@@ -26,7 +28,8 @@ using namespace k2eg::service::log;
 using namespace k2eg::service::log::impl;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
-
+using namespace k2eg::service::metric;
+using namespace k2eg::service::metric::impl;
 using namespace boost::json;
 
 #define KAFKA_ADDR "kafka:9092"
@@ -77,6 +80,7 @@ TEST(CMDController, CheckConfiguration) {
   setenv("EPICS_k2eg_cmd-input-topic", CMD_QUEUE, 1);
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   ASSERT_NO_THROW(opt->parse(argc, argv));
+  ServiceResolver<IMetricService>::registerService(std::make_shared<DummyMetricService>(opt->getMetricConfiguration()));
   ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
   ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(opt->getSubscriberConfiguration()));
   std::unique_ptr<CMDController> cmd_controller = std::make_unique<CMDController>(opt->getCMDControllerConfiguration(), handler);
@@ -96,6 +100,7 @@ TEST(CMDController, InitFaultCheckWithNoQueue) {
   setenv("EPICS_k2eg_sub-server-address", KAFKA_ADDR, 1);
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   ASSERT_NO_THROW(opt->parse(argc, argv));
+  ServiceResolver<IMetricService>::registerService(std::make_shared<DummyMetricService>(opt->getMetricConfiguration()));
   ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
   ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(opt->getSubscriberConfiguration()));
   ASSERT_ANY_THROW(std::make_unique<CMDController>(opt->getCMDControllerConfiguration(), handler););
@@ -114,6 +119,7 @@ TEST(CMDController, StartStop) {
   setenv("EPICS_k2eg_sub-server-address", KAFKA_ADDR, 1);
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   ASSERT_NO_THROW(opt->parse(argc, argv));
+  ServiceResolver<IMetricService>::registerService(std::make_shared<DummyMetricService>(opt->getMetricConfiguration()));
   ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
   ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(opt->getSubscriberConfiguration()));
   std::unique_ptr<CMDController> cmd_controller = std::make_unique<CMDController>(opt->getCMDControllerConfiguration(), handler);
@@ -138,8 +144,10 @@ class CMDControllerCommandTestParametrized : public ::testing::TestWithParam<std
     setenv("EPICS_k2eg_cmd-max-fecth-element", "100", 1);
     setenv("EPICS_k2eg_cmd-max-fecth-time-out", "100", 1);
     setenv("EPICS_k2eg_sub-server-address", KAFKA_ADDR, 1);
+    setenv("EPICS_k2eg_sub-group-id", "", 1);
     opt = std::make_unique<ProgramOptions>();
     opt->parse(argc, argv);
+    ServiceResolver<IMetricService>::registerService(std::make_shared<DummyMetricService>(opt->getMetricConfiguration()));
     ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
     ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(opt->getSubscriberConfiguration()));
   }
@@ -179,7 +187,7 @@ TEST_P(CMDControllerCommandTestParametrized, CheckCommand) {
 CMDControllerCommandHandler acquire_test_default_ser = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
   ASSERT_EQ(received_command[0]->type, CommandType::monitor);
-  ASSERT_EQ(received_command[0]->serialization, MessageSerType::json);
+  ASSERT_EQ(received_command[0]->serialization, SerializationType::JSON);
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
   ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->activate, true);
@@ -191,7 +199,7 @@ boost::json::value acquire_default_ser = {
 CMDControllerCommandHandler acquire_test_json = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
   ASSERT_EQ(received_command[0]->type, CommandType::monitor);
-  ASSERT_EQ(received_command[0]->serialization, MessageSerType::json);
+  ASSERT_EQ(received_command[0]->serialization, SerializationType::JSON);
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
   ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->activate, true);
@@ -207,7 +215,7 @@ boost::json::value acquire_json = {{KEY_COMMAND, "monitor"},
 CMDControllerCommandHandler acquire_test_msgpack = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
   ASSERT_EQ(received_command[0]->type, CommandType::monitor);
-  ASSERT_EQ(received_command[0]->serialization, MessageSerType::msgpack);
+  ASSERT_EQ(received_command[0]->serialization, SerializationType::Msgpack);
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
   ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->activate, true);
@@ -223,7 +231,7 @@ boost::json::value acquire_msgpack = {{KEY_COMMAND, "monitor"},
 CMDControllerCommandHandler acquire_test_msgpack_compact = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
   ASSERT_EQ(received_command[0]->type, CommandType::monitor);
-  ASSERT_EQ(received_command[0]->serialization, MessageSerType::msgpack_compact);
+  ASSERT_EQ(received_command[0]->serialization, SerializationType::MsgpackCompact);
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
   ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->activate, true);
@@ -239,7 +247,7 @@ boost::json::value acquire_msgpack_compact = {{KEY_COMMAND, "monitor"},
 CMDControllerCommandHandler get_test_json = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
   ASSERT_EQ(received_command[0]->type, CommandType::get);
-  ASSERT_EQ(received_command[0]->serialization, MessageSerType::json);
+  ASSERT_EQ(received_command[0]->serialization, SerializationType::JSON);
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
   ASSERT_EQ(reinterpret_cast<const GetCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"), 0);
@@ -250,7 +258,7 @@ boost::json::value get_json = {
 CMDControllerCommandHandler get_test_msgpack = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
   ASSERT_EQ(received_command[0]->type, CommandType::get);
-  ASSERT_EQ(received_command[0]->serialization, MessageSerType::msgpack);
+  ASSERT_EQ(received_command[0]->serialization, SerializationType::Msgpack);
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
   ASSERT_EQ(reinterpret_cast<const GetCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"), 0);
@@ -261,7 +269,7 @@ boost::json::value get_msgpack = {
 CMDControllerCommandHandler get_test_msgpack_compact = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
   ASSERT_EQ(received_command[0]->type, CommandType::get);
-  ASSERT_EQ(received_command[0]->serialization, MessageSerType::msgpack_compact);
+  ASSERT_EQ(received_command[0]->serialization, SerializationType::MsgpackCompact);
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
   ASSERT_EQ(reinterpret_cast<const GetCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"), 0);

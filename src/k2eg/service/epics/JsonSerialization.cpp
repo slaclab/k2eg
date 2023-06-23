@@ -1,38 +1,35 @@
 #include <k2eg/service/epics/JsonSerialization.h>
+#include <k2eg/controller/command/cmd/Command.h>
 #include <pv/bitSet.h>
 #include <pv/json.h>
 
+#include <memory>
 #include <sstream>
 
-#include "boost/json/array.hpp"
-#include "pvData.h"
-#include "pvIntrospect.h"
+#include <boost/json/array.hpp>
+#include "k2eg/common/JsonSerialization.h"
+#include <pvData.h>
+#include <pvIntrospect.h>
+using namespace k2eg::common;
 using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;
 
-#pragma region JsonMessage
-JsonMessage::JsonMessage(std::string& json_object) : json_object(std::move(json_object)) {}
-
-const size_t
-JsonMessage::size() const {
-  return json_object.size();
-}
-const char*
-JsonMessage::data() const {
-  return json_object.c_str();
-}
-#pragma endregion JsonMessage
-
 #pragma region JsonSerializer
 REGISTER_SERIALIZER(SerializationType::JSON, JsonSerializer)
+
+void
+JsonSerializer::serialize(const ChannelData& message, SerializedMessage& serialized_message){
+  JsonMessage& js_msg = dynamic_cast<JsonMessage&>(serialized_message);
+  processStructure(message.data.get(), message.pv_name, js_msg.getJsonObject());
+}
+
 SerializedMessageShrdPtr
-JsonSerializer::serialize(const ChannelData& message) {
-  std::stringstream       ss;
-  boost::json::object     json_root_object;
-  boost::json::serializer sr;
-  processStructure(message.data.get(), message.pv_name, json_root_object);
-  ss << json_root_object;
-  return MakeJsonMessageShrdPtr(std::move(ss.str()));
+JsonSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
+  auto json_message = std::make_shared<JsonMessage>();
+  // boost::json::serializer sr;
+  processStructure(message.data.get(), message.pv_name, json_message->getJsonObject());
+  if(!reply_id.empty()){json_message->getJsonObject()[KEY_REPLY_ID] = reply_id;}
+  return json_message;
 }
 
 void

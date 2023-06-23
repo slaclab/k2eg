@@ -74,6 +74,7 @@ void NodeController::submitCommand(ConstCommandShrdPtrVec commands) {
                 // start monitoring
                 node_configuration->addChannelMonitor(
                     {ChannelMonitorType{.pv_name = acquire_command_shrd->pv_name,
+                                        .event_serialization = static_cast<std::uint8_t>(acquire_command_shrd->serialization),
                                         .channel_protocol = acquire_command_shrd->protocol,
                                         .channel_destination = acquire_command_shrd->destination_topic}});
             } else {
