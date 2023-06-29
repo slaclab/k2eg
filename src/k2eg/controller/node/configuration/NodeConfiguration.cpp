@@ -22,7 +22,7 @@ void NodeConfiguration::addPVMonitor(const PVMonitorTypeConstVector& pv_descript
 void NodeConfiguration::removePVMonitor(const PVMonitorTypeConstVector& pv_descriptions) {
     auto pv_repository = toShared(data_storage->getPVRepository());
     for(auto const &desc: pv_descriptions) {
-        pv_repository->remove(desc);
+        pv_repository->remove(desc.pv_name, desc.pv_destination);
     }
 }
 

@@ -21,7 +21,8 @@ namespace k2eg::service::data
                                        make_column("pv_name", &repository::PVMonitorType::pv_name),
                                        make_column("event_serialization", &repository::PVMonitorType::event_serialization),
                                        make_column("pv_protocol", &repository::PVMonitorType::pv_protocol),
-                                       make_column("pv_destination", &repository::PVMonitorType::pv_destination)));
+                                       make_column("pv_destination", &repository::PVMonitorType::pv_destination),
+                                       make_column("requested_instance", &repository::PVMonitorType::requested_instance)));
     }
 
     using Storage = decltype(initStorage(""));

@@ -22,7 +22,7 @@ TEST(DataStorage, Default) {
                                 .event_serialization = static_cast<uint8_t>(SerializationType::JSON),
                                 .pv_protocol    = "pva",
                                 .pv_destination = "dest"}););
-  auto found_pv = toShared(storage->getPVRepository())->getPVMonitor({.pv_name = "channel::a", .pv_destination = "dest"});
+  auto found_pv = toShared(storage->getPVRepository())->getPVMonitor("channel::a", "dest");
 
   EXPECT_EQ(found_pv.has_value(), true);
   EXPECT_STREQ(found_pv->get()->pv_name.c_str(), "channel::a");
@@ -43,7 +43,7 @@ TEST(DataStorage, MultiThreading) {
     thread_vec.push_back(std::move(std::thread([t_id = idx, &t_storage = storage, &t_latch = test_done] {
       std::string pv_name = "channel::" + std::to_string(t_id);
       EXPECT_NO_THROW(toShared(t_storage->getPVRepository())->insert({.pv_name = pv_name, .pv_protocol = "pv", .pv_destination = "dest"}););
-      auto found_pv = toShared(t_storage->getPVRepository())->getPVMonitor({.pv_name = pv_name, .pv_protocol = "pv", .pv_destination = "dest"});
+      auto found_pv = toShared(t_storage->getPVRepository())->getPVMonitor(pv_name, "dest");
 
       EXPECT_EQ(found_pv.has_value(), true);
       EXPECT_STREQ(found_pv->get()->pv_name.c_str(), pv_name.c_str());
