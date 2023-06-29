@@ -3,7 +3,7 @@
 #define k2eg_SERVICE_DATA_DATASTORAGE_H_
 
 #include <sqlite_orm/sqlite_orm.h>
-#include <k2eg/service/data/repository/ChannelRepository.h>
+#include <k2eg/service/data/repository/PVRepository.h>
 
 #include <memory>
 #include <mutex>
@@ -16,12 +16,12 @@ namespace k2eg::service::data
     {
         using namespace sqlite_orm;
         return make_storage(path,
-                            make_table("channel_monitor",
-                                       make_column("id", &repository::ChannelMonitorType::id, primary_key().autoincrement()),
-                                       make_column("pv_name", &repository::ChannelMonitorType::pv_name),
-                                       make_column("event_serialization", &repository::ChannelMonitorType::event_serialization),
-                                       make_column("channel_protocol", &repository::ChannelMonitorType::channel_protocol),
-                                       make_column("channel_destination", &repository::ChannelMonitorType::channel_destination)));
+                            make_table("pv_monitor",
+                                       make_column("id", &repository::PVMonitorType::id, primary_key().autoincrement()),
+                                       make_column("pv_name", &repository::PVMonitorType::pv_name),
+                                       make_column("event_serialization", &repository::PVMonitorType::event_serialization),
+                                       make_column("pv_protocol", &repository::PVMonitorType::pv_protocol),
+                                       make_column("pv_destination", &repository::PVMonitorType::pv_destination)));
     }
 
     using Storage = decltype(initStorage(""));
@@ -70,12 +70,12 @@ namespace k2eg::service::data
         std::mutex repository_access_mutex;
         std::recursive_mutex storage_mutex;
         std::shared_ptr<Storage> storage;
-        std::shared_ptr<repository::ChannelRepository> channel_repository_instance;
+        std::shared_ptr<repository::PVRepository> channel_repository_instance;
 
     public:
         DataStorage(const std::string &path);
         ~DataStorage() = default;
-        std::weak_ptr<repository::ChannelRepository> getChannelRepository();
+        std::weak_ptr<repository::PVRepository> getPVRepository();
         /**
          * The result @StorageLockedRef reference should be used for single operation
         */

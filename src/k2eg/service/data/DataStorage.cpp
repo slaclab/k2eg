@@ -12,7 +12,7 @@ namespace fs = std::filesystem;
 #define PUBLIC_SHARED_ENABLER(x)                                                      \
     struct x##SharedEnabler : public x                                                \
     {                                                                                 \
-        x##SharedEnabler(DataStorage &data_storage) : ChannelRepository(data_storage) \
+        x##SharedEnabler(DataStorage &data_storage) : PVRepository(data_storage) \
         {                                                                             \
         }                                                                             \
     };
@@ -38,13 +38,13 @@ DataStorage::DataStorage(const std::string &path)
     storage->sync_schema();
 }
 
-std::weak_ptr<repository::ChannelRepository> DataStorage::getChannelRepository()
+std::weak_ptr<repository::PVRepository> DataStorage::getPVRepository()
 {
-    PUBLIC_SHARED_ENABLER(ChannelRepository)
+    PUBLIC_SHARED_ENABLER(PVRepository)
     std::unique_lock<std::mutex> m(repository_access_mutex);
     if (!channel_repository_instance)
     {
-        channel_repository_instance = std::make_shared<ChannelRepositorySharedEnabler>(*this);
+        channel_repository_instance = std::make_shared<PVRepositorySharedEnabler>(*this);
     }
     return channel_repository_instance;
 }

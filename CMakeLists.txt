@@ -60,7 +60,7 @@ set(COMMON_SOURCE_FILES
   src/k2eg/common/ProgramOptions.cpp
 
   src/k2eg/service/data/DataStorage.cpp
-  src/k2eg/service/data/repository/ChannelRepository.cpp
+  src/k2eg/service/data/repository/PVRepository.cpp
 
   src/k2eg/service/epics/EpicsData.cpp
   src/k2eg/service/epics/PVStructureMerger.cpp

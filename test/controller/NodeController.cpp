@@ -213,7 +213,7 @@ initBackend(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>());
   ServiceResolver<IPublisher>::registerService(pub);
   DataStorageUPtr storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");
-  if (clear_data) { toShared(storage->getChannelRepository())->removeAll(); }
+  if (clear_data) { toShared(storage->getPVRepository())->removeAll(); }
   return std::make_unique<NodeController>(std::move(storage));
 }
 

@@ -49,9 +49,9 @@ NodeController::~NodeController() {
 }
 
 void NodeController::reloadPersistentCommand() {
-    node_configuration->iterateAllChannelMonitor(
-        [this](uint32_t index, const ChannelMonitorType& monitor_element) {
-           auto command =  fromChannelMonitor(monitor_element);
+    node_configuration->iterateAllPVMonitor(
+        [this](uint32_t index, const PVMonitorType& monitor_element) {
+           auto command =  fromPVMonitor(monitor_element);
            submitCommand({command});
         }   
     );
@@ -72,16 +72,16 @@ void NodeController::submitCommand(ConstCommandShrdPtrVec commands) {
             auto acquire_command_shrd = static_pointer_cast<const MonitorCommand>(c);
             if (acquire_command_shrd->activate) {
                 // start monitoring
-                node_configuration->addChannelMonitor(
-                    {ChannelMonitorType{.pv_name = acquire_command_shrd->pv_name,
+                node_configuration->addPVMonitor(
+                    {PVMonitorType{.pv_name = acquire_command_shrd->pv_name,
                                         .event_serialization = static_cast<std::uint8_t>(acquire_command_shrd->serialization),
-                                        .channel_protocol = acquire_command_shrd->protocol,
-                                        .channel_destination = acquire_command_shrd->destination_topic}});
+                                        .pv_protocol = acquire_command_shrd->protocol,
+                                        .pv_destination = acquire_command_shrd->destination_topic}});
             } else {
                 // stop monitoring
-                node_configuration->removeChannelMonitor(
-                    {ChannelMonitorType{.pv_name = acquire_command_shrd->pv_name,
-                                        .channel_destination = acquire_command_shrd->destination_topic}});
+                node_configuration->removePVMonitor(
+                    {PVMonitorType{.pv_name = acquire_command_shrd->pv_name,
+                                        .pv_destination = acquire_command_shrd->destination_topic}});
             }
             break;
         }

@@ -6,7 +6,7 @@
 #include <memory>
 
 namespace k2eg::controller::node::configuration {
-    typedef std::vector<k2eg::service::data::repository::ChannelMonitorType> ChannelMonitorTypeConstVector;
+    typedef std::vector<k2eg::service::data::repository::PVMonitorType> PVMonitorTypeConstVector;
 /**
  * Abstract the node configuration
  */
@@ -20,11 +20,11 @@ public:
     NodeConfiguration& operator=(const NodeConfiguration&) = delete;
     ~NodeConfiguration() = default;
     /**
-     * Add a monitor configuration for a determinated channel for a destination topic
+     * Add a monitor configuration for a determinated pv for a destination topic
      */
-    void addChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions);
-    void removeChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions);
-    void iterateAllChannelMonitor(k2eg::service::data::repository::ChannelMonitorTypeProcessHandler handle);
+    void addPVMonitor(const PVMonitorTypeConstVector& pv_descriptions);
+    void removePVMonitor(const PVMonitorTypeConstVector& pv_descriptions);
+    void iterateAllPVMonitor(k2eg::service::data::repository::PVMonitorTypeProcessHandler handle);
 };
 
 typedef std::unique_ptr<NodeConfiguration> NodeConfigurationUPtr;
