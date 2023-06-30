@@ -365,6 +365,46 @@ TEST(NodeController, MonitorCommandAfterReboot) {
   deinitBackend(std::move(node_controller));
 }
 
+TEST(NodeController, MonitoringMulipleInstances) {
+  auto publisher = std::make_shared<DummyPublisherNoSignal>();
+  auto node_controller = initBackend(publisher);
+
+  // submit multiple instance
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
+      MonitorCommand{CommandType::monitor, SerializationType::JSON, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
+      MonitorCommand{CommandType::monitor, SerializationType::JSON, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+
+  wait_forPublished_message_size(*publisher, 1, 2000);
+  // we need to have publish some message
+  size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+  EXPECT_NE(published, 0);
+
+  //stop first instance
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
+      MonitorCommand{CommandType::monitor, SerializationType::JSON, "pva", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
+  sleep(2);
+  wait_forPublished_message_size(*publisher, published+1, 2000);
+  //stop first instance
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
+      MonitorCommand{CommandType::monitor, SerializationType::JSON, "pva", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN})}););
+  published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+  sleep(2);
+  wait_forPublished_message_size(*publisher, published+1, 2000);
+  auto new_published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+
+  EXPECT_EQ(published, new_published);
+
+  // stop the node controller
+  deinitBackend(std::move(node_controller));
+
+  EXPECT_NE(published, 0);
+
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
 TEST(NodeController, GetCommandJson) {
   boost::json::object             json_object;
   std::latch                      work_done{1};

@@ -27,7 +27,7 @@ class NodeController {
   k2eg::service::log::ILoggerShrdPtr             logger;
   k2eg::service::epics_impl::EpicsServiceManager epics_service_manager;
   k2eg::service::metric::INodeControllerMetric&  metric;
-
+  void forwardCommandToWorker(k2eg::controller::command::cmd::ConstCommandShrdPtr cmd);
  public:
   NodeController(k2eg::service::data::DataStorageUPtr data_storage);
   NodeController()                                 = delete;

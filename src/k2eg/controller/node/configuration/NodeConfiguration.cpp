@@ -11,19 +11,15 @@ using namespace k2eg::service::data::repository;
 NodeConfiguration::NodeConfiguration(DataStorageUPtr data_storage)
     : data_storage(std::move(data_storage)) {}
 
-void NodeConfiguration::addPVMonitor(const PVMonitorTypeConstVector& pv_descriptions) {
+void NodeConfiguration::addPVMonitor(const PVMonitorType& pv_description) {
     auto pv_repository = toShared(data_storage->getPVRepository());
-    
-    for(auto const &desc: pv_descriptions) {
-        pv_repository->insert(desc);
-    }
+    pv_repository->insert(pv_description);
 }
 
-void NodeConfiguration::removePVMonitor(const PVMonitorTypeConstVector& pv_descriptions) {
+bool NodeConfiguration::removePVMonitor(const PVMonitorType& pv_description) {
     auto pv_repository = toShared(data_storage->getPVRepository());
-    for(auto const &desc: pv_descriptions) {
-        pv_repository->remove(desc.pv_name, desc.pv_destination);
-    }
+    pv_repository->remove(pv_description.pv_name, pv_description.pv_destination);
+    return !pv_repository->isPresent(pv_description.pv_name, pv_description.pv_destination);
 }
 
 void NodeConfiguration::iterateAllPVMonitor(PVMonitorTypeProcessHandler handler) {

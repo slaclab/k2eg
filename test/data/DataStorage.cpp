@@ -20,8 +20,8 @@ TEST(DataStorage, Default) {
   EXPECT_NO_THROW(toShared(storage->getPVRepository())
                       ->insert({.pv_name             = "channel::a",
                                 .event_serialization = static_cast<uint8_t>(SerializationType::JSON),
-                                .pv_protocol    = "pva",
-                                .pv_destination = "dest"}););
+                                .pv_protocol         = "pva",
+                                .pv_destination      = "dest"}););
   auto found_pv = toShared(storage->getPVRepository())->getPVMonitor("channel::a", "dest");
 
   EXPECT_EQ(found_pv.has_value(), true);
@@ -29,6 +29,37 @@ TEST(DataStorage, Default) {
   EXPECT_EQ(found_pv->get()->event_serialization, static_cast<uint8_t>(SerializationType::JSON));
   EXPECT_STREQ(found_pv->get()->pv_protocol.c_str(), "pva");
   EXPECT_STREQ(found_pv->get()->pv_destination.c_str(), "dest");
+}
+
+TEST(DataStorage, SimulateMultipleMonitorSamePVTopic) {
+  std::unique_ptr<DataStorage> storage;
+  EXPECT_NO_THROW(storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite"););
+  EXPECT_NO_THROW(toShared(storage->getPVRepository())->removeAll(););
+  EXPECT_NO_THROW(toShared(storage->getPVRepository())
+                      ->insert({.pv_name             = "channel::a",
+                                .event_serialization = static_cast<uint8_t>(SerializationType::JSON),
+                                .pv_protocol         = "pva",
+                                .pv_destination      = "dest"}););
+  EXPECT_NO_THROW(toShared(storage->getPVRepository())
+                      ->insert({.pv_name             = "channel::a",
+                                .event_serialization = static_cast<uint8_t>(SerializationType::JSON),
+                                .pv_protocol         = "pva",
+                                .pv_destination      = "dest"}););
+  auto found_pv = toShared(storage->getPVRepository())->getPVMonitor("channel::a", "dest");
+
+  EXPECT_EQ(found_pv.has_value(), true);
+  EXPECT_STREQ(found_pv->get()->pv_name.c_str(), "channel::a");
+  EXPECT_EQ(found_pv->get()->event_serialization, static_cast<uint8_t>(SerializationType::JSON));
+  EXPECT_STREQ(found_pv->get()->pv_protocol.c_str(), "pva");
+  EXPECT_STREQ(found_pv->get()->pv_destination.c_str(), "dest");
+  EXPECT_EQ(found_pv->get()->requested_instance, 2);
+
+  EXPECT_NO_THROW(toShared(storage->getPVRepository())->remove("channel::a", "dest"););
+  found_pv = toShared(storage->getPVRepository())->getPVMonitor("channel::a", "dest");
+  EXPECT_EQ(found_pv->get()->requested_instance, 1);
+
+  EXPECT_NO_THROW(toShared(storage->getPVRepository())->remove("channel::a", "dest"););
+  EXPECT_EQ(toShared(storage->getPVRepository())->isPresent("channel::a", "dest"), false);
 }
 
 TEST(DataStorage, MultiThreading) {

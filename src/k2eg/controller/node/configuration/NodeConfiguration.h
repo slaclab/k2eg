@@ -4,6 +4,7 @@
 #include <k2eg/service/data/DataStorage.h>
 
 #include <memory>
+#include "k2eg/service/data/repository/PVRepository.h"
 
 namespace k2eg::controller::node::configuration {
     typedef std::vector<k2eg::service::data::repository::PVMonitorType> PVMonitorTypeConstVector;
@@ -22,8 +23,13 @@ public:
     /**
      * Add a monitor configuration for a determinated pv for a destination topic
      */
-    void addPVMonitor(const PVMonitorTypeConstVector& pv_descriptions);
-    void removePVMonitor(const PVMonitorTypeConstVector& pv_descriptions);
+    void addPVMonitor(const service::data::repository::PVMonitorType& pv_descriptions);
+    /**
+    * Remove a moitor
+    * return true is the monitor has been remove, return false if the monitor has 
+    * been decremented but there are other active
+    */
+    bool removePVMonitor(const service::data::repository::PVMonitorType& pv_description);
     void iterateAllPVMonitor(k2eg::service::data::repository::PVMonitorTypeProcessHandler handle);
 };
 
