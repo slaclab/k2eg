@@ -7,6 +7,7 @@
 
 #include "client.h"
 #include "k2eg/controller/node/worker/CommandWorker.h"
+#include "k2eg/service/epics/EpicsData.h"
 #include "k2eg/service/metric/IMetricService.h"
 
 using namespace k2eg::common;
@@ -54,6 +55,13 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
   // check for timeout
   if (get_info->isTimeout()) {
     logger->logMessage(STRING_FORMAT("Timeout get command for %1%", get_info->pv_name), LogLevel::ERROR);
+    auto serialized_message = serialize(GetFaultyCommandReply{-3, get_info->reply_id, "Timeout operation"}, get_info->serialization);
+    if (!serialized_message) {
+      logger->logMessage("Invalid serialized message", LogLevel::FATAL);
+    } else {
+      publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->destination_topic, "get-operation", get_info->pv_name, serialized_message),
+                              {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
+    }
     return;
   }
   // give some time of relaxing
@@ -64,14 +72,30 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
     processing_pool->push_task(&GetCommandWorker::checkGetCompletion, this, get_info);
   } else {
     switch (get_info->op->getState().event) {
-      case pvac::GetEvent::Fail:
+      case pvac::GetEvent::Fail: {
         logger->logMessage(STRING_FORMAT("Failed get command for %1% with message %2%", get_info->pv_name % get_info->op->getState().message), LogLevel::ERROR);
+        auto serialized_message = serialize(GetFaultyCommandReply{-1, get_info->reply_id, get_info->op->getState().message}, get_info->serialization);
+        if (!serialized_message) {
+          logger->logMessage("Invalid serialized message", LogLevel::FATAL);
+        } else {
+          publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->destination_topic, "get-operation", get_info->pv_name, serialized_message),
+                                 {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
+        }
         break;
-      case pvac::GetEvent::Cancel:
+      }
+      case pvac::GetEvent::Cancel: {
         logger->logMessage(STRING_FORMAT("Cancelled get command for %1% with message %2%", get_info->pv_name % get_info->op->getState().message),
                            LogLevel::ERROR);
+        auto serialized_message = serialize(GetFaultyCommandReply{-2, get_info->reply_id, get_info->op->getState().message}, get_info->serialization);
+        if (!serialized_message) {
+          logger->logMessage("Invalid serialized message", LogLevel::FATAL);
+        } else {
+          publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->destination_topic, "get-operation", get_info->pv_name, serialized_message),
+                                 {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
+        }
         break;
-      case pvac::GetEvent::Success:
+      }
+      case pvac::GetEvent::Success: {
         // update metric
         metric.incrementCounter(IEpicsMetricCounterType::Get);
         logger->logMessage(STRING_FORMAT("Success get command for %1%", get_info->pv_name), LogLevel::INFO);
@@ -88,6 +112,7 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
         publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->destination_topic, "get-operation", get_info->pv_name, serialized_message),
                                {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
         break;
+      }
     }
   }
 }

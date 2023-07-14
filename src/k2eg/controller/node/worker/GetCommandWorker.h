@@ -25,6 +25,11 @@ struct GetCommandReply : public k2eg::controller::node::worker::CommandReply {
 };
 DEFINE_PTR_TYPES(GetCommandReply)
 
+struct GetFaultyCommandReply : public k2eg::controller::node::worker::CommandReply {
+  const std::string message;
+};
+DEFINE_PTR_TYPES(GetFaultyCommandReply)
+
 /**
 Get reply message json serialization
 */
@@ -33,7 +38,11 @@ serializeJson(const GetCommandReply& reply, common::JsonMessage& json_message) {
   serializeJson(static_cast<CommandReply>(reply), json_message);
   service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::JSON)->serialize(*reply.pv_data, json_message);
 }
-
+inline void
+serializeJson(const GetFaultyCommandReply& reply, common::JsonMessage& json_message) {
+  serializeJson(static_cast<CommandReply>(reply), json_message);
+  if (!reply.message.empty()) { json_message.getJsonObject()["message"] = reply.message; }
+}
 /**
 Get reply message msgpack serialization
 */
@@ -42,7 +51,15 @@ serializeMsgpack(const GetCommandReply& reply, common::MsgpackMessage& msgpack_m
   serializeMsgpack(static_cast<CommandReply>(reply), msgpack_message, map_size + 1);
   service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::Msgpack)->serialize(*reply.pv_data, msgpack_message);
 }
-
+inline void
+serializeMsgpack(const GetFaultyCommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0) {
+  serializeMsgpack(static_cast<CommandReply>(reply), msgpack_message, map_size + (reply.message.empty() ? 0 : 1));
+  msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
+  if (!reply.message.empty()) {
+    packer.pack("message");
+    packer.pack(reply.message);
+  }
+}
 /**
 Get reply message msgpack compact serialization
 */
@@ -51,7 +68,18 @@ serializeMsgpackCompact(const GetCommandReply& reply, common::MsgpackMessage& ms
   serializeMsgpackCompact(static_cast<CommandReply>(reply), msgpack_message, map_size + 1);
   service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::MsgpackCompact)->serialize(*reply.pv_data, msgpack_message);
 }
+inline void
+serializeMsgpackCompact(const GetFaultyCommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0) {
+  serializeMsgpackCompact(static_cast<CommandReply>(reply), msgpack_message, map_size + (reply.message.empty() ? 0 : 1));
+  msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
+  if (!reply.message.empty()) {
+    packer.pack("message");
+    packer.pack(reply.message);
+  }
+}
 
+/**
+ */
 class GetOpInfo : public WorkerAsyncOperation {
  public:
   std::string                                pv_name;
