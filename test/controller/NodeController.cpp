@@ -412,6 +412,31 @@ TEST(NodeController, GetCommandJsonWithReplyID) {
   deinitBackend(std::move(node_controller));
 }
 
+TEST(NodeController, GetFaultyCommandJsonWithReplyID) {
+  boost::json::object             json_obj;
+  std::latch                      work_done{1};
+  std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
+  // set environment variable for test
+  auto node_controller = initBackend(publisher);
+
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(
+      GetCommand{CommandType::get, SerializationType::JSON, "pva", "bad:channel", KAFKA_TOPIC_ACQUIRE_IN, "REP_ID_JSON"})}););
+
+  work_done.wait();
+  // we need to have publish some message
+  size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+  EXPECT_NE(published, 0);
+  // check for json forward
+  EXPECT_NO_THROW(json_obj = getJsonObject(*publisher->sent_messages[0]););
+  EXPECT_EQ(json_obj.contains("error"), true);
+  EXPECT_NE(json_obj["error"].as_int64(), 0);
+  EXPECT_EQ(json_obj.contains(KEY_REPLY_ID), true);
+  EXPECT_EQ(json_obj.contains("message"), true);
+  EXPECT_STREQ(json_obj[KEY_REPLY_ID].as_string().c_str(), "REP_ID_JSON");
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
 TEST(NodeController, GetCommandMsgPack) {
   typedef std::map<std::string, msgpack::object> Map;
   std::latch                                     work_done{1};
