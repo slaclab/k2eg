@@ -47,6 +47,12 @@ void RDKafkaPublisher::init() {
     RDK_CONF_SET(conf, "compression.type", "snappy")
     RDK_CONF_SET(conf, "linger.ms", "5")
     RDK_CONF_SET(conf, "dr_cb", this);
+
+    if(configuration->custom_impl_parameter.size()>0) {
+        // apply custom user configuration
+        applyCustomConfiguration(configuration->custom_impl_parameter);
+    }
+
     producer.reset(RdKafka::Producer::create(conf.get(), errstr));
     if (!producer) {
         // RDK_PUB_ERR_ << "Failed to create producer: " << errstr << std::endl;

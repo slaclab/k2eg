@@ -56,6 +56,29 @@ TEST(Kafka, KafkaFaultInitWithNoAddress) {
   ASSERT_ANY_THROW(std::make_unique<RDKafkaSubscriber>(std::make_unique<const SubscriberConfiguration>(SubscriberConfiguration{})););
 }
 
+TEST(Kafka, KafkaAuthenticationTest) {
+  auto pub_conf = PublisherConfiguration{
+    .server_address = "kafka:9092",
+    .custom_impl_parameter = k2eg::common::MapStrKV {
+      {"security.protocol", "SASL_PLAINTEXT"},
+      {"sasl.mechanisms", "SCRAM-SHA-512"},
+      {"sasl.username", "admin-user"},
+      {"sasl.password", "admin-password"},
+    }
+    };
+  auto sub_conf = SubscriberConfiguration{
+    .server_address = "kafka:9092",
+    .custom_impl_parameter = k2eg::common::MapStrKV {
+      {"security.protocol", "SASL_PLAINTEXT"},
+      {"sasl.mechanisms", "SCRAM-SHA-512"},
+      {"sasl.username", "admin-user"},
+      {"sasl.password", "admin-password"},
+    }
+    };
+  ASSERT_NO_THROW(std::make_unique<RDKafkaPublisher>(std::make_unique<const PublisherConfiguration>(pub_conf)););
+  ASSERT_NO_THROW(std::make_unique<RDKafkaSubscriber>(std::make_unique<const SubscriberConfiguration>(sub_conf)););
+}
+
 TEST(Kafka, KafkaSimplePubSub) {
   SubscriberInterfaceElementVector  messages;
   std::unique_ptr<RDKafkaPublisher> producer =
