@@ -61,6 +61,7 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
     } else {
       publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->destination_topic, "get-operation", get_info->pv_name, serialized_message),
                               {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
+      logger->logMessage(STRING_FORMAT("Sent get faulty reply for reply_id %1%", get_info->reply_id), LogLevel::DEBUG);
     }
     return;
   }
@@ -80,6 +81,7 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
         } else {
           publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->destination_topic, "get-operation", get_info->pv_name, serialized_message),
                                  {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
+          logger->logMessage(STRING_FORMAT("Sent get faulty reply for reply_id %1%", get_info->reply_id), LogLevel::DEBUG);
         }
         break;
       }
@@ -92,6 +94,7 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
         } else {
           publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->destination_topic, "get-operation", get_info->pv_name, serialized_message),
                                  {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
+          logger->logMessage(STRING_FORMAT("Sent get faulty reply for reply_id %1%", get_info->reply_id), LogLevel::DEBUG);
         }
         break;
       }
