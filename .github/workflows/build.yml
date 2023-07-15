@@ -28,18 +28,6 @@ jobs:
               CMakeLists.txt
               src/**
               test/**
-        - name: Set Buil Bullseye to success
-          if: steps.changed-src.outputs.any_changed == 'false'
-          uses: ouzi-dev/commit-status-updater@v2
-          with:
-            name: Buil Bullseye
-            status: success
-        - name: Set Test Ubuntu Kinetic / test_build to success
-          if: steps.changed-src.outputs.any_changed == 'false'
-          uses: ouzi-dev/commit-status-updater@v2
-          with:
-            name: Test Bullseye / test_build
-            status: success
         - name: Set Build Ubuntu Kinetic to success
           if: steps.changed-src.outputs.any_changed == 'false'
           uses: ouzi-dev/commit-status-updater@v2
@@ -52,64 +40,6 @@ jobs:
           with:
             name: Test Ubuntu Kinetic / test_build
             status: success
-    test_debian_bullseye:
-      name: Test Bullseye
-      needs: [build_debian_bullseye] 
-      uses: ./.github/workflows/test.yml
-      with:
-        build_image: ${{ needs.build_debian_bullseye.outputs.build_image }}
-        artifact_name: ${{ needs.build_debian_bullseye.outputs.artifact_name }}
-        docker_compose_profile: app-debian
-      secrets: inherit
-    build_debian_bullseye:
-        name: Build Bullseye
-        needs: check-changed-file
-        if: needs.check-changed-file.outputs.source_changed == 'true'
-        runs-on: ubuntu-latest
-        container: scr.svc.stanford.edu/eed-public/build-image/cpp-build-image/gcc-debian:12.2.0-bullseye
-        env:
-          BUILD_IMAGE: scr.svc.stanford.edu/eed-public/build-image/cpp-build-image/gcc-debian:12.2.0-bullseye
-          ARTIFACT_NAME: artifact-gcc-debian-12-2-0-bullseye
-          BUILD_TYPE: Debug
-          
-        outputs:
-          build_image: ${{ env.BUILD_IMAGE }}
-          artifact_name: ${{ env.ARTIFACT_NAME}}  
-
-        steps:
-            - name: Checkout source code
-              uses: actions/checkout@v3
-            - name: Restore cached build directory
-              id: cache-build-restore
-              uses: actions/cache@v3
-              with:
-               path: build
-               key: debian-bullseye-${{ hashFiles('CMakeLists.txt') }}
-            - name: Configure CMake
-              # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-              # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-              run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DENABLE_ASAN=1
-            - name: Build
-              # Build your program with the given configuration
-              run: cmake --build build --config ${{env.BUILD_TYPE}} --target install
-            - name: Get log on failure
-              if: ${{ failure() }}
-              uses: actions/upload-artifact@v3
-              with:
-                name: ${{env.ARTIFACT_NAME}}-log
-                path: build/**/*.log
-                retention-days: 1
-            - name: Archive artifacts
-              uses: actions/upload-artifact@v3
-              with:
-                name: ${{env.ARTIFACT_NAME}}
-                path: |
-                    build/local/lib
-                    build/local/bin
-                retention-days: 1
-            - uses: ouzi-dev/commit-status-updater@v2
-              with:
-                status: success
     test_ubuntu_kinetic:
       name: Test Ubuntu Kinetic
       needs: [build_ubuntu_kinetic] 
@@ -139,7 +69,7 @@ jobs:
               run: |
                 export DEBIAN_FRONTEND=noninteractive
                 apt update
-                apt install -y build-essential cmake git tclsh ninja-build lcov libssl-dev curl libcurl4-openssl-dev
+                apt install -y build-essential cmake git tclsh ninja-build lcov  libsasl2-dev libssl-dev curl libcurl4-openssl-dev
             - name: Checkout source code
               uses: actions/checkout@v3
             - name: Restore cached build directory
