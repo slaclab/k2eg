@@ -1,7 +1,0 @@
-typer==0.7.0
-colorama==0.4.6
-shellingham==1.5.0
-kafka_python==2.0.2
-python_snappy==0.6.1
-rich==13.3.4
-msgpack==1.0.5
