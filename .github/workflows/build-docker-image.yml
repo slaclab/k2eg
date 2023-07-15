@@ -20,8 +20,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dockerfile: Dockerfile.debian_bullseye
-            variant: debian
           - dockerfile: Dockerfile.ubuntu_kinetic
             variant: ubuntu
     steps:
@@ -48,7 +46,6 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v4
@@ -64,7 +61,6 @@ jobs:
             org.opencontainers.image.title=K2EG
             org.opencontainers.image.description=Kafka To Epics Gateway
             org.opencontainers.image.vendor=SLAC National Accelerator Laboratory 
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:

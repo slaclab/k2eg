@@ -27,6 +27,11 @@ RDKafkaSubscriber::init() {
   RDK_CONF_SET(conf, "auto.offset.reset", "latest")
   RDK_CONF_SET(conf, "default_topic_conf", t_conf.get())
 
+  if(configuration->custom_impl_parameter.size()>0) {
+      // apply custom user configuration
+      applyCustomConfiguration(configuration->custom_impl_parameter);
+  }
+
   // RDK_CONF_SET(conf, "batch.size", "2000", errstr);
   consumer.reset(RdKafka::KafkaConsumer::create(conf.get(), errstr));
   if (!consumer) { throw std::runtime_error("Error creating kafka producer (" + errstr + ")"); }

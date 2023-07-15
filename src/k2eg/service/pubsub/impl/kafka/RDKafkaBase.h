@@ -7,9 +7,11 @@
 #include <memory>
 #include <stdexcept>
 #include <librdkafka/rdkafkacpp.h>
+#include <k2eg/common/types.h>
+
 // macro utility
 #define RDK_LOG_AND_THROW(msg) \
-    throw std::runtime_error("Error creating kafka producer (" + errstr + ")");
+    throw std::runtime_error("Error configuring kafka (" + errstr + ")");
 
 #define RDK_CONF_SET(conf, prop, value)                               \
     {                                                                 \
@@ -31,6 +33,7 @@ namespace k2eg::service::pubsub::impl::kafka
     public:
         RDKafkaBase();
         ~RDKafkaBase();
+        void applyCustomConfiguration(k2eg::common::MapStrKV custom_impl_parameter);
         int setOption(const std::string &key, const std::string &value);
     };
 }
