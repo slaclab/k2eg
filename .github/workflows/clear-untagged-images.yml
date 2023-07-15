@@ -1,25 +1,22 @@
-name: Cleanup Untagged Images
+name: Delete old container images
 
 on:
-  # or manually
+  # schedule:
+  #   - cron: "0 0 1 * *"  # every day at midnight
   workflow_dispatch:
 
 jobs:
-  delete-untagged-images:
+  clean-ghcr:
+    name: Delete old unused container images
     runs-on: ubuntu-latest
     steps:
-      - name: Login to GitHub Container Registry with DELETE_PACKAGES_TOKEN
-        uses: docker/login-action@v2
+      - name: Delete 'dev' containers older than a week
+        uses: snok/container-retention-policy@v2
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.DELETE_PACKAGES_TOKEN }}
-      - name: Delete all containers from repository without tags
-        uses: Chizkiyahu/delete-untagged-ghcr-action@v2
-        with:
-            token: ${{ secrets.DELETE_PACKAGES_TOKEN }}
-            repository_owner: ${{ github.repository_owner }}
-            repository: ${{ github.repository }}
-            untagged_only: true
-            owner_type: org # or user
-            except_untagged_multiplatform: true
+          image-names: k2eg/ubuntu, k2eg/debian
+          cut-off: A week ago UTC
+          account-type: org
+          org-name: slaclab
+          keep-at-least: 1
+          untagged-only: true
+          token: ${{ secrets.GITHUB_TOKEN }}
