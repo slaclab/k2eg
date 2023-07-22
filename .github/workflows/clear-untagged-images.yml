@@ -19,4 +19,4 @@ jobs:
           org-name: slaclab
           keep-at-least: 1
           untagged-only: true
-          token: ${{ secrets.DELETE_PACKAGES_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
