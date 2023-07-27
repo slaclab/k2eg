@@ -1,21 +1,23 @@
+#include <k2eg/service/epics/EpicsChannel.h>
+#include <k2eg/service/epics/EpicsGetOperation.h>
+#include <k2eg/service/epics/EpicsMonitorOperation.h>
+#include <k2eg/service/epics/EpicsPutOperation.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
+#include <memory>
 #include <mutex>
 #include <ranges>
-
-#include "k2eg/service/epics/EpicsChannel.h"
-#include "k2eg/service/epics/EpicsGetOperation.h"
-#include "k2eg/service/epics/EpicsMonitorOperation.h"
-#include "k2eg/service/epics/EpicsPutOperation.h"
+#include <regex>
 
 using namespace k2eg::common;
 using namespace k2eg::service::epics_impl;
 
-EpicsServiceManager::EpicsServiceManager() : end_processing(false),processing_pool(2) {
-  pva_provider     = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
-  ca_provider      = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
+EpicsServiceManager::EpicsServiceManager() : end_processing(false), processing_pool(2) {
+  pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
+  ca_provider  = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
 }
 EpicsServiceManager::~EpicsServiceManager() {
   // remove all monitor handler
@@ -32,7 +34,7 @@ EpicsServiceManager::addChannel(const std::string& pv_name, const std::string& p
   std::unique_lock guard(channel_map_mutex);
   if (auto search = channel_map.find(pv_name); search != channel_map.end()) { return; }
   try {
-    channel_map[pv_name]                         = std::make_shared<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
+    channel_map[pv_name]                           = std::make_shared<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
     ConstMonitorOperationShrdPtr monitor_operation = channel_map[pv_name]->monitor();
     // lock and insert in queue
     processing_pool.push_task(&EpicsServiceManager::task, this, monitor_operation);
@@ -92,16 +94,19 @@ EpicsServiceManager::getChannelData(const std::string& pv_name, const std::strin
 }
 
 ConstPutOperationUPtr
-EpicsServiceManager::putChannelData(const std::string& pv_name, const std::string& field, const std::string& value, const std::string& protocol) {
+EpicsServiceManager::putChannelData(const std::string& pv_name, const std::string& value, const std::string& protocol) {
   ConstPutOperationUPtr result;
   std::unique_lock      guard(channel_map_mutex);
-  if (auto search = channel_map.find(pv_name); search != channel_map.end()) {
+
+  auto pv = sanitizePVName(pv_name);
+
+  if (auto search = channel_map.find(pv->name); search != channel_map.end()) {
     // the same channel is in monitor so we can use it
-    result = search->second->put(field, value);
+    result = search->second->put(pv->field, value);
   } else {
     // allocate channel and return data
-    auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
-    result       = channel->put(field, value);
+    auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), pv->name);
+    result       = channel->put(pv->field, value);
   }
   return result;
 }
@@ -127,13 +132,14 @@ EpicsServiceManager::getHandlerSize() {
 
 void
 EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op) {
-  if(end_processing) return;
+  if (end_processing) return;
   // fetch op to manage
-  //std::this_thread::sleep_for(std::chrono::microseconds(100));
+  // std::this_thread::sleep_for(std::chrono::microseconds(100));
   {
     // check if we need to remove th emonitor for the specific pv owned by cur_monitor_op
     std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
-    auto                        found = std::find_if(std::begin(pv_to_remove), std::end(pv_to_remove), [&monitor_op](auto& pv_name) { return monitor_op->getPVName().compare(pv_name) == 0; });
+    auto                        found =
+        std::find_if(std::begin(pv_to_remove), std::end(pv_to_remove), [&monitor_op](auto& pv_name) { return monitor_op->getPVName().compare(pv_name) == 0; });
     if (found != std::end(pv_to_remove)) {
       // i need to remove this monitor
       pv_to_remove.erase(found);
@@ -143,10 +149,34 @@ EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op) {
 
   // manage monitor op
   std::lock_guard guard(channel_map_mutex);
-  //try to fetch a specific number of 'data' event only
+  // try to fetch a specific number of 'data' event only
   monitor_op->poll();
   if (monitor_op->hasEvents() && handler_broadcaster.targets.size()) { handler_broadcaster.broadcast(monitor_op->getEventData()); }
 
-  //re-enque
+  // re-enque
   processing_pool.push_task(&EpicsServiceManager::task, this, monitor_op);
+}
+
+// regex for IOC name
+std::regex pv_name_regex("^([a-zA-Z0-9_]+(?::[a-zA-Z0-9_]+)*)(\\.([a-zA-Z0-9_]+(?:\\.[a-zA-Z0-9_]+)*))?$");
+
+PVUPtr
+EpicsServiceManager::sanitizePVName(const std::string& pv_name) {
+  std::smatch match;
+  // Use std::regex_match to check if pvName matches regExp
+  if (!std::regex_match(pv_name, match, pv_name_regex)) { return PVUPtr(); }
+  size_t      matches = match.size();
+  std::string base_pv_name;
+  std::string field_name = "value";
+  // Access the groups: match[1] is the PV name without field, match[3] is the field including the '.'
+  if (matches > 1) { base_pv_name = match[1].str(); }
+
+  if (match.size() == 4) {
+    std::string tmp = match[3].str();
+    // Remove the '.' from the start of the field name
+    if (!tmp.empty()) {
+      field_name = tmp;
+    }
+  }
+  return std::make_unique<PV>(PV{base_pv_name, field_name});
 }

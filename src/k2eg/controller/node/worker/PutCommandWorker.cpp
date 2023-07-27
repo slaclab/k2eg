@@ -35,7 +35,7 @@ PutCommandWorker::processCommand(ConstCommandShrdPtr command) {
   if (command->type != CommandType::put) return;
   ConstPutCommandShrdPtr p_ptr = static_pointer_cast<const PutCommand>(command);
   logger->logMessage(STRING_FORMAT("Perform put command for %1%", p_ptr->pv_name), LogLevel::DEBUG);
-  auto put_op = epics_service_manager->putChannelData(p_ptr->pv_name, "value", p_ptr->value);
+  auto put_op = epics_service_manager->putChannelData(p_ptr->pv_name, p_ptr->value);
   processing_pool->push_task(
       &PutCommandWorker::checkPutCompletion,
       this,

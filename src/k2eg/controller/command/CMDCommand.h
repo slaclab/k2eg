@@ -88,10 +88,18 @@ check_for_serialization(const boost::json::object& o, common::SerializationType 
   return ser_type;
 }
 
+// Represent a pv with the record name
+struct PVName {
+    std::string pv_name;
+    std::string field_name;
+};
+DEFINE_PTR_TYPES(PVName)
+
 /**
  * class that help to map the json structure to a command
  */
 class MapToCommand {
+  static PVNameUPtr saintizePVName(const std::string& pv_name);
   /**
    * Extract the command type
    */

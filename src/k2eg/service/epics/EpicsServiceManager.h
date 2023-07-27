@@ -21,7 +21,15 @@ namespace k2eg::service::epics_impl {
 DEFINE_MAP_FOR_TYPE(std::string, EpicsChannelShrdPtr, EpicsChannelMap)
 typedef const EventReceivedShrdPtr& EpicsServiceManagerHandlerParamterType;
 typedef std::function<void(EpicsServiceManagerHandlerParamterType)> EpicsServiceManagerHandler;
-//typedef std::function<void(EventType, EpicsServiceManagerHandlerParamterType)> EpicsServiceManagerHandler;
+
+/*
+Represent a PV with his name and field
+*/
+struct PV {
+    std::string name;
+    std::string field;
+};
+DEFINE_PTR_TYPES(PV)
 
 class EpicsServiceManager {
     std::mutex channel_map_mutex;
@@ -42,8 +50,9 @@ public:
     void removeChannel(const std::string& pv_name);
     void monitorChannel(const std::string& pv_name, bool activate, const std::string& protocol);
     ConstGetOperationUPtr getChannelData(const std::string& pv_name, const std::string& protocol = "pva");
-    ConstPutOperationUPtr putChannelData(const std::string& pv_name, const std::string& field, const std::string& value, const std::string& protocol = "pva");
+    ConstPutOperationUPtr putChannelData(const std::string& pv_name, const std::string& value, const std::string& protocol = "pva");
     size_t getChannelMonitoredSize();
+    PVUPtr sanitizePVName(const std::string& pv_name);
     /**
      * Register an event handler and return a token. Unitl this token is alive
      * the handler receives the events. The internal broadcaster dispose all handler
