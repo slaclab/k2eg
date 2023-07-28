@@ -52,6 +52,17 @@ public:
     ConstGetOperationUPtr getChannelData(const std::string& pv_name, const std::string& protocol = "pva");
     ConstPutOperationUPtr putChannelData(const std::string& pv_name, const std::string& value, const std::string& protocol = "pva");
     size_t getChannelMonitoredSize();
+    /*
+    give some sanitizaiton to epics pv names patter <pvname>.<value>
+    this method always return a valid pointer if the name is totaly 
+    wrong and noting is matched the default value are returned.
+
+    thi method recognize values using multi dot notaion for substructures 
+    so either the two form are valid:
+
+    ioc:pv_name.value
+    ioc:pv_name.field.subfield
+    */
     PVUPtr sanitizePVName(const std::string& pv_name);
     /**
      * Register an event handler and return a token. Unitl this token is alive
