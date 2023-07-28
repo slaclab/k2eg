@@ -64,26 +64,10 @@ serializeMsgpackCompact(const PutCommandReply& reply, common::MsgpackMessage& ms
 }
 
 struct PutOpInfo : public WorkerAsyncOperation {
-  std::string                                pv_name;
-  std::string                                destination_topic;
-  std::string                                value;
-  std::string                                reply_id;
-  k2eg::common::SerializationType            serialization;
-  service::epics_impl::ConstPutOperationUPtr op;
-  PutOpInfo(const std::string&                         pv_name,
-            const std::string&                         destination_topic,
-            const std::string&                         value,
-            const std::string&                         reply_id,
-            const k2eg::common::SerializationType&     serialization,
-            service::epics_impl::ConstPutOperationUPtr op,
-            std::uint32_t                              tout_msc = 10000)
-      : WorkerAsyncOperation(std::chrono::milliseconds(tout_msc)),
-        destination_topic(destination_topic),
-        pv_name(pv_name),
-        value(value),
-        reply_id(reply_id),
-        serialization(serialization),
-        op(std::move(op)) {}
+  k2eg::controller::command::cmd::ConstPutCommandShrdPtr cmd;
+  service::epics_impl::ConstPutOperationUPtr          op;
+  PutOpInfo(k2eg::controller::command::cmd::ConstPutCommandShrdPtr cmd, service::epics_impl::ConstPutOperationUPtr op, std::uint32_t tout_msc = 10000)
+      : WorkerAsyncOperation(std::chrono::milliseconds(tout_msc)), cmd(cmd), op(std::move(op)) {}
 };
 DEFINE_PTR_TYPES(PutOpInfo)
 
@@ -96,6 +80,7 @@ class PutCommandWorker : public CommandWorker {
   k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
   void                                                  checkPutCompletion(PutOpInfoShrdPtr put_info);
   k2eg::common::ConstSerializedMessageShrdPtr           getReply(PutOpInfoShrdPtr put_info);
+  void                                                  manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstPutCommandShrdPtr cmd);
 
  public:
   PutCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);

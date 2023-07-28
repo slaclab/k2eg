@@ -4,6 +4,8 @@ record(ao, "variable:a")
     field(DRVH, "100")
     field(DOL, "0")
     field(PINI, "YES")
+    field(HIGH, "0")
+    field(LOW, "0")
 }
 record(ao, "variable:b")
 {

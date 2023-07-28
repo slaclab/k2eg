@@ -1,6 +1,7 @@
 #include <k2eg/service/epics/EpicsPutOperation.h>
 #include <pv/createRequest.h>
 #include <pvData.h>
+#include <stdexcept>
 
 using namespace k2eg::service::epics_impl;
 
@@ -26,6 +27,8 @@ PutOperation::putBuild(const epics::pvData::StructureConstPtr& build, pvac::Clie
   pvd::PVStructurePtr root(pvd::getPVDataCreate()->createPVStructure(build));
   // we only know about writes to scalar 'value' field
   auto fld = root->getSubField(field);
+  if(!fld){throw std::runtime_error("Field has not been found");}
+  bool immutable = fld->isImmutable();
   switch (fld->getField()->getType()) {
     case pvd::scalar: {
       pvd::PVScalarPtr pv = static_pointer_cast<pvd::PVScalar>(fld);

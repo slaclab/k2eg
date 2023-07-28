@@ -35,27 +35,39 @@ PutCommandWorker::processCommand(ConstCommandShrdPtr command) {
   if (command->type != CommandType::put) return;
   ConstPutCommandShrdPtr p_ptr = static_pointer_cast<const PutCommand>(command);
   logger->logMessage(STRING_FORMAT("Perform put command for %1%", p_ptr->pv_name), LogLevel::DEBUG);
-  auto put_op = epics_service_manager->putChannelData(p_ptr->pv_name, "value", p_ptr->value);
-  processing_pool->push_task(
-      &PutCommandWorker::checkPutCompletion,
-      this,
-      std::make_shared<PutOpInfo>(p_ptr->pv_name, p_ptr->destination_topic, p_ptr->value, p_ptr->reply_id, p_ptr->serialization, std::move(put_op)));
+  auto put_op = epics_service_manager->putChannelData(p_ptr->pv_name, p_ptr->value);
+  if (!put_op) {
+    // fire error
+    manageReply(-1, "PV name malformed", p_ptr);
+  } else {
+    processing_pool->push_task(
+        &PutCommandWorker::checkPutCompletion,
+        this,
+        std::make_shared<PutOpInfo>(p_ptr, std::move(put_op)));
+  }
+}
+
+void
+PutCommandWorker::manageReply(const std::int8_t error_code, const std::string& error_message, ConstPutCommandShrdPtr cmd) {
+  logger->logMessage(STRING_FORMAT("%1% [pv:%2% avalue:%3%]", error_message % cmd->pv_name % cmd->value), LogLevel::ERROR);
+  if (cmd->destination_topic.empty() || cmd->reply_id.empty()) {
+    return;
+  } else {
+    auto serialized_message = serialize(PutCommandReply{error_code, cmd->reply_id, error_message}, cmd->serialization);
+    if (!serialized_message) {
+      logger->logMessage("Invalid serialized message", LogLevel::FATAL);
+    } else {
+      publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->destination_topic, "put-operation", cmd->pv_name, serialized_message),
+                             {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
+    }
+  }
 }
 
 void
 PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
   // check for timeout
   if (put_info->isTimeout()) {
-    logger->logMessage(STRING_FORMAT("Timeout put command for %1% and value %2%", put_info->pv_name % put_info->value), LogLevel::ERROR);
-    if (!put_info->destination_topic.empty()) {
-      auto serialized_message = serialize(PutCommandReply{-3, put_info->reply_id, "Timeout operation"}, put_info->serialization);
-      if (!serialized_message) {
-        logger->logMessage("Invalid serialized message", LogLevel::FATAL);
-      } else {
-        publisher->pushMessage(MakeReplyPushableMessageUPtr(put_info->destination_topic, "put-operation", put_info->pv_name, serialized_message),
-                               {{"k2eg-ser-type", serialization_to_string(put_info->serialization)}});
-      }
-    }
+    manageReply(-3, "Timeout operation", put_info->cmd);
     return;
   }
   // give some time of relaxing
@@ -66,44 +78,16 @@ PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
   } else {
     switch (put_info->op->getState().event) {
       case pvac::PutEvent::Fail: {
-        logger->logMessage(STRING_FORMAT("Failed put command for %1% and message %2%", put_info->pv_name % put_info->op->getState().message), LogLevel::ERROR);
-        if (!put_info->destination_topic.empty()) {
-          auto serialized_message = serialize(PutCommandReply{-2, put_info->reply_id, put_info->op->getState().message}, put_info->serialization);
-          if (!serialized_message) {
-            logger->logMessage("Invalid serialized message", LogLevel::FATAL);
-          } else {
-            publisher->pushMessage(MakeReplyPushableMessageUPtr(put_info->destination_topic, "put-operation", put_info->pv_name, serialized_message),
-                                   {{"k2eg-ser-type", serialization_to_string(put_info->serialization)}});
-          }
-        }
+        manageReply(-2, put_info->op->getState().message, put_info->cmd);
         break;
       }
       case pvac::PutEvent::Cancel: {
-        logger->logMessage(STRING_FORMAT("Cancelled put command for %1% and message %2%", put_info->pv_name % put_info->op->getState().message),
-                           LogLevel::ERROR);
-        if (!put_info->destination_topic.empty()) {
-          auto serialized_message = serialize(PutCommandReply{-1, put_info->reply_id, "Cancelled operation"}, put_info->serialization);
-          if (!serialized_message) {
-            logger->logMessage("Invalid serialized message", LogLevel::FATAL);
-          } else {
-            publisher->pushMessage(MakeReplyPushableMessageUPtr(put_info->destination_topic, "put-operation", put_info->pv_name, serialized_message),
-                                   {{"k2eg-ser-type", serialization_to_string(put_info->serialization)}});
-          }
-        }
+        manageReply(-2, "Put operation hs been cancelled", put_info->cmd);
         break;
       }
       case pvac::PutEvent::Success: {
         metric.incrementCounter(IEpicsMetricCounterType::Put);
-        logger->logMessage(STRING_FORMAT("Success put command for %1%", put_info->pv_name), LogLevel::INFO);
-        if (!put_info->destination_topic.empty()) {
-          auto serialized_message = serialize(PutCommandReply{0, put_info->reply_id, ""}, put_info->serialization);
-          if (!serialized_message) {
-            logger->logMessage("Invalid serialized message", LogLevel::FATAL);
-          } else {
-            publisher->pushMessage(MakeReplyPushableMessageUPtr(put_info->destination_topic, "put-operation", put_info->pv_name, serialized_message),
-                                   {{"k2eg-ser-type", serialization_to_string(put_info->serialization)}});
-          }
-        }
+        manageReply(0, "Successfull operation", put_info->cmd);
         break;
       }
     }

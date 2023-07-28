@@ -82,23 +82,10 @@ serializeMsgpackCompact(const GetFaultyCommandReply& reply, common::MsgpackMessa
  */
 class GetOpInfo : public WorkerAsyncOperation {
  public:
-  std::string                                pv_name;
-  std::string                                destination_topic;
-  k2eg::common::SerializationType            serialization;
-  std::string                                reply_id;
-  service::epics_impl::ConstGetOperationUPtr op;
-  GetOpInfo(const std::string&                         pv_name,
-            const std::string&                         destination_topic,
-            const k2eg::common::SerializationType&     serialization,
-            std::string                                reply_id,
-            service::epics_impl::ConstGetOperationUPtr op,
-            std::uint32_t                              tout_msc = 10000)
-      : WorkerAsyncOperation(std::chrono::milliseconds(tout_msc)),
-        pv_name(pv_name),
-        destination_topic(destination_topic),
-        serialization(serialization),
-        reply_id(reply_id),
-        op(std::move(op)) {}
+  k2eg::controller::command::cmd::ConstGetCommandShrdPtr cmd;
+  service::epics_impl::ConstGetOperationUPtr             op;
+  GetOpInfo(k2eg::controller::command::cmd::ConstGetCommandShrdPtr cmd, k2eg::service::epics_impl::ConstGetOperationUPtr op, std::uint32_t tout_msc = 10000)
+      : WorkerAsyncOperation(std::chrono::milliseconds(tout_msc)), cmd(cmd), op(std::move(op)) {}
 };
 DEFINE_PTR_TYPES(GetOpInfo)
 
@@ -109,7 +96,7 @@ class GetCommandWorker : public CommandWorker {
   k2eg::service::metric::IEpicsMetric&                  metric;
   k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
   void                                                  checkGetCompletion(GetOpInfoShrdPtr put_info);
-
+  void                                                  manageFaultyReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstGetCommandShrdPtr cmd);
  public:
   GetCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
   virtual ~GetCommandWorker();

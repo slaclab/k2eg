@@ -9,10 +9,12 @@
 #include <latch>
 #include <thread>
 
+#include "epicsException.h"
 #include "k2eg/service/epics/EpicsGetOperation.h"
 #include "k2eg/service/epics/EpicsMonitorOperation.h"
 #include "k2eg/service/epics/EpicsPutOperation.h"
 #include "pvData.h"
+#include "pvType.h"
 
 using namespace k2eg::service::epics_impl;
 
@@ -198,6 +200,32 @@ struct HandlerClass {
   }
 };
 
+TEST(Epics, EpicsServiceManagerPVSanitization) {
+  PVUPtr                pv_desc;
+  std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
+  EXPECT_NO_THROW(pv_desc = manager->sanitizePVName("variable:a.HIHI"););
+  EXPECT_STREQ(pv_desc->name.c_str(), "variable:a");
+  EXPECT_STREQ(pv_desc->field.c_str(), "HIHI");
+  manager.reset();
+}
+
+TEST(Epics, EpicsServiceManagerPVSanitizationWithNoName) {
+  PVUPtr                pv_desc;
+  std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
+  EXPECT_NO_THROW(pv_desc = manager->sanitizePVName(""););
+  EXPECT_EQ(pv_desc, nullptr);
+  manager.reset();
+}
+
+TEST(Epics, EpicsServiceManagerPVSanitizationOkWithMultipleLevelStructure) {
+  PVUPtr                pv_desc;
+  std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
+  EXPECT_NO_THROW(pv_desc = manager->sanitizePVName("variable:a.root.field"););
+  EXPECT_STREQ(pv_desc->name.c_str(), "variable:a");
+  EXPECT_STREQ(pv_desc->field.c_str(), "root.field");
+  manager.reset();
+}
+
 TEST(Epics, EpicsServiceManagerMonitorOk) {
   HandlerClass                         handler(1);
   k2eg::common::BroadcastToken         handler_tok;
@@ -244,9 +272,9 @@ TEST(Epics, EpicsServiceManagerGetPut) {
   ConstPutOperationUPtr                put_op_a;
   ConstPutOperationUPtr                put_op_b;
   std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-  EXPECT_NO_THROW(put_op_a = manager->putChannelData("variable:a", "value", "1"););
+  EXPECT_NO_THROW(put_op_a = manager->putChannelData("variable:a","1"););
   WHILE(put_op_a->isDone(), false);
-  EXPECT_NO_THROW(put_op_b = manager->putChannelData("variable:b", "value", "2"););
+  EXPECT_NO_THROW(put_op_b = manager->putChannelData("variable:b", "2"););
   WHILE(put_op_b->isDone(), false);
   // give time to update
   std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -261,7 +289,7 @@ TEST(Epics, EpicsServiceManagerGetPutWaveForm) {
   ConstPutOperationUPtr                put_op_a;
   ConstPutOperationUPtr                put_op_b;
   std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-  EXPECT_NO_THROW(put_op_a = manager->putChannelData("channel:waveform", "value", "1 2 3 4 5 6 7 8"););
+  EXPECT_NO_THROW(put_op_a = manager->putChannelData("channel:waveform", "1 2 3 4 5 6 7 8"););
   WHILE(put_op_a->isDone(), false);
   EXPECT_NO_THROW(sum_data = manager->getChannelData("channel:waveform"););
   WHILE(sum_data->isDone(), false);
@@ -278,5 +306,33 @@ TEST(Epics, EpicsServiceManagerGetPutWaveForm) {
   EXPECT_EQ(arr[5], 6);
   EXPECT_EQ(arr[6], 7);
   EXPECT_EQ(arr[7], 8);
+  manager.reset();
+}
+
+TEST(Epics, EpicsServiceManagerPutWrongField) {
+  ConstGetOperationUPtr                sum_data;
+  ConstPutOperationUPtr                put_op_a;
+  ConstPutOperationUPtr                put_op_b;
+  std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
+  EXPECT_NO_THROW(put_op_a = manager->putChannelData("variable:a.HIHI", "100"););
+  WHILE(put_op_a->isDone(), false);
+  EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::Fail);
+  manager.reset();
+}
+
+TEST(Epics, EpicsServiceManagerPutOtherField) {
+  ConstGetOperationUPtr                sum_data;
+  ConstPutOperationUPtr                put_op_a;
+  ConstPutOperationUPtr                put_op_b;
+  std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
+  // EXPECT_NO_THROW(put_op_a = manager->putChannelData("variable:a.valueAlarm.highWarningLimit", "200"););
+  // WHILE(put_op_a->isDone(), false);
+  // EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::Success);
+  // EXPECT_NO_THROW(sum_data = manager->getChannelData("variable:a"););
+  // WHILE(sum_data->isDone(), false);
+  // epics::pvData::PVScalar::const_shared_pointer scalar_result;
+  // EXPECT_NO_THROW(scalar_result = sum_data->getChannelData()->data->getSubField<epics::pvData::PVScalar>("valueAlarm.highWarningLimit"));
+  // int hihi_result = scalar_result->getAs<epics::pvData::uint32>();
+  // EXPECT_EQ(hihi_result, 200);
   manager.reset();
 }
