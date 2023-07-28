@@ -213,8 +213,7 @@ TEST(Epics, EpicsServiceManagerPVSanitizationWithNoName) {
   PVUPtr                pv_desc;
   std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
   EXPECT_NO_THROW(pv_desc = manager->sanitizePVName(""););
-  EXPECT_STREQ(pv_desc->name.c_str(), "");
-  EXPECT_STREQ(pv_desc->field.c_str(), "value");
+  EXPECT_EQ(pv_desc, nullptr);
   manager.reset();
 }
 
