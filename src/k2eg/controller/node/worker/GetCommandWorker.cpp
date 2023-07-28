@@ -43,26 +43,37 @@ GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
   logger->logMessage(STRING_FORMAT("Perform get command for %1% with protocol %2% on topic %3% with sertype: %4%",
                                    g_ptr->pv_name % g_ptr->protocol % g_ptr->destination_topic % serialization_to_string(g_ptr->serialization)),
                      LogLevel::DEBUG);
-  auto channel_data = epics_service_manager->getChannelData(g_ptr->pv_name, g_ptr->protocol);
-  processing_pool->push_task(
-      &GetCommandWorker::checkGetCompletion,
-      this,
-      std::make_shared<GetOpInfo>(g_ptr->pv_name, g_ptr->destination_topic, g_ptr->serialization, g_ptr->reply_id, std::move(channel_data)));
+  auto get_op = epics_service_manager->getChannelData(g_ptr->pv_name, g_ptr->protocol);
+  if (!get_op) {
+    manageFaultyReply(-1, "PV name malformed", g_ptr);
+  } else {
+    processing_pool->push_task(&GetCommandWorker::checkGetCompletion,
+                               this,
+                               std::make_shared<GetOpInfo>(g_ptr, std::move(get_op)));
+  }
+}
+
+void
+GetCommandWorker::manageFaultyReply(const std::int8_t error_code, const std::string& error_message, ConstGetCommandShrdPtr cmd) {
+  logger->logMessage(STRING_FORMAT("%1% [pv:%2%]", error_message % cmd->pv_name), LogLevel::ERROR);
+  if (cmd->destination_topic.empty()) {
+    return;
+  } else {
+    auto serialized_message = serialize(GetFaultyCommandReply{error_code, cmd->reply_id, error_message}, cmd->serialization);
+    if (!serialized_message) {
+      logger->logMessage("Invalid serialized message", LogLevel::FATAL);
+    } else {
+      publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->destination_topic, "put-operation", cmd->pv_name, serialized_message),
+                             {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
+    }
+  }
 }
 
 void
 GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
   // check for timeout
   if (get_info->isTimeout()) {
-    logger->logMessage(STRING_FORMAT("Timeout get command for %1%", get_info->pv_name), LogLevel::ERROR);
-    auto serialized_message = serialize(GetFaultyCommandReply{-3, get_info->reply_id, "Timeout operation"}, get_info->serialization);
-    if (!serialized_message) {
-      logger->logMessage("Invalid serialized message", LogLevel::FATAL);
-    } else {
-      publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->destination_topic, "get-operation", get_info->pv_name, serialized_message),
-                              {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
-      logger->logMessage(STRING_FORMAT("Sent get faulty reply for reply_id %1%", get_info->reply_id), LogLevel::DEBUG);
-    }
+    manageFaultyReply(-3, "Timeout operation", get_info->cmd);
     return;
   }
   // give some time of relaxing
@@ -74,46 +85,29 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
   } else {
     switch (get_info->op->getState().event) {
       case pvac::GetEvent::Fail: {
-        logger->logMessage(STRING_FORMAT("Failed get command for %1% with message %2%", get_info->pv_name % get_info->op->getState().message), LogLevel::ERROR);
-        auto serialized_message = serialize(GetFaultyCommandReply{-1, get_info->reply_id, get_info->op->getState().message}, get_info->serialization);
-        if (!serialized_message) {
-          logger->logMessage("Invalid serialized message", LogLevel::FATAL);
-        } else {
-          publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->destination_topic, "get-operation", get_info->pv_name, serialized_message),
-                                 {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
-          logger->logMessage(STRING_FORMAT("Sent get faulty reply for reply_id %1%", get_info->reply_id), LogLevel::DEBUG);
-        }
+        manageFaultyReply(-2, get_info->op->getState().message, get_info->cmd);
         break;
       }
       case pvac::GetEvent::Cancel: {
-        logger->logMessage(STRING_FORMAT("Cancelled get command for %1% with message %2%", get_info->pv_name % get_info->op->getState().message),
-                           LogLevel::ERROR);
-        auto serialized_message = serialize(GetFaultyCommandReply{-2, get_info->reply_id, get_info->op->getState().message}, get_info->serialization);
-        if (!serialized_message) {
-          logger->logMessage("Invalid serialized message", LogLevel::FATAL);
-        } else {
-          publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->destination_topic, "get-operation", get_info->pv_name, serialized_message),
-                                 {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
-          logger->logMessage(STRING_FORMAT("Sent get faulty reply for reply_id %1%", get_info->reply_id), LogLevel::DEBUG);
-        }
+        manageFaultyReply(-2, "Operaton cancelled", get_info->cmd);
         break;
       }
       case pvac::GetEvent::Success: {
         // update metric
         metric.incrementCounter(IEpicsMetricCounterType::Get);
-        logger->logMessage(STRING_FORMAT("Success get command for %1%", get_info->pv_name), LogLevel::INFO);
+        logger->logMessage(STRING_FORMAT("Success get command for %1%", get_info->cmd->pv_name), LogLevel::INFO);
         auto channel_data = get_info->op->getChannelData();
         if (!channel_data) {
-          logger->logMessage(STRING_FORMAT("No data received for %1%", get_info->pv_name), LogLevel::ERROR);
+          logger->logMessage(STRING_FORMAT("No data received for %1%", get_info->cmd->pv_name), LogLevel::ERROR);
           break;
         }
-        auto serialized_message = serialize(GetCommandReply{0, get_info->reply_id, get_info->op->getChannelData()}, get_info->serialization);
+        auto serialized_message = serialize(GetCommandReply{0, get_info->cmd->reply_id, get_info->op->getChannelData()}, get_info->cmd->serialization);
         if (!serialized_message) {
           logger->logMessage("Invalid serialized message", LogLevel::FATAL);
           break;
         }
-        publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->destination_topic, "get-operation", get_info->pv_name, serialized_message),
-                               {{"k2eg-ser-type", serialization_to_string(get_info->serialization)}});
+        publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->cmd->destination_topic, "get-operation", get_info->cmd->pv_name, serialized_message),
+                               {{"k2eg-ser-type", serialization_to_string(get_info->cmd->serialization)}});
         break;
       }
     }

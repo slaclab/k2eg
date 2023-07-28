@@ -765,7 +765,7 @@ TEST(NodeController, PutCommandScalarArray) {
   deinitBackend(std::move(node_controller));
 }
 
-TEST(NodeController, PutCommandOnWronPVCheckReply) {
+TEST(NodeController, PutCommandOnWrongPVCheckReply) {
   typedef std::map<std::string, msgpack::object> Map;
   typedef std::vector<msgpack::object>           Vec;
   msgpack::unpacked                              msgpack_unpacked;
@@ -776,7 +776,7 @@ TEST(NodeController, PutCommandOnWronPVCheckReply) {
   auto node_controller = initBackend(publisher);
 
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(
-      PutCommand{CommandType::put, SerializationType::MsgpackCompact, "pva", "channel:wrong-pv-name", "DESTINATION_TOPIC", "8 0 0 0 0 0 0 0 0", "PUT_REPLY_ID"})}););
+      PutCommand{CommandType::put, SerializationType::MsgpackCompact, "pva", "channel:wrong_pv_name", "DESTINATION_TOPIC", "8 0 0 0 0 0 0 0 0", "PUT_REPLY_ID"})}););
   // give some time for the timeout
   wait_forPublished_message_size(*publisher, 1, 10000);
   EXPECT_EQ(publisher->sent_messages.size(), 1);

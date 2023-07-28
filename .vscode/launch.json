@@ -168,7 +168,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=Epics.EpicsServiceManager*"],
+            "args": ["--gtest_filter=Epics.*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
@@ -284,7 +284,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=NodeController.*"],
+            "args": ["--gtest_filter=NodeController.GetFaultyCommandMsg*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

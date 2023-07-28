@@ -84,6 +84,7 @@ EpicsServiceManager::getChannelData(const std::string& pv_name, const std::strin
   std::unique_lock      guard(channel_map_mutex);
   // give a sanitization on pvname, the value will be not used cause k2eg return always all information
   auto pv = sanitizePVName(pv_name);
+  if(!pv) {return ConstGetOperationUPtr();}
   if (auto search = channel_map.find(pv->name); search != channel_map.end()) {
     // the same channel is in monitor so we can use it
     result = search->second->get();
@@ -101,6 +102,7 @@ EpicsServiceManager::putChannelData(const std::string& pv_name, const std::strin
   std::unique_lock      guard(channel_map_mutex);
 
   auto pv = sanitizePVName(pv_name);
+  if(!pv) {return ConstPutOperationUPtr();}
   if (auto search = channel_map.find(pv->name); search != channel_map.end()) {
     // the same channel is in monitor so we can use it
     result = search->second->put(pv->field, value);
@@ -167,16 +169,18 @@ EpicsServiceManager::sanitizePVName(const std::string& pv_name) {
   std::string base_pv_name;
   std::string field_name = "value";
   // Use std::regex_match to check if pvName matches regExp
-  if (std::regex_match(pv_name, match, pv_name_regex)) {
-    size_t matches = match.size();
-    // Access the groups: match[1] is the PV name without field, match[3] is the field including the '.'
-    if (matches > 1) { base_pv_name = match[1].str(); }
-    // try to decode the multy dot field part
-    if (match.size() == 4) {
-      std::string tmp = match[3].str();
-      // Remove the '.' from the start of the field name
-      if (!tmp.empty()) { field_name = tmp; }
-    }
+  if (!std::regex_match(pv_name, match, pv_name_regex)) {
+    return PVUPtr();
+  }
+
+  size_t matches = match.size();
+  // Access the groups: match[1] is the PV name without field, match[3] is the field including the '.'
+  if (matches > 1) { base_pv_name = match[1].str(); }
+  // try to decode the multy dot field part
+  if (match.size() == 4) {
+    std::string tmp = match[3].str();
+    // Remove the '.' from the start of the field name
+    if (!tmp.empty()) { field_name = tmp; }
   }
   return std::make_unique<PV>(PV{base_pv_name, field_name});
 }
