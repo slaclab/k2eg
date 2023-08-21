@@ -46,8 +46,8 @@ services:
 
   zookeeper:
     image: bitnami/zookeeper:3.8.1
-    ports:
-      - 2181:2181
+    # ports:
+    #   - 2181:2181
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
 
