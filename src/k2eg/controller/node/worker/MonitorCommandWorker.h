@@ -12,6 +12,7 @@
 #include <shared_mutex>
 #include <string>
 #include <vector>
+#include "k2eg/controller/command/cmd/MonitorCommand.h"
 namespace k2eg::controller::node::worker {
 
 /**
@@ -48,8 +49,7 @@ serializeMsgpack(const MonitorCommandReply& reply, common::MsgpackMessage& msgpa
 // contains the information for the forward
 // of the monitor data to a topic
 struct ChannelTopicMonitorInfo {
-    std::string dest_topic;
-    k2eg::common::SerializationType ser_type;
+    k2eg::controller::command::cmd::ConstMonitorCommandShrdPtr cmd;
 };
 DEFINE_PTR_TYPES(ChannelTopicMonitorInfo);
 

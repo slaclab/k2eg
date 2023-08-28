@@ -46,15 +46,15 @@ void MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
         if (a_ptr->activate) {
             // add topic to channel
             // check if the topic is already present[fault tollerant check]
-            if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&a_ptr](auto& info_topic) { return info_topic->dest_topic.compare(a_ptr->destination_topic) == 0; }) == std::end(vec_ref)) {
-                    channel_topics_map[a_ptr->pv_name].push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{.dest_topic = a_ptr->destination_topic, .ser_type = a_ptr->serialization})
+            if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&a_ptr](auto& info_topic) { return info_topic->cmd->monitor_destination_topic.compare(a_ptr->monitor_destination_topic) == 0; }) == std::end(vec_ref)) {
+                    channel_topics_map[a_ptr->pv_name].push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{a_ptr})
                 );
             } else {
                 logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated", a_ptr->pv_name % a_ptr->destination_topic));
             }
         } else {
             // remove topic to channel
-            auto itr = std::find_if(std::begin(vec_ref), std::end(vec_ref), [&a_ptr](auto& info_topic) { return info_topic->dest_topic.compare(a_ptr->destination_topic) == 0; });
+            auto itr = std::find_if(std::begin(vec_ref), std::end(vec_ref), [&a_ptr](auto& info_topic) { return info_topic->cmd->monitor_destination_topic.compare(a_ptr->monitor_destination_topic) == 0; });
             if (itr != std::end(vec_ref)) {
                 vec_ref.erase(itr);
             } else {
@@ -99,22 +99,22 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
     for (auto& event: *event_received->event_data) {
         // publisher
         for (auto& info_topic: channel_topics_map[event->channel_data.pv_name]) {
-            logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", event->channel_data.pv_name % info_topic->dest_topic), LogLevel::TRACE);
-            if (!local_serialization_cache.contains(info_topic->ser_type)) {
+            logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", event->channel_data.pv_name % info_topic->cmd->monitor_destination_topic), LogLevel::TRACE);
+            if (!local_serialization_cache.contains(info_topic->cmd->serialization)) {
                 // cache new serialized message
-                local_serialization_cache[info_topic->ser_type] = serialize(event->channel_data, static_cast<SerializationType>(info_topic->ser_type));
+                local_serialization_cache[info_topic->cmd->serialization] = serialize(event->channel_data, static_cast<SerializationType>(info_topic->cmd->serialization));
             }
             publisher->pushMessage(
                 MakeReplyPushableMessageUPtr(
-                    info_topic->dest_topic,
+                    info_topic->cmd->monitor_destination_topic,
                     "monitor-message",
                     event->channel_data.pv_name,
-                    local_serialization_cache[info_topic->ser_type]
+                    local_serialization_cache[info_topic->cmd->serialization]
                     ),
                     {// add header
                         {
                         "k2eg-ser-type",
-                        serialization_to_string(info_topic->ser_type)
+                        serialization_to_string(info_topic->cmd->serialization)
                         }
                     }
            );

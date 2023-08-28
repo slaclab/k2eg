@@ -14,9 +14,9 @@ namespace k2eg::controller::command::cmd {
 */
 struct MonitorCommand : public Command {
     bool activate;
-    std::string destination_topic;
     std::string monitor_destination_topic;
     std::string reply_id;
+    std::string destination_topic;
 };
 DEFINE_PTR_TYPES(MonitorCommand)
 
