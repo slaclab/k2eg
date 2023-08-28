@@ -63,15 +63,19 @@ MapToCommand::parse(const object& obj) {
   switch (getCMDType(obj)) {
     case CommandType::monitor: {
       if (auto activation = obj.if_contains(KEY_ACTIVATE); activation != nullptr && activation->is_bool()) {
+        const std::string reply_id = check_for_reply_id(obj, logger);
+        const std::string destination_topic = check_destnation_topic(obj, logger);
         if (activation->as_bool()) {
-          if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
+          if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_MONITOR_DEST_TOPIC, kind::string}}); fields != nullptr) {
             SerializationType ser_type = check_for_serialization(obj, SerializationType::JSON, logger);
             result = std::make_shared<MonitorCommand>(MonitorCommand{CommandType::monitor,
                                                                      ser_type,
                                                                      std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
                                                                      std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
                                                                      true,
-                                                                     std::any_cast<std::string>(fields->find(KEY_DEST_TOPIC)->second)});
+                                                                     destination_topic,
+                                                                     std::any_cast<std::string>(fields->find(KEY_MONITOR_DEST_TOPIC)->second),
+                                                                     reply_id});
           } else {
             logger->logMessage("Missing key for the AquireCommand: " + serialize(obj), LogLevel::ERROR);
           }
@@ -82,7 +86,7 @@ MapToCommand::parse(const object& obj) {
                                                                      "",
                                                                      std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
                                                                      false,
-                                                                     std::any_cast<std::string>(fields->find(KEY_DEST_TOPIC)->second)});
+                                                                     destination_topic});
           } else {
             logger->logMessage("Missing key for the AquireCommand: " + serialize(obj), LogLevel::ERROR);
           }

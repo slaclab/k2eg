@@ -15,6 +15,8 @@ namespace k2eg::controller::command::cmd {
 struct MonitorCommand : public Command {
     bool activate;
     std::string destination_topic;
+    std::string monitor_destination_topic;
+    std::string reply_id;
 };
 DEFINE_PTR_TYPES(MonitorCommand)
 
@@ -24,7 +26,9 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Moni
         {"pv_name", c.pv_name}, 
         {"protocol", c.protocol},
         {"activate", c.activate}, 
-        {"destination_topic", c.destination_topic}
+        {"destination_topic", c.destination_topic},
+        {"monitor_destination_topic", c.monitor_destination_topic},
+        {"reply_id", c.reply_id}
         };
 }
 } // namespace k2eg::controller::command::cmd

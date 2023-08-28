@@ -25,14 +25,15 @@ command_type_to_string(CommandType t) noexcept {
   return "undefined";
 }
 
-#define KEY_COMMAND       "command"
-#define KEY_SERIALIZATION "serialization"
-#define KEY_PROTOCOL      "protocol"
-#define KEY_PV_NAME       "pv_name"
-#define KEY_ACTIVATE      "activate"
-#define KEY_DEST_TOPIC    "dest_topic"
-#define KEY_VALUE         "value"
-#define KEY_REPLY_ID      "reply_id"
+#define KEY_COMMAND             "command"
+#define KEY_SERIALIZATION       "serialization"
+#define KEY_PROTOCOL            "protocol"
+#define KEY_PV_NAME             "pv_name"
+#define KEY_ACTIVATE            "activate"
+#define KEY_DEST_TOPIC          "dest_topic"
+#define KEY_MONITOR_DEST_TOPIC  "monitor_dest_topic"
+#define KEY_VALUE               "value"
+#define KEY_REPLY_ID            "reply_id"
 
 /**
 Base command structure

@@ -76,12 +76,12 @@ void NodeController::submitCommand(ConstCommandShrdPtrVec commands) {
                     {ChannelMonitorType{.pv_name = acquire_command_shrd->pv_name,
                                         .event_serialization = static_cast<std::uint8_t>(acquire_command_shrd->serialization),
                                         .channel_protocol = acquire_command_shrd->protocol,
-                                        .channel_destination = acquire_command_shrd->destination_topic}});
+                                        .channel_destination = acquire_command_shrd->monitor_destination_topic}});
             } else {
                 // stop monitoring
                 node_configuration->removeChannelMonitor(
                     {ChannelMonitorType{.pv_name = acquire_command_shrd->pv_name,
-                                        .channel_destination = acquire_command_shrd->destination_topic}});
+                                        .channel_destination = acquire_command_shrd->monitor_destination_topic}});
             }
             break;
         }
