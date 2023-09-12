@@ -41,7 +41,7 @@ GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
 
   ConstGetCommandShrdPtr g_ptr = static_pointer_cast<const GetCommand>(command);
   logger->logMessage(STRING_FORMAT("Perform get command for %1% with protocol %2% on topic %3% with sertype: %4%",
-                                   g_ptr->pv_name % g_ptr->protocol % g_ptr->destination_topic % serialization_to_string(g_ptr->serialization)),
+                                   g_ptr->pv_name % g_ptr->protocol % g_ptr->reply_topic % serialization_to_string(g_ptr->serialization)),
                      LogLevel::DEBUG);
   auto get_op = epics_service_manager->getChannelData(g_ptr->pv_name, g_ptr->protocol);
   if (!get_op) {
@@ -56,14 +56,14 @@ GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
 void
 GetCommandWorker::manageFaultyReply(const std::int8_t error_code, const std::string& error_message, ConstGetCommandShrdPtr cmd) {
   logger->logMessage(STRING_FORMAT("%1% [pv:%2%]", error_message % cmd->pv_name), LogLevel::ERROR);
-  if (cmd->destination_topic.empty()) {
+  if (cmd->reply_topic.empty()) {
     return;
   } else {
     auto serialized_message = serialize(GetFaultyCommandReply{error_code, cmd->reply_id, error_message}, cmd->serialization);
     if (!serialized_message) {
       logger->logMessage("Invalid serialized message", LogLevel::FATAL);
     } else {
-      publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->destination_topic, "put-operation", cmd->pv_name, serialized_message),
+      publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "put-operation", cmd->pv_name, serialized_message),
                              {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
     }
   }
@@ -106,7 +106,7 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
           logger->logMessage("Invalid serialized message", LogLevel::FATAL);
           break;
         }
-        publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->cmd->destination_topic, "get-operation", get_info->cmd->pv_name, serialized_message),
+        publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->cmd->reply_topic, "get-operation", get_info->cmd->pv_name, serialized_message),
                                {{"k2eg-ser-type", serialization_to_string(get_info->cmd->serialization)}});
         break;
       }

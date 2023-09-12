@@ -40,7 +40,7 @@ void MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
     // lock the map and contained vector for write
     {
         std::unique_lock lock(channel_map_mtx);
-        logger->logMessage(STRING_FORMAT("%1% monitor on '%2%' for topic '%3%'", (a_ptr->activate ? "Activate" : "Deactivate") % a_ptr->pv_name % a_ptr->destination_topic));
+        logger->logMessage(STRING_FORMAT("%1% monitor on '%2%' for topic '%3%'", (a_ptr->activate ? "Activate" : "Deactivate") % a_ptr->pv_name % a_ptr->monitor_destination_topic));
 
         auto& vec_ref = channel_topics_map[a_ptr->pv_name];
         if (a_ptr->activate) {
@@ -50,7 +50,7 @@ void MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
                     channel_topics_map[a_ptr->pv_name].push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{a_ptr})
                 );
             } else {
-                logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated", a_ptr->pv_name % a_ptr->destination_topic));
+                logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated", a_ptr->pv_name % a_ptr->monitor_destination_topic));
             }
         } else {
             // remove topic to channel
@@ -58,7 +58,7 @@ void MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
             if (itr != std::end(vec_ref)) {
                 vec_ref.erase(itr);
             } else {
-                logger->logMessage(STRING_FORMAT("No active monitor on '%1%' for topic '%2%'", a_ptr->pv_name % a_ptr->destination_topic));
+                logger->logMessage(STRING_FORMAT("No active monitor on '%1%' for topic '%2%'", a_ptr->pv_name % a_ptr->monitor_destination_topic));
             }
         }
         activate = vec_ref.size();
@@ -69,18 +69,18 @@ void MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
 
 void
 MonitorCommandWorker::manageReply(const std::int8_t error_code, const std::string& error_message, ConstMonitorCommandShrdPtr cmd) {
-//   logger->logMessage(STRING_FORMAT("%1% [pv:%2% avalue:%3%]", error_message % cmd->pv_name % cmd->value), LogLevel::ERROR);
-//   if (cmd->destination_topic.empty() || cmd->reply_id.empty()) {
-//     return;
-//   } else {
-//     auto serialized_message = serialize(MonitorCommandReply{error_code, cmd->reply_id, error_message}, cmd->serialization);
-//     if (!serialized_message) {
-//       logger->logMessage("Invalid serialized message", LogLevel::FATAL);
-//     } else {
-//       publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->destination_topic, "put-operation", cmd->pv_name, serialized_message),
-//                              {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
-//     }
-//   }
+  logger->logMessage(STRING_FORMAT("%1% [pv:%2%]", error_message % cmd->pv_name), LogLevel::ERROR);
+  if (cmd->reply_topic.empty() || cmd->reply_id.empty()) {
+    return;
+  } else {
+    auto serialized_message = serialize(MonitorCommandReply{error_code, cmd->reply_id, error_message}, cmd->serialization);
+    if (!serialized_message) {
+      logger->logMessage("Invalid serialized message", LogLevel::FATAL);
+    } else {
+      publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "monitor-operation", cmd->pv_name, serialized_message),
+                             {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
+    }
+  }
 }
 
 void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType event_received) {

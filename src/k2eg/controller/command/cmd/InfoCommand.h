@@ -9,12 +9,12 @@ namespace k2eg::controller::command::cmd {
         "command", "info",
         "protocol", "pva|ca",
         "pv_name", "channel::a",
-        "dest_topic", "destination_topic"
+        "reply_topic", "reply_topic"
         }
 */
 
 struct InfoCommand : public Command {
-    std::string destination_topic;
+    std::string reply_topic;
     std::string reply_id;
 };
 DEFINE_PTR_TYPES(InfoCommand)
@@ -25,7 +25,7 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value &jv,  Inf
         {"serialization", serialization_to_string(c.serialization)},
         {"pv_name", c.pv_name},
         {"protocol", c.protocol},
-        {"destination_topic", c.destination_topic},
+        {"reply_topic", c.reply_topic},
         {"reply_id", c.reply_id},
     };
 }

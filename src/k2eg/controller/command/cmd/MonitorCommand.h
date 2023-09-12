@@ -9,14 +9,14 @@ namespace k2eg::controller::command::cmd {
         "activate", true|false,
         "protocol", "pva|ca",
         "pv_name", "channel::a",
-        "dest_topic", "destination_topic"
+        "reply_topic", "reply_topic"
         }
 */
 struct MonitorCommand : public Command {
     bool activate;
     std::string monitor_destination_topic;
     std::string reply_id;
-    std::string destination_topic;
+    std::string reply_topic;
 };
 DEFINE_PTR_TYPES(MonitorCommand)
 
@@ -26,7 +26,7 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Moni
         {"pv_name", c.pv_name}, 
         {"protocol", c.protocol},
         {"activate", c.activate}, 
-        {"destination_topic", c.destination_topic},
+        {"reply_topic", c.reply_topic},
         {"monitor_destination_topic", c.monitor_destination_topic},
         {"reply_id", c.reply_id}
         };

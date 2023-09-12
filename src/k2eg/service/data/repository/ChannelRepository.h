@@ -22,7 +22,7 @@ inline ChannelMonitorType toChannelMonitor(const k2eg::controller::command::cmd:
         .pv_name = acquire_command.pv_name, 
         .event_serialization = static_cast<std::uint8_t>(acquire_command.serialization),
         .channel_protocol = acquire_command.protocol,
-        .channel_destination = acquire_command.destination_topic
+        .channel_destination = acquire_command.monitor_destination_topic
     };
 }
 

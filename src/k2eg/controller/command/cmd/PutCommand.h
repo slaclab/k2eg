@@ -13,7 +13,7 @@ namespace k2eg::controller::command::cmd {
         }
 */
 struct PutCommand : public Command {
-    std::string destination_topic;
+    std::string reply_topic;
     std::string value;
     std::string reply_id;
 };
@@ -24,7 +24,7 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, PutC
         {"serialization", c.serialization},
         {"pv_name", c.pv_name}, 
         {"protocol", c.protocol},
-        {"destination_topic", c.destination_topic},
+        {"reply_topic", c.reply_topic},
         {"value", c.value},
         {"reply_id", c.reply_id}
         }; 

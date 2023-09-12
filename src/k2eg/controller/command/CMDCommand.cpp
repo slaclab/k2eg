@@ -64,29 +64,38 @@ MapToCommand::parse(const object& obj) {
     case CommandType::monitor: {
       if (auto activation = obj.if_contains(KEY_ACTIVATE); activation != nullptr && activation->is_bool()) {
         const std::string reply_id = check_for_reply_id(obj, logger);
-        const std::string destination_topic = check_destnation_topic(obj, logger);
+        const std::string reply_topic = check_reply_topic(obj, logger);
         if (activation->as_bool()) {
-          if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_MONITOR_DEST_TOPIC, kind::string}}); fields != nullptr) {
+          if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_REPLY_TOPIC, kind::string}}); fields != nullptr) {
+            std::string event_destination_topic;
+            if (auto v = obj.if_contains(KEY_REPLY_TOPIC)) {
+              if (v->is_string()) {
+                event_destination_topic = v->as_string();
+              } else {
+                // by default uses the reply topic as monitor event
+                event_destination_topic = reply_topic;
+              }
+            }
             SerializationType ser_type = check_for_serialization(obj, SerializationType::JSON, logger);
             result = std::make_shared<MonitorCommand>(MonitorCommand{CommandType::monitor,
                                                                      ser_type,
                                                                      std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
                                                                      std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
                                                                      true,
-                                                                     destination_topic,
+                                                                     reply_topic,
                                                                      std::any_cast<std::string>(fields->find(KEY_MONITOR_DEST_TOPIC)->second),
                                                                      reply_id});
           } else {
             logger->logMessage("Missing key for the AquireCommand: " + serialize(obj), LogLevel::ERROR);
           }
         } else {
-          if (auto fields = checkFields(obj, {{KEY_PV_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
+          if (auto fields = checkFields(obj, {{KEY_PV_NAME, kind::string}, {KEY_REPLY_TOPIC, kind::string}}); fields != nullptr) {
             result = std::make_shared<MonitorCommand>(MonitorCommand{CommandType::monitor,
                                                                      SerializationType::Unknown,
                                                                      "",
                                                                      std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
                                                                      false,
-                                                                     destination_topic});
+                                                                     reply_topic});
           } else {
             logger->logMessage("Missing key for the AquireCommand: " + serialize(obj), LogLevel::ERROR);
           }
@@ -95,14 +104,15 @@ MapToCommand::parse(const object& obj) {
       break;
     }
     case CommandType::get: {
-      if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
+      if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_REPLY_TOPIC, kind::string}}); fields != nullptr) {
         std::string    reply_id = check_for_reply_id(obj, logger);
         SerializationType ser_type = check_for_serialization(obj, SerializationType::JSON, logger);
+        const std::string reply_topic = check_reply_topic(obj, logger);
         result = std::make_shared<GetCommand>(GetCommand{CommandType::get,
                                                          ser_type,
                                                          std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
                                                          std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
-                                                         std::any_cast<std::string>(fields->find(KEY_DEST_TOPIC)->second),
+                                                         reply_topic,
                                                          reply_id});
       } else {
         logger->logMessage("Missing key for the GetCommand: " + serialize(obj), LogLevel::ERROR);
@@ -113,12 +123,12 @@ MapToCommand::parse(const object& obj) {
       if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_VALUE, kind::string}}); fields != nullptr) {
         std::string    reply_id = check_for_reply_id(obj, logger);
         SerializationType ser_type = check_for_serialization(obj, SerializationType::JSON, logger);
-        const std::string destination_topic = check_destnation_topic(obj, logger);
+        const std::string reply_topic = check_reply_topic(obj, logger);
         result = std::make_shared<PutCommand>(PutCommand{CommandType::put,
                                                          ser_type,
                                                          std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
                                                          std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
-                                                         destination_topic,
+                                                         reply_topic,
                                                          std::any_cast<std::string>(fields->find(KEY_VALUE)->second),
                                                          reply_id});
       } else {
@@ -127,14 +137,15 @@ MapToCommand::parse(const object& obj) {
       break;
     }
     case CommandType::info: {
-      if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_DEST_TOPIC, kind::string}}); fields != nullptr) {
+      if (auto fields = checkFields(obj, {{KEY_PROTOCOL, kind::string}, {KEY_PV_NAME, kind::string}, {KEY_REPLY_TOPIC, kind::string}}); fields != nullptr) {
         std::string    reply_id = check_for_reply_id(obj, logger);
         SerializationType ser_type = check_for_serialization(obj, SerializationType::JSON, logger);
+        const std::string reply_topic = check_reply_topic(obj, logger);
         result = std::make_shared<InfoCommand>(InfoCommand{CommandType::info,
                                                            ser_type,
                                                            std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
                                                            std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
-                                                           std::any_cast<std::string>(fields->find(KEY_DEST_TOPIC)->second),
+                                                           reply_topic,
                                                            reply_id});
       } else {
         logger->logMessage("Missing key for the InfoCommand: " + serialize(obj), LogLevel::ERROR);

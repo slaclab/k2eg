@@ -191,10 +191,24 @@ CMDControllerCommandHandler acquire_test_default_ser = [](ConstCommandShrdPtrVec
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
   ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->activate, true);
-  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->reply_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->monitor_destination_topic.compare("topic-dest"), 0);
 };
 boost::json::value acquire_default_ser = {
-    {KEY_COMMAND, "monitor"}, {KEY_ACTIVATE, true}, {KEY_PROTOCOL, "pva"}, {KEY_PV_NAME, "channel::a"}, {KEY_DEST_TOPIC, "topic-dest"}};
+    {KEY_COMMAND, "monitor"}, {KEY_ACTIVATE, true}, {KEY_PROTOCOL, "pva"}, {KEY_PV_NAME, "channel::a"}, {KEY_REPLY_TOPIC, "topic-dest"}};
+
+CMDControllerCommandHandler acquire_test_specific_monitor_dest_topic = [](ConstCommandShrdPtrVec received_command) {
+  ASSERT_EQ(received_command.size(), 1);
+  ASSERT_EQ(received_command[0]->type, CommandType::monitor);
+  ASSERT_EQ(received_command[0]->serialization, SerializationType::JSON);
+  ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
+  ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
+  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->activate, true);
+  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->reply_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->monitor_destination_topic.compare("monitor-topic-dest"), 0);
+};
+boost::json::value acquire_specific_monitor_dest_topic = {
+    {KEY_COMMAND, "monitor"}, {KEY_ACTIVATE, true}, {KEY_PROTOCOL, "pva"}, {KEY_PV_NAME, "channel::a"}, {KEY_REPLY_TOPIC, "topic-dest"}, {KEY_MONITOR_DEST_TOPIC, "monitor-topic-dest"}};
 
 CMDControllerCommandHandler acquire_test_json = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
@@ -203,14 +217,15 @@ CMDControllerCommandHandler acquire_test_json = [](ConstCommandShrdPtrVec receiv
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
   ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->activate, true);
-  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->reply_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->monitor_destination_topic.compare("topic-dest"), 0);
 };
 boost::json::value acquire_json = {{KEY_COMMAND, "monitor"},
                                    {KEY_ACTIVATE, true},
                                    {KEY_SERIALIZATION, "json"},
                                    {KEY_PROTOCOL, "pva"},
                                    {KEY_PV_NAME, "channel::a"},
-                                   {KEY_DEST_TOPIC, "topic-dest"}};
+                                   {KEY_REPLY_TOPIC, "topic-dest"}};
 
 CMDControllerCommandHandler acquire_test_msgpack = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
@@ -219,14 +234,15 @@ CMDControllerCommandHandler acquire_test_msgpack = [](ConstCommandShrdPtrVec rec
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
   ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->activate, true);
-  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->reply_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->monitor_destination_topic.compare("topic-dest"), 0);
 };
 boost::json::value acquire_msgpack = {{KEY_COMMAND, "monitor"},
                                       {KEY_ACTIVATE, true},
                                       {KEY_SERIALIZATION, "msgpack"},
                                       {KEY_PROTOCOL, "pva"},
                                       {KEY_PV_NAME, "channel::a"},
-                                      {KEY_DEST_TOPIC, "topic-dest"}};
+                                      {KEY_REPLY_TOPIC, "topic-dest"}};
 
 CMDControllerCommandHandler acquire_test_msgpack_compact = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
@@ -235,14 +251,15 @@ CMDControllerCommandHandler acquire_test_msgpack_compact = [](ConstCommandShrdPt
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
   ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->activate, true);
-  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->reply_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->monitor_destination_topic.compare("topic-dest"), 0);
 };
 boost::json::value acquire_msgpack_compact = {{KEY_COMMAND, "monitor"},
                                               {KEY_ACTIVATE, true},
                                               {KEY_SERIALIZATION, "msgpack-compact"},
                                               {KEY_PROTOCOL, "pva"},
                                               {KEY_PV_NAME, "channel::a"},
-                                              {KEY_DEST_TOPIC, "topic-dest"}};
+                                              {KEY_REPLY_TOPIC, "topic-dest"}};
 
 CMDControllerCommandHandler get_test_json = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
@@ -250,10 +267,10 @@ CMDControllerCommandHandler get_test_json = [](ConstCommandShrdPtrVec received_c
   ASSERT_EQ(received_command[0]->serialization, SerializationType::JSON);
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
-  ASSERT_EQ(reinterpret_cast<const GetCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const GetCommand*>(received_command[0].get())->reply_topic.compare("topic-dest"), 0);
 };
 boost::json::value get_json = {
-    {KEY_COMMAND, "get"}, {KEY_PROTOCOL, "pva"}, {KEY_PV_NAME, "channel::a"}, {KEY_SERIALIZATION, "json"}, {KEY_DEST_TOPIC, "topic-dest"}};
+    {KEY_COMMAND, "get"}, {KEY_PROTOCOL, "pva"}, {KEY_PV_NAME, "channel::a"}, {KEY_SERIALIZATION, "json"}, {KEY_REPLY_TOPIC, "topic-dest"}};
 
 CMDControllerCommandHandler get_test_msgpack = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
@@ -261,10 +278,10 @@ CMDControllerCommandHandler get_test_msgpack = [](ConstCommandShrdPtrVec receive
   ASSERT_EQ(received_command[0]->serialization, SerializationType::Msgpack);
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
-  ASSERT_EQ(reinterpret_cast<const GetCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const GetCommand*>(received_command[0].get())->reply_topic.compare("topic-dest"), 0);
 };
 boost::json::value get_msgpack = {
-    {KEY_COMMAND, "get"}, {KEY_PROTOCOL, "pva"}, {KEY_PV_NAME, "channel::a"}, {KEY_SERIALIZATION, "msgpack"}, {KEY_DEST_TOPIC, "topic-dest"}};
+    {KEY_COMMAND, "get"}, {KEY_PROTOCOL, "pva"}, {KEY_PV_NAME, "channel::a"}, {KEY_SERIALIZATION, "msgpack"}, {KEY_REPLY_TOPIC, "topic-dest"}};
 
 CMDControllerCommandHandler get_test_msgpack_compact = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
@@ -272,10 +289,10 @@ CMDControllerCommandHandler get_test_msgpack_compact = [](ConstCommandShrdPtrVec
   ASSERT_EQ(received_command[0]->serialization, SerializationType::MsgpackCompact);
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
-  ASSERT_EQ(reinterpret_cast<const GetCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const GetCommand*>(received_command[0].get())->reply_topic.compare("topic-dest"), 0);
 };
 boost::json::value get_msgpack_compact = {
-    {KEY_COMMAND, "get"}, {KEY_PROTOCOL, "pva"}, {KEY_PV_NAME, "channel::a"}, {KEY_SERIALIZATION, "msgpack-compact"}, {KEY_DEST_TOPIC, "topic-dest"}};
+    {KEY_COMMAND, "get"}, {KEY_PROTOCOL, "pva"}, {KEY_PV_NAME, "channel::a"}, {KEY_SERIALIZATION, "msgpack-compact"}, {KEY_REPLY_TOPIC, "topic-dest"}};
 
 CMDControllerCommandHandler put_test = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
@@ -291,10 +308,10 @@ CMDControllerCommandHandler info_test = [](ConstCommandShrdPtrVec received_comma
   ASSERT_EQ(received_command[0]->type, CommandType::info);
   ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
   ASSERT_EQ(received_command[0]->pv_name.compare("channel::a"), 0);
-  ASSERT_EQ(reinterpret_cast<const GetCommand*>(received_command[0].get())->destination_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const GetCommand*>(received_command[0].get())->reply_topic.compare("topic-dest"), 0);
 };
 
-boost::json::value info_json = {{KEY_COMMAND, "info"}, {KEY_PROTOCOL, "pva"}, {KEY_PV_NAME, "channel::a"}, {KEY_DEST_TOPIC, "topic-dest"}};
+boost::json::value info_json = {{KEY_COMMAND, "info"}, {KEY_PROTOCOL, "pva"}, {KEY_PV_NAME, "channel::a"}, {KEY_REPLY_TOPIC, "topic-dest"}};
 
 boost::json::value bad_acquire_command = {{KEY_COMMAND, "monitor"}, {KEY_PROTOCOL, "pva"}, {"destination", "topic-dest"}};
 
@@ -309,7 +326,7 @@ random_string(int size) {
   std::generate(begin(data), end(data), std::ref(rbe));
   return std::string(reinterpret_cast<const char*>(&data[0]), data.size());
 }
-boost::json::value       non_compliant_command_1 = {{KEY_COMMAND, "strange"}, {KEY_DEST_TOPIC, "topic-dest"}};
+boost::json::value       non_compliant_command_1 = {{KEY_COMMAND, "strange"}, {KEY_REPLY_TOPIC, "topic-dest"}};
 boost::json::value       non_compliant_command_2 = {{"key", "value"}};
 static const std::string bad_command_str         = "this is only a string";
 static const std::string random_str1             = random_string(16);
@@ -322,6 +339,7 @@ static const std::string random_str7             = random_string(1024);
 INSTANTIATE_TEST_CASE_P(CMDControllerCommandTest,
                         CMDControllerCommandTestParametrized,
                         ::testing::Values(std::make_tuple(acquire_test_default_ser, serialize(acquire_default_ser)),
+                                          std::make_tuple(acquire_test_specific_monitor_dest_topic, serialize(acquire_specific_monitor_dest_topic)),
                                           std::make_tuple(acquire_test_json, serialize(acquire_json)),
                                           std::make_tuple(acquire_test_msgpack, serialize(acquire_msgpack)),
                                           std::make_tuple(acquire_test_msgpack_compact, serialize(acquire_msgpack_compact)),

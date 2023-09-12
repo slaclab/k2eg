@@ -125,7 +125,7 @@ The **get** command permit to retrive the current value of an epics pv, so it ge
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
     "pv_name": "channel::a",
-    "dest_topic": "destination_topic"
+    "reply_topic": "reply_topic"
 }
 ```
 
@@ -139,7 +139,7 @@ The **monitor** command permits to enable or disable the update notification, fo
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
     "pv_name": "pv name",
-    "dest_topic": "destination topic",
+    "reply_topic": "reply_topic",
     "activate": true
 }
 ```

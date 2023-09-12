@@ -17,3 +17,5 @@ k8s/epics-config.*
 .vscode/.env
 kafka/*
 .gitignore
+kafka-consumer.kafka
+kafka-producer.kafka

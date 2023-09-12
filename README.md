@@ -136,7 +136,7 @@ This implemets the base caget|pvaget fucntion of epics command, if possible will
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
     "pv_name": "channel::a",
-    "dest_topic": "destination_topic",
+    "reply_topic": "reply_topic",
     "reply_id": "random custom string"
 }
 ```
