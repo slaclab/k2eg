@@ -6,10 +6,11 @@
 #include <k2eg/controller/node/worker/MonitorCommandWorker.h>
 #include <map>
 
-#include <../epics/epics.h>
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/controller/node/worker/MonitorCommandWorker.h>
 #include <msgpack/v3/object_fwd_decl.hpp>
+
+#include "../epics/epics.h"
 
 using namespace k2eg::common;
 using namespace k2eg::controller::node::worker;
