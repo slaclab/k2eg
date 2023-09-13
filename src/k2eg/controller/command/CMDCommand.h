@@ -48,7 +48,7 @@ check_reply_topic(const boost::json::object& o, k2eg::service::log::ILoggerShrdP
     if (v->is_string()) {
       reply_topic = v->as_string();
     } else {
-      l->logMessage("Destination topic is need to be string", service::log::LogLevel::ERROR);
+      l->logMessage("Reply topic is need to be string", service::log::LogLevel::ERROR);
     }
   }
   return reply_topic;

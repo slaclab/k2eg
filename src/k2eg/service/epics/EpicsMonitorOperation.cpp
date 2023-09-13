@@ -44,10 +44,10 @@ MonitorOperationImpl::monitorEvent(const pvac::MonitorEvent& evt) {
       break;
     // explicit call of 'mon.cancel' or subscription dropped
     case pvac::MonitorEvent::Cancel:
-      // if (mon.valid()) {
-      //   //mon is valid so we can continnue because this class is valid
-      //   received_event->event_cancel->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Cancel, pv_name, evt.message, nullptr}));
-      // }
+      if (mon.valid()) {
+        //mon is valid so we can continnue because this class is valid
+        received_event->event_cancel->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Cancel, pv_name, evt.message, nullptr}));
+      }
       break;
     // Underlying channel becomes disconnected
     case pvac::MonitorEvent::Disconnect:
