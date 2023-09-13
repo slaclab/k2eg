@@ -49,15 +49,15 @@ PutCommandWorker::processCommand(ConstCommandShrdPtr command) {
 
 void
 PutCommandWorker::manageReply(const std::int8_t error_code, const std::string& error_message, ConstPutCommandShrdPtr cmd) {
-  logger->logMessage(STRING_FORMAT("%1% [pv:%2% avalue:%3%]", error_message % cmd->pv_name % cmd->value), LogLevel::ERROR);
-  if (cmd->destination_topic.empty() || cmd->reply_id.empty()) {
+  logger->logMessage(STRING_FORMAT("%1% [pv:%2% value:%3%]", error_message % cmd->pv_name % cmd->value), LogLevel::ERROR);
+  if (cmd->reply_topic.empty() || cmd->reply_id.empty()) {
     return;
   } else {
     auto serialized_message = serialize(PutCommandReply{error_code, cmd->reply_id, error_message}, cmd->serialization);
     if (!serialized_message) {
       logger->logMessage("Invalid serialized message", LogLevel::FATAL);
     } else {
-      publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->destination_topic, "put-operation", cmd->pv_name, serialized_message),
+      publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "put-operation", cmd->pv_name, serialized_message),
                              {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
     }
   }

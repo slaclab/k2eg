@@ -39,7 +39,7 @@ jobs:
     needs: check-changed-file
     if: needs.check-changed-file.outputs.source_changed == 'true'
     runs-on: ubuntu-latest
-    container: docker.io/ubuntu:kinetic
+    container: docker.io/ubuntu:jammy
     permissions:
       actions: read
       contents: read

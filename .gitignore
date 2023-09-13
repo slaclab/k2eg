@@ -15,3 +15,7 @@ cli/k2egcli/__pycache__
 k8s/secret.*
 k8s/epics-config.*
 .vscode/.env
+kafka/*
+.gitignore
+kafka-consumer.kafka
+kafka-producer.kafka

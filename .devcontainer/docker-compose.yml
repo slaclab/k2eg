@@ -8,9 +8,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.ubuntu
-    env_file:
+    # env_file:
       # Ensure that the variables in .env match the same variables in devcontainer.json
-      - .env
+      # - .env
 
     # Security Opt and cap_add allow for C++ based debuggers to work. 
     # See `runArgs`: https://github.com/Microsoft/vscode-docs/blob/main/docs/remote/devcontainerjson-reference.md
@@ -46,16 +46,16 @@ services:
 
   zookeeper:
     image: bitnami/zookeeper:3.8.1
-    ports:
-      - 2181:2181
+    # ports:
+    #   - 2181:2181
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
 
   kafka:
     image: bitnami/kafka:3.4.0
-    ports:
-      - 9092:9092
-      - 9093:9093
+    # ports:
+    #   - 9092:9092
+    #   - 9093:9093
     environment:
       - KAFKA_BROKER_ID=1
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
@@ -65,8 +65,3 @@ services:
       - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
       - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
-    volumes:
-      - kafka-data:/bitnami/kafka
-
-volumes:
-  kafka-data:

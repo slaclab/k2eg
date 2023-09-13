@@ -3,11 +3,14 @@
 #include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/controller/node/worker/GetCommandWorker.h>
 #include <k2eg/controller/node/worker/PutCommandWorker.h>
+#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
 #include <map>
 
+#include <k2eg/common/BaseSerialization.h>
+#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
+#include <msgpack/v3/object_fwd_decl.hpp>
+
 #include "../epics/epics.h"
-#include "k2eg/common/BaseSerialization.h"
-#include "msgpack/v3/object_fwd_decl.hpp"
 
 using namespace k2eg::common;
 using namespace k2eg::controller::node::worker;
@@ -163,4 +166,18 @@ TEST(NodeControllerReplyMessages, PutCommandReplyWithMessage) {
   EXPECT_NE(serialization, nullptr);
   auto msg = getMsgPackObject(*serialization);
   auto msgpack_object = msg.get();
+};
+
+TEST(NodeControllerReplyMessages, MonitorCommandActivateReply) {
+  typedef std::map<std::string, msgpack::object> Map;
+  INIT_PVA_PROVIDER()
+  EpicsChannelUPtr      pc;
+  MonitorCommandReply cr            = {0, "rep_id", "Activated"};
+  auto            serialization = serialize(cr, SerializationType::Msgpack);
+  EXPECT_NE(serialization, nullptr);
+  auto msg = getMsgPackObject(*serialization);
+  auto msgpack_object = msg.get();
+  auto message_map = msgpack_object.as<Map>();
+  EXPECT_EQ(message_map.contains("message"), true);
+  EXPECT_STREQ(message_map["message"].as<std::string>().c_str(), "Activated");
 };

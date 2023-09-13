@@ -6,17 +6,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  clean-ghcr:
-    name: Delete old unused container images
+  delete-k2eg-ubuntu-untagged-images:
+    name: Delete Untagged Images
     runs-on: ubuntu-latest
     steps:
-      - name: Delete 'dev' containers older than a week
-        uses: snok/container-retention-policy@v2
+      - uses: bots-house/ghcr-delete-image-action@v1.1.0
         with:
-          image-names: k2eg/ubuntu, k2eg/debian
-          cut-off: A week ago UTC
-          account-type: org
-          org-name: slaclab
-          keep-at-least: 1
-          untagged-only: true
+          # NOTE: at now only orgs is supported
+          owner: slaclab
+          name: k2eg/ubuntu
+          # Keep latest N untagged images
+          untagged-keep-latest: 3
+          token: ${{ secrets.DELETE_PACKAGES_TOKEN }}
+  delete-k2eg-debian-untagged-images:
+    name: Delete Untagged Images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: bots-house/ghcr-delete-image-action@v1.1.0
+        with:
+          # NOTE: at now only orgs is supported
+          owner: slaclab
+          name: k2eg/debian
+          # Keep latest N untagged images
+          untagged-keep-latest: 3
           token: ${{ secrets.DELETE_PACKAGES_TOKEN }}

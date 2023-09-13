@@ -10,7 +10,8 @@ Each command has a minimum set of attributes that are the ones below:
     "command": "command string desceription",
     "serialization": "json|msgpack",
     "pv_name": "channel description",
-    "dest_topic": "destination topic"
+    "reply_topic": "reply-destination-topic",
+    "reply_id":"reply id",
 }
 ```
 The 'serialization' field is keeped in consideration only for the command that generate a data flow form EPICS to kafka, or generally speaking for all those command that has a read behaviour. For the command kind that have a write behaviour this field is keepd in consideration only if the write operation require a message for an answer.
@@ -125,7 +126,8 @@ The **get** command permit to retrive the current value of an epics pv, so it ge
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
     "pv_name": "channel::a",
-    "dest_topic": "destination_topic"
+    "reply_topic": "reply-destination-topic",
+    "reply_id":"reply id",
 }
 ```
 
@@ -139,7 +141,8 @@ The **monitor** command permits to enable or disable the update notification, fo
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
     "pv_name": "pv name",
-    "dest_topic": "destination topic",
+    "reply_topic": "reply-destination-topic",
+    "reply_id":"reply id",
     "activate": true
 }
 ```
@@ -149,7 +152,8 @@ The **monitor** command permits to enable or disable the update notification, fo
 {
     "command": "monitor",
     "pv_name": "pv name",
-    "dest_topic": "destination topic",
+    "reply_topic": "reply-destination-topic",
+    "reply_id":"reply id",
     "activate": false
 }
 ```
@@ -161,6 +165,8 @@ Put command is ismilar to caput or pvput epics command, it permit to applya a va
     "command": "put",
     "protocol": "pva|ca",
     "pv_name": "pv name",
-    "value": "<value>|<value> <value> <value> <value>"
+    "value": "<value>|<value> <value> <value> <value>",
+    "reply_topic": "reply-destination-topic",
+    "reply_id":"reply id",
 }
 ```

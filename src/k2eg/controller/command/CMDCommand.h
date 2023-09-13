@@ -42,16 +42,16 @@ to_json_string(cmd::ConstCommandShrdPtr c) {
 }
 
 inline std::string
-check_destnation_topic(const boost::json::object& o, k2eg::service::log::ILoggerShrdPtr l) {
-  std::string destination_topic;
-  if (auto v = o.if_contains(KEY_DEST_TOPIC)) {
+check_reply_topic(const boost::json::object& o, k2eg::service::log::ILoggerShrdPtr l) {
+  std::string reply_topic;
+  if (auto v = o.if_contains(KEY_REPLY_TOPIC)) {
     if (v->is_string()) {
-      destination_topic = v->as_string();
+      reply_topic = v->as_string();
     } else {
-      l->logMessage("Destination topic is need to be string", service::log::LogLevel::ERROR);
+      l->logMessage("Reply topic is need to be string", service::log::LogLevel::ERROR);
     }
   }
-  return destination_topic;
+  return reply_topic;
 }
 
 

@@ -32,7 +32,6 @@ inline void
 serializeJson(const PutCommandReply& reply, common::JsonMessage& json_message) {
   serializeJson(static_cast<CommandReply>(reply), json_message);
   if (!reply.message.empty()) { json_message.getJsonObject()["message"] = reply.message; }
-  // service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::JSON)->serialize(*reply.pv_data, json_message);
 }
 
 /**

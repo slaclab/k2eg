@@ -136,13 +136,13 @@ This implemets the base caget|pvaget fucntion of epics command, if possible will
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
     "pv_name": "channel::a",
-    "dest_topic": "destination_topic",
-    "reply_id": "random custom string"
+    "reply_topic": "reply-destination-topic",
+    "reply_id": "reply id"
 }
 ```
 
 ### Monitor Command
-This implements the base camonitor|pvamonitor function of epics client, create a monitor thread into the gateway that send over the destination topic the received values.
+This implements the base camonitor|pvamonitor function of epics client, create a monitor thread into the gateway that send over the destination topic the received values. The field **monitor_destination_topic** shuld be used to specify the monitor event topic, if not speified the event will be forwarded to the reply topic.
 
 Monitor Activation
 ```json
@@ -151,8 +151,10 @@ Monitor Activation
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
     "pv_name": "pv name",
-    "dest_topic": "destination topic",
-    "activate": true
+    "reply_topic": "reply-destination-topic",
+    "reply_id":"reply id",
+    "activate": true,
+    "monitor_destination_topic":"alternate-destination-topic"
 }
 ```
 
@@ -161,8 +163,10 @@ Monitor deactivation
 {
     "command": "monitor",
     "pv_name": "pv name",
-    "dest_topic": "destination topic",
-    "activate": false
+    "reply_topic": "reply-destination-topic",
+    "reply_id":"reply id",
+    "activate": false,
+    "monitor_destination_topic":"alternate-destination-topic"
 }
 ```
 ### Put command
@@ -173,8 +177,8 @@ PV. The put command can send a reply with the result of the put operation, in th
     "command": "monitor",
     "pv_name": "pv name",
     "protocol": "pva|ca",
-    "dest_topic": "destination topic",
     "value": "pv new value",
-    "reply_id": "random custom string"
+    "reply_topic": "reply-destination-topic",
+    "reply_id":"reply id"
 }
 ```
