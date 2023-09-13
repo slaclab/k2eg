@@ -33,6 +33,8 @@ inline  k2eg::controller::command::cmd::ConstCommandShrdPtr  fromChannelMonitor(
         command.channel_protocol,
         command.pv_name, 
         true,
+        "",
+        "",
         command.channel_destination
     });
 }

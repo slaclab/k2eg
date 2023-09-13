@@ -203,7 +203,7 @@ initBackend(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   clearenv();
   if (enable_debug_log) {
     setenv("EPICS_k2eg_log-on-console", "true", 1);
-    setenv("EPICS_k2eg_log-level", "debug", 1);
+    setenv("EPICS_k2eg_log-level", "trace", 1);
   } else {
     setenv("EPICS_k2eg_log-on-console", "false", 1);
   }
@@ -264,6 +264,7 @@ exstractMsgpackObjectThatContainsKey(std::vector<PublishMessageSharedPtr>& messa
     if(messages[idx]->getQueue().compare(published_on_topic)!=0)
       continue;
     auto msgpack_obj = getMsgPackObject(*messages[idx]);
+    std::cout << msgpack_obj.get() << std::endl;
     switch(msgpack_obj->type){
       case msgpack::type::MAP:{
           auto map_reply = msgpack_obj->as<Map>();
@@ -356,7 +357,7 @@ TEST(NodeController, MonitorCommandSpecifySpecificMonitorEventTopic) {
 }
 
 TEST(NodeController, MonitorCommandMsgPackSer) {
-  std::latch                      work_done{1};
+  std::latch                      work_done{2};
   msgpack::unpacked reply_msg;
   std::unique_ptr<NodeController> node_controller;
   auto                            publisher = std::make_shared<DummyPublisher>(work_done);
@@ -393,7 +394,7 @@ TEST(NodeController, MonitorCommandMsgPackSer) {
 }
 
 TEST(NodeController, MonitorCommandMsgPackCompactSer) {
-  std::latch                      work_done{1};
+  std::latch                      work_done{2};
   std::unique_ptr<NodeController> node_controller;
   auto                            publisher = std::make_shared<DummyPublisher>(work_done);
   node_controller                           = initBackend(publisher);
@@ -427,8 +428,8 @@ TEST(NodeController, MonitorCommandMsgPackCompactSer) {
 }
 
 TEST(NodeController, MonitorCommandAfterReboot) {
-  std::latch work_done{1};
-  std::latch work_done_2{1};
+  std::latch work_done{2};
+  std::latch work_done_2{2};
 
   auto node_controller = initBackend(std::make_shared<DummyPublisher>(work_done));
 
