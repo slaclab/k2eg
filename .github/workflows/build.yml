@@ -28,42 +28,40 @@ jobs:
               CMakeLists.txt
               src/**
               test/**
-        - name: Set Build Ubuntu Kinetic to success
+        - name: Set Build Ubuntu to success
           if: steps.changed-src.outputs.any_changed == 'false'
           uses: ouzi-dev/commit-status-updater@v2
           with:
-            name: Build Ubuntu Kinetic
+            name: Build Ubuntu
             status: success
-        - name: Set Test Ubuntu Kinetic / test_build to success
+        - name: Set Test Ubuntu / test_build to success
           if: steps.changed-src.outputs.any_changed == 'false'
           uses: ouzi-dev/commit-status-updater@v2
           with:
-            name: Test Ubuntu Kinetic / test_build
+            name: Test Ubuntu / test_build
             status: success
-    test_ubuntu_kinetic:
-      name: Test Ubuntu Kinetic
-      needs: [build_ubuntu_kinetic] 
+    test_ubuntu:
+      name: Test Ubuntu 
+      needs: [build_ubuntu] 
       uses: ./.github/workflows/test.yml
       with:
-        build_image: ${{ needs.build_ubuntu_kinetic.outputs.build_image }}
-        artifact_name: ${{ needs.build_ubuntu_kinetic.outputs.artifact_name }}
+        build_image: ${{ needs.build_ubuntu.outputs.build_image }}
+        artifact_name: ${{ needs.build_ubuntu.outputs.artifact_name }}
         docker_compose_profile: app-ubuntu
       secrets: inherit
-    build_ubuntu_kinetic:
-        name: Build Ubuntu Kinetic
+    build_ubuntu:
+        name: Build Ubuntu
         needs: check-changed-file
         if: needs.check-changed-file.outputs.source_changed == 'true'
         runs-on: ubuntu-latest
-        container: docker.io/ubuntu:kinetic
+        container: docker.io/ubuntu:jammy
         env:
-          BUILD_IMAGE: ubuntu:kinetic
-          ARTIFACT_NAME: artifact-gcc-ubuntu-kinetic
+          BUILD_IMAGE: ubuntu:jammy
+          ARTIFACT_NAME: artifact-gcc-ubuntu
           BUILD_TYPE: Debug
-          
         outputs:
           build_image: ${{ env.BUILD_IMAGE }}
           artifact_name: ${{ env.ARTIFACT_NAME}}  
-
         steps:
             - name: Setup bild system
               run: |
