@@ -80,6 +80,7 @@ class DummyPublisher : public IPublisher {
   createQueue(const QueueDescription& queue) {
     return 0;
   }
+  int deleteQueue(const std::string& queue_name){return 0;}
   int
   flush(const int timeo) {
     return 0;
@@ -123,6 +124,7 @@ class DummyPublisherCounter : public IPublisher {
   createQueue(const QueueDescription& queue) {
     return 0;
   }
+  int deleteQueue(const std::string& queue_name){return 0;}
   int
   flush(const int timeo) {
     return 0;
@@ -160,6 +162,7 @@ class DummyPublisherNoSignal : public IPublisher {
   createQueue(const QueueDescription& queue) {
     return 0;
   }
+  int deleteQueue(const std::string& queue_name){return 0;}
   int
   flush(const int timeo) {
     return 0;

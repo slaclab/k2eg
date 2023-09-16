@@ -90,6 +90,8 @@ TEST(Kafka, CreateTopic) {
       .retention_size = 1024*2
   }
   );
+
+  producer->deleteQueue("new-queue");
 }
 
 TEST(Kafka, KafkaSimplePubSub) {

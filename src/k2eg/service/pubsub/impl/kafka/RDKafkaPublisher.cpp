@@ -3,7 +3,7 @@
 #include <iostream>
 #include <string>
 #include <librdkafka/rdkafkacpp.h>
-#include <librdkafka/rdkafka.h>
+
 using namespace k2eg::service::pubsub::impl::kafka;
 
 RDKafkaPublisher::RDKafkaPublisher(ConstPublisherConfigurationUPtr configuration)
@@ -127,6 +127,44 @@ int RDKafkaPublisher::createQueue(const QueueDescription& new_queue) {
     return 0;
 }
 
+int RDKafkaPublisher::deleteQueue(const std::string& queue_name) {
+    char errstr[512];
+    const int tmout = 30 * 1000;
+    rd_kafka_resp_err_t err;
+    rd_kafka_queue_t *queue = nullptr;
+    rd_kafka_DeleteTopic_t **del_topics = nullptr;
+
+    del_topics = (rd_kafka_DeleteTopic_t **)malloc(sizeof(*del_topics) * 1);
+    del_topics[0] = rd_kafka_DeleteTopic_new(queue_name.c_str());
+    
+    rd_kafka_AdminOptions_t *admin_options = rd_kafka_AdminOptions_new(producer.get()->c_ptr(), RD_KAFKA_ADMIN_OP_DELETETOPICS);
+
+    err = rd_kafka_AdminOptions_set_request_timeout( admin_options, tmout, errstr, sizeof(errstr));
+    
+    err = rd_kafka_AdminOptions_set_operation_timeout( admin_options, tmout - 5000, errstr, sizeof(errstr));
+
+    queue = rd_kafka_queue_new(producer.get()->c_ptr());
+    rd_kafka_DeleteTopics(producer.get()->c_ptr(), del_topics, 1, admin_options, queue);
+
+    rd_kafka_AdminOptions_destroy(admin_options);
+
+    rd_kafka_DeleteTopic_destroy_array(del_topics, 1);
+
+    rd_kafka_event_t* rkev = wait_admin_result(queue, RD_KAFKA_EVENT_DELETETOPICS_RESULT, tmout + 5000);
+    size_t terr_cnt                        = 0;
+    const rd_kafka_DeleteTopics_result_t *res;
+     const rd_kafka_topic_result_t **terr   = NULL;
+                // if (!(res = rd_kafka_event_DeleteTopics_result(rkev)))
+                //         TEST_FAIL("Expected a DeleteTopics result, not %s",
+                //                   rd_kafka_event_name(rkev));
+
+    terr = rd_kafka_DeleteTopics_result_topics(res, &terr_cnt);
+
+    rd_kafka_queue_destroy(queue);  
+    //free(del_topic_op);
+    return 0;
+}
+
 int RDKafkaPublisher::pushMessage(PublishMessageUniquePtr message, const std::map<std::string,std::string>& headers) {
     RdKafka::ErrorCode resp = RdKafka::ERR_NO_ERROR;
     RdKafka::Headers* kafka_headers = RdKafka::Headers::create();
@@ -177,3 +215,30 @@ int RDKafkaPublisher::pushMessages(PublisherMessageVector& messages, const std::
 }
 
 size_t RDKafkaPublisher::getQueueMessageSize() { return 0; }
+
+/**
+ * @brief Wait for up to \p tmout for any type of admin result.
+ * @returns the event
+ */
+rd_kafka_event_t *RDKafkaPublisher::wait_admin_result(rd_kafka_queue_t *q,
+                                         rd_kafka_event_type_t evtype,
+                                         int tmout) {
+        rd_kafka_event_t *rkev;
+
+        while (1) {
+                rkev = rd_kafka_queue_poll(q, tmout);
+                if (!rkev)
+                        return nullptr;
+
+                if (rd_kafka_event_type(rkev) == evtype)
+                        return rkev;
+
+
+                if (rd_kafka_event_type(rkev) == RD_KAFKA_EVENT_ERROR) {
+                        rd_kafka_event_error_string(rkev);
+                        continue;
+                }
+        }
+
+        return NULL;
+}
