@@ -79,6 +79,19 @@ TEST(Kafka, KafkaAuthenticationTest) {
   ASSERT_NO_THROW(std::make_unique<RDKafkaSubscriber>(std::make_unique<const SubscriberConfiguration>(sub_conf)););
 }
 
+TEST(Kafka, CreateTopic) {
+  std::unique_ptr<RDKafkaPublisher> producer =
+      std::make_unique<RDKafkaPublisher>(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "kafka:9092"}));
+  producer->createQueue(
+    QueueDescription{
+      .name = "new-queue",
+      .paritions = 2,
+      .retention_time = 1000*60*60,
+      .retention_size = 1024*2
+  }
+  );
+}
+
 TEST(Kafka, KafkaSimplePubSub) {
   SubscriberInterfaceElementVector  messages;
   std::unique_ptr<RDKafkaPublisher> producer =
@@ -89,7 +102,14 @@ TEST(Kafka, KafkaSimplePubSub) {
   std::string message_sent = "hello_" + UUID::generateUUIDLite();
   ASSERT_NO_THROW(consumer->setQueue({TOPIC_TEST_NAME}));
   // give some times to consumer to register
-  ASSERT_EQ(producer->createQueue(TOPIC_TEST_NAME), 0);
+  ASSERT_EQ(producer->createQueue(
+    QueueDescription{
+      .name = TOPIC_TEST_NAME,
+      .paritions = 1,
+      .retention_time = 1000*60*60,
+      .retention_size = 1024*2
+    }
+  ), 0);
   ASSERT_EQ(consumer->getMsg(messages, 1, 1000), 0);
   sleep(5);
   auto iotaFuture = std::async(
@@ -128,7 +148,14 @@ TEST(Kafka, KafkaSimplePubSubHeaderCheck) {
   std::string message_sent = "hello_" + UUID::generateUUIDLite();
   ASSERT_NO_THROW(consumer->setQueue({TOPIC_TEST_NAME}));
   // give some times to consumer to register
-  ASSERT_EQ(producer->createQueue(TOPIC_TEST_NAME), 0);
+  ASSERT_EQ(producer->createQueue(
+        QueueDescription{
+      .name = TOPIC_TEST_NAME,
+      .paritions = 1,
+      .retention_time = 1000*60*60,
+      .retention_size = 1024*2
+    }
+  ), 0);
   ASSERT_EQ(consumer->getMsg(messages, 1, 1000), 0);
   sleep(5);
   auto iotaFuture = std::async(

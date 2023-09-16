@@ -25,7 +25,7 @@ namespace k2eg::service::pubsub::impl::kafka
     public:
         explicit RDKafkaPublisher(ConstPublisherConfigurationUPtr configuration);
         virtual ~RDKafkaPublisher();
-        virtual int createQueue(const std::string &queue);
+        virtual int createQueue(const QueueDescription& new_queue);
         virtual void setAutoPoll(bool autopoll);
         virtual int flush(const int timeo = 10000);
         virtual int pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& headers = PublisherHeaders());

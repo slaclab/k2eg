@@ -1,7 +1,9 @@
 #include <k2eg/service/pubsub/impl/kafka/RDKafkaPublisher.h>
 
 #include <iostream>
-
+#include <string>
+#include <librdkafka/rdkafkacpp.h>
+#include <librdkafka/rdkafka.h>
 using namespace k2eg::service::pubsub::impl::kafka;
 
 RDKafkaPublisher::RDKafkaPublisher(ConstPublisherConfigurationUPtr configuration)
@@ -88,17 +90,40 @@ int RDKafkaPublisher::flush(const int timeo) {
     return 0;
 }
 
-int RDKafkaPublisher::createQueue(const std::string& queue) {
+int RDKafkaPublisher::createQueue(const QueueDescription& new_queue) {
     std::string errstr;
-    std::unique_ptr<RdKafka::Topic> topic = nullptr;
-    if (!queue.empty()) {
-        topic = std::unique_ptr<RdKafka::Topic>(RdKafka::Topic::create(producer.get(), queue, t_conf.get(), errstr));
-        if (!topic) {
-            // RDK_PUB_ERR_ << "Failed to create topic: " << errstr;
-            return -1;
-        }
+    auto topic_configuration = RdKafka::Conf::create(RdKafka::Conf::CONF_TOPIC);
+    if (new_queue.name.empty()) {
+        throw std::runtime_error("The topic name is mandatory");
+    }
+    // rd_kafka_topic_new(rd_kafka_t *rk, const char *topic, rd_kafka_topic_conf_t *conf)
+    //RDK_CONF_SET(topic_configuration, "retention.bytes", std::to_string(new_queue.retention_size));
+    // RDK_CONF_SET(topic_configuration, "segment.ms", std::to_string(new_queue.retention_time));
+    //RDK_CONF_SET(topic_configuration, "num.partitions", "2");
+    auto topic = std::unique_ptr<RdKafka::Topic>(RdKafka::Topic::create(producer.get(), new_queue.name, t_conf.get(), errstr));
+    if (!producer) {
+        throw std::runtime_error("Error creating kafka producer (" + errstr + ")");
     }
     
+    // Poll and wait for topic creation (you can customize this loop)
+    bool topicCreated = false;
+    RdKafka::ErrorCode err = RdKafka::ERR_NO_ERROR;
+    while (!topicCreated) {
+        // producer->poll(1000); // Poll for events every 1 second
+        // Check if the topic exists in the metadata
+        RdKafka::Metadata *metadata = nullptr;
+        if (err = producer->metadata(false, NULL, &metadata, 1000); err == RdKafka::ERR_NO_ERROR) {
+            std::unique_ptr<RdKafka::Metadata> metadata_uptr(metadata);
+            // check for metadata
+            const RdKafka::Metadata::TopicMetadataVector *topics = metadata_uptr->topics();
+            for (const auto &topic : *topics) {
+                if (topic->topic() == new_queue.name) {
+                    topicCreated = true;
+                    break;
+                }
+            }
+        }
+    }
     return 0;
 }
 
