@@ -82,16 +82,15 @@ TEST(Kafka, KafkaAuthenticationTest) {
 TEST(Kafka, CreateTopic) {
   std::unique_ptr<RDKafkaPublisher> producer =
       std::make_unique<RDKafkaPublisher>(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "kafka:9092"}));
-  producer->createQueue(
+  ASSERT_EQ(producer->createQueue(
     QueueDescription{
       .name = "new-queue",
       .paritions = 2,
       .retention_time = 1000*60*60,
       .retention_size = 1024*2
-  }
-  );
+  }), 0);
 
-  producer->deleteQueue("new-queue");
+  ASSERT_EQ(producer->deleteQueue("new-queue"), 0);
 }
 
 TEST(Kafka, KafkaSimplePubSub) {

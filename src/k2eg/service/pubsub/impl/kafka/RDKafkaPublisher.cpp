@@ -1,5 +1,6 @@
 #include <k2eg/service/pubsub/impl/kafka/RDKafkaPublisher.h>
 
+#include <cstddef>
 #include <iostream>
 #include <string>
 #include <librdkafka/rdkafkacpp.h>
@@ -94,7 +95,8 @@ int RDKafkaPublisher::createQueue(const QueueDescription& new_queue) {
     std::string errstr;
     auto topic_configuration = RdKafka::Conf::create(RdKafka::Conf::CONF_TOPIC);
     if (new_queue.name.empty()) {
-        throw std::runtime_error("The topic name is mandatory");
+       // throw std::runtime_error("The topic name is mandatory");
+       return -1;
     }
     // rd_kafka_topic_new(rd_kafka_t *rk, const char *topic, rd_kafka_topic_conf_t *conf)
     //RDK_CONF_SET(topic_configuration, "retention.bytes", std::to_string(new_queue.retention_size));
@@ -102,7 +104,8 @@ int RDKafkaPublisher::createQueue(const QueueDescription& new_queue) {
     //RDK_CONF_SET(topic_configuration, "num.partitions", "2");
     auto topic = std::unique_ptr<RdKafka::Topic>(RdKafka::Topic::create(producer.get(), new_queue.name, t_conf.get(), errstr));
     if (!producer) {
-        throw std::runtime_error("Error creating kafka producer (" + errstr + ")");
+        //throw std::runtime_error("Error creating kafka producer (" + errstr + ")");
+        return -2;
     }
     
     // Poll and wait for topic creation (you can customize this loop)
@@ -127,40 +130,82 @@ int RDKafkaPublisher::createQueue(const QueueDescription& new_queue) {
     return 0;
 }
 
+struct RdKafkaQueueDeleter {
+    void operator()(rd_kafka_queue_t* queue) {
+        rd_kafka_queue_destroy(queue);
+    }
+};
+
+struct RdKafkaAdminOptionDeleter {
+    void operator()(rd_kafka_AdminOptions_t* option) {
+        rd_kafka_AdminOptions_destroy(option);
+    }
+};
+
+struct RdKafkaDeleteTopicArrayDeleter {
+    const size_t count;
+    RdKafkaDeleteTopicArrayDeleter(size_t count) : count(count) {}
+    void operator()(rd_kafka_DeleteTopic_t** delete_topic_array) {
+        rd_kafka_DeleteTopic_destroy_array(delete_topic_array, count);
+    }
+};
+
 int RDKafkaPublisher::deleteQueue(const std::string& queue_name) {
     char errstr[512];
+    size_t res_cnt;
     const int tmout = 30 * 1000;
     rd_kafka_resp_err_t err;
-    rd_kafka_queue_t *queue = nullptr;
-    rd_kafka_DeleteTopic_t **del_topics = nullptr;
 
-    del_topics = (rd_kafka_DeleteTopic_t **)malloc(sizeof(*del_topics) * 1);
-    del_topics[0] = rd_kafka_DeleteTopic_new(queue_name.c_str());
+    std::unique_ptr<rd_kafka_DeleteTopic_t*, RdKafkaDeleteTopicArrayDeleter> del_topics_uptr(
+        static_cast<rd_kafka_DeleteTopic_t**>(malloc(sizeof(rd_kafka_DeleteTopic_t*) * 1)),
+        RdKafkaDeleteTopicArrayDeleter(1)
+    );
+    del_topics_uptr.get()[0] = rd_kafka_DeleteTopic_new(queue_name.c_str());
     
-    rd_kafka_AdminOptions_t *admin_options = rd_kafka_AdminOptions_new(producer.get()->c_ptr(), RD_KAFKA_ADMIN_OP_DELETETOPICS);
+    std::unique_ptr<rd_kafka_AdminOptions_t, RdKafkaAdminOptionDeleter> admin_options(
+        rd_kafka_AdminOptions_new(producer.get()->c_ptr(), RD_KAFKA_ADMIN_OP_DELETETOPICS),
+        RdKafkaAdminOptionDeleter()
+    );
 
-    err = rd_kafka_AdminOptions_set_request_timeout( admin_options, tmout, errstr, sizeof(errstr));
+    if(err = rd_kafka_AdminOptions_set_request_timeout(
+        admin_options.get(), tmout, errstr, sizeof(errstr)
+        ); 
+        err != RD_KAFKA_RESP_ERR_NO_ERROR
+    ) {
+        return -1;//throw std::runtime_error("Error creating kafka option reqeust timeout (" + std::string(errstr) + ")"); 
+    }
     
-    err = rd_kafka_AdminOptions_set_operation_timeout( admin_options, tmout - 5000, errstr, sizeof(errstr));
+    if(err = rd_kafka_AdminOptions_set_operation_timeout(
+            admin_options.get(), tmout - 5000, errstr, sizeof(errstr)); 
+        err != RD_KAFKA_RESP_ERR_NO_ERROR
+    ) {
+        return -2; //throw std::runtime_error("Error creating kafka option reqeust timeout (" + std::string(errstr) + ")"); 
+    }
 
-    queue = rd_kafka_queue_new(producer.get()->c_ptr());
-    rd_kafka_DeleteTopics(producer.get()->c_ptr(), del_topics, 1, admin_options, queue);
+    //allocate queue
+    std::unique_ptr<rd_kafka_queue_t, RdKafkaQueueDeleter> queue(
+        rd_kafka_queue_new(producer.get()->c_ptr()),
+        RdKafkaQueueDeleter()
+    );
+    // delete topic
+    rd_kafka_DeleteTopics(producer.get()->c_ptr(), del_topics_uptr.get(), 1, admin_options.get(), queue.get());
 
-    rd_kafka_AdminOptions_destroy(admin_options);
-
-    rd_kafka_DeleteTopic_destroy_array(del_topics, 1);
-
-    rd_kafka_event_t* rkev = wait_admin_result(queue, RD_KAFKA_EVENT_DELETETOPICS_RESULT, tmout + 5000);
-    size_t terr_cnt                        = 0;
-    const rd_kafka_DeleteTopics_result_t *res;
-     const rd_kafka_topic_result_t **terr   = NULL;
-                // if (!(res = rd_kafka_event_DeleteTopics_result(rkev)))
-                //         TEST_FAIL("Expected a DeleteTopics result, not %s",
-                //                   rd_kafka_event_name(rkev));
-
-    terr = rd_kafka_DeleteTopics_result_topics(res, &terr_cnt);
-
-    rd_kafka_queue_destroy(queue);  
+    rd_kafka_event_t *rkev = rd_kafka_queue_poll(queue.get(), tmout + 2000);
+    const rd_kafka_DeleteTopics_result_t *res = rd_kafka_event_DeleteTopics_result(rkev);
+    const rd_kafka_topic_result_t **terr = rd_kafka_DeleteTopics_result_topics(res, &res_cnt);
+    if(res_cnt!=1) {
+        // no topic has been deleted
+        return -3;
+    }
+    if(err = rd_kafka_topic_result_error(terr[0]); 
+    err != RD_KAFKA_RESP_ERR_NO_ERROR) {
+        auto err_topic_name = std::string(rd_kafka_topic_result_name(terr[0]));
+        auto err_str = std::string(rd_kafka_topic_result_error_string(terr[0]));
+        //  throw std::runtime_error("Error deleteing topic:"+
+        //  std::string(rd_kafka_topic_result_name(terr[0]))+
+        //  " => (" + std::string(rd_kafka_topic_result_error_string(terr[0])) + ")"); 
+        return -4;
+    }
     //free(del_topic_op);
     return 0;
 }
