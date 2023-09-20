@@ -51,7 +51,10 @@ Define the porperties of a queue
 */
 struct QueueDescription {
     std::string name;
+    // ow many partitions the topic need to have
     long paritions;
+    // number of the replicas for the topics
+    long replicas;
     // express in milliseconds
     long retention_time;
     // express in byte

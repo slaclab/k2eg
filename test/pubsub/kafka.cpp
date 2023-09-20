@@ -86,8 +86,9 @@ TEST(Kafka, CreateTopic) {
     QueueDescription{
       .name = "new-queue",
       .paritions = 2,
+      .replicas = 1,
       .retention_time = 1000*60*60,
-      .retention_size = 1024*2
+      .retention_size = 1024*1024*1
   }), 0);
 
   ASSERT_EQ(producer->deleteQueue("new-queue"), 0);
