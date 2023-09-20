@@ -100,7 +100,6 @@ RDKafkaPublisher::createQueue(const QueueDescription &new_queue) {
   char                                  errstr[errstr_cnt];
   const int                             opt_timeout = 10000;
   rd_kafka_resp_err_t                   err         = RD_KAFKA_RESP_ERR_NO_ERROR;
-  rd_kafka_event_t                     *rkev        = nullptr;
   const rd_kafka_CreateTopics_result_t *res         = nullptr;
   const rd_kafka_topic_result_t       **restopics   = nullptr;
 
@@ -139,15 +138,16 @@ RDKafkaPublisher::createQueue(const QueueDescription &new_queue) {
   // create topic
   rd_kafka_CreateTopics(producer.get()->c_ptr(), new_topics_uptr.get(), 1, admin_options.get(), queue.get());
   // wait for completion
+  std::unique_ptr<rd_kafka_event_t, RdKafkaEventDeleter> event_uptr;
   do {
-    rkev = rd_kafka_queue_poll(queue.get(), 1.0);
-    if (!rkev) continue;
-    const char *evt_name = rd_kafka_event_name(rkev);
-    if (rd_kafka_event_error(rkev)) { throw std::runtime_error("Error creating topic topic (" + std::string(rd_kafka_event_error_string(rkev)) + ")"); }
-  } while (rd_kafka_event_type(rkev) != RD_KAFKA_EVENT_CREATETOPICS_RESULT);
+    event_uptr.reset(rd_kafka_queue_poll(queue.get(), 1.0));
+    if (!event_uptr) continue;
+    const char *evt_name = rd_kafka_event_name(event_uptr.get());
+    if (rd_kafka_event_error(event_uptr.get())) { throw std::runtime_error("Error creating topic topic (" + std::string(rd_kafka_event_error_string(event_uptr.get())) + ")"); }
+  } while (rd_kafka_event_type(event_uptr.get()) != RD_KAFKA_EVENT_CREATETOPICS_RESULT);
 
   // get event results
-  res = rd_kafka_event_CreateTopics_result(rkev);
+  res = rd_kafka_event_CreateTopics_result(event_uptr.get());
   if (err) { throw std::runtime_error("Error creating topic topic (" + std::string(rd_kafka_err2str(err)) + ")"); }
 
   // exstract result information by event result

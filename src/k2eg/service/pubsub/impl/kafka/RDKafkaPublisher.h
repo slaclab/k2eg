@@ -47,6 +47,13 @@ struct RdKafkaNewTopicArrayDeleter {
   }
 };
 
+// smart pointer deallocator for event
+struct RdKafkaEventDeleter {
+  void
+  operator()(rd_kafka_event_t* event) {
+    rd_kafka_event_destroy(event);
+  }
+};
 
 // published implementation usin librdkafka
 class RDKafkaPublisher : public IPublisher, RDKafkaBase, RdKafka::DeliveryReportCb {
