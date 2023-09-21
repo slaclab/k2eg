@@ -12,6 +12,14 @@
 
 // smart pointer delete for rd_kafka_queue_t
 namespace k2eg::service::pubsub::impl::kafka {
+
+struct RdKafkaTopicDeleter {
+  void
+  operator()(rd_kafka_topic_t* topic) {
+    rd_kafka_topic_destroy(topic);
+  }
+};
+
 struct RdKafkaQueueDeleter {
   void
   operator()(rd_kafka_queue_t* queue) {
@@ -77,6 +85,7 @@ class RDKafkaPublisher : public IPublisher, RDKafkaBase, RdKafka::DeliveryReport
   virtual ~RDKafkaPublisher();
   virtual int    createQueue(const QueueDescription& new_queue);
   virtual int    deleteQueue(const std::string& queue_name);
+  virtual QueueMetadataUPtr getQueueMetadata(const std::string& queue_name);
   virtual void   setAutoPoll(bool autopoll);
   virtual int    flush(const int timeo = 10000);
   virtual int    pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& headers = PublisherHeaders());

@@ -7,6 +7,7 @@
 
 #include "librdkafka/rdkafka.h"
 
+using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
 
 RDKafkaPublisher::RDKafkaPublisher(ConstPublisherConfigurationUPtr configuration)
@@ -224,6 +225,23 @@ RDKafkaPublisher::deleteQueue(const std::string &queue_name) {
   }
   // free(del_topic_op);
   return 0;
+}
+
+QueueMetadataUPtr 
+RDKafkaPublisher::getQueueMetadata(const std::string& queue_name) {
+  QueueMetadataUPtr result;
+  const rd_kafka_metadata_t *md;
+  const int           tmout = 30 * 1000;
+  //allocate topic structure
+  std::unique_ptr<rd_kafka_topic_t, RdKafkaTopicDeleter> topic_uptr(
+    rd_kafka_topic_new(producer.get()->c_ptr(), queue_name.c_str(), NULL),
+    RdKafkaTopicDeleter());
+
+  rd_kafka_resp_err_t err = rd_kafka_metadata(producer.get()->c_ptr(), 0 /*only_given_topics*/, topic_uptr.get(), &md, tmout);
+  if(err) return result;
+
+  // can proceed to read metadata
+  return result;
 }
 
 int
