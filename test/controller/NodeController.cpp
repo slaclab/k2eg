@@ -31,6 +31,7 @@
 
 #include "boost/json/object.hpp"
 #include "k2eg/service/metric/IMetricService.h"
+#include "k2eg/service/pubsub/IPublisher.h"
 #include "msgpack/v3/object_fwd_decl.hpp"
 
 namespace bj = boost::json;
@@ -76,9 +77,10 @@ class DummyPublisher : public IPublisher {
     return 0;
   }
   int
-  createQueue(const std::string& queue) {
+  createQueue(const QueueDescription& queue) {
     return 0;
   }
+  int deleteQueue(const std::string& queue_name){return 0;}
   int
   flush(const int timeo) {
     return 0;
@@ -119,9 +121,10 @@ class DummyPublisherCounter : public IPublisher {
     return 0;
   }
   int
-  createQueue(const std::string& queue) {
+  createQueue(const QueueDescription& queue) {
     return 0;
   }
+  int deleteQueue(const std::string& queue_name){return 0;}
   int
   flush(const int timeo) {
     return 0;
@@ -156,9 +159,10 @@ class DummyPublisherNoSignal : public IPublisher {
     return 0;
   }
   int
-  createQueue(const std::string& queue) {
+  createQueue(const QueueDescription& queue) {
     return 0;
   }
+  int deleteQueue(const std::string& queue_name){return 0;}
   int
   flush(const int timeo) {
     return 0;

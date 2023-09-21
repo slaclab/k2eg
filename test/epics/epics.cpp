@@ -200,6 +200,15 @@ struct HandlerClass {
   }
 };
 
+TEST(Epics, EpicsServiceManagerPVSanitizationUppercaseAndDash) {
+  PVUPtr                pv_desc;
+  std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
+  EXPECT_NO_THROW(pv_desc = manager->sanitizePVName("VGXX-L3B-1602-PLOG"););
+  EXPECT_STREQ(pv_desc->name.c_str(), "VGXX-L3B-1602-PLOG");
+  EXPECT_STREQ(pv_desc->field.c_str(), "value");
+  manager.reset();
+}
+
 TEST(Epics, EpicsServiceManagerPVSanitization) {
   PVUPtr                pv_desc;
   std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();

@@ -140,7 +140,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=Kafka*"],
+            "args": ["--gtest_filter=Kafka.Create*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
@@ -168,7 +168,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=Epics.*"],
+            "args": ["--gtest_filter=Kafka.*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

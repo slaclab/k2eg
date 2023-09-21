@@ -46,11 +46,26 @@ typedef std::map<std::string, EventCallback> MapEvtHndlrForReqType;
 typedef std::pair<std::string, EventCallback> MapEvtHndlrForReqTypePair;
 typedef std::map<std::string,std::string> PublisherHeaders;
 
+/**
+Define the porperties of a queue
+*/
+struct QueueDescription {
+    std::string name;
+    // ow many partitions the topic need to have
+    long paritions;
+    // number of the replicas for the topics
+    long replicas;
+    // express in milliseconds
+    long retention_time;
+    // express in byte
+    long retention_size;
+};
+DEFINE_PTR_TYPES(QueueDescription)
+
 class IPublisher {
 protected:
     MapEvtHndlrForReqType eventCallbackForReqType;
     const ConstPublisherConfigurationUPtr configuration;
-
 public:
     IPublisher(ConstPublisherConfigurationUPtr configuration);
     IPublisher() = delete;
@@ -60,7 +75,8 @@ public:
     virtual void setAutoPoll(bool autopoll) = 0;
     //! PublisherInterface initialization
     virtual int setCallBackForReqType(const std::string req_type, EventCallback eventCallback);
-    virtual int createQueue(const std::string& queue) = 0;
+    virtual int createQueue(const QueueDescription& new_queue) = 0;
+    virtual int deleteQueue(const std::string& queue_name) = 0;
     virtual int flush(const int timeo) = 0;
     virtual int pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& headers = PublisherHeaders()) = 0;
     virtual int pushMessages(PublisherMessageVector& messages, const PublisherHeaders& headers = PublisherHeaders()) = 0;
