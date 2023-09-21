@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <iostream>
 #include <string>
+
 #include "librdkafka/rdkafka.h"
 
 using namespace k2eg::service::pubsub::impl::kafka;
@@ -93,7 +94,7 @@ RDKafkaPublisher::flush(const int timeo) {
   return 0;
 }
 
-#define DEFAULT_TO_1(val) val==0?1:val
+#define DEFAULT_TO_1(val) val == 0 ? 1 : val
 int
 RDKafkaPublisher::createQueue(const QueueDescription &new_queue) {
   const int                             errstr_cnt = 512;
@@ -143,7 +144,9 @@ RDKafkaPublisher::createQueue(const QueueDescription &new_queue) {
     event_uptr.reset(rd_kafka_queue_poll(queue.get(), 1.0));
     if (!event_uptr) continue;
     const char *evt_name = rd_kafka_event_name(event_uptr.get());
-    if (rd_kafka_event_error(event_uptr.get())) { throw std::runtime_error("Error creating topic topic (" + std::string(rd_kafka_event_error_string(event_uptr.get())) + ")"); }
+    if (rd_kafka_event_error(event_uptr.get())) {
+      throw std::runtime_error("Error creating topic topic (" + std::string(rd_kafka_event_error_string(event_uptr.get())) + ")");
+    }
   } while (rd_kafka_event_type(event_uptr.get()) != RD_KAFKA_EVENT_CREATETOPICS_RESULT);
 
   // get event results
@@ -156,14 +159,16 @@ RDKafkaPublisher::createQueue(const QueueDescription &new_queue) {
   restopics = rd_kafka_CreateTopics_result_topics(res, &topic_count);
   /* Scan topics for proper fields and expected failures. */
   for (size_t i = 0; i < (int)topic_count; i++) {
-    const rd_kafka_topic_result_t *tres                      = restopics[i];
-    auto                           topic_name                = std::string(rd_kafka_topic_result_name(tres));
-    auto                           toipc_result_error        = rd_kafka_topic_result_error(tres);
-    auto                           topic_result_error_string = std::string(rd_kafka_topic_result_error_string(tres));
-    auto                           err_name                  = std::string(rd_kafka_err2name(toipc_result_error));
-    if (toipc_result_error != RD_KAFKA_RESP_ERR_NO_ERROR &&
-        toipc_result_error != RD_KAFKA_RESP_ERR_TOPIC_ALREADY_EXISTS) { 
-            throw std::runtime_error("Error '" + err_name + "' creating topic " + topic_name + " (" + topic_result_error_string + ")"); 
+    const rd_kafka_topic_result_t *tres               = restopics[i];
+    auto                           topic_name         = std::string(rd_kafka_topic_result_name(tres));
+    auto                           toipc_result_error = rd_kafka_topic_result_error(tres);
+    if (
+      toipc_result_error != RD_KAFKA_RESP_ERR_NO_ERROR && 
+      toipc_result_error != RD_KAFKA_RESP_ERR_TOPIC_ALREADY_EXISTS
+      ) {
+      auto topic_result_error_string = std::string(rd_kafka_topic_result_error_string(tres));
+      auto err_name                  = std::string(rd_kafka_err2name(toipc_result_error));
+      throw std::runtime_error("Error '" + err_name + "' creating topic " + topic_name + " (" + topic_result_error_string + ")");
     }
   }
   return 0;
@@ -196,12 +201,14 @@ RDKafkaPublisher::deleteQueue(const std::string &queue_name) {
   // delete topic
   rd_kafka_DeleteTopics(producer.get()->c_ptr(), del_topics_uptr.get(), 1, admin_options.get(), queue.get());
 
- std::unique_ptr<rd_kafka_event_t, RdKafkaEventDeleter> event_uptr;
- do {
+  std::unique_ptr<rd_kafka_event_t, RdKafkaEventDeleter> event_uptr;
+  do {
     event_uptr.reset(rd_kafka_queue_poll(queue.get(), 1.0));
     if (!event_uptr) continue;
     const char *evt_name = rd_kafka_event_name(event_uptr.get());
-    if (rd_kafka_event_error(event_uptr.get())) { throw std::runtime_error("Error deleting topic (" + std::string(rd_kafka_event_error_string(event_uptr.get())) + ")"); }
+    if (rd_kafka_event_error(event_uptr.get())) {
+      throw std::runtime_error("Error deleting topic (" + std::string(rd_kafka_event_error_string(event_uptr.get())) + ")");
+    }
   } while (rd_kafka_event_type(event_uptr.get()) != RD_KAFKA_EVENT_DELETETOPICS_RESULT);
 
   const rd_kafka_DeleteTopics_result_t *res  = rd_kafka_event_DeleteTopics_result(event_uptr.get());
