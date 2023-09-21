@@ -103,7 +103,7 @@ RDKafkaPublisher::createQueue(const QueueDescription &new_queue) {
   rd_kafka_resp_err_t                   err         = RD_KAFKA_RESP_ERR_NO_ERROR;
   const rd_kafka_CreateTopics_result_t *res         = nullptr;
   const rd_kafka_topic_result_t       **restopics   = nullptr;
-
+  
   std::unique_ptr<rd_kafka_NewTopic_t *, RdKafkaNewTopicArrayDeleter> new_topics_uptr(
       static_cast<rd_kafka_NewTopic_t **>(malloc(sizeof(rd_kafka_NewTopic_t *) * 1)), RdKafkaNewTopicArrayDeleter(1));
   // define the topic

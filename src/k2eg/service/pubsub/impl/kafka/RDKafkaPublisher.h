@@ -34,6 +34,7 @@ struct RdKafkaDeleteTopicArrayDeleter {
   void
   operator()(rd_kafka_DeleteTopic_t** delete_topic_array) {
     rd_kafka_DeleteTopic_destroy_array(delete_topic_array, count);
+    free(delete_topic_array);
   }
 };
 
@@ -42,8 +43,9 @@ struct RdKafkaNewTopicArrayDeleter {
   const size_t count;
   RdKafkaNewTopicArrayDeleter(size_t count) : count(count) {}
   void
-  operator()(rd_kafka_NewTopic_t** delete_topic_array) {
-    rd_kafka_NewTopic_destroy_array(delete_topic_array, count);
+  operator()(rd_kafka_NewTopic_t** new_topic_array) {
+    rd_kafka_NewTopic_destroy_array(new_topic_array, count);
+    free(new_topic_array);
   }
 };
 

@@ -161,7 +161,7 @@ EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op) {
 }
 
 // regex for IOC name
-std::regex pv_name_regex("^([a-zA-Z0-9_]+(?::[a-zA-Z0-9_]+)*)(\\.([a-zA-Z0-9_]+(?:\\.[a-zA-Z0-9_]+)*))?$");
+std::regex pv_name_regex("^([a-zA-Z0-9-_]+(?::[a-zA-Z0-9-_]+)*)(\\.([a-zA-Z0-9-_]+(?:\\.[a-zA-Z0-9_]+)*))?$");
 
 PVUPtr
 EpicsServiceManager::sanitizePVName(const std::string& pv_name) {
