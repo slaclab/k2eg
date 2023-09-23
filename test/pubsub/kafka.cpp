@@ -90,7 +90,7 @@ TEST(Kafka, CreateTopic) {
       .retention_time = 1000*60*60,
       .retention_size = 1024*1024*1
   }), 0);
-
+  producer->getQueueMetadata("new-queue");
   ASSERT_EQ(producer->deleteQueue("new-queue"), 0);
 }
 

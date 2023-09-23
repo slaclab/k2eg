@@ -81,6 +81,7 @@ class DummyPublisher : public IPublisher {
     return 0;
   }
   int deleteQueue(const std::string& queue_name){return 0;}
+  QueueMetadataUPtr getQueueMetadata(const std::string& queue_name){return nullptr;}
   int
   flush(const int timeo) {
     return 0;
@@ -125,6 +126,7 @@ class DummyPublisherCounter : public IPublisher {
     return 0;
   }
   int deleteQueue(const std::string& queue_name){return 0;}
+  QueueMetadataUPtr getQueueMetadata(const std::string& queue_name){return nullptr;}
   int
   flush(const int timeo) {
     return 0;
@@ -163,6 +165,7 @@ class DummyPublisherNoSignal : public IPublisher {
     return 0;
   }
   int deleteQueue(const std::string& queue_name){return 0;}
+  QueueMetadataUPtr getQueueMetadata(const std::string& queue_name){return nullptr;}
   int
   flush(const int timeo) {
     return 0;

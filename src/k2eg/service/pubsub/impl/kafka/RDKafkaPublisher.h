@@ -72,8 +72,8 @@ class RDKafkaPublisher : public IPublisher, RDKafkaBase, RdKafka::DeliveryReport
   std::thread                        auto_poll_thread;
   std::unique_ptr<RdKafka::Producer> producer;
 
-  rd_kafka_event_t* wait_admin_result(rd_kafka_queue_t* q, rd_kafka_event_type_t evtype, int tmout);
-
+  int print_groups_info(const rd_kafka_ListConsumerGroups_result_t *list);
+  int describe_groups(const char *group);
  protected:
   void         dr_cb(RdKafka::Message& message);
   void         autoPoll();
