@@ -3,6 +3,7 @@
 
 #include <k2eg/common/types.h>
 
+#include <cstddef>
 #include <functional>
 #include <map>
 #include <memory>
@@ -62,11 +63,19 @@ struct QueueDescription {
 };
 DEFINE_PTR_TYPES(QueueDescription)
 
+
+struct QueueSubscriberGroupInfo{
+    std::string subscriber_group_name;
+    std::vector<std::string> subscriber_names;
+};
+
 /*
 Define the queue metadata infromation
 */
 struct QueueMetadata{
-
+    // the number of subcriber to the queue
+    size_t subscribe_count;
+    std::vector<QueueSubscriberGroupInfo> subscriber_groups;
 };
 DEFINE_PTR_TYPES(QueueMetadata)
 

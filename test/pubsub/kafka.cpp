@@ -90,6 +90,13 @@ TEST(Kafka, CreateTopic) {
       .retention_time = 1000*60*60,
       .retention_size = 1024*1024*1
   }), 0);
+  SubscriberInterfaceElementVector data;
+  std::unique_ptr<RDKafkaSubscriber> consumer =
+      std::make_unique<RDKafkaSubscriber>(std::make_unique<const SubscriberConfiguration>(SubscriberConfiguration{.server_address = "kafka:9092"}));
+  consumer->addQueue({"new-queue"});
+  consumer->getMsg(data, 10);
+  sleep(5);
+  consumer->getMsg(data, 10);
   producer->getQueueMetadata("new-queue");
   ASSERT_EQ(producer->deleteQueue("new-queue"), 0);
 }
