@@ -3,6 +3,7 @@
 
 #include <k2eg/common/types.h>
 
+#include <cstddef>
 #include <functional>
 #include <map>
 #include <memory>
@@ -46,7 +47,7 @@ typedef std::map<std::string, EventCallback> MapEvtHndlrForReqType;
 typedef std::pair<std::string, EventCallback> MapEvtHndlrForReqTypePair;
 typedef std::map<std::string,std::string> PublisherHeaders;
 
-/**
+/*
 Define the porperties of a queue
 */
 struct QueueDescription {
@@ -61,6 +62,35 @@ struct QueueDescription {
     long retention_size;
 };
 DEFINE_PTR_TYPES(QueueDescription)
+
+/*
+Information about the subscriber of the queue
+*/
+struct QueueSubscriberInfo{
+    std::string client_id;
+    std::string member_id;
+    std::string host;
+
+};
+DEFINE_PTR_TYPES(QueueSubscriberInfo)
+
+/*
+Information about the subscriber group of the queue
+*/
+struct QueueSubscriberGroupInfo{
+    std::string name;
+    std::vector<QueueSubscriberInfoUPtr> subscribers;
+};
+DEFINE_PTR_TYPES(QueueSubscriberGroupInfo)
+/*
+Define the queue metadata infromation
+*/
+struct QueueMetadata{
+    // the number of subcriber to the queue
+    std::string name;
+    std::vector<QueueSubscriberGroupInfoUPtr> subscriber_groups;
+};
+DEFINE_PTR_TYPES(QueueMetadata)
 
 class IPublisher {
 protected:
@@ -77,6 +107,7 @@ public:
     virtual int setCallBackForReqType(const std::string req_type, EventCallback eventCallback);
     virtual int createQueue(const QueueDescription& new_queue) = 0;
     virtual int deleteQueue(const std::string& queue_name) = 0;
+    virtual QueueMetadataUPtr getQueueMetadata(const std::string& queue_name) = 0;
     virtual int flush(const int timeo) = 0;
     virtual int pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& headers = PublisherHeaders()) = 0;
     virtual int pushMessages(PublisherMessageVector& messages, const PublisherHeaders& headers = PublisherHeaders()) = 0;

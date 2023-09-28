@@ -90,7 +90,18 @@ TEST(Kafka, CreateTopic) {
       .retention_time = 1000*60*60,
       .retention_size = 1024*1024*1
   }), 0);
-
+  SubscriberInterfaceElementVector data;
+  std::unique_ptr<RDKafkaSubscriber> consumer =
+      std::make_unique<RDKafkaSubscriber>(std::make_unique<const SubscriberConfiguration>(SubscriberConfiguration{.server_address = "kafka:9092"}));
+  consumer->addQueue({"new-queue"});
+  consumer->getMsg(data, 10);
+  sleep(5);
+  consumer->getMsg(data, 10);
+  auto tipic_metadata = producer->getQueueMetadata("new-queue");
+  consumer.reset();
+  ASSERT_NE(tipic_metadata, nullptr);
+  ASSERT_STREQ(tipic_metadata->name.c_str(), "new-queue");
+  ASSERT_EQ(tipic_metadata->subscriber_groups.size(), 1);
   ASSERT_EQ(producer->deleteQueue("new-queue"), 0);
 }
 

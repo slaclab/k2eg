@@ -12,6 +12,14 @@
 
 // smart pointer delete for rd_kafka_queue_t
 namespace k2eg::service::pubsub::impl::kafka {
+
+struct RdKafkaTopicDeleter {
+  void
+  operator()(rd_kafka_topic_t* topic) {
+    rd_kafka_topic_destroy(topic);
+  }
+};
+
 struct RdKafkaQueueDeleter {
   void
   operator()(rd_kafka_queue_t* queue) {
@@ -35,6 +43,13 @@ struct RdKafkaDeleteTopicArrayDeleter {
   operator()(rd_kafka_DeleteTopic_t** delete_topic_array) {
     rd_kafka_DeleteTopic_destroy_array(delete_topic_array, count);
     free(delete_topic_array);
+  }
+};
+
+struct RdKafkaGroupListDeleter {
+  void
+  operator()(const rd_kafka_group_list* grlist) {
+    rd_kafka_group_list_destroy(grlist);
   }
 };
 
@@ -64,8 +79,8 @@ class RDKafkaPublisher : public IPublisher, RDKafkaBase, RdKafka::DeliveryReport
   std::thread                        auto_poll_thread;
   std::unique_ptr<RdKafka::Producer> producer;
 
-  rd_kafka_event_t* wait_admin_result(rd_kafka_queue_t* q, rd_kafka_event_type_t evtype, int tmout);
-
+  int scan_groups(const rd_kafka_ListConsumerGroups_result_t *list, QueueMetadata& q_desc_ref);
+  QueueSubscriberGroupInfoUPtr get_group_info(const char *group);
  protected:
   void         dr_cb(RdKafka::Message& message);
   void         autoPoll();
@@ -77,6 +92,7 @@ class RDKafkaPublisher : public IPublisher, RDKafkaBase, RdKafka::DeliveryReport
   virtual ~RDKafkaPublisher();
   virtual int    createQueue(const QueueDescription& new_queue);
   virtual int    deleteQueue(const std::string& queue_name);
+  virtual QueueMetadataUPtr getQueueMetadata(const std::string& queue_name);
   virtual void   setAutoPoll(bool autopoll);
   virtual int    flush(const int timeo = 10000);
   virtual int    pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& headers = PublisherHeaders());
