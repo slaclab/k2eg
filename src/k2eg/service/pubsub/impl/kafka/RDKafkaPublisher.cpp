@@ -2,9 +2,12 @@
 #include <librdkafka/rdkafkacpp.h>
 
 #include <cstddef>
+#include <cstring>
 #include <iostream>
+#include <memory>
 #include <string>
 
+#include "k2eg/service/pubsub/IPublisher.h"
 #include "librdkafka/rdkafka.h"
 
 using namespace k2eg::service::pubsub;
@@ -226,9 +229,12 @@ RDKafkaPublisher::deleteQueue(const std::string &queue_name) {
 
 QueueMetadataUPtr
 RDKafkaPublisher::getQueueMetadata(const std::string &queue_name) {
-  QueueMetadataUPtr          result;
+  // create empty metadata ptr
+  char errstr[512];
   const rd_kafka_metadata_t *metadata = nullptr;
   const int                  tmout    = 30 * 1000;
+  QueueMetadataUPtr          result = std::make_unique<QueueMetadata>();
+  result->name = queue_name;
   // allocate topic structure
   std::unique_ptr<rd_kafka_topic_t, RdKafkaTopicDeleter> topic_uptr(rd_kafka_topic_new(producer.get()->c_ptr(), queue_name.c_str(), NULL),
                                                                     RdKafkaTopicDeleter());
@@ -236,45 +242,13 @@ RDKafkaPublisher::getQueueMetadata(const std::string &queue_name) {
   rd_kafka_resp_err_t err = rd_kafka_metadata(producer.get()->c_ptr(), 0 /*only_given_topics*/, topic_uptr.get(), &metadata, tmout);
   if (err) return result;
 
-  // can proceed to read metadata
-  printf(" %i topics:\n", metadata->topic_cnt);
-  for (int i = 0; i < metadata->topic_cnt; i++) {
-    const struct rd_kafka_metadata_topic *t = &metadata->topics[i];
-    printf("  topic \"%s\" with %i partitions:", t->topic, t->partition_cnt);
-    if (t->err) {
-      printf(" %s", rd_kafka_err2str(t->err));
-      if (t->err == RD_KAFKA_RESP_ERR_LEADER_NOT_AVAILABLE) printf(" (try again)");
-    }
-    printf("\n");
-
-    /* Iterate topic's partitions */
-    for (int j = 0; j < t->partition_cnt; j++) {
-      const struct rd_kafka_metadata_partition *p = &t->partitions[j];
-      printf("    partition %" PRId32
-             ", "
-             "leader %" PRId32 ", replicas: ",
-             p->id,
-             p->leader);
-      int consumer_group_count = 0;
-
-      /* Iterate partition's replicas */
-      for (int k = 0; k < p->replica_cnt; k++) printf("%s%" PRId32, k > 0 ? "," : "", p->replicas[k]);
-
-      /* Iterate partition's ISRs */
-      printf(", isrs: ");
-      for (int k = 0; k < p->isr_cnt; k++) printf("%s%" PRId32, k > 0 ? "," : "", p->isrs[k]);
-      if (p->err)
-        printf(", %s\n", rd_kafka_err2str(p->err));
-      else
-        printf("\n");
-    }
-  }
-
   // consumer group
   std::unique_ptr<rd_kafka_queue_t, RdKafkaQueueDeleter>              queue(rd_kafka_queue_new(producer.get()->c_ptr()), RdKafkaQueueDeleter());
   std::unique_ptr<rd_kafka_AdminOptions_t, RdKafkaAdminOptionDeleter> admin_options(
-      rd_kafka_AdminOptions_new(producer.get()->c_ptr(), RD_KAFKA_ADMIN_OP_LISTCONSUMERGROUPS), RdKafkaAdminOptionDeleter());
-  char errstr[512];
+      rd_kafka_AdminOptions_new(producer.get()->c_ptr(), RD_KAFKA_ADMIN_OP_LISTCONSUMERGROUPS), 
+      RdKafkaAdminOptionDeleter()
+      );
+
   if (err = rd_kafka_AdminOptions_set_request_timeout(admin_options.get(), tmout, errstr, sizeof(errstr)); err != RD_KAFKA_RESP_ERR_NO_ERROR) {
     throw std::runtime_error("Error creating kafka option reqeust timeout (" + std::string(errstr) + ")");
   }
@@ -284,27 +258,18 @@ RDKafkaPublisher::getQueueMetadata(const std::string &queue_name) {
                                                * the request timeout set
                                                * above (10s) */);
   if (!event) {
-    /* User hit Ctrl-C,
-     * see yield call in stop() signal handler */
-    fprintf(stderr, "%% Cancelled by user\n");
-
+    /* see yield call in stop() signal handler */
+    throw std::runtime_error("NUll event received");
   } else if (rd_kafka_event_error(event)) {
     rd_kafka_resp_err_t err = rd_kafka_event_error(event);
     /* ListConsumerGroups request failed */
-    fprintf(stderr, "%% ListConsumerGroups failed[%" PRId32 "]: %s\n", err, rd_kafka_event_error_string(event));
-    return nullptr;
-
+    throw std::runtime_error("Error executing ListConsumerGroups (" + std::string(rd_kafka_event_error_string(event)) + ")");
   } else {
     /* ListConsumerGroups request succeeded, but individual
      * groups may have errors. */
-    const rd_kafka_ListConsumerGroups_result_t *result;
-
     const rd_kafka_ListConsumerGroups_result_t *consumer_group_info = rd_kafka_event_ListConsumerGroups_result(event);
-    printf("ListConsumerGroups results:\n");
-    print_groups_info(consumer_group_info);
-    return nullptr;
+    scan_groups(consumer_group_info, *result);
   }
-
   return result;
 }
 
@@ -312,7 +277,7 @@ RDKafkaPublisher::getQueueMetadata(const std::string &queue_name) {
  * @brief Print group information.
  */
 int
-RDKafkaPublisher::print_groups_info(const rd_kafka_ListConsumerGroups_result_t *list) {
+RDKafkaPublisher::scan_groups(const rd_kafka_ListConsumerGroups_result_t *list,  QueueMetadata& q_desc_ref) {
   size_t                                  i;
   const rd_kafka_ConsumerGroupListing_t **result_groups;
   const rd_kafka_error_t                **errors;
@@ -321,7 +286,7 @@ RDKafkaPublisher::print_groups_info(const rd_kafka_ListConsumerGroups_result_t *
   result_groups = rd_kafka_ListConsumerGroups_result_valid(list, &result_groups_cnt);
   errors        = rd_kafka_ListConsumerGroups_result_errors(list, &result_error_cnt);
 
-  if (result_groups_cnt == 0) { fprintf(stderr, "No matching groups found\n"); }
+  if (result_groups_cnt == 0) { return 0; }
 
   for (i = 0; i < result_groups_cnt; i++) {
     const rd_kafka_ConsumerGroupListing_t *group                    = result_groups[i];
@@ -330,64 +295,74 @@ RDKafkaPublisher::print_groups_info(const rd_kafka_ListConsumerGroups_result_t *
     int                                    is_simple_consumer_group = rd_kafka_ConsumerGroupListing_is_simple_consumer_group(group);
     const struct rd_kafka_group_list      *grplistp                 = nullptr;
 
-    printf("Group \"%s\", is simple %" PRId32
-           ", "
-           "state %s",
-           group_id,
-           is_simple_consumer_group,
-           rd_kafka_consumer_group_state_name(state));
-    printf("\n");
-    describe_groups(group_id);
+    // printf("Group \"%s\", is simple %" PRId32
+    //        ", "
+    //        "state %s",
+    //        group_id,
+    //        is_simple_consumer_group,
+    //        rd_kafka_consumer_group_state_name(state));
+    // printf("\n");
+    q_desc_ref.subscriber_groups.push_back(
+      get_group_info(group_id)
+    );
+    
   }
-  for (i = 0; i < result_error_cnt; i++) {
-    const rd_kafka_error_t *error = errors[i];
-    printf("Error[%" PRId32 "]: %s\n", rd_kafka_error_code(error), rd_kafka_error_string(error));
-  }
+  // for (i = 0; i < result_error_cnt; i++) {
+  //   const rd_kafka_error_t *error = errors[i];
+  //   printf("Error[%" PRId32 "]: %s\n", rd_kafka_error_code(error), rd_kafka_error_string(error));
+  // }
   return 0;
 }
 
-int
-RDKafkaPublisher::describe_groups(const char *group) {
+QueueSubscriberGroupInfoUPtr
+RDKafkaPublisher::get_group_info(const char *group) {
+
   rd_kafka_resp_err_t               err;
-  const struct rd_kafka_group_list *grplist;
-  int                               i;
-
+  const rd_kafka_group_list *grplist;
+  QueueSubscriberGroupInfoUPtr result = std::make_unique<QueueSubscriberGroupInfo>();
   err = rd_kafka_list_groups(producer.get()->c_ptr(), group, &grplist, 10000);
-
   if (err) {
-    fprintf(stderr, "%% Failed to acquire group list: %s\n", rd_kafka_err2str(err));
-    return -1;
+    throw std::runtime_error("Failed to acquire group list (" + std::string(rd_kafka_err2str(err)) + ")");
   }
-
-  for (i = 0; i < grplist->group_cnt; i++) {
-    const struct rd_kafka_group_info *gi = &grplist->groups[i];
+  std::unique_ptr<const rd_kafka_group_list,  RdKafkaGroupListDeleter> grlist_uptr(grplist, RdKafkaGroupListDeleter());
+  // set group name
+  result->name = group;
+  // scan the subscriber of the group
+  for (int i = 0; i < grlist_uptr->group_cnt; i++) {
+    const struct rd_kafka_group_info *gi = &grlist_uptr->groups[i];
     int                               j;
 
-    printf("Group \"%s\" in state %s on broker %d (%s:%d)\n", gi->group, gi->state, gi->broker.id, gi->broker.host, gi->broker.port);
-    if (gi->err) printf(" Error: %s\n", rd_kafka_err2str(gi->err));
-    printf(
-        " Protocol type \"%s\", protocol \"%s\", "
-        "with %d member(s):\n",
-        gi->protocol_type,
-        gi->protocol,
-        gi->member_cnt);
+    //printf("Group \"%s\" in state %s on broker %d (%s:%d)\n", gi->group, gi->state, gi->broker.id, gi->broker.host, gi->broker.port);
+    if (gi->err) throw std::runtime_error("Failed to acquire group info (" + std::string(rd_kafka_err2str(gi->err)) + ")");
+    // printf(
+    //     " Protocol type \"%s\", protocol \"%s\", "
+    //     "with %d member(s):\n",
+    //     gi->protocol_type,
+    //     gi->protocol,
+    //     gi->member_cnt);
 
     for (j = 0; j < gi->member_cnt; j++) {
       const struct rd_kafka_group_member_info *mi;
       mi = &gi->members[j];
-
-      printf("  \"%s\", client id \"%s\" on host %s\n", mi->member_id, mi->client_id, mi->client_host);
-      printf("    metadata: %d bytes\n", mi->member_metadata_size);
-      printf("    assignment: %d bytes\n", mi->member_assignment_size);
+      // printf("  \"%s\", client id \"%s\" on host %s\n", mi->member_id, mi->client_id, mi->client_host);
+      // printf("    metadata: %d bytes\n", mi->member_metadata_size);
+      // printf("    assignment: %d bytes\n", mi->member_assignment_size);
+      result->subscribers.push_back(
+        MakeQueueSubscriberInfoUPtr(
+          QueueSubscriberInfo{
+            .client_id = mi->client_id,
+            .member_id = mi->member_id,
+            .host = mi->client_host
+          }
+        )
+      );
     }
-    printf("\n");
   }
 
-  if (group && !grplist->group_cnt) fprintf(stderr, "%% No matching group (%s)\n", group);
+  if (group && !grlist_uptr->group_cnt) fprintf(stderr, "%% No matching group (%s)\n", group);
 
-  rd_kafka_group_list_destroy(grplist);
-
-  return 0;
+  // rd_kafka_group_list_destroy(grplist);
+  return result;
 }
 
 int

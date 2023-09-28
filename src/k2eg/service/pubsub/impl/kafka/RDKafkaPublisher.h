@@ -46,6 +46,13 @@ struct RdKafkaDeleteTopicArrayDeleter {
   }
 };
 
+struct RdKafkaGroupListDeleter {
+  void
+  operator()(const rd_kafka_group_list* grlist) {
+    rd_kafka_group_list_destroy(grlist);
+  }
+};
+
 // smart pointer delete for rd_kafka_NewTopic_t**
 struct RdKafkaNewTopicArrayDeleter {
   const size_t count;
@@ -72,8 +79,8 @@ class RDKafkaPublisher : public IPublisher, RDKafkaBase, RdKafka::DeliveryReport
   std::thread                        auto_poll_thread;
   std::unique_ptr<RdKafka::Producer> producer;
 
-  int print_groups_info(const rd_kafka_ListConsumerGroups_result_t *list);
-  int describe_groups(const char *group);
+  int scan_groups(const rd_kafka_ListConsumerGroups_result_t *list, QueueMetadata& q_desc_ref);
+  QueueSubscriberGroupInfoUPtr get_group_info(const char *group);
  protected:
   void         dr_cb(RdKafka::Message& message);
   void         autoPoll();

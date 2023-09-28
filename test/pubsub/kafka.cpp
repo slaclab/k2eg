@@ -97,7 +97,11 @@ TEST(Kafka, CreateTopic) {
   consumer->getMsg(data, 10);
   sleep(5);
   consumer->getMsg(data, 10);
-  producer->getQueueMetadata("new-queue");
+  auto tipic_metadata = producer->getQueueMetadata("new-queue");
+  consumer.reset();
+  ASSERT_NE(tipic_metadata, nullptr);
+  ASSERT_STREQ(tipic_metadata->name.c_str(), "new-queue");
+  ASSERT_EQ(tipic_metadata->subscriber_groups.size(), 1);
   ASSERT_EQ(producer->deleteQueue("new-queue"), 0);
 }
 

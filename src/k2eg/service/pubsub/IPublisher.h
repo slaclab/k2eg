@@ -63,19 +63,32 @@ struct QueueDescription {
 };
 DEFINE_PTR_TYPES(QueueDescription)
 
+/*
+Information about the subscriber of the queue
+*/
+struct QueueSubscriberInfo{
+    std::string client_id;
+    std::string member_id;
+    std::string host;
 
-struct QueueSubscriberGroupInfo{
-    std::string subscriber_group_name;
-    std::vector<std::string> subscriber_names;
 };
+DEFINE_PTR_TYPES(QueueSubscriberInfo)
 
+/*
+Information about the subscriber group of the queue
+*/
+struct QueueSubscriberGroupInfo{
+    std::string name;
+    std::vector<QueueSubscriberInfoUPtr> subscribers;
+};
+DEFINE_PTR_TYPES(QueueSubscriberGroupInfo)
 /*
 Define the queue metadata infromation
 */
 struct QueueMetadata{
     // the number of subcriber to the queue
-    size_t subscribe_count;
-    std::vector<QueueSubscriberGroupInfo> subscriber_groups;
+    std::string name;
+    std::vector<QueueSubscriberGroupInfoUPtr> subscriber_groups;
 };
 DEFINE_PTR_TYPES(QueueMetadata)
 
