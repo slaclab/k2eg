@@ -12,7 +12,9 @@ Scheduler::start(int thread_number) {
 void
 Scheduler::stop() {
   processing = false;
-  for (auto& t : thread_group) {}
+  for (auto& t : thread_group) {
+    t.join();
+  }
 }
 
 void
@@ -30,7 +32,7 @@ Scheduler::removeTaskByName(std::string& task_name) {
 void
 Scheduler::scheduleTask() {
   while (processing) {
-    std::time_t now      = std::time_t();
+    std::time_t now      = std::time(0);
     TaskShrdPtr cur_task = nullptr;
 
     // protcted block for find the task to proecess

@@ -11,7 +11,7 @@
 
 namespace k2eg::service::scheduler {
 
-#define THREAD_SLEEP_SECONDS 60
+#define THREAD_SLEEP_SECONDS 1
 /*
     Permits to execute handler specifying cronjob timing string
 */
