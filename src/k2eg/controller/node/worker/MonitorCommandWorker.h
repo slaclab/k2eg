@@ -68,7 +68,6 @@ class MonitorCommandWorker : public CommandWorker {
     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
     // Handler's liveness token
     k2eg::common::BroadcastToken handler_token;
-    
     void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstMonitorCommandShrdPtr cmd);
     void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
 public:

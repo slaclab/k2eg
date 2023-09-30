@@ -30,6 +30,7 @@ set(MSGPACK_VERSION cpp-6.0.0)
 set(CURL_VERSION curl-7_88_1)
 set(ZLIB_VERSION v1.2.13)
 set(PROMETHEUS_VERSION v1.1.0)
+SET(CRONCPP_VERSION v2023.03.30)
 set(GTEST_VERSION 1.8.0)
 
 # set(PROTOBUF_VERSION v22.0)
@@ -89,6 +90,9 @@ set(COMMON_SOURCE_FILES
 
   src/k2eg/service/log/impl/BoostLogger.cpp
 
+  src/k2eg/service/scheduler/Scheduler.cpp
+  src/k2eg/service/scheduler/Task.cpp
+
   src/k2eg/controller/command/CMDController.cpp
   src/k2eg/controller/command/CMDCommand.cpp
 
@@ -139,6 +143,7 @@ set(TEST_SOURCE_FILES
   test/metric/EpicsMetric.cpp
   test/metric/CMDMetric.cpp
   test/metric/NodeControllerMetric.cpp
+  test/scheduler/Scheduler.cpp
   ${COMMON_SOURCE_FILES}
 )
 
@@ -394,6 +399,24 @@ ADD_DEPENDENCIES(prometheus zlib)
 SET(BUILD_LIBRARY ${BUILD_LIBRARY} prometheus-cpp-pull prometheus-cpp-core curl)
 ADD_DEPENDENCIES(${PROJECT_NAME} prometheus)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus)
+
+# ---------- cron scheduler-----
+ExternalProject_Add(
+  croncpp
+  GIT_REPOSITORY https://github.com/mariusbancila/croncpp.git
+  GIT_TAG ${CRONCPP_VERSION}
+  PREFIX "${CMAKE_CURRENT_BINARY_DIR}/croncpp"
+  LOG_DOWNLOAD ON
+  LOG_CONFIGURE ON
+  LOG_BUILD ON
+  CMAKE_ARGS
+  -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+)
+#SET(BUILD_LIBRARY ${BUILD_LIBRARY} cron)
+ADD_DEPENDENCIES(${PROJECT_NAME} croncpp)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test croncpp)
 
 # --------Google Test------
 message(STATUS "Setup GTest version ${GTEST_VERSION}")
