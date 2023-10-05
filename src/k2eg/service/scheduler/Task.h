@@ -15,7 +15,6 @@ class Scheduler;
     Task that is executed on a specific crontab expression
 */
 class Task {
-    friend class Scheduler;
     const std::string name;
     cron::cronexpr cron_expr;
     std::time_t next_schedule;
@@ -24,6 +23,8 @@ class Task {
     Task(const std::string& name, const std::string& cron_expr, std::function<void()> handler);
     void execute();
     bool canBeExecuted(const std::time_t& current_time);
+    const std::string& getName();
+    std::time_t nextSchedule();
 };
 
 DEFINE_PTR_TYPES(Task)

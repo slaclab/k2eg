@@ -13,6 +13,16 @@ Task::canBeExecuted(const std::time_t& current_time) {
     return next_schedule <= current_time;
 }
 
+std::time_t 
+Task::nextSchedule() {
+    return next_schedule;
+}
+
+const std::string& 
+Task::getName() {
+    return name;
+}
+
 void 
 Task::execute() {
     try{

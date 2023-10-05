@@ -1,8 +1,12 @@
 #include <k2eg/service/scheduler/Scheduler.h>
-
+#include <chrono>
+#include <iterator>
+#include <ostream>
+#include <iostream>
 #include "k2eg/service/scheduler/Task.h"
 
 using namespace k2eg::service::scheduler;
+using namespace std::chrono;
 
 void
 Scheduler::start(int thread_number) {
@@ -11,22 +15,30 @@ Scheduler::start(int thread_number) {
 }
 void
 Scheduler::stop() {
-  processing = false;
-  for (auto& t : thread_group) {
-    t.join();
+  {
+    std::lock_guard<std::mutex> lock(thread_wait_mtx);
+    processing = false;
   }
+  cv.notify_one();
+  for (auto& t : thread_group) { t.join(); }
 }
 
 void
 Scheduler::addTask(TaskShrdPtr task_shrd_ptr) {
-  std::lock_guard<std::mutex> lock(tasks_queue_mtx);
-  tasks_queue.push_front(task_shrd_ptr);
+  {
+    std::lock_guard<std::mutex> lock(tasks_queue_mtx);
+    tasks_queue.push_front(task_shrd_ptr);
+    std::lock_guard<std::mutex> lock_for_Variable(thread_wait_mtx);
+    new_taks_submitted = true;
+  }
+  // wakeup condition variable to update his wait_until value
+  cv.notify_one();
 }
 
 void
-Scheduler::removeTaskByName(std::string& task_name) {
+Scheduler::removeTaskByName(const std::string& task_name) {
   std::lock_guard<std::mutex> lock(tasks_queue_mtx);
-  std::erase_if(tasks_queue, [task_name](TaskShrdPtr& task) { return task->name.compare(task_name) == 0; });
+  std::erase_if(tasks_queue, [task_name](TaskShrdPtr& task) { return task->getName().compare(task_name) == 0; });
 }
 
 void
@@ -35,12 +47,12 @@ Scheduler::scheduleTask() {
     std::time_t now      = std::time(0);
     TaskShrdPtr cur_task = nullptr;
 
-    // protcted block for find the task to proecess
+    // protected block for find the task to proecess
     {
       std::lock_guard<std::mutex> lock(tasks_queue_mtx);
       for (auto& task : tasks_queue) {
         if (task->canBeExecuted(now)) {
-          std::erase_if(tasks_queue, [task](TaskShrdPtr& checked_task) { return checked_task->name.compare(task->name) == 0; });
+          std::erase_if(tasks_queue, [task](TaskShrdPtr& checked_task) { return checked_task->getName().compare(task->getName()) == 0; });
           cur_task = task;
           break;
         }
@@ -49,19 +61,21 @@ Scheduler::scheduleTask() {
 
     if (cur_task) {
       // execute the task
-      cur_task->handler();
+      cur_task->execute();
 
       // lock the queue
       std::lock_guard<std::mutex> lock(tasks_queue_mtx);
 
       // reinsert task at the front of the queue
       tasks_queue.push_front(cur_task);
-    }
-
-    // sleep for a while
-    {
-      std::unique_lock<std::mutex> lock(thread_wait_mtx);
-      cv.wait_for(lock, std::chrono::seconds(THREAD_SLEEP_SECONDS), [this] { return !processing; });  // Wait for the flag to become true
+    }else{
+      // sleep for a while if we haven't new job to execute
+      {
+        std::unique_lock<std::mutex> lock(thread_wait_mtx);
+        new_taks_submitted = false;
+        // Wait for a specific amount of time or until processing variable is true
+        cv.wait_for(lock, std::chrono::seconds(THREAD_SLEEP_SECONDS), [this] { return !processing || !new_taks_submitted; });
+      }
     }
   }
 }
