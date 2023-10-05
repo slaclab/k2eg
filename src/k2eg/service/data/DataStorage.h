@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <mutex>
+#include "k2eg/common/types.h"
 namespace k2eg::service::data
 {
     /**
@@ -60,8 +61,6 @@ namespace k2eg::service::data
         std::unique_lock<std::recursive_mutex> s_lock;
     };
 
-    typedef std::unique_ptr<DataStorage> DataStorageUPtr;
-
     /**
      *
      */
@@ -81,7 +80,7 @@ namespace k2eg::service::data
         */
         StorageLockedRef getLockedStorage();
     };
-
+    DEFINE_PTR_TYPES(DataStorage)
 }
 
 #endif // k2eg_SERVICE_DATA_DATASTORAGE_H_

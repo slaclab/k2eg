@@ -2,6 +2,7 @@
 #define k2eg_CONTROLLER_NODE_WORKER_MonitorCommandWORKER_H_
 
 #include <k2eg/common/types.h>
+#include <k2eg/controller/node/configuration/NodeConfiguration.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/log/ILogger.h>
@@ -62,6 +63,7 @@ DEFINE_MAP_FOR_TYPE(std::string, std::vector<ChannelTopicMonitorInfoUPtr>, Chann
 class MonitorCommandWorker : public CommandWorker {
     mutable std::shared_mutex channel_map_mtx;
     ChannelTopicsMap channel_topics_map;
+    k2eg::controller::node::configuration::NodeConfigurationShrdPtr node_configuration_db;
     k2eg::service::log::ILoggerShrdPtr logger;
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
     k2eg::service::metric::IEpicsMetric& metric;
@@ -71,7 +73,9 @@ class MonitorCommandWorker : public CommandWorker {
     void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstMonitorCommandShrdPtr cmd);
     void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
 public:
-    MonitorCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
+    MonitorCommandWorker(
+      k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager,
+      k2eg::controller::node::configuration::NodeConfigurationShrdPtr node_configuration_db);
     virtual ~MonitorCommandWorker() = default;
     void processCommand(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 };

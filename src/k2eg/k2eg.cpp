@@ -63,7 +63,7 @@ K2EGateway::setup(int argc, const char* argv[]) {
     logger->logMessage("Start subscriber service");
     ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(po->getSubscriberConfiguration()));
     logger->logMessage("Start node controller");
-    node_controller = std::make_unique<NodeController>(std::make_unique<DataStorage>(po->getStoragePath()));
+    node_controller = std::make_unique<NodeController>(std::make_shared<DataStorage>(po->getStoragePath()));
     logger->logMessage("Restore persistent command");
     node_controller->reloadPersistentCommand();
     logger->logMessage("Start command controller");

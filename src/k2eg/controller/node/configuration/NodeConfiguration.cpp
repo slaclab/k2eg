@@ -8,8 +8,8 @@ using namespace k2eg::controller::node::configuration;
 using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
 
-NodeConfiguration::NodeConfiguration(DataStorageUPtr data_storage)
-    : data_storage(std::move(data_storage)) {}
+NodeConfiguration::NodeConfiguration(DataStorageShrdPtr data_storage)
+    : data_storage(data_storage) {}
 
 void NodeConfiguration::addChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions) {
     auto channel_repository = toShared(data_storage->getChannelRepository());

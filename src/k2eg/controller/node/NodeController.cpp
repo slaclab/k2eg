@@ -8,6 +8,7 @@
 #include <k2eg/service/ServiceResolver.h>
 
 #include <k2eg/common/utility.h>
+#include "k2eg/service/data/DataStorage.h"
 #include "k2eg/service/log/ILogger.h"
 #include "k2eg/service/metric/INodeControllerMetric.h"
 
@@ -25,8 +26,8 @@ using namespace k2eg::service::log;
 using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::metric;
 
-NodeController::NodeController(DataStorageUPtr data_storage)
-    : node_configuration(std::make_unique<NodeConfiguration>(std::move(data_storage)))
+NodeController::NodeController(DataStorageShrdPtr data_storage)
+    : node_configuration(std::make_shared<NodeConfiguration>(data_storage))
     , processing_pool(std::make_shared<BS::thread_pool>())
     , metric(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric()) {
     // set logger
@@ -35,7 +36,7 @@ NodeController::NodeController(DataStorageUPtr data_storage)
     // register worker for command type
     worker_resolver.registerObjectInstance(
         CommandType::monitor,
-        std::make_shared<MonitorCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
+        std::make_shared<MonitorCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve(), node_configuration));
     worker_resolver.registerObjectInstance(
         CommandType::get,
         std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));

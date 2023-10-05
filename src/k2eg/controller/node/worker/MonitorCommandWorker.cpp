@@ -11,22 +11,21 @@
 
 using namespace k2eg::common;
 
+using namespace k2eg::controller::node::configuration;
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::command;
 using namespace k2eg::controller::command::cmd;
 
 using namespace k2eg::service;
 using namespace k2eg::service::log;
-
 using namespace k2eg::service::epics_impl;
-
 using namespace k2eg::service::pubsub;
-
 using namespace k2eg::service::metric;
 
 #pragma region MonitorCommandWorker
-MonitorCommandWorker::MonitorCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager)
-    : logger(ServiceResolver<ILogger>::resolve())
+MonitorCommandWorker::MonitorCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager, NodeConfigurationShrdPtr node_configuration_db)
+    : node_configuration_db(node_configuration_db)
+    , logger(ServiceResolver<ILogger>::resolve())
     , publisher(ServiceResolver<IPublisher>::resolve())
     , metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric())
     , epics_service_manager(epics_service_manager) {

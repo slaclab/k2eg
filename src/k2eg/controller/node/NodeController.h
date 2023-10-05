@@ -13,6 +13,7 @@
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <memory>
 
+#include "k2eg/service/data/DataStorage.h"
 #include "k2eg/service/metric/INodeControllerMetric.h"
 
 namespace k2eg::controller::node {
@@ -22,14 +23,14 @@ namespace k2eg::controller::node {
 class NodeController {
   std::shared_ptr<BS::thread_pool>                                                                      processing_pool;
   k2eg::common::ObjectByTypeFactory<k2eg::controller::command::cmd::CommandType, worker::CommandWorker> worker_resolver;
-  configuration::NodeConfigurationUPtr                                                                  node_configuration;
+  configuration::NodeConfigurationShrdPtr                                                                node_configuration;
 
   k2eg::service::log::ILoggerShrdPtr             logger;
   k2eg::service::epics_impl::EpicsServiceManager epics_service_manager;
   k2eg::service::metric::INodeControllerMetric&  metric;
 
  public:
-  NodeController(k2eg::service::data::DataStorageUPtr data_storage);
+  NodeController(k2eg::service::data::DataStorageShrdPtr data_storage);
   NodeController()                                 = delete;
   NodeController(const NodeController&)            = delete;
   NodeController& operator=(const NodeController&) = delete;
