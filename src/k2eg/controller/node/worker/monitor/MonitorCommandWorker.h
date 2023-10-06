@@ -2,9 +2,12 @@
 #define k2eg_CONTROLLER_NODE_WORKER_MonitorCommandWORKER_H_
 
 #include <k2eg/common/types.h>
+#include "k2eg/controller/command/cmd/MonitorCommand.h"
 #include <k2eg/controller/node/configuration/NodeConfiguration.h>
+#include <k2eg/controller/node/worker/monitor/MonitorChecker.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
+
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/metric/IMetricService.h>
@@ -13,8 +16,8 @@
 #include <shared_mutex>
 #include <string>
 #include <vector>
-#include "k2eg/controller/command/cmd/MonitorCommand.h"
-namespace k2eg::controller::node::worker {
+
+namespace k2eg::controller::node::worker::monitor {
 
 /**
 Monitor reply message
@@ -68,6 +71,7 @@ class MonitorCommandWorker : public CommandWorker {
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
     k2eg::service::metric::IEpicsMetric& metric;
     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
+    MonitorCheckerShrdPtr monitor_checker_shrd_ptr;
     // Handler's liveness token
     k2eg::common::BroadcastToken handler_token;
     void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstMonitorCommandShrdPtr cmd);

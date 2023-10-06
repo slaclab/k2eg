@@ -2,9 +2,9 @@
 #define k2eg_CONTROLLER_NODE_CONFIGURATION_NODECONFIGURATION_H_
 
 #include <k2eg/service/data/DataStorage.h>
-
-#include <memory>
 #include "k2eg/common/types.h"
+#include <memory>
+
 
 namespace k2eg::controller::node::configuration {
     typedef std::vector<k2eg::service::data::repository::ChannelMonitorType> ChannelMonitorTypeConstVector;
@@ -22,8 +22,9 @@ public:
     ~NodeConfiguration() = default;
     /**
      * Add a monitor configuration for a determinated channel for a destination topic
+     return for each monitor type if the record has been inserted or not
      */
-    void addChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions);
+    std::vector<bool> addChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions);
     void removeChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions);
     void iterateAllChannelMonitor(k2eg::service::data::repository::ChannelMonitorTypeProcessHandler handle);
 };

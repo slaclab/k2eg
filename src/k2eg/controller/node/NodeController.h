@@ -36,9 +36,6 @@ class NodeController {
   NodeController& operator=(const NodeController&) = delete;
   ~NodeController();
 
-  // apply all the spermanent command
-  void reloadPersistentCommand();
-
   void waitForTaskCompletion();
 
   // Process an array of command

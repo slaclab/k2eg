@@ -44,7 +44,7 @@ class Scheduler {
   void addTask(TaskShrdPtr task_shrd_ptr);
   void removeTaskByName(const std::string& task_name);
 };
-
+DEFINE_PTR_TYPES(Scheduler)
 }  // namespace k2eg::service::scheduler
 
 #endif  // K2EG_SERVICE_SCHEDULER_SCHEDULER_H_

@@ -3,7 +3,7 @@
 //------------ command include ----------
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/worker/GetCommandWorker.h>
-#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
+#include <k2eg/controller/node/worker/monitor/MonitorCommandWorker.h>
 #include <k2eg/controller/node/worker/PutCommandWorker.h>
 #include <k2eg/service/ServiceResolver.h>
 
@@ -13,6 +13,7 @@
 
 using namespace k2eg::controller::node;
 using namespace k2eg::controller::node::worker;
+using namespace k2eg::controller::node::worker::monitor;
 using namespace k2eg::controller::node::configuration;
 
 using namespace k2eg::controller::command;
@@ -40,14 +41,6 @@ NodeController::NodeController(DataStorageShrdPtr data_storage)
 }
 
 NodeController::~NodeController() { processing_pool->wait_for_tasks(); }
-
-void
-NodeController::reloadPersistentCommand() {
-  node_configuration->iterateAllChannelMonitor([this](uint32_t index, const ChannelMonitorType& monitor_element) {
-    auto command = fromChannelMonitor(monitor_element);
-    submitCommand({command});
-  });
-}
 
 void
 NodeController::waitForTaskCompletion() {

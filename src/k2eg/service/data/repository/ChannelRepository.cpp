@@ -11,7 +11,7 @@ using namespace sqlite_orm;
 ChannelRepository::ChannelRepository(DataStorage& data_storage)
     : data_storage(data_storage) {}
 
-void ChannelRepository::insert(const ChannelMonitorType& channel_description) {
+bool ChannelRepository::insert(const ChannelMonitorType& channel_description) {
     auto locked_instance = data_storage.getLockedStorage();
     auto lstorage = locked_instance.get();
     auto found = lstorage->count<ChannelMonitorType>(
@@ -20,6 +20,7 @@ void ChannelRepository::insert(const ChannelMonitorType& channel_description) {
                       == channel_description.channel_destination));
 
     if (!found) lstorage->insert(channel_description);
+    return !found;
 }
 
 void ChannelRepository::remove(const ChannelMonitorType& channel_description) {

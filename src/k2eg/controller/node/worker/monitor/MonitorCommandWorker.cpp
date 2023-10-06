@@ -1,5 +1,5 @@
 #include <k2eg/common/utility.h>
-#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
+#include <k2eg/controller/node/worker/monitor/MonitorCommandWorker.h>
 #include <k2eg/service/ServiceResolver.h>
 
 #include <cassert>
@@ -7,6 +7,7 @@
 
 #include "k2eg/controller/command/cmd/MonitorCommand.h"
 #include "k2eg/controller/node/worker/CommandWorker.h"
+#include "k2eg/controller/node/worker/monitor/MonitorChecker.h"
 #include "k2eg/service/epics/EpicsChannel.h"
 #include "k2eg/service/log/ILogger.h"
 #include "k2eg/service/metric/IMetricService.h"
@@ -16,6 +17,7 @@ using namespace k2eg::common;
 
 using namespace k2eg::controller::node::configuration;
 using namespace k2eg::controller::node::worker;
+using namespace k2eg::controller::node::worker::monitor;
 using namespace k2eg::controller::command;
 using namespace k2eg::controller::command::cmd;
 
@@ -33,21 +35,13 @@ MonitorCommandWorker::MonitorCommandWorker(EpicsServiceManagerShrdPtr epics_serv
       logger(ServiceResolver<ILogger>::resolve()),
       publisher(ServiceResolver<IPublisher>::resolve()),
       metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric()),
-      epics_service_manager(epics_service_manager) {
+      epics_service_manager(epics_service_manager),
+      monitor_checker_shrd_ptr(MakeMonitorCheckerShrdPtr(ServiceResolver<IPublisher>::resolve(), node_configuration_db)) {
   handler_token = epics_service_manager->addHandler(std::bind(&MonitorCommandWorker::epicsMonitorEvent, this, std::placeholders::_1));
 }
 
 void
 MonitorCommandWorker::manageStartMonitorCommand(ConstMonitorCommandShrdPtr cmd_ptr) {
-  // if (start_monitor_command->activate) {
-  //             // start monitoring
-  //
-  //         } else {
-  //             // stop monitoring
-  //             node_configuration->removeChannelMonitor(
-  //                 {ChannelMonitorType{.pv_name = acquire_command_shrd->pv_name,
-  //                                     .channel_destination = acquire_command_shrd->monitor_destination_topic}});
-  //         }
   // ensure database is update with monitor information
   node_configuration_db->addChannelMonitor({ChannelMonitorType{.pv_name             = cmd_ptr->pv_name,
                                                                .event_serialization = static_cast<std::uint8_t>(cmd_ptr->serialization),

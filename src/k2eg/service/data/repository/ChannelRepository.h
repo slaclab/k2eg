@@ -49,7 +49,7 @@ class ChannelRepository {
 
 public:
     ~ChannelRepository() = default;
-    void insert(const ChannelMonitorType& channel_description);
+    bool insert(const ChannelMonitorType& channel_description);
     void remove(const ChannelMonitorType& channel_description);
     bool isPresent(const ChannelMonitorType& new_cannel) const;
     std::optional<ChannelMonitorTypeUPtr> getChannelMonitor(const ChannelMonitorType& channel_descirption) const;

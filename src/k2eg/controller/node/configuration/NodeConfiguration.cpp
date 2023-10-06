@@ -11,12 +11,14 @@ using namespace k2eg::service::data::repository;
 NodeConfiguration::NodeConfiguration(DataStorageShrdPtr data_storage)
     : data_storage(data_storage) {}
 
-void NodeConfiguration::addChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions) {
+std::vector<bool> NodeConfiguration::addChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions) {
     auto channel_repository = toShared(data_storage->getChannelRepository());
-    
+    std::vector<bool> result(channel_descriptions.size());
+    int idx = 0;
     for(auto const &desc: channel_descriptions) {
-        channel_repository->insert(desc);
+        result[idx++] = channel_repository->insert(desc);
     }
+    return result;
 }
 
 void NodeConfiguration::removeChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions) {
