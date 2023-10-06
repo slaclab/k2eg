@@ -9,6 +9,7 @@
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/pubsub/ISubscriber.h>
 #include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/scheduler/Scheduler.h>
 
 namespace po = boost::program_options;
 
@@ -39,6 +40,8 @@ static const char* const SUB_IMPL_KV = "sub-impl-kv";
 
 static const char* const STORAGE_PATH = "storage-path";
 
+static const char* const SCHEDULER_THREAD_NUMBER = "scheduler-thread-number";
+
 static const char* const METRIC_ENABLE = "metric-enable";
 static const char* const METRIC_HTTP_PORT = "metric-server-http-port";
 
@@ -65,6 +68,7 @@ namespace k2eg
             k2eg::service::pubsub::ConstPublisherConfigurationUPtr getPublisherConfiguration();
             k2eg::service::pubsub::ConstSubscriberConfigurationUPtr getSubscriberConfiguration();
             k2eg::service::metric::ConstMetricConfigurationUPtr getMetricConfiguration();
+            k2eg::service::scheduler::ConstSchedulerConfigurationUPtr getSchedulerConfiguration();
             const std::string getStoragePath();
             bool optionConfigure(const std::string &name);
 

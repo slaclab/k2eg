@@ -8,10 +8,12 @@
 using namespace k2eg::service::scheduler;
 using namespace std::chrono;
 
+Scheduler::Scheduler(ConstSchedulerConfigurationUPtr configuration):configuration(std::move(configuration)){}
+
 void
-Scheduler::start(int thread_number) {
+Scheduler::start() {
   processing = true;
-  for (int idx = 0; idx < thread_number; idx++) { thread_group.push_back(std::thread(&Scheduler::scheduleTask, this)); }
+  for (int idx = 0; idx < configuration->thread_number; idx++) { thread_group.push_back(std::thread(&Scheduler::scheduleTask, this)); }
 }
 void
 Scheduler::stop() {

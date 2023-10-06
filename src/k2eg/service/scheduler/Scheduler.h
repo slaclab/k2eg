@@ -3,6 +3,7 @@
 
 #include <croncpp.h>
 #include <k2eg/service/scheduler/Task.h>
+#include <sys/types.h>
 
 #include <condition_variable>
 #include <cstdint>
@@ -13,10 +14,18 @@
 namespace k2eg::service::scheduler {
 typedef std::deque<TaskShrdPtr> TaskQueue;
 #define THREAD_SLEEP_SECONDS 60
+
+struct SchedulerConfiguration {
+    // the number of thread for the scheduler
+    unsigned int thread_number;
+};
+DEFINE_PTR_TYPES(SchedulerConfiguration)
+
 /*
     Permits to execute handler specifying cronjob timing string
 */
 class Scheduler {
+  ConstSchedulerConfigurationUPtr configuration;
   std::mutex               tasks_queue_mtx;
   std::mutex               thread_wait_mtx;
   std::condition_variable  cv;
@@ -28,9 +37,9 @@ class Scheduler {
   void                     scheduleTask();
   std::chrono::system_clock::time_point getNewWaitUntilTimePoint();  
  public:
-  Scheduler() = default; 
+  Scheduler(ConstSchedulerConfigurationUPtr configuration); 
   ~Scheduler() = default;
-  void start(int thread_number);
+  void start();
   void stop();
   void addTask(TaskShrdPtr task_shrd_ptr);
   void removeTaskByName(const std::string& task_name);

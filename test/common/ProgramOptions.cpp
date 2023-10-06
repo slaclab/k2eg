@@ -135,4 +135,15 @@ TEST(ProgramOptions, MetricConfiguration) {
     EXPECT_EQ(metric_configuration->tcp_port, 8888);
 }
 
+TEST(ProgramOptions, SchedulerConfiguration) {
+    int argc = 1;
+    const char* argv[1] = {"epics-k2eg-test"};
+    // set environment variable for test
+    clearenv();
+    setenv("EPICS_k2eg_scheduler-thread-number", "100", 1);
+    std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
+    EXPECT_NO_THROW(opt->parse(argc, argv););
+    auto scheduler_configuration = opt->getSchedulerConfiguration();
+    EXPECT_EQ(scheduler_configuration->thread_number, 100);
+}
 #endif //__linux__

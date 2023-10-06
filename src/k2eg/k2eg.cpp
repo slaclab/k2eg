@@ -3,6 +3,7 @@
 #include <k2eg/version.h>
 #include <k2eg/k2eg.h>
 #include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/scheduler/Scheduler.h>
 #include <k2eg/service/data/DataStorage.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/log/ILogger.h>
@@ -19,17 +20,14 @@ using namespace k2eg::service;
 
 using namespace k2eg::service::log;
 using namespace k2eg::service::log::impl;
-
 using namespace k2eg::service::metric;
 using namespace k2eg::service::metric::impl;
 using namespace k2eg::service::metric::impl::prometheus_impl;
-
 using namespace k2eg::service::epics_impl;
-
 using namespace k2eg::service::data;
-
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
+using namespace k2eg::service::scheduler;
 
 using namespace k2eg::controller::node;
 using namespace k2eg::controller::command;
@@ -62,10 +60,11 @@ K2EGateway::setup(int argc, const char* argv[]) {
     ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(po->getPublisherConfiguration()));
     logger->logMessage("Start subscriber service");
     ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(po->getSubscriberConfiguration()));
+    logger->logMessage("Start Scheduler Service");
+    ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(po->getSchedulerConfiguration()));
+    ServiceResolver<Scheduler>::resolve()->start();
     logger->logMessage("Start node controller");
     node_controller = std::make_unique<NodeController>(std::make_shared<DataStorage>(po->getStoragePath()));
-    logger->logMessage("Restore persistent command");
-    node_controller->reloadPersistentCommand();
     logger->logMessage("Start command controller");
     cmd_controller = std::make_unique<CMDController>(po->getCMDControllerConfiguration(), std::bind(&K2EGateway::commandReceived, this, std::placeholders::_1));
 
@@ -77,6 +76,8 @@ K2EGateway::setup(int argc, const char* argv[]) {
     cmd_controller.reset();
     logger->logMessage("Stop node controller");
     node_controller.reset();
+    logger->logMessage("Stop scheduler service");
+    ServiceResolver<Scheduler>::resolve()->stop();
     logger->logMessage("Stop subscriber service");
     ServiceResolver<ISubscriber>::resolve().reset();
     logger->logMessage("Stop publihser service");
