@@ -36,7 +36,7 @@ MonitorCommandWorker::MonitorCommandWorker(EpicsServiceManagerShrdPtr epics_serv
       publisher(ServiceResolver<IPublisher>::resolve()),
       metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric()),
       epics_service_manager(epics_service_manager),
-      monitor_checker_shrd_ptr(MakeMonitorCheckerShrdPtr(ServiceResolver<IPublisher>::resolve(), node_configuration_db)) {
+      monitor_checker_shrd_ptr(MakeMonitorCheckerShrdPtr(node_configuration_db)) {
   handler_token = epics_service_manager->addHandler(std::bind(&MonitorCommandWorker::epicsMonitorEvent, this, std::placeholders::_1));
 }
 

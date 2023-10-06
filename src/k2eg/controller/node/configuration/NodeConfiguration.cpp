@@ -28,13 +28,15 @@ void NodeConfiguration::removeChannelMonitor(const ChannelMonitorTypeConstVector
     }
 }
 
-void NodeConfiguration::iterateAllChannelMonitor(ChannelMonitorTypeProcessHandler handler) {
+void NodeConfiguration::iterateAllChannelMonitor(bool reset_from_beginning, size_t element_to_process, ChannelMonitorTypeProcessHandler handler) {
     auto channel_repository = toShared(data_storage->getChannelRepository());
     auto distinct_name_prot = channel_repository->getDistinctByNameProtocol();
+
     for(auto &ch: distinct_name_prot) {
-        channel_repository->processAllChannelMonitor(
+        if(reset_from_beginning) {channel_repository->resetProcessStateChannel(std::get<0>(ch));}
+        channel_repository->processUnprocessedChannelMonitor(
             std::get<0>(ch),
-            std::get<1>(ch),
+            element_to_process,
             handler
         );
     }

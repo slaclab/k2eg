@@ -22,7 +22,8 @@ namespace k2eg::service::data
                                        make_column("pv_name", &repository::ChannelMonitorType::pv_name),
                                        make_column("event_serialization", &repository::ChannelMonitorType::event_serialization),
                                        make_column("channel_protocol", &repository::ChannelMonitorType::channel_protocol),
-                                       make_column("channel_destination", &repository::ChannelMonitorType::channel_destination)));
+                                       make_column("channel_destination", &repository::ChannelMonitorType::channel_destination),
+                                       make_column("processed", &repository::ChannelMonitorType::processed)));
     }
 
     using Storage = decltype(initStorage(""));

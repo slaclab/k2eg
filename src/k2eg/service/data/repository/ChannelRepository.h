@@ -15,6 +15,7 @@ struct ChannelMonitorType {
     std::uint8_t event_serialization;
     std::string channel_protocol;
     std::string channel_destination;
+    bool processed = false;
 };
 
 inline ChannelMonitorType toChannelMonitor(const k2eg::controller::command::cmd::MonitorCommand& acquire_command) {
@@ -55,8 +56,12 @@ public:
     std::optional<ChannelMonitorTypeUPtr> getChannelMonitor(const ChannelMonitorType& channel_descirption) const;
     ChannelMonitorDistinctResultType getDistinctByNameProtocol() const;
     void processAllChannelMonitor(const std::string& pv_name,
-                                  const std::string& channel_protocol,
                                   ChannelMonitorTypeProcessHandler handler) const;
+    // apply the handler to all non processed element
+    void processUnprocessedChannelMonitor(const std::string& pv_name,
+                                  const size_t number_of_element,
+                                  ChannelMonitorTypeProcessHandler handler) const;
+    void resetProcessStateChannel(const std::string& pv_name);
     void removeAll();
 };
 } // namespace repository

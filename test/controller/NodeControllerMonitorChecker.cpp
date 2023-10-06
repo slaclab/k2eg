@@ -67,9 +67,8 @@ TEST(NodeControllerMonitorChecker, StartMonitoringSingle) {
   std::shared_ptr<DataStorage> storage;
   EXPECT_NO_THROW(storage = std::make_shared<DataStorage>(fs::path(fs::current_path()) / "test.sqlite"););
   EXPECT_NO_THROW(toShared(storage->getChannelRepository())->removeAll(););
-  auto publisher = std::make_shared<DummyPublisher>();
   auto                                    node_configuraiton = std::make_shared<NodeConfiguration>(storage);
-  MonitorChecker                          checker(publisher, node_configuraiton);
+  MonitorChecker                          checker(node_configuraiton);
   std::function<void(MonitorHandlerData)> checker_handler = [&number_of_start_monitor](MonitorHandlerData event_data) { 
     number_of_start_monitor++;
     ASSERT_EQ(event_data.action, MonitorHandlerAction::Start);
@@ -84,9 +83,8 @@ TEST(NodeControllerMonitorChecker, StartMonitoringSingleEventOnTwoSameMonitorReq
   std::shared_ptr<DataStorage> storage;
   EXPECT_NO_THROW(storage = std::make_shared<DataStorage>(fs::path(fs::current_path()) / "test.sqlite"););
   EXPECT_NO_THROW(toShared(storage->getChannelRepository())->removeAll(););
-  auto publisher = std::make_shared<DummyPublisher>();
   auto                                    node_configuraiton = std::make_shared<NodeConfiguration>(storage);
-  MonitorChecker                          checker(publisher, node_configuraiton);
+  MonitorChecker                          checker(node_configuraiton);
   std::function<void(MonitorHandlerData)> checker_handler = [&number_of_start_monitor](MonitorHandlerData event_data) { 
     number_of_start_monitor++;
     ASSERT_EQ(event_data.action, MonitorHandlerAction::Start);
@@ -98,4 +96,24 @@ TEST(NodeControllerMonitorChecker, StartMonitoringSingleEventOnTwoSameMonitorReq
     }
     );
   ASSERT_EQ(number_of_start_monitor, 1);
+}
+
+TEST(NodeControllerMonitorChecker, StartMonitoringDubleEventOnTwoSameMonitorRequestDifferentDestination) {
+  int                          number_of_start_monitor = 0;
+  std::shared_ptr<DataStorage> storage;
+  EXPECT_NO_THROW(storage = std::make_shared<DataStorage>(fs::path(fs::current_path()) / "test.sqlite"););
+  EXPECT_NO_THROW(toShared(storage->getChannelRepository())->removeAll(););
+  auto                                    node_configuraiton = std::make_shared<NodeConfiguration>(storage);
+  MonitorChecker                          checker(node_configuraiton);
+  std::function<void(MonitorHandlerData)> checker_handler = [&number_of_start_monitor](MonitorHandlerData event_data) { 
+    number_of_start_monitor++;
+    ASSERT_EQ(event_data.action, MonitorHandlerAction::Start);
+  };
+  auto                                    event_token     = checker.addHandler(checker_handler);
+  checker.storeMonitorData({
+    ChannelMonitorType{.pv_name = "pv", .event_serialization = 0, .channel_protocol = "prot-a", .channel_destination = "dest-a"},
+    ChannelMonitorType{.pv_name = "pv", .event_serialization = 0, .channel_protocol = "prot-b", .channel_destination = "dest-b"}
+    }
+    );
+  ASSERT_EQ(number_of_start_monitor, 2);
 }
