@@ -45,7 +45,7 @@ class MonitorChecker {
   k2eg::service::scheduler::SchedulerShrdPtr    scheduler;
   k2eg::common::broadcaster<MonitorHandlerData> handler_broadcaster;
   std::mutex                                    op_mux;
-
+  std::set<k2eg::service::data::repository::ChannelMonitorType, ChannelMonitorTypeComparator> to_stop;
  public:
   MonitorChecker(configuration::NodeConfigurationShrdPtr node_configuration_db);
   ~MonitorChecker();

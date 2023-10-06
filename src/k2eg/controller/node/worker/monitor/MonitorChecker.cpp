@@ -41,11 +41,9 @@ MonitorChecker::storeMonitorData(const ChannelMonitorTypeConstVector& channel_de
 }
 
 
-
 void
 MonitorChecker::scanForMonitorToStop(bool reset_from_beginning) {
   logger->logMessage("Start scanning for monitor eviction");
-  std::set<ChannelMonitorType, ChannelMonitorTypeComparator> to_stop;
   // scan al monitor to check what need to be
   node_configuration_db->iterateAllChannelMonitor(
     false,
