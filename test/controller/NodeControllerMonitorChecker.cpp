@@ -117,3 +117,5 @@ TEST(NodeControllerMonitorChecker, StartMonitoringDubleEventOnTwoSameMonitorRequ
     );
   ASSERT_EQ(number_of_start_monitor, 2);
 }
+
+// TODO need to be tested the method scanForMonitorToStop

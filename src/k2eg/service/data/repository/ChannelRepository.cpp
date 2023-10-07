@@ -1,6 +1,7 @@
 #include <k2eg/service/data/DataStorage.h>
 #include <k2eg/service/data/repository/ChannelRepository.h>
 
+#include <chrono>
 #include <iostream>
 
 using namespace k2eg::service::data;
@@ -12,12 +13,17 @@ ChannelRepository::ChannelRepository(DataStorage& data_storage) : data_storage(d
 
 bool
 ChannelRepository::insert(const ChannelMonitorType& channel_description) {
-  auto locked_instance = data_storage.getLockedStorage();
-  auto lstorage        = locked_instance.get();
-  auto found           = lstorage->count<ChannelMonitorType>(where(c(&ChannelMonitorType::pv_name) == channel_description.pv_name and
+  auto               locked_instance = data_storage.getLockedStorage();
+  auto               lstorage        = locked_instance.get();
+  ChannelMonitorType tmp_data        = channel_description;
+  // set to default value the mandatory field for purging the monitor
+  tmp_data.processed      = false;
+  tmp_data.start_purge_ts = -1;
+
+  auto found = lstorage->count<ChannelMonitorType>(where(c(&ChannelMonitorType::pv_name) == channel_description.pv_name and
                                                          c(&ChannelMonitorType::channel_destination) == channel_description.channel_destination));
 
-  if (!found) lstorage->insert(channel_description);
+  if (!found) lstorage->insert(tmp_data);
   return !found;
 }
 
@@ -39,10 +45,14 @@ ChannelRepository::isPresent(const ChannelMonitorType& new_cannel) const {
 std::optional<ChannelMonitorTypeUPtr>
 ChannelRepository::getChannelMonitor(const ChannelMonitorType& channel_descirption) const {
   auto result = data_storage.getLockedStorage().get()->get_all_pointer<ChannelMonitorType>(
-      where(c(&ChannelMonitorType::pv_name) == channel_descirption.pv_name
-            //   and c(&ChannelMonitorType::channel_protocol)
-            //           == channel_descirption.channel_protocol
-            and c(&ChannelMonitorType::channel_destination) == channel_descirption.channel_destination));
+      where(c(&ChannelMonitorType::pv_name) == channel_descirption.pv_name and
+            c(&ChannelMonitorType::channel_destination) == channel_descirption.channel_destination));
+  return (result.size() == 0) ? std::optional<std::unique_ptr<ChannelMonitorType>>() : make_optional(std::make_unique<ChannelMonitorType>(*result[0]));
+}
+
+std::optional<ChannelMonitorTypeUPtr>
+ChannelRepository::getNextChannelMonitorToProcess(const std::string& pv_name) const {
+  auto result = data_storage.getLockedStorage().get()->get_all_pointer<ChannelMonitorType>(where(c(&ChannelMonitorType::pv_name) == pv_name), limit(1));
   return (result.size() == 0) ? std::optional<std::unique_ptr<ChannelMonitorType>>() : make_optional(std::make_unique<ChannelMonitorType>(*result[0]));
 }
 
@@ -83,6 +93,29 @@ ChannelRepository::resetProcessStateChannel(const std::string& pv_name) {
   auto locked_instance = data_storage.getLockedStorage();
   auto lstorage        = locked_instance.get();
   lstorage->update_all(set(c(&ChannelMonitorType::processed) = true), where(c(&ChannelMonitorType::pv_name) == pv_name));
+}
+
+void
+ChannelRepository::setStartPurgeTimeStamp(int64_t monitor_id) {
+  auto locked_instance = data_storage.getLockedStorage();
+  auto lstorage        = locked_instance.get();
+  auto monitor_data    = lstorage->get<ChannelMonitorType>(monitor_id);
+
+  // set purge ts to now
+  monitor_data.start_purge_ts = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+  // update monitor data
+  lstorage->update(monitor_data);
+}
+
+void
+ChannelRepository::resetStartPurgeTimeStamp(int64_t monitor_id) {
+  auto locked_instance = data_storage.getLockedStorage();
+  auto lstorage        = locked_instance.get();
+  auto monitor_data    = lstorage->get<ChannelMonitorType>(monitor_id);
+  // set purge ts to now
+  monitor_data.start_purge_ts = -1;
+  // update monitor data
+  lstorage->update(monitor_data);
 }
 
 void

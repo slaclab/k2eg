@@ -8,6 +8,7 @@
 
 namespace k2eg::controller::node::configuration {
     typedef std::vector<k2eg::service::data::repository::ChannelMonitorType> ChannelMonitorTypeConstVector;
+    typedef std::function<void(const k2eg::service::data::repository::ChannelMonitorType&, int&)> ChannelMonitorTypePurgeHandler;
 /**
  * Abstract the node configuration
  */
@@ -26,7 +27,7 @@ public:
      */
     std::vector<bool> addChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions);
     void removeChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions);
-    void iterateAllChannelMonitor(bool reset_from_beginning, size_t element_to_process, k2eg::service::data::repository::ChannelMonitorTypeProcessHandler handle);
+    void iterateAllChannelMonitor(bool reset_from_beginning, size_t element_to_process, ChannelMonitorTypePurgeHandler handle);
 };
 DEFINE_PTR_TYPES(NodeConfiguration)
 } // namespace k2eg::controller::node::configuration
