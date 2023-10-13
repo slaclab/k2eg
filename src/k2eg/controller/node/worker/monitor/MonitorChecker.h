@@ -3,6 +3,7 @@
 
 #include <k2eg/common/broadcaster.h>
 
+#include <cstdint>
 #include <mutex>
 
 #include "k2eg/common/types.h"
@@ -45,7 +46,10 @@ class MonitorChecker {
   k2eg::service::scheduler::SchedulerShrdPtr    scheduler;
   k2eg::common::broadcaster<MonitorHandlerData> handler_broadcaster;
   std::mutex                                    op_mux;
+  //timeout in second that when expired the queue can be purged and moitor stopped
+  int64_t                                       expiration_timeout;
   std::set<k2eg::service::data::repository::ChannelMonitorType, ChannelMonitorTypeComparator> to_stop;
+  bool isTimeoutExperid(const k2eg::service::data::repository::ChannelMonitorType& monitor_info);
  public:
   MonitorChecker(configuration::NodeConfigurationShrdPtr node_configuration_db);
   ~MonitorChecker();
@@ -55,6 +59,7 @@ class MonitorChecker {
   k2eg::common::BroadcastToken addHandler(CheckerEventHandler handler);
   void                         storeMonitorData(const k2eg::controller::node::configuration::ChannelMonitorTypeConstVector& monitor_info);
   void                         scanForMonitorToStop(bool reset_from_beginning = false);
+  void setPurgeTimeout(int64_t expiration_timeout);
 };
 
 DEFINE_PTR_TYPES(MonitorChecker);

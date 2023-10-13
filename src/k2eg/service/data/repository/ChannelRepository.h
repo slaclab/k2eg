@@ -17,6 +17,7 @@ struct ChannelMonitorType {
     std::string channel_protocol;
     std::string channel_destination;
     bool processed = false;
+    int64_t counter = 1;
     int64_t start_purge_ts = -1;
 };
 
@@ -71,7 +72,8 @@ public:
                                   const size_t number_of_element,
                                   ChannelMonitorTypeProcessHandler handler) const;
     void resetProcessStateChannel(const std::string& pv_name);
-    // set the 'start_purge_ts' filed to tag the beginning of purge check
+    void setProcessStateChannel(const int64_t id, bool process_state);
+    // set the 'start_purge_ts' filed to tag the beginning of purge check and contestually reset the counter
     void setStartPurgeTimeStamp(int64_t monitor_id);
     // reset the purge check
     void resetStartPurgeTimeStamp(int64_t monitor_id);

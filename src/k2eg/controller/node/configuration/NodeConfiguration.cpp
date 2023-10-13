@@ -33,15 +33,15 @@ void NodeConfiguration::removeChannelMonitor(const ChannelMonitorTypeConstVector
 void NodeConfiguration::iterateAllChannelMonitor(bool reset_from_beginning, size_t element_to_process, ChannelMonitorTypePurgeHandler purge_handler) {
     auto channel_repository = toShared(data_storage->getChannelRepository());
     auto distinct_name_prot = channel_repository->getDistinctByNameProtocol();
-
+    size_t processed = 0;
     for(auto &ch: distinct_name_prot) {
         if(reset_from_beginning) {channel_repository->resetProcessStateChannel(std::get<0>(ch));}
         bool to_reset;
         std::optional<ChannelMonitorTypeUPtr> found = channel_repository->getNextChannelMonitorToProcess(std::get<0>(ch));
         while(found.has_value()) {
+            if(++processed > element_to_process) break;
             // 0-leave untouche, 1 set timestamp, -1 reset timestamp
             int purge_ts_set_flag = 0;
-            found = channel_repository->getNextChannelMonitorToProcess(std::get<0>(ch));
             purge_handler(*found->get(), purge_ts_set_flag);
             if(purge_ts_set_flag == -1) {
                 // reset ts to purge
@@ -50,12 +50,20 @@ void NodeConfiguration::iterateAllChannelMonitor(bool reset_from_beginning, size
                 // set the purge timestamp
                 channel_repository->setStartPurgeTimeStamp(found->get()->id);
             }
+            // tag as processed
+            channel_repository->setProcessStateChannel(found->get()->id, true);
+            // get next
+            found = channel_repository->getNextChannelMonitorToProcess(std::get<0>(ch));
         }
 
-        // channel_repository->processUnprocessedChannelMonitor(
-        //     std::get<0>(ch),
-        //     element_to_process,
-        //     handler
-        // );
+        if(processed == 0) {
+            // we need to reset all the pv channel monitoring
+            channel_repository->resetProcessStateChannel(std::get<0>(ch));
+        }
+    }
+
+    if(processed==0) {
+        //recall this function to work
+        iterateAllChannelMonitor(false, element_to_process, purge_handler);
     }
 }
