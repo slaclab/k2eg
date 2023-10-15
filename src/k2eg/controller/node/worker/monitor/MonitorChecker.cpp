@@ -16,8 +16,14 @@ using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
 using namespace k2eg::controller::node::configuration;
 
-MonitorChecker::MonitorChecker(configuration::NodeConfigurationShrdPtr node_configuration_db)
-    : publisher(ServiceResolver<IPublisher>::resolve()), logger(ServiceResolver<ILogger>::resolve()), node_configuration_db(node_configuration_db) {}
+MonitorChecker::MonitorChecker(
+  const MonitorCheckerConfiguration& monitor_checker_configuration, 
+  configuration::NodeConfigurationShrdPtr node_configuration_db)
+    : monitor_checker_configuration(monitor_checker_configuration)
+    , publisher(ServiceResolver<IPublisher>::resolve())
+    , logger(ServiceResolver<ILogger>::resolve())
+    , node_configuration_db(node_configuration_db)
+    , expiration_timeout(monitor_checker_configuration.monitor_expiration_timeout) {}
 
 MonitorChecker::~MonitorChecker() {}
 
@@ -99,7 +105,12 @@ MonitorChecker::isTimeoutExperid(const ChannelMonitorType& monitor_info) {
 
 void 
 MonitorChecker::setPurgeTimeout(int64_t expiration_timeout) {
-  this->expiration_timeout = expiration_timeout;
+  if(expiration_timeout<0) {
+    expiration_timeout = monitor_checker_configuration.monitor_expiration_timeout;
+  } else {
+    this->expiration_timeout = expiration_timeout;
+  }
+
 }
 // if (start_monitor_command->activate) {
 //             // start monitoring

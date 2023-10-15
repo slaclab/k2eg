@@ -223,7 +223,7 @@ initBackend(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   ServiceResolver<IPublisher>::registerService(pub);
   DataStorageUPtr storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");
   if (clear_data) { toShared(storage->getChannelRepository())->removeAll(); }
-  return std::make_unique<NodeController>(std::move(storage));
+  return std::make_unique<NodeController>(opt->getNodeControllerConfiguration(), std::move(storage));
 }
 
 void

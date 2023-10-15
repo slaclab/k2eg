@@ -14,6 +14,15 @@
 
 namespace k2eg::controller::node::worker::monitor {
 
+struct MonitorCheckerConfiguration {
+  // represent the seconds timeout where a monitor queue is  not conusmed 
+  // ater these second are expired, the monitor that push on the specific
+  // queue is stopped
+  int64_t monitor_expiration_timeout;
+  // if true the queue is pruged when monitor is stopped
+  bool purge_queue_on_monitor_timeout;
+};
+
 // the type of the monitor events
 enum class MonitorHandlerAction { Start, Stop };
 
@@ -27,12 +36,10 @@ typedef struct {
 typedef std::function<void(MonitorHandlerData)> CheckerEventHandler;
 
 struct ChannelMonitorTypeComparator {
-    bool operator()(
-    const k2eg::service::data::repository::ChannelMonitorType& lhs, 
-    const k2eg::service::data::repository::ChannelMonitorType& rhs
-    ) const {
-        return lhs.id < rhs.id;
-    }
+  bool
+  operator()(const k2eg::service::data::repository::ChannelMonitorType& lhs, const k2eg::service::data::repository::ChannelMonitorType& rhs) const {
+    return lhs.id < rhs.id;
+  }
 };
 
 // class that manage the checking of the activated monitor, when some criteria will
@@ -40,18 +47,20 @@ struct ChannelMonitorTypeComparator {
 // start and stop monitor needs according to the above rules. At each restart the
 // database is check to see if there are monitor to be started
 class MonitorChecker {
+  const MonitorCheckerConfiguration             monitor_checker_configuration;
   service::pubsub::IPublisherShrdPtr            publisher;
   service::log::ILoggerShrdPtr                  logger;
   configuration::NodeConfigurationShrdPtr       node_configuration_db;
   k2eg::service::scheduler::SchedulerShrdPtr    scheduler;
   k2eg::common::broadcaster<MonitorHandlerData> handler_broadcaster;
   std::mutex                                    op_mux;
-  //timeout in second that when expired the queue can be purged and moitor stopped
-  int64_t                                       expiration_timeout;
+  // timeout in second that when expired the queue can be purged and moitor stopped
+  int64_t                                                                                     expiration_timeout;
   std::set<k2eg::service::data::repository::ChannelMonitorType, ChannelMonitorTypeComparator> to_stop;
   bool isTimeoutExperid(const k2eg::service::data::repository::ChannelMonitorType& monitor_info);
+
  public:
-  MonitorChecker(configuration::NodeConfigurationShrdPtr node_configuration_db);
+  MonitorChecker(const MonitorCheckerConfiguration& monitor_checker_configuration, configuration::NodeConfigurationShrdPtr node_configuration_db);
   ~MonitorChecker();
   /**
   the returned token needs to be maintaned until event are neede
@@ -59,7 +68,11 @@ class MonitorChecker {
   k2eg::common::BroadcastToken addHandler(CheckerEventHandler handler);
   void                         storeMonitorData(const k2eg::controller::node::configuration::ChannelMonitorTypeConstVector& monitor_info);
   void                         scanForMonitorToStop(bool reset_from_beginning = false);
-  void setPurgeTimeout(int64_t expiration_timeout);
+  /**
+  Update the configured value for the expiration timeout of the active monitor
+  if expiration_timeout is < 0 the default configured value will be restored
+  */
+  void                         setPurgeTimeout(int64_t expiration_timeout);
 };
 
 DEFINE_PTR_TYPES(MonitorChecker);

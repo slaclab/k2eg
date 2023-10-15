@@ -26,8 +26,9 @@ using namespace k2eg::service::log;
 using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::metric;
 
-NodeController::NodeController(DataStorageShrdPtr data_storage)
-    : node_configuration(std::make_shared<NodeConfiguration>(data_storage)),
+NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_controller_configuration, DataStorageShrdPtr data_storage)
+    : node_controller_configuration(std::move(node_controller_configuration)),
+      node_configuration(std::make_shared<NodeConfiguration>(data_storage)),
       processing_pool(std::make_shared<BS::thread_pool>()),
       metric(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric()) {
   // set logger
@@ -35,7 +36,7 @@ NodeController::NodeController(DataStorageShrdPtr data_storage)
 
   // register worker for command type
   worker_resolver.registerObjectInstance(CommandType::monitor,
-                                         std::make_shared<MonitorCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve(), node_configuration));
+                                         std::make_shared<MonitorCommandWorker>(node_controller_configuration->monitor_command_configuration, ServiceResolver<EpicsServiceManager>::resolve(), node_configuration));
   worker_resolver.registerObjectInstance(CommandType::get, std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
   worker_resolver.registerObjectInstance(CommandType::put, std::make_shared<PutCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
 }

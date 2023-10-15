@@ -64,7 +64,7 @@ K2EGateway::setup(int argc, const char* argv[]) {
     ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(po->getSchedulerConfiguration()));
     ServiceResolver<Scheduler>::resolve()->start();
     logger->logMessage("Start node controller");
-    node_controller = std::make_unique<NodeController>(std::make_shared<DataStorage>(po->getStoragePath()));
+    node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
     logger->logMessage("Start command controller");
     cmd_controller = std::make_unique<CMDController>(po->getCMDControllerConfiguration(), std::bind(&K2EGateway::commandReceived, this, std::placeholders::_1));
 

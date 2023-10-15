@@ -30,13 +30,17 @@ using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
 
 #pragma region MonitorCommandWorker
-MonitorCommandWorker::MonitorCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager, NodeConfigurationShrdPtr node_configuration_db)
-    : node_configuration_db(node_configuration_db),
+MonitorCommandWorker::MonitorCommandWorker(
+  const MonitorCommandConfiguration& monitor_command_configuration,
+  EpicsServiceManagerShrdPtr epics_service_manager, 
+  NodeConfigurationShrdPtr node_configuration_db)
+    : monitor_command_configuration(monitor_command_configuration),
+      node_configuration_db(node_configuration_db),
       logger(ServiceResolver<ILogger>::resolve()),
       publisher(ServiceResolver<IPublisher>::resolve()),
       metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric()),
       epics_service_manager(epics_service_manager),
-      monitor_checker_shrd_ptr(MakeMonitorCheckerShrdPtr(node_configuration_db)) {
+      monitor_checker_shrd_ptr(MakeMonitorCheckerShrdPtr(monitor_command_configuration.monitor_checker_configuration, node_configuration_db)) {
   handler_token = epics_service_manager->addHandler(std::bind(&MonitorCommandWorker::epicsMonitorEvent, this, std::placeholders::_1));
 }
 

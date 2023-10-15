@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
+#include <cstdint>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -10,12 +11,18 @@
 #include <ostream>
 #include <string>
 
+#include "k2eg/controller/node/NodeController.h"
+#include "k2eg/controller/node/worker/monitor/MonitorChecker.h"
+#include "k2eg/controller/node/worker/monitor/MonitorCommandWorker.h"
 #include "k2eg/service/metric/IMetricService.h"
 #include "k2eg/service/scheduler/Scheduler.h"
 
 using namespace k2eg::common;
 using namespace k2eg::service::log;
 using namespace k2eg::controller::command;
+using namespace k2eg::controller::node;
+using namespace k2eg::controller::node::worker;
+using namespace k2eg::controller::node::worker::monitor;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::metric;
 using namespace k2eg::service::scheduler;
@@ -38,6 +45,12 @@ ProgramOptions::ProgramOptions() {
       CMD_INPUT_TOPIC, po::value<std::string>(), "Specify the messages bus queue where the k2eg receive the configuration command")(
       CMD_MAX_FECTH_CMD, po::value<unsigned int>()->default_value(10), "The max number of command fetched per consume operation")(
       CMD_MAX_FETCH_TIME_OUT, po::value<unsigned int>()->default_value(250), "Specify the timeout for waith the command in microseconds")(
+      NC_MONITOR_EXPIRATION_TIMEOUT,
+      po::value<int64_t>()->default_value(60 * 60),
+      "Specify the amount of time with no consumer on a queue after which monitor can be stopped")(
+      NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT,
+      po::value<bool>()->default_value(true),
+      "Specify when the a queue purged when the monitor that push data onto is stopped")(
       PUB_SERVER_ADDRESS, po::value<std::string>(), "Publisher server address")(
       PUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for publisher implementation driver")(
       SUB_SERVER_ADDRESS, po::value<std::string>(), "Subscriber server address")(
@@ -100,15 +113,6 @@ ProgramOptions::getloggerConfiguration() {
                                                                    .log_syslog_srv_port  = GET_OPTION(SYSLOG_PORT, int, 514)});
 }
 
-ConstCMDControllerConfigUPtr
-ProgramOptions::getCMDControllerConfiguration() {
-  return std::make_unique<const CMDControllerConfig>(CMDControllerConfig{
-      .topic_in             = GET_OPTION(CMD_INPUT_TOPIC, std::string, ""),
-      .max_message_to_fetch = GET_OPTION(CMD_MAX_FECTH_CMD, unsigned int, 250),
-      .fetch_time_out       = GET_OPTION(CMD_MAX_FETCH_TIME_OUT, unsigned int, 10),
-  });
-}
-
 MapStrKV
 ProgramOptions::parseKVCustomParam(const std::vector<std::string>& kv_vec) {
   MapStrKV impl_config_map;
@@ -131,6 +135,28 @@ ProgramOptions::getHelpDescription() {
 bool
 ProgramOptions::hasOption(const std::string& option) {
   return vm.count(option);
+}
+
+ConstCMDControllerConfigUPtr
+ProgramOptions::getCMDControllerConfiguration() {
+  return std::make_unique<const CMDControllerConfig>(CMDControllerConfig{
+      .topic_in             = GET_OPTION(CMD_INPUT_TOPIC, std::string, ""),
+      .max_message_to_fetch = GET_OPTION(CMD_MAX_FECTH_CMD, unsigned int, 250),
+      .fetch_time_out       = GET_OPTION(CMD_MAX_FETCH_TIME_OUT, unsigned int, 10),
+  });
+}
+
+ConstNodeControllerConfigurationUPtr
+ProgramOptions::getNodeControllerConfiguration() {
+  // node controller configuration
+  return std::make_unique<const NodeControllerConfiguration>(NodeControllerConfiguration{
+      .monitor_command_configuration =
+      // monitor command configuration
+          MonitorCommandConfiguration{
+            // monitor command checker configurtion
+            .monitor_checker_configuration = MonitorCheckerConfiguration{
+                                          .monitor_expiration_timeout     = GET_OPTION(NC_MONITOR_EXPIRATION_TIMEOUT, int64_t, 60 * 60),
+                                          .purge_queue_on_monitor_timeout = GET_OPTION(NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT, bool, true)}}});
 }
 
 ConstPublisherConfigurationUPtr
@@ -156,11 +182,7 @@ ProgramOptions::getMetricConfiguration() {
 
 ConstSchedulerConfigurationUPtr
 ProgramOptions::getSchedulerConfiguration() {
-  return std::make_unique<const SchedulerConfiguration>(
-    SchedulerConfiguration{
-        .thread_number = GET_OPTION(SCHEDULER_THREAD_NUMBER, unsigned int, 1)
-        }
-        );
+  return std::make_unique<const SchedulerConfiguration>(SchedulerConfiguration{.thread_number = GET_OPTION(SCHEDULER_THREAD_NUMBER, unsigned int, 1)});
 }
 
 const std::string

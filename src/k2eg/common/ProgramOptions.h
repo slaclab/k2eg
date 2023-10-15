@@ -2,6 +2,7 @@
 #define __PROGRAMOPTIONS_H__
 
 #include <boost/program_options.hpp>
+#include "k2eg/controller/node/NodeController.h"
 
 #include <k2eg/common/types.h>
 #include <k2eg/service/log/ILogger.h>
@@ -30,6 +31,10 @@ static const char* const SYSLOG_PORT = "syslog-port";
 static const char* const CMD_INPUT_TOPIC = "cmd-input-topic";
 static const char* const CMD_MAX_FECTH_CMD = "cmd-max-fecth-element";
 static const char* const CMD_MAX_FETCH_TIME_OUT = "cmd-max-fecth-time-out";
+
+//node controller configuration
+static const char* const NC_MONITOR_EXPIRATION_TIMEOUT = "nc-monitor-expiration-timeout";
+static const char* const NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT = "nc-purge-queue-on-exp-timeout";
 
 static const char* const PUB_SERVER_ADDRESS = "pub-server-address";
 static const char* const PUB_IMPL_KV = "pub-impl-kv";
@@ -65,6 +70,7 @@ namespace k2eg
 
             k2eg::service::log::ConstLogConfigurationUPtr getloggerConfiguration();
             k2eg::controller::command::ConstCMDControllerConfigUPtr getCMDControllerConfiguration();
+            k2eg::controller::node::ConstNodeControllerConfigurationUPtr getNodeControllerConfiguration();
             k2eg::service::pubsub::ConstPublisherConfigurationUPtr getPublisherConfiguration();
             k2eg::service::pubsub::ConstSubscriberConfigurationUPtr getSubscriberConfiguration();
             k2eg::service::metric::ConstMetricConfigurationUPtr getMetricConfiguration();

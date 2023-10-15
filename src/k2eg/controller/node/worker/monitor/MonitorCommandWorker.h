@@ -19,6 +19,11 @@
 
 namespace k2eg::controller::node::worker::monitor {
 
+struct MonitorCommandConfiguration{
+  MonitorCheckerConfiguration monitor_checker_configuration;
+};
+DEFINE_PTR_TYPES(MonitorCommandConfiguration)
+
 /**
 Monitor reply message
 */
@@ -64,6 +69,7 @@ DEFINE_MAP_FOR_TYPE(std::string, std::vector<ChannelTopicMonitorInfoUPtr>, Chann
 // ss the command handler for the management of the MonitorCommand
 //
 class MonitorCommandWorker : public CommandWorker {
+    const MonitorCommandConfiguration monitor_command_configuration;
     mutable std::shared_mutex channel_map_mtx;
     ChannelTopicsMap channel_topics_map;
     k2eg::controller::node::configuration::NodeConfigurationShrdPtr node_configuration_db;
@@ -79,6 +85,7 @@ class MonitorCommandWorker : public CommandWorker {
     void manageStartMonitorCommand(k2eg::controller::command::cmd::ConstMonitorCommandShrdPtr cmd_ptr);
 public:
     MonitorCommandWorker(
+      const MonitorCommandConfiguration& monitor_command_configuration,
       k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager,
       k2eg::controller::node::configuration::NodeConfigurationShrdPtr node_configuration_db);
     virtual ~MonitorCommandWorker() = default;
