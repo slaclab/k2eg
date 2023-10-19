@@ -13,7 +13,7 @@
 #include <k2eg/service/log/impl/BoostLogger.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
 #include <k2eg/service/pubsub/pubsub.h>
-
+#include <k2eg/service/scheduler/Scheduler.h>
 #include <boost/json.hpp>
 #include <chrono>
 #include <cstddef>
@@ -29,6 +29,7 @@
 #include <string>
 #include <thread>
 
+#include "NodeControllerCommon.h"
 #include "boost/json/object.hpp"
 #include "k2eg/service/metric/IMetricService.h"
 #include "k2eg/service/pubsub/IPublisher.h"
@@ -49,6 +50,7 @@ using namespace k2eg::service::log;
 using namespace k2eg::service::log::impl;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::data;
+using namespace k2eg::service::scheduler;
 using namespace k2eg::service::epics_impl;
 
 using namespace k2eg::service::pubsub;
@@ -61,51 +63,6 @@ using namespace k2eg::service::metric::impl::prometheus_impl;
 #define KAFKA_TOPIC_ACQUIRE_IN "acquire_commad_in"
 
 int tcp_port = 9000;
-
-class DummyPublisher : public IPublisher {
-  std::latch& lref;
-
- public:
-  std::vector<PublishMessageSharedPtr> sent_messages;
-  DummyPublisher(std::latch& lref)
-      : IPublisher(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "fake_address"})), lref(lref){};
-  ~DummyPublisher() = default;
-  void
-  setAutoPoll(bool autopoll) {}
-  int
-  setCallBackForReqType(const std::string req_type, EventCallback eventCallback) {
-    return 0;
-  }
-  int
-  createQueue(const QueueDescription& queue) {
-    return 0;
-  }
-  int deleteQueue(const std::string& queue_name){return 0;}
-  QueueMetadataUPtr getQueueMetadata(const std::string& queue_name){return nullptr;}
-  int
-  flush(const int timeo) {
-    return 0;
-  }
-  int
-  pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& header = PublisherHeaders()) {
-    PublishMessageSharedPtr message_shrd_ptr = std::move(message);
-    sent_messages.push_back(message_shrd_ptr);
-    lref.count_down();
-    return 0;
-  }
-  int
-  pushMessages(PublisherMessageVector& messages, const PublisherHeaders& header = PublisherHeaders()) {
-    for (auto& uptr : messages) {
-      sent_messages.push_back(std::move(uptr));
-      lref.count_down();
-    }
-    return 0;
-  }
-  size_t
-  getQueueMessageSize() {
-    return sent_messages.size();
-  }
-};
 
 class DummyPublisherCounter : public IPublisher {
   std::uint64_t counter;
@@ -215,8 +172,14 @@ initBackend(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
     setenv("EPICS_k2eg_log-on-console", "false", 1);
   }
   setenv("EPICS_k2eg_metric-server-http-port", std::to_string(++tcp_port).c_str(), 1);
+  setenv(("EPICS_k2eg_"+std::string(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS)).c_str(), "1", 1);
+  // set monitor expiration time out at minimum
+  setenv(("EPICS_k2eg_"+std::string(NC_MONITOR_EXPIRATION_TIMEOUT)).c_str(), "1", 1);
+  
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   opt->parse(argc, argv);
+  ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(opt->getSchedulerConfiguration()));
+  ServiceResolver<Scheduler>::resolve()->start();
   ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
   ServiceResolver<IMetricService>::registerService(std::make_shared<PrometheusMetricService>(opt->getMetricConfiguration()));
   ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>());
@@ -233,6 +196,8 @@ deinitBackend(std::unique_ptr<NodeController> node_controller) {
   EXPECT_NO_THROW(ServiceResolver<EpicsServiceManager>::resolve().reset(););
   EXPECT_NO_THROW(ServiceResolver<IMetricService>::resolve().reset(););
   EXPECT_NO_THROW(ServiceResolver<ILogger>::resolve().reset(););
+  EXPECT_NO_THROW(ServiceResolver<Scheduler>::resolve()->stop(););
+  EXPECT_NO_THROW(ServiceResolver<Scheduler>::resolve().reset(););
 }
 
 boost::json::object
@@ -271,7 +236,7 @@ exstractMsgpackObjectThatContainsKey(std::vector<PublishMessageSharedPtr>& messa
     if(messages[idx]->getQueue().compare(published_on_topic)!=0)
       continue;
     auto msgpack_obj = getMsgPackObject(*messages[idx]);
-    std::cout << msgpack_obj.get() << std::endl;
+    //std::cout << msgpack_obj.get() << std::endl;
     switch(msgpack_obj->type){
       case msgpack::type::MAP:{
           auto map_reply = msgpack_obj->as<Map>();
@@ -296,10 +261,20 @@ TEST(NodeController, MonitorCommandJsonSerByDefault) {
   auto                            publisher = std::make_shared<DummyPublisher>(work_done);
   node_controller                           = initBackend(publisher);
 
+// add the number of reader from topic
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
+
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
       MonitorCommand{CommandType::monitor, SerializationType::JSON, "pva", "channel:ramp:ramp", true,  KAFKA_TOPIC_ACQUIRE_IN,  "rep-id", KAFKA_TOPIC_ACQUIRE_IN})}););
 
   work_done.wait();
+  // reduce the number of consumer
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(0);
+  // force call add purge timestamp to the monitor
+  node_controller->performManagementTask();
+  sleep(5);
+  // this close the emonitor
+  node_controller->performManagementTask();
   // we need to have publish some message
   size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
   EXPECT_NE(published, 0);
@@ -310,12 +285,7 @@ TEST(NodeController, MonitorCommandJsonSerByDefault) {
   // chec that there is a reply
   EXPECT_NO_THROW(reply_msg = exstractJsonObjectThatContainsKey(publisher->sent_messages, KEY_REPLY_ID, KAFKA_TOPIC_ACQUIRE_IN));
   EXPECT_EQ(reply_msg.contains(KEY_REPLY_ID), true);
-
-  // stop acquire
-  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
-      MonitorCommand{CommandType::monitor, SerializationType::JSON, "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", KAFKA_TOPIC_ACQUIRE_IN})}););
-
-  sleep(1);
+  // confirm that monitor has stopped
   EXPECT_NO_THROW(published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(););
   sleep(2);
   EXPECT_EQ(ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(), published);
@@ -332,11 +302,20 @@ TEST(NodeController, MonitorCommandSpecifySpecificMonitorEventTopic) {
   std::unique_ptr<NodeController> node_controller;
   auto                            publisher = std::make_shared<DummyPublisher>(work_done);
   node_controller                           = initBackend(publisher);
-
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
       MonitorCommand{CommandType::monitor, SerializationType::JSON, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "alternate_topic"})}););
 
   work_done.wait();
+
+  // reduce the number of consumer
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(0);
+  // force call add purge timestamp to the monitor
+  node_controller->performManagementTask();
+  sleep(5);
+  // this close the emonitor
+  node_controller->performManagementTask();
+
   // we need to have publish some message
   size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
   EXPECT_NE(published, 0);
@@ -348,11 +327,7 @@ TEST(NodeController, MonitorCommandSpecifySpecificMonitorEventTopic) {
   EXPECT_NO_THROW(reply_msg = exstractJsonObjectThatContainsKey(publisher->sent_messages, KEY_REPLY_ID, KAFKA_TOPIC_ACQUIRE_IN));
   EXPECT_EQ(reply_msg.contains(KEY_REPLY_ID), true);
 
-  // stop acquire
-  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
-      MonitorCommand{CommandType::monitor, SerializationType::JSON, "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN,  "rep-id", "alternate_topic"})}););
-
-  sleep(1);
+  // confirm that monitor is stopped
   EXPECT_NO_THROW(published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(););
   sleep(2);
   EXPECT_EQ(ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(), published);
@@ -369,19 +344,24 @@ TEST(NodeController, MonitorCommandMsgPackSer) {
   std::unique_ptr<NodeController> node_controller;
   auto                            publisher = std::make_shared<DummyPublisher>(work_done);
   node_controller                           = initBackend(publisher);
-
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
       MonitorCommand{CommandType::monitor, SerializationType::Msgpack, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN,  "rep-id", KAFKA_TOPIC_ACQUIRE_IN})}););
 
   work_done.wait();
+    // reduce the number of consumer
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(0);
+  // force call add purge timestamp to the monitor
+  node_controller->performManagementTask();
+  sleep(5);
+  // this close the emonitor
+  node_controller->performManagementTask();
+
   // we need to have publish some message
   size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
   EXPECT_NE(published, 0);
 
-  // stop acquire
-  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
-      MonitorCommand{CommandType::monitor, SerializationType::Msgpack, "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN,  "rep-id", KAFKA_TOPIC_ACQUIRE_IN})}););
-
+  // configrm that monitor has stoppped
   sleep(1);
   EXPECT_NO_THROW(published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(););
   sleep(2);
@@ -405,19 +385,25 @@ TEST(NodeController, MonitorCommandMsgPackCompactSer) {
   std::unique_ptr<NodeController> node_controller;
   auto                            publisher = std::make_shared<DummyPublisher>(work_done);
   node_controller                           = initBackend(publisher);
-
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
       MonitorCommand{CommandType::monitor, SerializationType::MsgpackCompact, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN,  "rep-id", KAFKA_TOPIC_ACQUIRE_IN})}););
 
   work_done.wait();
+  // stop acquire
+  // reduce the number of consumer
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(0);
+  // force call add purge timestamp to the monitor
+  node_controller->performManagementTask();
+  sleep(5);
+  // this close the emonitor
+  node_controller->performManagementTask();
+
   // we need to have publish some message
   size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
   EXPECT_NE(published, 0);
 
-  // stop acquire
-  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
-      MonitorCommand{CommandType::monitor, k2eg::common::SerializationType::MsgpackCompact, "", "channel:ramp:ramp", false, KAFKA_TOPIC_ACQUIRE_IN,  "rep-id", KAFKA_TOPIC_ACQUIRE_IN})}););
-
+  // confirm that monitor has stoppped
   sleep(1);
   EXPECT_NO_THROW(published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize(););
   sleep(2);

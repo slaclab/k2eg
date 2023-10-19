@@ -36,12 +36,18 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
 
   // register worker for command type
   worker_resolver.registerObjectInstance(CommandType::monitor,
-                                         std::make_shared<MonitorCommandWorker>(node_controller_configuration->monitor_command_configuration, ServiceResolver<EpicsServiceManager>::resolve(), node_configuration));
+                                         std::make_shared<MonitorCommandWorker>(this->node_controller_configuration->monitor_command_configuration, ServiceResolver<EpicsServiceManager>::resolve(), node_configuration));
   worker_resolver.registerObjectInstance(CommandType::get, std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
   worker_resolver.registerObjectInstance(CommandType::put, std::make_shared<PutCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
 }
 
 NodeController::~NodeController() { processing_pool->wait_for_tasks(); }
+
+void 
+NodeController::performManagementTask() {
+  auto monitor_worker = worker_resolver.resolve(CommandType::monitor);
+  dynamic_cast<MonitorCommandWorker*>(monitor_worker.get())->executeCleaningTask();
+}
 
 void
 NodeController::waitForTaskCompletion() {

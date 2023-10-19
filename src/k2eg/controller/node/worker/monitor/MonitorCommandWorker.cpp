@@ -1,9 +1,11 @@
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/worker/monitor/MonitorCommandWorker.h>
 #include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/scheduler/Scheduler.h>
 
 #include <cassert>
 #include <functional>
+#include <mutex>
 
 #include "k2eg/controller/command/cmd/MonitorCommand.h"
 #include "k2eg/controller/node/worker/CommandWorker.h"
@@ -12,6 +14,7 @@
 #include "k2eg/service/log/ILogger.h"
 #include "k2eg/service/metric/IMetricService.h"
 #include "k2eg/service/pubsub/IPublisher.h"
+#include "k2eg/service/scheduler/Task.h"
 
 using namespace k2eg::common;
 
@@ -26,14 +29,15 @@ using namespace k2eg::service::log;
 using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::metric;
+using namespace k2eg::service::scheduler;
 using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
 
 #pragma region MonitorCommandWorker
-MonitorCommandWorker::MonitorCommandWorker(
-  const MonitorCommandConfiguration& monitor_command_configuration,
-  EpicsServiceManagerShrdPtr epics_service_manager, 
-  NodeConfigurationShrdPtr node_configuration_db)
+#define MONITOR_TASK_NAME "monitor-task"
+MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& monitor_command_configuration,
+                                           EpicsServiceManagerShrdPtr         epics_service_manager,
+                                           NodeConfigurationShrdPtr           node_configuration_db)
     : monitor_command_configuration(monitor_command_configuration),
       node_configuration_db(node_configuration_db),
       logger(ServiceResolver<ILogger>::resolve()),
@@ -41,54 +45,74 @@ MonitorCommandWorker::MonitorCommandWorker(
       metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric()),
       epics_service_manager(epics_service_manager),
       monitor_checker_shrd_ptr(MakeMonitorCheckerShrdPtr(monitor_command_configuration.monitor_checker_configuration, node_configuration_db)) {
-  handler_token = epics_service_manager->addHandler(std::bind(&MonitorCommandWorker::epicsMonitorEvent, this, std::placeholders::_1));
+  // add epics monitor handler
+  epics_handler_token = epics_service_manager->addHandler(std::bind(&MonitorCommandWorker::epicsMonitorEvent, this, std::placeholders::_1));
+  // add monitor checker handler
+  monitor_checker_token = monitor_checker_shrd_ptr->addHandler(std::bind(&MonitorCommandWorker::handleMonitorCheckEvents, this, std::placeholders::_1));
+
+  // start checker timing
+  auto task = MakeTaskShrdPtr(
+      MONITOR_TASK_NAME, 
+      monitor_command_configuration.cron_scheduler_monitor_check, 
+      std::bind(&MonitorCommandWorker::handlePeriodicCleaningtask, this)
+    );
+  ServiceResolver<Scheduler>::resolve()->addTask(task);
+}
+
+MonitorCommandWorker::~MonitorCommandWorker() {
+  ServiceResolver<Scheduler>::resolve()->removeTaskByName(MONITOR_TASK_NAME);
 }
 
 void
-MonitorCommandWorker::manageStartMonitorCommand(ConstMonitorCommandShrdPtr cmd_ptr) {
-  // ensure database is update with monitor information
-  node_configuration_db->addChannelMonitor({ChannelMonitorType{.pv_name             = cmd_ptr->pv_name,
-                                                               .event_serialization = static_cast<std::uint8_t>(cmd_ptr->serialization),
-                                                               .channel_protocol    = cmd_ptr->protocol,
-                                                               .channel_destination = cmd_ptr->monitor_destination_topic}});
-  // lock the map and contained vector for write
-  {
-    if (cmd_ptr->monitor_destination_topic.empty()) {
-      logger->logMessage(STRING_FORMAT("No destination topic found on monitor command for %1%", cmd_ptr->pv_name), LogLevel::ERROR);
-      return;
+MonitorCommandWorker::handlePeriodicCleaningtask() {
+  logger->logMessage("Checking active monitor");
+  std::lock_guard<std::mutex> lock(periodic_task_mutex);
+  auto processed = monitor_checker_shrd_ptr->scanForMonitorToStop();
+  if(!processed) monitor_checker_shrd_ptr->resetMonitorToProcess();
+}
+
+void 
+MonitorCommandWorker::executeCleaningTask() {
+  handlePeriodicCleaningtask();
+}
+
+void
+MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_data) {
+  auto& vec_ref = channel_topics_map[checker_event_data.monitor_type.pv_name];
+  switch (checker_event_data.action) {
+    case MonitorHandlerAction::Start: {
+      logger->logMessage(STRING_FORMAT("Activate monitor on '%1%' for topic '%2%'", checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
+      // got start event
+      if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&checker_event_data](auto& info_topic) {
+            return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
+          }) == std::end(vec_ref)) {
+        channel_topics_map[checker_event_data.monitor_type.pv_name].push_back(
+            MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
+         epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, true, checker_event_data.monitor_type.channel_protocol);
+      } else {
+        logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated",
+                                         checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
+      }
+      break;
     }
 
-    std::unique_lock lock(channel_map_mtx);
-    logger->logMessage(STRING_FORMAT("%1% monitor on '%2%' for topic '%3%'",
-                                     (cmd_ptr->activate ? "Activate" : "Deactivate") % cmd_ptr->pv_name % cmd_ptr->monitor_destination_topic));
-
-    auto& vec_ref = channel_topics_map[cmd_ptr->pv_name];
-    if (cmd_ptr->activate) {
-      // add topic to channel
-      // check if the topic is already present[fault tollerant check]
-      if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&cmd_ptr](auto& info_topic) {
-            return info_topic->cmd->monitor_destination_topic.compare(cmd_ptr->monitor_destination_topic) == 0;
-          }) == std::end(vec_ref)) {
-        channel_topics_map[cmd_ptr->pv_name].push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{cmd_ptr}));
-      } else {
-        logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated", cmd_ptr->pv_name % cmd_ptr->monitor_destination_topic));
-      }
-    } else {
+    case MonitorHandlerAction::Stop: {
+      // got stop event
       // remove topic to channel
-      auto itr = std::find_if(std::begin(vec_ref), std::end(vec_ref), [&cmd_ptr](auto& info_topic) {
-        return info_topic->cmd->monitor_destination_topic.compare(cmd_ptr->monitor_destination_topic) == 0;
+      logger->logMessage(STRING_FORMAT("Activate monitor on '%1%' for topic '%2%'", checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
+      auto itr = std::find_if(std::begin(vec_ref), std::end(vec_ref), [&checker_event_data](auto& info_topic) {
+        return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
       });
       if (itr != std::end(vec_ref)) {
         vec_ref.erase(itr);
+        epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, false, checker_event_data.monitor_type.channel_protocol);
       } else {
-        logger->logMessage(STRING_FORMAT("No active monitor on '%1%' for topic '%2%'", cmd_ptr->pv_name % cmd_ptr->monitor_destination_topic));
+        logger->logMessage(STRING_FORMAT("No active monitor on '%1%' for topic '%2%'",
+                                         checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
       }
+      break;
     }
   }
-  // if the vec_ref has size > 0 mean that someone is still needed the channel data in monitor way
-  epics_service_manager->monitorChannel(cmd_ptr->pv_name, true, cmd_ptr->protocol);
-  // send reply
-  manageReply(0, "Monitor activated", cmd_ptr);
 }
 
 void
@@ -97,7 +121,17 @@ MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
   bool activate = false;
   auto cmd_ptr  = static_pointer_cast<const MonitorCommand>(command);
   if (cmd_ptr->activate) {
-    manageStartMonitorCommand(cmd_ptr);
+    if(cmd_ptr->monitor_destination_topic.empty()) {
+      logger->logMessage(STRING_FORMAT("No destination topic found on monitor command for %1%", cmd_ptr->pv_name), LogLevel::ERROR);
+      manageReply(-1, "Empty destination topic", cmd_ptr);
+      return;
+    }
+    // manageStartMonitorCommand(cmd_ptr);
+    monitor_checker_shrd_ptr->storeMonitorData({ChannelMonitorType{.pv_name             = cmd_ptr->pv_name,
+                                                                   .event_serialization = static_cast<std::uint8_t>(cmd_ptr->serialization),
+                                                                   .channel_protocol    = cmd_ptr->protocol,
+                                                                   .channel_destination = cmd_ptr->monitor_destination_topic}});
+    manageReply(0, "Monitor activated", cmd_ptr);
   } else {
     logger->logMessage(STRING_FORMAT("Deactivation for monitor is deprecated[%1%-%2%]", cmd_ptr->pv_name % cmd_ptr->monitor_destination_topic),
                        LogLevel::ERROR);
@@ -137,19 +171,18 @@ MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType e
   for (auto& event : *event_received->event_data) {
     // publisher
     for (auto& info_topic : channel_topics_map[event->channel_data.pv_name]) {
-      logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", event->channel_data.pv_name % info_topic->cmd->monitor_destination_topic),
-                         LogLevel::TRACE);
-      if (!local_serialization_cache.contains(info_topic->cmd->serialization)) {
+      logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", event->channel_data.pv_name % info_topic->cmd.channel_destination), LogLevel::TRACE);
+      if (!local_serialization_cache.contains(static_cast<SerializationType>(info_topic->cmd.event_serialization))) {
         // cache new serialized message
-        local_serialization_cache[info_topic->cmd->serialization] =
-            serialize(event->channel_data, static_cast<SerializationType>(info_topic->cmd->serialization));
+        local_serialization_cache[static_cast<SerializationType>(info_topic->cmd.event_serialization)] =
+            serialize(event->channel_data, static_cast<SerializationType>(info_topic->cmd.event_serialization));
       }
-      publisher->pushMessage(MakeReplyPushableMessageUPtr(info_topic->cmd->monitor_destination_topic,
+      publisher->pushMessage(MakeReplyPushableMessageUPtr(info_topic->cmd.channel_destination,
                                                           "monitor-message",
                                                           event->channel_data.pv_name,
-                                                          local_serialization_cache[info_topic->cmd->serialization]),
+                                                          local_serialization_cache[static_cast<SerializationType>(info_topic->cmd.event_serialization)]),
                              {// add header
-                              {"k2eg-ser-type", serialization_to_string(info_topic->cmd->serialization)}});
+                              {"k2eg-ser-type", serialization_to_string(static_cast<SerializationType>(info_topic->cmd.event_serialization))}});
     }
   }
   publisher->flush(100);

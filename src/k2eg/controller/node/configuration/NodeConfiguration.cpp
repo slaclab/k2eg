@@ -1,5 +1,6 @@
 #include <k2eg/controller/node/configuration/NodeConfiguration.h>
 #include <k2eg/common/utility.h>
+#include <cstddef>
 #include <optional>
 #include "k2eg/service/data/repository/ChannelRepository.h"
 
@@ -30,13 +31,11 @@ void NodeConfiguration::removeChannelMonitor(const ChannelMonitorTypeConstVector
     }
 }
 
-void NodeConfiguration::iterateAllChannelMonitor(bool reset_from_beginning, size_t element_to_process, ChannelMonitorTypePurgeHandler purge_handler) {
+size_t NodeConfiguration::iterateAllChannelMonitor(size_t element_to_process, ChannelMonitorTypePurgeHandler purge_handler) {
     auto channel_repository = toShared(data_storage->getChannelRepository());
     auto distinct_name_prot = channel_repository->getDistinctByNameProtocol();
     size_t processed = 0;
     for(auto &ch: distinct_name_prot) {
-        if(reset_from_beginning) {channel_repository->resetProcessStateChannel(std::get<0>(ch));}
-        bool to_reset;
         std::optional<ChannelMonitorTypeUPtr> found = channel_repository->getNextChannelMonitorToProcess(std::get<0>(ch));
         while(found.has_value()) {
             if(++processed > element_to_process) break;
@@ -55,15 +54,14 @@ void NodeConfiguration::iterateAllChannelMonitor(bool reset_from_beginning, size
             // get next
             found = channel_repository->getNextChannelMonitorToProcess(std::get<0>(ch));
         }
-
-        if(processed == 0) {
-            // we need to reset all the pv channel monitoring
-            channel_repository->resetProcessStateChannel(std::get<0>(ch));
-        }
     }
+    return processed;
+}
 
-    if(processed==0) {
-        //recall this function to work
-        iterateAllChannelMonitor(false, element_to_process, purge_handler);
+void NodeConfiguration::resetAllChannelMonitorCheck() {
+    auto channel_repository = toShared(data_storage->getChannelRepository());
+    auto distinct_name_prot = channel_repository->getDistinctByNameProtocol();
+    for(auto &ch: distinct_name_prot) {
+         channel_repository->resetProcessStateChannel(std::get<0>(ch));
     }
 }

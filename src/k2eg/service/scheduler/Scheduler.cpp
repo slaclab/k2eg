@@ -39,8 +39,15 @@ Scheduler::addTask(TaskShrdPtr task_shrd_ptr) {
 
 void
 Scheduler::removeTaskByName(const std::string& task_name) {
-  std::lock_guard<std::mutex> lock(tasks_queue_mtx);
-  std::erase_if(tasks_queue, [task_name](TaskShrdPtr& task) { return task->getName().compare(task_name) == 0; });
+  int erased = 0;
+  // wait until the task is erased, sometime it cannot be erased because
+  // is executing
+  while(!erased) {
+    {
+      std::lock_guard<std::mutex> lock(tasks_queue_mtx);
+      erased = std::erase_if(tasks_queue, [task_name](TaskShrdPtr& task) { return task->getName().compare(task_name) == 0; });
+    }
+  }
 }
 
 void
@@ -54,8 +61,8 @@ Scheduler::scheduleTask() {
       std::lock_guard<std::mutex> lock(tasks_queue_mtx);
       for (auto& task : tasks_queue) {
         if (task->canBeExecuted(now)) {
-          std::erase_if(tasks_queue, [task](TaskShrdPtr& checked_task) { return checked_task->getName().compare(task->getName()) == 0; });
           cur_task = task;
+          std::erase_if(tasks_queue, [task](TaskShrdPtr& checked_task) { return checked_task->getName().compare(task->getName()) == 0; });
           break;
         }
       }
@@ -76,7 +83,7 @@ Scheduler::scheduleTask() {
         std::unique_lock<std::mutex> lock(thread_wait_mtx);
         new_taks_submitted = false;
         // Wait for a specific amount of time or until processing variable is true
-        cv.wait_for(lock, std::chrono::seconds(THREAD_SLEEP_SECONDS), [this] { return !processing || !new_taks_submitted; });
+        cv.wait_for(lock, std::chrono::seconds(configuration->check_every_amount_of_seconds), [this] { return !processing || !new_taks_submitted; });
       }
     }
   }

@@ -45,6 +45,8 @@ static const char* const SUB_IMPL_KV = "sub-impl-kv";
 
 static const char* const STORAGE_PATH = "storage-path";
 
+static const char* const MONITOR_WORKER_SCHEDULE_CRON_CONFIGURATION = "monitor-worker-cron-schedule";
+static const char* const SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS = "scheduler-check-delay-seconds";
 static const char* const SCHEDULER_THREAD_NUMBER = "scheduler-thread-number";
 
 static const char* const METRIC_ENABLE = "metric-enable";

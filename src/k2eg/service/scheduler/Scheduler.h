@@ -16,6 +16,8 @@ typedef std::deque<TaskShrdPtr> TaskQueue;
 #define THREAD_SLEEP_SECONDS 60
 
 struct SchedulerConfiguration {
+    // wakeup thread after a specific amount of secondds
+    unsigned int check_every_amount_of_seconds = THREAD_SLEEP_SECONDS;
     // the number of thread for the scheduler
     unsigned int thread_number;
 };
@@ -32,6 +34,7 @@ class Scheduler {
   TaskQueue  tasks_queue;
   std::vector<std::thread> thread_group;
   std::time_t              time_to_wakeup;
+
   bool                     processing;
   bool                     new_taks_submitted;
   void                     scheduleTask();

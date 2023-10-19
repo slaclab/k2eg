@@ -15,7 +15,7 @@
 namespace k2eg::controller::node::worker::monitor {
 
 struct MonitorCheckerConfiguration {
-  // represent the seconds timeout where a monitor queue is  not conusmed 
+  // represent the seconds timeout where a monitor queue is  not conusmed
   // ater these second are expired, the monitor that push on the specific
   // queue is stopped
   int64_t monitor_expiration_timeout;
@@ -67,12 +67,13 @@ class MonitorChecker {
   */
   k2eg::common::BroadcastToken addHandler(CheckerEventHandler handler);
   void                         storeMonitorData(const k2eg::controller::node::configuration::ChannelMonitorTypeConstVector& monitor_info);
-  void                         scanForMonitorToStop(bool reset_from_beginning = false);
+  size_t                       scanForMonitorToStop(size_t element_to_process = 10);
+  void                         resetMonitorToProcess();
   /**
   Update the configured value for the expiration timeout of the active monitor
   if expiration_timeout is < 0 the default configured value will be restored
   */
-  void                         setPurgeTimeout(int64_t expiration_timeout);
+  void setPurgeTimeout(int64_t expiration_timeout);
 };
 
 DEFINE_PTR_TYPES(MonitorChecker);

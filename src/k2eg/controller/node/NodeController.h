@@ -44,7 +44,7 @@ class NodeController {
   NodeController(const NodeController&)            = delete;
   NodeController& operator=(const NodeController&) = delete;
   ~NodeController();
-
+  void performManagementTask();
   void waitForTaskCompletion();
 
   // Process an array of command

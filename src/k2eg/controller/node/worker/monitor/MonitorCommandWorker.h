@@ -20,6 +20,8 @@
 namespace k2eg::controller::node::worker::monitor {
 
 struct MonitorCommandConfiguration{
+  // the cron stirng for schedule the monitor
+  std::string cron_scheduler_monitor_check;
   MonitorCheckerConfiguration monitor_checker_configuration;
 };
 DEFINE_PTR_TYPES(MonitorCommandConfiguration)
@@ -58,7 +60,8 @@ serializeMsgpack(const MonitorCommandReply& reply, common::MsgpackMessage& msgpa
 // contains the information for the forward
 // of the monitor data to a topic
 struct ChannelTopicMonitorInfo {
-    k2eg::controller::command::cmd::ConstMonitorCommandShrdPtr cmd;
+    //k2eg::controller::command::cmd::ConstMonitorCommandShrdPtr cmd;
+    k2eg::service::data::repository::ChannelMonitorType cmd;
 };
 DEFINE_PTR_TYPES(ChannelTopicMonitorInfo);
 
@@ -79,16 +82,21 @@ class MonitorCommandWorker : public CommandWorker {
     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
     MonitorCheckerShrdPtr monitor_checker_shrd_ptr;
     // Handler's liveness token
-    k2eg::common::BroadcastToken handler_token;
+    k2eg::common::BroadcastToken epics_handler_token;
+    k2eg::common::BroadcastToken monitor_checker_token;
     void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstMonitorCommandShrdPtr cmd);
     void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
-    void manageStartMonitorCommand(k2eg::controller::command::cmd::ConstMonitorCommandShrdPtr cmd_ptr);
+    void handleMonitorCheckEvents(MonitorHandlerData checker_event_data);
+
+    std::mutex periodic_task_mutex;
+    void handlePeriodicCleaningtask();
 public:
     MonitorCommandWorker(
       const MonitorCommandConfiguration& monitor_command_configuration,
       k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager,
       k2eg::controller::node::configuration::NodeConfigurationShrdPtr node_configuration_db);
-    virtual ~MonitorCommandWorker() = default;
+    virtual ~MonitorCommandWorker();
+    void executeCleaningTask();
     void processCommand(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 };
 

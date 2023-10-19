@@ -2,6 +2,7 @@
 #include <k2eg/controller/node/worker/monitor/MonitorChecker.h>
 #include <k2eg/service/ServiceResolver.h>
 
+#include <cstddef>
 #include <ostream>
 
 #include "k2eg/service/log/ILogger.h"
@@ -16,14 +17,12 @@ using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
 using namespace k2eg::controller::node::configuration;
 
-MonitorChecker::MonitorChecker(
-  const MonitorCheckerConfiguration& monitor_checker_configuration, 
-  configuration::NodeConfigurationShrdPtr node_configuration_db)
-    : monitor_checker_configuration(monitor_checker_configuration)
-    , publisher(ServiceResolver<IPublisher>::resolve())
-    , logger(ServiceResolver<ILogger>::resolve())
-    , node_configuration_db(node_configuration_db)
-    , expiration_timeout(monitor_checker_configuration.monitor_expiration_timeout) {}
+MonitorChecker::MonitorChecker(const MonitorCheckerConfiguration& monitor_checker_configuration, configuration::NodeConfigurationShrdPtr node_configuration_db)
+    : monitor_checker_configuration(monitor_checker_configuration),
+      publisher(ServiceResolver<IPublisher>::resolve()),
+      logger(ServiceResolver<ILogger>::resolve()),
+      node_configuration_db(node_configuration_db),
+      expiration_timeout(monitor_checker_configuration.monitor_expiration_timeout) {}
 
 MonitorChecker::~MonitorChecker() {}
 
@@ -43,13 +42,12 @@ MonitorChecker::storeMonitorData(const ChannelMonitorTypeConstVector& channel_de
   }
 }
 
-void
-MonitorChecker::scanForMonitorToStop(bool reset_from_beginning) {
+size_t
+MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
   logger->logMessage("[ purge scan ] Start scanning for monitor eviction");
   // scan al monitor to check what need to be
-  node_configuration_db->iterateAllChannelMonitor(
-      false,
-      10,  // number of unprocessed element to check
+  return node_configuration_db->iterateAllChannelMonitor(
+      element_to_process,  // number of unprocessed element to check
       [this](const ChannelMonitorType& monitor_info, int& purge_ts_set_flag) {
         std::lock_guard guard(op_mux);
         logger->logMessage(STRING_FORMAT("[  purge scan - %1%-%2% ] get metadata", monitor_info.pv_name % monitor_info.channel_destination));
@@ -58,66 +56,63 @@ MonitorChecker::scanForMonitorToStop(bool reset_from_beginning) {
         if (queue_metadata && queue_metadata->subscriber_groups.size()) {
           logger->logMessage(STRING_FORMAT("[  purge scan - %1%-%2% ] subscriber found %3%",
                                            monitor_info.pv_name % monitor_info.channel_destination % queue_metadata->subscriber_groups.size()));
-          
+
           purge_ts_set_flag = -1;
         } else {
-          if(monitor_info.start_purge_ts == -1) {
-            // whenever set the pruge timestamp so we need to set it
+          if (monitor_info.start_purge_ts == -1) {
+            // set the purge timestamp
             purge_ts_set_flag = 1;
             logger->logMessage(STRING_FORMAT("[  purge scan - %1%-%2% ] no subscriber found, set timestamp for purege timeout",
-                                           monitor_info.pv_name % monitor_info.channel_destination));
+                                             monitor_info.pv_name % monitor_info.channel_destination));
           } else {
             // we have to check if the timeout is expired
             logger->logMessage(STRING_FORMAT("[  purge scan - %1%-%2% ] Check if we need to delete the monitor queue",
-                                           monitor_info.pv_name % monitor_info.channel_destination), LogLevel::ERROR);
-            if(isTimeoutExperid(monitor_info)) {
-              try{
-                logger->logMessage(STRING_FORMAT("[  purge scan - %1%-%2% ] Stop monitor",
-                                            monitor_info.pv_name % monitor_info.channel_destination), LogLevel::ERROR);
+                                             monitor_info.pv_name % monitor_info.channel_destination),
+                               LogLevel::ERROR);
+            if (isTimeoutExperid(monitor_info)) {
+              try {
+                logger->logMessage(STRING_FORMAT("[  purge scan - %1%-%2% ] Stop monitor", monitor_info.pv_name % monitor_info.channel_destination),
+                                   LogLevel::ERROR);
                 handler_broadcaster.broadcast(MonitorHandlerData{MonitorHandlerAction::Stop, monitor_info});
 
-                logger->logMessage(STRING_FORMAT("[  purge scan - %1%-%2% ] delete queue",
-                                            monitor_info.pv_name % monitor_info.channel_destination), LogLevel::ERROR);
+                logger->logMessage(STRING_FORMAT("[  purge scan - %1%-%2% ] delete queue", monitor_info.pv_name % monitor_info.channel_destination),
+                                   LogLevel::ERROR);
                 publisher->deleteQueue(monitor_info.channel_destination);
 
                 // remove the channel monitor form the database
                 node_configuration_db->removeChannelMonitor({monitor_info});
-              } catch(...) {
-                logger->logMessage(STRING_FORMAT("[  purge scan - %1%-%2% ] Error during the stop of the monitor",
-                                            monitor_info.pv_name % monitor_info.channel_destination), LogLevel::ERROR);
+              } catch (...) {
+                logger->logMessage(
+                    STRING_FORMAT("[  purge scan - %1%-%2% ] Error during the stop of the monitor", monitor_info.pv_name % monitor_info.channel_destination),
+                    LogLevel::ERROR);
               }
             } else {
-              logger->logMessage(STRING_FORMAT("[  purge scan - %1%-%2% ] waiting for timeout exceed",
-                                           monitor_info.pv_name % monitor_info.channel_destination));
+              logger->logMessage(
+                  STRING_FORMAT("[  purge scan - %1%-%2% ] waiting for timeout exceed", monitor_info.pv_name % monitor_info.channel_destination));
             }
           }
         }
       });
 }
 
-bool 
+bool
 MonitorChecker::isTimeoutExperid(const ChannelMonitorType& monitor_info) {
-  if(monitor_info.start_purge_ts == -1) return false;
+  if (monitor_info.start_purge_ts == -1) return false;
 
   auto now_sec_from_epoch = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-  return now_sec_from_epoch-monitor_info.start_purge_ts>expiration_timeout;
+  return now_sec_from_epoch - monitor_info.start_purge_ts > expiration_timeout;
 }
 
-void 
+void
 MonitorChecker::setPurgeTimeout(int64_t expiration_timeout) {
-  if(expiration_timeout<0) {
+  if (expiration_timeout < 0) {
     expiration_timeout = monitor_checker_configuration.monitor_expiration_timeout;
   } else {
     this->expiration_timeout = expiration_timeout;
   }
-
 }
-// if (start_monitor_command->activate) {
-//             // start monitoring
-//
-//         } else {
-//             // stop monitoring
-//             node_configuration->removeChannelMonitor(
-//                 {ChannelMonitorType{.pv_name = acquire_command_shrd->pv_name,
-//                                     .channel_destination = acquire_command_shrd->monitor_destination_topic}});
-//         }
+
+void
+MonitorChecker::resetMonitorToProcess() {
+  node_configuration_db->resetAllChannelMonitorCheck();
+}
