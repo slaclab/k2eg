@@ -263,7 +263,7 @@ TEST(NodeController, MonitorCommandJsonSerByDefault) {
 
 // add the number of reader from topic
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
-
+  while(!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)){sleep(1);}
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
       MonitorCommand{CommandType::monitor, SerializationType::JSON, "pva", "channel:ramp:ramp", true,  KAFKA_TOPIC_ACQUIRE_IN,  "rep-id", KAFKA_TOPIC_ACQUIRE_IN})}););
 
@@ -303,6 +303,7 @@ TEST(NodeController, MonitorCommandSpecifySpecificMonitorEventTopic) {
   auto                            publisher = std::make_shared<DummyPublisher>(work_done);
   node_controller                           = initBackend(publisher);
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
+   while(!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)){sleep(1);}
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
       MonitorCommand{CommandType::monitor, SerializationType::JSON, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "alternate_topic"})}););
 
@@ -344,6 +345,7 @@ TEST(NodeController, MonitorCommandMsgPackSer) {
   std::unique_ptr<NodeController> node_controller;
   auto                            publisher = std::make_shared<DummyPublisher>(work_done);
   node_controller                           = initBackend(publisher);
+  while(!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)){sleep(1);}
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
       MonitorCommand{CommandType::monitor, SerializationType::Msgpack, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN,  "rep-id", KAFKA_TOPIC_ACQUIRE_IN})}););
@@ -385,6 +387,7 @@ TEST(NodeController, MonitorCommandMsgPackCompactSer) {
   std::unique_ptr<NodeController> node_controller;
   auto                            publisher = std::make_shared<DummyPublisher>(work_done);
   node_controller                           = initBackend(publisher);
+  while(!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)){sleep(1);}
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
       MonitorCommand{CommandType::monitor, SerializationType::MsgpackCompact, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN,  "rep-id", KAFKA_TOPIC_ACQUIRE_IN})}););
@@ -421,32 +424,36 @@ TEST(NodeController, MonitorCommandMsgPackCompactSer) {
 }
 
 TEST(NodeController, MonitorCommandAfterReboot) {
-  // std::latch work_done{2};
-  // std::latch work_done_2{2};
+  std::latch work_done{2};
+  std::latch work_done_2{2};
+  auto publisher = std::make_shared<DummyPublisher>(work_done);
+  auto node_controller = initBackend(publisher, true, true);
 
-  // auto node_controller = initBackend(std::make_shared<DummyPublisher>(work_done));
+  while(!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)){sleep(1);}
+  
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
+      MonitorCommand{CommandType::monitor, SerializationType::JSON, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN,  "rep-id", KAFKA_TOPIC_ACQUIRE_IN})}););
 
-  // EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
-  //     MonitorCommand{CommandType::monitor, SerializationType::JSON, "pva", "channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN,  "rep-id", KAFKA_TOPIC_ACQUIRE_IN})}););
+  work_done.wait();
+  // we need to have publish some message
+  size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+  EXPECT_NE(published, 0);
 
-  // work_done.wait();
-  // // we need to have publish some message
-  // size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
-  // EXPECT_NE(published, 0);
+  // stop the node controller
+  deinitBackend(std::move(node_controller));
 
-  // // stop the node controller
-  // deinitBackend(std::move(node_controller));
+  // reboot without delete database
+  node_controller = initBackend(std::make_shared<DummyPublisher>(work_done_2), false, true);
+  while(!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)){sleep(1);}
+  //we have to wait for monitor event
+  work_done_2.wait();
+  // we need to have publish some message
+  published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+  EXPECT_NE(published, 0);
 
-  // // reboot without delete database
-  // node_controller = initBackend(std::make_shared<DummyPublisher>(work_done_2), false);
-  // //TODO we have to waith for monitr will be autoclosed
-  // work_done_2.wait();
-  // // we need to have publish some message
-  // published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
-  // EXPECT_NE(published, 0);
-
-  // // dispose all
-  // deinitBackend(std::move(node_controller));
+  // dispose all
+  deinitBackend(std::move(node_controller));
 }
 
 TEST(NodeController, GetCommandJson) {

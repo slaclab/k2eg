@@ -28,3 +28,8 @@ const std::string&
 ReplyPushableMessage::getReqType() {
   return request_type;
 }
+
+bool 
+CommandWorker::isReady() {
+  return true;
+}

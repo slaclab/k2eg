@@ -31,7 +31,26 @@ void NodeConfiguration::removeChannelMonitor(const ChannelMonitorTypeConstVector
     }
 }
 
-size_t NodeConfiguration::iterateAllChannelMonitor(size_t element_to_process, ChannelMonitorTypePurgeHandler purge_handler) {
+size_t NodeConfiguration::iterateAllChannelMonitor(size_t element_to_process, ChannelMonitorTypeHandler handle) {
+auto channel_repository = toShared(data_storage->getChannelRepository());
+    auto distinct_name_prot = channel_repository->getDistinctByNameProtocol();
+    size_t processed = 0;
+    for(auto &ch: distinct_name_prot) {
+        std::optional<ChannelMonitorTypeUPtr> found = channel_repository->getNextChannelMonitorToProcess(std::get<0>(ch));
+        while(found.has_value()) {
+            if(++processed > element_to_process) break;
+            int dummy_flag = 0;
+            handle(*found->get(), dummy_flag);
+            // tag as processed
+            channel_repository->setProcessStateChannel(found->get()->id, true);
+            // get next
+            found = channel_repository->getNextChannelMonitorToProcess(std::get<0>(ch));
+        }
+    }
+    return processed;   
+}
+
+size_t NodeConfiguration::iterateAllChannelMonitorForPurge(size_t element_to_process, ChannelMonitorTypeHandler purge_handler) {
     auto channel_repository = toShared(data_storage->getChannelRepository());
     auto distinct_name_prot = channel_repository->getDistinctByNameProtocol();
     size_t processed = 0;

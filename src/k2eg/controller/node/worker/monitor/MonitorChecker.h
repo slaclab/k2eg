@@ -3,6 +3,7 @@
 
 #include <k2eg/common/broadcaster.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <mutex>
 
@@ -67,7 +68,10 @@ class MonitorChecker {
   */
   k2eg::common::BroadcastToken addHandler(CheckerEventHandler handler);
   void                         storeMonitorData(const k2eg::controller::node::configuration::ChannelMonitorTypeConstVector& monitor_info);
+  // scann element for automatic disable the monitoring
   size_t                       scanForMonitorToStop(size_t element_to_process = 10);
+  // scann element for restart the monitor
+  size_t                       scanForRestart(size_t element_to_process = 10);
   void                         resetMonitorToProcess();
   /**
   Update the configured value for the expiration timeout of the active monitor

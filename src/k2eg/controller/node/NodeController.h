@@ -46,7 +46,7 @@ class NodeController {
   ~NodeController();
   void performManagementTask();
   void waitForTaskCompletion();
-
+  bool isWorkerReady(k2eg::controller::command::cmd::CommandType cmd_type);
   // Process an array of command
   void submitCommand(k2eg::controller::command::cmd::ConstCommandShrdPtrVec commands);
 };

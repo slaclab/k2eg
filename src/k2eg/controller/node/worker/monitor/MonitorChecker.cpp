@@ -43,10 +43,22 @@ MonitorChecker::storeMonitorData(const ChannelMonitorTypeConstVector& channel_de
 }
 
 size_t
+MonitorChecker::scanForRestart(size_t element_to_process) {
+  logger->logMessage("[ restart scan ] Start scanning for monitor eviction");
+  // scan al monitor to check what need to be
+  return node_configuration_db->iterateAllChannelMonitorForPurge(
+      element_to_process,  // number of unprocessed element to check
+      [this](const ChannelMonitorType& monitor_info, int& purge_ts_set_flag) {
+        logger->logMessage(STRING_FORMAT("[ restart scan - %1%-%2% ] reactivate monitor", monitor_info.pv_name % monitor_info.channel_destination));
+        handler_broadcaster.broadcast(MonitorHandlerData{MonitorHandlerAction::Start, monitor_info});
+      });
+}
+
+size_t
 MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
   logger->logMessage("[ purge scan ] Start scanning for monitor eviction");
   // scan al monitor to check what need to be
-  return node_configuration_db->iterateAllChannelMonitor(
+  return node_configuration_db->iterateAllChannelMonitorForPurge(
       element_to_process,  // number of unprocessed element to check
       [this](const ChannelMonitorType& monitor_info, int& purge_ts_set_flag) {
         std::lock_guard guard(op_mux);

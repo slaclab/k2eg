@@ -16,6 +16,7 @@
 #include <shared_mutex>
 #include <string>
 #include <vector>
+#include <atomic>
 
 namespace k2eg::controller::node::worker::monitor {
 
@@ -87,17 +88,19 @@ class MonitorCommandWorker : public CommandWorker {
     void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstMonitorCommandShrdPtr cmd);
     void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
     void handleMonitorCheckEvents(MonitorHandlerData checker_event_data);
+    std::atomic_bool starting_up;
 
     std::mutex periodic_task_mutex;
-    void handlePeriodicCleaningtask();
+    void handlePeriodicTask();
 public:
     MonitorCommandWorker(
       const MonitorCommandConfiguration& monitor_command_configuration,
       k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager,
       k2eg::controller::node::configuration::NodeConfigurationShrdPtr node_configuration_db);
     virtual ~MonitorCommandWorker();
-    void executeCleaningTask();
+    void executePeriodicTask();
     void processCommand(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
+    bool isReady();
 };
 
 } // namespace k2eg::controller::node::worker

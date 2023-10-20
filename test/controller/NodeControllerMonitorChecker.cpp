@@ -49,6 +49,13 @@ initChecker(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   return MakeMonitorCheckerUPtr(opt->getNodeControllerConfiguration()->monitor_command_configuration.monitor_checker_configuration, node_configuraiton);
 }
 
+void checkerAutomaticManagementForStop(MonitorChecker& checker) {
+  if(!checker.scanForMonitorToStop()) {
+    checker.resetMonitorToProcess();
+    checker.scanForMonitorToStop();
+  }
+}
+
 void
 deinitChecker() {
   EXPECT_NO_THROW(ServiceResolver<IPublisher>::resolve().reset(););
@@ -117,18 +124,18 @@ TEST(NodeControllerMonitorChecker, ScanForMonitorToStop) {
   // add a simulated consumer
   dynamic_cast<ControllerConsumerDummyPublisher*>(pub.get())->setConsumerNumber(1);
   // execute checking
-  checker->scanForMonitorToStop(false);
+  checkerAutomaticManagementForStop(*checker);
   // this time no stop signal received
   ASSERT_EQ(number_of_stop_monitor, 0);
 
   dynamic_cast<ControllerConsumerDummyPublisher*>(pub.get())->setConsumerNumber(0);
   // set high timeout for simulate that is not the time to delete
   checker->setPurgeTimeout(3600);
-  checker->scanForMonitorToStop(false);
+  checkerAutomaticManagementForStop(*checker);
   // st timeout low for let chek ca trigger the delete of the queue
   sleep(2);
   checker->setPurgeTimeout(1);
-  checker->scanForMonitorToStop(false);
+  checkerAutomaticManagementForStop(*checker);
   // now we need to be called for the delete of the monitor
   ASSERT_EQ(number_of_stop_monitor, 1);
   deinitChecker();

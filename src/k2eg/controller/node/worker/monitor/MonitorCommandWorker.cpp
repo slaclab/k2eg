@@ -44,7 +44,10 @@ MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& mo
       publisher(ServiceResolver<IPublisher>::resolve()),
       metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric()),
       epics_service_manager(epics_service_manager),
-      monitor_checker_shrd_ptr(MakeMonitorCheckerShrdPtr(monitor_command_configuration.monitor_checker_configuration, node_configuration_db)) {
+      monitor_checker_shrd_ptr(MakeMonitorCheckerShrdPtr(monitor_command_configuration.monitor_checker_configuration, node_configuration_db)),
+      starting_up(true) {
+  // reset all processed element present in the monitor database
+  monitor_checker_shrd_ptr->resetMonitorToProcess();
   // add epics monitor handler
   epics_handler_token = epics_service_manager->addHandler(std::bind(&MonitorCommandWorker::epicsMonitorEvent, this, std::placeholders::_1));
   // add monitor checker handler
@@ -54,7 +57,7 @@ MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& mo
   auto task = MakeTaskShrdPtr(
       MONITOR_TASK_NAME, 
       monitor_command_configuration.cron_scheduler_monitor_check, 
-      std::bind(&MonitorCommandWorker::handlePeriodicCleaningtask, this)
+      std::bind(&MonitorCommandWorker::handlePeriodicTask, this)
     );
   ServiceResolver<Scheduler>::resolve()->addTask(task);
 }
@@ -64,16 +67,24 @@ MonitorCommandWorker::~MonitorCommandWorker() {
 }
 
 void
-MonitorCommandWorker::handlePeriodicCleaningtask() {
-  logger->logMessage("Checking active monitor");
+MonitorCommandWorker::handlePeriodicTask() {
   std::lock_guard<std::mutex> lock(periodic_task_mutex);
-  auto processed = monitor_checker_shrd_ptr->scanForMonitorToStop();
-  if(!processed) monitor_checker_shrd_ptr->resetMonitorToProcess();
+  if(starting_up) {
+    logger->logMessage("[ Automatic Task ] Restart monitor requests");
+    auto processed = monitor_checker_shrd_ptr->scanForRestart();
+    // when all monitor has been restarted we can remove the startup flag
+    starting_up = processed!=0;
+  } else {
+    logger->logMessage("[ Automatic Task ] Checking active monitor");
+    auto processed = monitor_checker_shrd_ptr->scanForMonitorToStop();
+    if(!processed) monitor_checker_shrd_ptr->resetMonitorToProcess();
+  }
+  
 }
 
 void 
-MonitorCommandWorker::executeCleaningTask() {
-  handlePeriodicCleaningtask();
+MonitorCommandWorker::executePeriodicTask() {
+  handlePeriodicTask();
 }
 
 void
@@ -126,6 +137,12 @@ MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
       manageReply(-1, "Empty destination topic", cmd_ptr);
       return;
     }
+
+    if(starting_up) {
+        logger->logMessage(STRING_FORMAT("[ Restarting ] Comamnd for  start monitor on %1% to %2%", cmd_ptr->pv_name%cmd_ptr->monitor_destination_topic), LogLevel::INFO);
+        manageReply(-2, "Command cannot be executed, k2eg monitor worker is starting", cmd_ptr);
+        return;
+    }
     // manageStartMonitorCommand(cmd_ptr);
     monitor_checker_shrd_ptr->storeMonitorData({ChannelMonitorType{.pv_name             = cmd_ptr->pv_name,
                                                                    .event_serialization = static_cast<std::uint8_t>(cmd_ptr->serialization),
@@ -136,6 +153,11 @@ MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
     logger->logMessage(STRING_FORMAT("Deactivation for monitor is deprecated[%1%-%2%]", cmd_ptr->pv_name % cmd_ptr->monitor_destination_topic),
                        LogLevel::ERROR);
   }
+}
+
+bool 
+MonitorCommandWorker::isReady() {
+  return !starting_up;
 }
 
 void

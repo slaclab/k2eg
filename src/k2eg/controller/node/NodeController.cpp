@@ -46,12 +46,21 @@ NodeController::~NodeController() { processing_pool->wait_for_tasks(); }
 void 
 NodeController::performManagementTask() {
   auto monitor_worker = worker_resolver.resolve(CommandType::monitor);
-  dynamic_cast<MonitorCommandWorker*>(monitor_worker.get())->executeCleaningTask();
+  dynamic_cast<MonitorCommandWorker*>(monitor_worker.get())->executePeriodicTask();
 }
 
 void
 NodeController::waitForTaskCompletion() {
   processing_pool->wait_for_tasks();
+}
+
+bool 
+NodeController::isWorkerReady(k2eg::controller::command::cmd::CommandType cmd_type) {
+  if (auto worker = worker_resolver.resolve(cmd_type); worker != nullptr) {
+    return worker->isReady();
+  } else {
+    return false;
+  }
 }
 
 void
