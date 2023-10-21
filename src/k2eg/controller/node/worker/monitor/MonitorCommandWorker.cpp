@@ -63,6 +63,19 @@ MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& mo
 }
 
 MonitorCommandWorker::~MonitorCommandWorker() {
+  //dipose all still live monitor
+  logger->logMessage("[ Exing Worker ] stop all still live monitor");
+  for(auto& mon_vec_for_pv: channel_topics_map) {
+    logger->logMessage(STRING_FORMAT("[ Exing Worker ] Stop all monitor for pv '%1%'", mon_vec_for_pv.first));
+    for(auto & monitor_info: mon_vec_for_pv.second) {
+      logger->logMessage(STRING_FORMAT("[ Exing Worker ] Stop monitor for pv '%1%' with target '%2%'", monitor_info->cmd.pv_name%monitor_info->cmd.channel_destination));
+      epics_service_manager->monitorChannel(monitor_info->cmd.pv_name, false, monitor_info->cmd.channel_protocol);
+    }
+  }
+ 
+  // dispose the token for the event
+  epics_handler_token.reset();
+  monitor_checker_token.reset();
   logger->logMessage("[ Automatic Task ] remove periodic task from scheduler", LogLevel::DEBUG);
   bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(MONITOR_TASK_NAME);
   if(!erased) {

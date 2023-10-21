@@ -53,6 +53,9 @@ Scheduler::removeTaskByName(const std::string& task_name) {
       task_name_to_remove.insert(task_name);
       //wait for completion
       cv_remove_item.wait(lock);
+    } else {
+      // erase task name from the list of task to remove
+      task_name_to_remove.erase(task_name);
     }
   }
   return erased;
@@ -87,11 +90,9 @@ Scheduler::scheduleTask() {
         if(task_name_to_remove.contains(cur_task->name)) {
           // set task as to delete
           cur_task->to_be_deleted = true;
-          // erase task name from the list of task to remove
-          task_name_to_remove.erase(cur_task->name);
-          //reinsert task into queue
-          tasks_queue.push_back(cur_task);
         }
+        //reinsert task into queue
+        tasks_queue.push_back(cur_task);
       }
       
       // notify pending removing waiting variables

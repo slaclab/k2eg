@@ -445,6 +445,7 @@ TEST(NodeController, MonitorCommandAfterReboot) {
 
   // reboot without delete database
   node_controller = initBackend(std::make_shared<DummyPublisher>(work_done_2), false, true);
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   //we have to wait for monitor event
   work_done_2.wait();
   // we need to have publish some message

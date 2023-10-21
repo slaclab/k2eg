@@ -20,7 +20,7 @@ using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
 
 class ControllerConsumerDummyPublisher : public IPublisher {
-  size_t consumer_number;
+  size_t consumer_number = 0;
 
  public:
   std::vector<PublishMessageSharedPtr> sent_messages;
