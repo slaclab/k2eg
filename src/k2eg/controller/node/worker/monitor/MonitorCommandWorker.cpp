@@ -63,7 +63,11 @@ MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& mo
 }
 
 MonitorCommandWorker::~MonitorCommandWorker() {
-  ServiceResolver<Scheduler>::resolve()->removeTaskByName(MONITOR_TASK_NAME);
+  logger->logMessage("[ Automatic Task ] remove periodic task from scheduler", LogLevel::DEBUG);
+  bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(MONITOR_TASK_NAME);
+  if(!erased) {
+    logger->logMessage("[ Automatic Task ] remove periodic unsuccessfully", LogLevel::ERROR);
+  }
 }
 
 void
@@ -74,6 +78,9 @@ MonitorCommandWorker::handlePeriodicTask() {
     auto processed = monitor_checker_shrd_ptr->scanForRestart();
     // when all monitor has been restarted we can remove the startup flag
     starting_up = processed!=0;
+    if(!starting_up) {
+      logger->logMessage("[ Automatic Task ] Startup completed");
+    }
   } else {
     logger->logMessage("[ Automatic Task ] Checking active monitor");
     auto processed = monitor_checker_shrd_ptr->scanForMonitorToStop();

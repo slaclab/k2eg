@@ -10,7 +10,7 @@ handler(handler){}
 
 bool 
 Task::canBeExecuted(const std::time_t& current_time) {
-    return next_schedule <= current_time;
+    return next_schedule <= current_time && !to_be_deleted;
 }
 
 std::time_t 

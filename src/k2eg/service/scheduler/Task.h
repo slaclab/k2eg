@@ -15,10 +15,12 @@ class Scheduler;
     Task that is executed on a specific crontab expression
 */
 class Task {
+    friend class Scheduler;
     const std::string name;
     cron::cronexpr cron_expr;
     std::time_t next_schedule;
     std::function<void()> handler;
+    bool to_be_deleted = false;
  public:
     Task(const std::string& name, const std::string& cron_expr, std::function<void()> handler);
     void execute();

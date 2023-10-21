@@ -425,7 +425,7 @@ TEST(NodeController, MonitorCommandMsgPackCompactSer) {
 
 TEST(NodeController, MonitorCommandAfterReboot) {
   std::latch work_done{2};
-  std::latch work_done_2{2};
+  std::latch work_done_2{5};
   auto publisher = std::make_shared<DummyPublisher>(work_done);
   auto node_controller = initBackend(publisher, true, true);
 
@@ -445,7 +445,6 @@ TEST(NodeController, MonitorCommandAfterReboot) {
 
   // reboot without delete database
   node_controller = initBackend(std::make_shared<DummyPublisher>(work_done_2), false, true);
-  while(!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)){sleep(1);}
   //we have to wait for monitor event
   work_done_2.wait();
   // we need to have publish some message

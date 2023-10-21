@@ -31,6 +31,8 @@ class Scheduler {
   std::mutex               tasks_queue_mtx;
   std::mutex               thread_wait_mtx;
   std::condition_variable  cv;
+  std::condition_variable  cv_remove_item;
+  std::set<std::string>   task_name_to_remove;
   TaskQueue  tasks_queue;
   std::vector<std::thread> thread_group;
   std::time_t              time_to_wakeup;
@@ -45,7 +47,7 @@ class Scheduler {
   void start();
   void stop();
   void addTask(TaskShrdPtr task_shrd_ptr);
-  void removeTaskByName(const std::string& task_name);
+  bool removeTaskByName(const std::string& task_name);
 };
 DEFINE_PTR_TYPES(Scheduler)
 }  // namespace k2eg::service::scheduler
