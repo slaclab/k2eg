@@ -135,4 +135,29 @@ TEST(ProgramOptions, MetricConfiguration) {
     EXPECT_EQ(metric_configuration->tcp_port, 8888);
 }
 
+TEST(ProgramOptions, SchedulerConfiguration) {
+    int argc = 1;
+    const char* argv[1] = {"epics-k2eg-test"};
+    // set environment variable for test
+    clearenv();
+    setenv("EPICS_k2eg_scheduler-thread-number", "100", 1);
+    std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
+    EXPECT_NO_THROW(opt->parse(argc, argv););
+    auto scheduler_configuration = opt->getSchedulerConfiguration();
+    EXPECT_EQ(scheduler_configuration->thread_number, 100);
+}
+
+TEST(ProgramOptions, NodeControllerConfiguration) {
+    int argc = 1;
+    const char* argv[1] = {"epics-k2eg-test"};
+    // set environment variable for test
+    clearenv();
+    setenv("EPICS_k2eg_nc-monitor-expiration-timeout", "60", 1);
+    setenv("EPICS_k2eg_nc-purge-queue-on-exp-timeout", "false", 1);
+    std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
+    EXPECT_NO_THROW(opt->parse(argc, argv););
+    auto node_controller_configuration = opt->getNodeControllerConfiguration();
+    EXPECT_EQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.monitor_expiration_timeout, 60);
+    EXPECT_EQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.purge_queue_on_monitor_timeout, false);
+}
 #endif //__linux__

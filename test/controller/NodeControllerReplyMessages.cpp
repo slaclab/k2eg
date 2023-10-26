@@ -3,17 +3,18 @@
 #include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/controller/node/worker/GetCommandWorker.h>
 #include <k2eg/controller/node/worker/PutCommandWorker.h>
-#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
+#include <k2eg/controller/node/worker/monitor/MonitorCommandWorker.h>
 #include <map>
 
 #include <k2eg/common/BaseSerialization.h>
-#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
+#include <k2eg/controller/node/worker/monitor/MonitorCommandWorker.h>
 #include <msgpack/v3/object_fwd_decl.hpp>
 
 #include "../epics/epics.h"
 
 using namespace k2eg::common;
 using namespace k2eg::controller::node::worker;
+using namespace k2eg::controller::node::worker::monitor;
 using namespace k2eg::service::epics_impl;
 
 msgpack::unpacked

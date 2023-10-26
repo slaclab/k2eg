@@ -1,6 +1,7 @@
 #ifndef k2eg_SERVICE_DATA_MODEL_CHANNEL_H_
 #define k2eg_SERVICE_DATA_MODEL_CHANNEL_H_
 #include <k2eg/controller/command/CMDCommand.h>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -10,11 +11,19 @@ namespace k2eg::service::data {
 class DataStorage;
 namespace repository {
 struct ChannelMonitorType {
-    int id = -1;
+    int64_t id = -1;
     std::string pv_name;
     std::uint8_t event_serialization;
     std::string channel_protocol;
     std::string channel_destination;
+    bool processed = false;
+    int64_t counter = 1;
+    int64_t start_purge_ts = -1;
+};
+
+struct ChannelMonitorStat {
+    int id = -1;
+    int64_t mointor_id;
 };
 
 inline ChannelMonitorType toChannelMonitor(const k2eg::controller::command::cmd::MonitorCommand& acquire_command) {
@@ -49,14 +58,26 @@ class ChannelRepository {
 
 public:
     ~ChannelRepository() = default;
-    void insert(const ChannelMonitorType& channel_description);
+    bool insert(const ChannelMonitorType& channel_description);
     void remove(const ChannelMonitorType& channel_description);
     bool isPresent(const ChannelMonitorType& new_cannel) const;
     std::optional<ChannelMonitorTypeUPtr> getChannelMonitor(const ChannelMonitorType& channel_descirption) const;
+    // return the next monitor data to process
+    std::optional<ChannelMonitorTypeUPtr> getNextChannelMonitorToProcess(const std::string& pv_name) const;
     ChannelMonitorDistinctResultType getDistinctByNameProtocol() const;
     void processAllChannelMonitor(const std::string& pv_name,
-                                  const std::string& channel_protocol,
                                   ChannelMonitorTypeProcessHandler handler) const;
+    // apply the handler to all non processed element
+    void processUnprocessedChannelMonitor(const std::string& pv_name,
+                                  const size_t number_of_element,
+                                  ChannelMonitorTypeProcessHandler handler) const;
+    void resetProcessStateChannel(const std::string& pv_name);
+    void setProcessStateChannel(const int64_t id, bool process_state);
+    // set the 'start_purge_ts' filed to tag the beginning of purge check and contestually reset the counter
+    void setStartPurgeTimeStamp(int64_t monitor_id);
+    // reset the purge check
+    void resetStartPurgeTimeStamp(int64_t monitor_id);
+    // remove all stored monitor
     void removeAll();
 };
 } // namespace repository

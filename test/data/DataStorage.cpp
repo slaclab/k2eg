@@ -2,6 +2,7 @@
 #include <k2eg/service/data/DataStorage.h>
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <latch>
 #include <thread>
@@ -95,10 +96,75 @@ TEST(DataStorage, ChannelProcessingHandler) {
     // check processing
     EXPECT_NO_THROW(toShared(storage->getChannelRepository())->processAllChannelMonitor(
         std::get<0>(distinct_result[0]),
-        std::get<1>(distinct_result[0]),
         [&all_index = all_index](uint32_t index, auto &channel_description) {
             ASSERT_NE(std::find(std::begin(all_index), std::end(all_index), index), std::end(all_index));
             EXPECT_STREQ(channel_description.channel_destination.c_str(), ("dest_" + std::to_string(index)).c_str());
         }
     ););
+}
+
+TEST(DataStorage, ChannelProcessingHandlerLimitedNumberOfItem) {
+    const int test_element = 10;
+    std::shared_ptr<DataStorage> storage;
+    EXPECT_NO_THROW(storage = std::make_shared<DataStorage>(fs::path(fs::current_path())
+                                                            / "test.sqlite"););
+    EXPECT_NO_THROW(toShared(storage->getChannelRepository())->removeAll(););
+    std::vector<uint32_t> all_index;
+    for (int idx = 0; idx < 100; idx++) {
+        all_index.push_back(idx);
+        EXPECT_NO_THROW(
+            toShared(storage->getChannelRepository())
+                ->insert({.pv_name = "channel",
+                          .channel_protocol = "pv",
+                          .channel_destination = "dest_" + std::to_string(idx)}););
+    }
+
+    //check distinct, only one need to be found
+    ChannelMonitorDistinctResultType distinct_result;
+    EXPECT_NO_THROW(distinct_result = toShared(storage->getChannelRepository())->getDistinctByNameProtocol());
+    EXPECT_EQ(distinct_result.size(), 1);
+
+    // check processing first 10 element
+    std::set<uint32_t> procesed_element;
+    EXPECT_NO_THROW(toShared(storage->getChannelRepository())->processUnprocessedChannelMonitor(
+        std::get<0>(distinct_result[0]),
+        10,
+        [&procesed_element](uint32_t index, auto &channel_description) {
+           
+            ASSERT_TRUE(index<10);
+            ASSERT_TRUE(procesed_element.insert(channel_description.id).second);
+        }
+    ););
+    // check processing next 10 element
+    EXPECT_NO_THROW(toShared(storage->getChannelRepository())->processUnprocessedChannelMonitor(
+        std::get<0>(distinct_result[0]),
+        10,
+        [&procesed_element](uint32_t index, auto &channel_description) {
+            ASSERT_TRUE(index<10);
+            ASSERT_TRUE(procesed_element.insert(channel_description.id).second);
+        }
+    ););
+
+    // reset the processing state and restart from the beginning
+    EXPECT_NO_THROW(toShared(storage->getChannelRepository())->resetProcessStateChannel(std::get<0>(distinct_result[0])));
+    // in this case all the insert should gone wrong
+        EXPECT_NO_THROW(toShared(storage->getChannelRepository())->processUnprocessedChannelMonitor(
+        std::get<0>(distinct_result[0]),
+        10,
+        [&procesed_element](uint32_t index, auto &channel_description) {
+           
+            ASSERT_TRUE(index<10);
+            ASSERT_FALSE(procesed_element.insert(channel_description.id).second);
+        }
+    ););
+    // check processing next 10 element
+    EXPECT_NO_THROW(toShared(storage->getChannelRepository())->processUnprocessedChannelMonitor(
+        std::get<0>(distinct_result[0]),
+        10,
+        [&procesed_element](uint32_t index, auto &channel_description) {
+            ASSERT_TRUE(index<10);
+            ASSERT_FALSE(procesed_element.insert(channel_description.id).second);
+        }
+    ););
+
 }
