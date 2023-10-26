@@ -4,10 +4,12 @@
 #include <k2eg/controller/node/worker/monitor/MonitorChecker.h>
 #include <k2eg/service/data/DataStorage.h>
 
+#include <atomic>
 #include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
+#include <latch>
 
 #include "NodeControllerCommon.h"
 #include "k2eg/common/ProgramOptions.h"
@@ -138,5 +140,47 @@ TEST(NodeControllerMonitorChecker, ScanForMonitorToStop) {
   checkerAutomaticManagementForStop(*checker);
   // now we need to be called for the delete of the monitor
   ASSERT_EQ(number_of_stop_monitor, 1);
+  deinitChecker();
+}
+
+
+TEST(NodeControllerMonitorChecker, SimulateStartMonitorDuringAutomaticStop) {
+  bool work = true;
+  std::atomic_int                         start_received_signal = 0;
+  std::latch                              stop_received_signal(1);
+  std::shared_ptr<IPublisher>             pub                     = std::make_shared<ControllerConsumerDummyPublisher>();
+  auto                                    checker                 = initChecker(pub, true, false);
+  std::function<void(MonitorHandlerData)> checker_handler         = [&start_received_signal, &stop_received_signal](MonitorHandlerData event_data) {
+    switch (event_data.action) {
+      case MonitorHandlerAction::Start: {start_received_signal++; sleep(5); break;}
+      case MonitorHandlerAction::Stop: {stop_received_signal.count_down(); sleep(5); break;}
+    }
+  };
+
+  // simulate automatic management
+  std::thread t([&checker, &work](){
+    while(work){
+      checkerAutomaticManagementForStop(*checker);
+      sleep(1);
+    }
+  });
+  auto event_token = checker->addHandler(checker_handler);
+  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pv", .event_serialization = 0, .channel_protocol = "prot-a", .channel_destination = "dest-a"}});
+  // add a simulated consumer
+  dynamic_cast<ControllerConsumerDummyPublisher*>(pub.get())->setConsumerNumber(1);
+  while(start_received_signal == 0){sleep(1);}
+  ASSERT_EQ(start_received_signal, 1);
+  // remove consumer
+  dynamic_cast<ControllerConsumerDummyPublisher*>(pub.get())->setConsumerNumber(0);
+  // set low timeout for let the stop signal will occur faster
+  checker->setPurgeTimeout(1);
+  stop_received_signal.wait();
+  //renable 
+  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pv", .event_serialization = 0, .channel_protocol = "prot-a", .channel_destination = "dest-a"}});
+  // now we need to be called for the delete of the monitor
+  while(start_received_signal == 1){sleep(1);}
+  ASSERT_EQ(start_received_signal, 2);
+  work = false;
+  t.join();
   deinitChecker();
 }
