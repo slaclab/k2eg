@@ -97,9 +97,7 @@ void
 MonitorCommandWorker::handleRestartMonitorTask(TaskProperties& task_properties) {
   std::lock_guard<std::mutex> lock(periodic_task_mutex);
   logger->logMessage("[ Automatic Task ] Restart monitor requests");
-  task_properties.completed = monitor_checker_shrd_ptr->scanForRestart();
-  // when all monitor has been restarted we can remove the startup flag
-  starting_up = task_properties.completed;
+  task_properties.completed = !(starting_up = monitor_checker_shrd_ptr->scanForRestart());
 }
 
 void
