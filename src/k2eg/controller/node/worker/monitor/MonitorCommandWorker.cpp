@@ -112,7 +112,8 @@ MonitorCommandWorker::handlePeriodicTask(TaskProperties& task_properties) {
 
 void 
 MonitorCommandWorker::executePeriodicTask() {
-  handlePeriodicTask();
+  TaskProperties task_properties;
+  handlePeriodicTask(task_properties);
 }
 
 void
