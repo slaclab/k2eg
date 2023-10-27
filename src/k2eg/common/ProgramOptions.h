@@ -33,8 +33,9 @@ static const char* const CMD_MAX_FECTH_CMD = "cmd-max-fecth-element";
 static const char* const CMD_MAX_FETCH_TIME_OUT = "cmd-max-fecth-time-out";
 
 //node controller configuration
+static const char* const NC_MONITOR_CONSUMER_FILTEROUT_REGEX = "nc-monitor-consumer-filterout-regex";
 static const char* const NC_MONITOR_EXPIRATION_TIMEOUT = "nc-monitor-expiration-timeout";
-static const char* const NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT = "nc-purge-queue-on-exp-timeout";
+static const char* const NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT = "nc-purge-queue-on-exp-timeout"; 
 
 static const char* const PUB_SERVER_ADDRESS = "pub-server-address";
 static const char* const PUB_IMPL_KV = "pub-impl-kv";

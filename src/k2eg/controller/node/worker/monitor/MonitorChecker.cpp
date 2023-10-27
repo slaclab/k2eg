@@ -22,7 +22,9 @@ MonitorChecker::MonitorChecker(const MonitorCheckerConfiguration& monitor_checke
       publisher(ServiceResolver<IPublisher>::resolve()),
       logger(ServiceResolver<ILogger>::resolve()),
       node_configuration_db(node_configuration_db),
-      expiration_timeout(monitor_checker_configuration.monitor_expiration_timeout) {}
+      expiration_timeout(monitor_checker_configuration.monitor_expiration_timeout) {
+  for (auto& regex : monitor_checker_configuration.filter_out_regex) { vec_fillout_regex.push_back(std::regex(regex)); }
+}
 
 MonitorChecker::~MonitorChecker() {}
 
@@ -54,6 +56,16 @@ MonitorChecker::scanForRestart(size_t element_to_process) {
       });
 }
 
+bool 
+MonitorChecker::excludeConsumer(std::string consumer_group_name) {
+  bool exclude = false;
+  for(auto &r: vec_fillout_regex) {
+    exclude = std::regex_match(consumer_group_name, r);
+    if(exclude) break;
+  }
+  return exclude;
+}
+
 #define PURGE_SCAN_LOG_HEADER "Purge Scan"
 size_t
 MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
@@ -63,12 +75,25 @@ MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
       element_to_process,  // number of unprocessed element to check
       [this](const ChannelMonitorType& monitor_info, int& purge_ts_set_flag) {
         std::lock_guard guard(op_mux);
-        logger->logMessage(STRING_FORMAT("[ %1% - %2% - %3% ] check metadata", PURGE_SCAN_LOG_HEADER%monitor_info.pv_name % monitor_info.channel_destination));
+        logger->logMessage(
+            STRING_FORMAT("[ %1% - %2% - %3% ] check metadata", PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination));
 
         auto queue_metadata = publisher->getQueueMetadata(monitor_info.channel_destination);
-        if (queue_metadata && queue_metadata->subscriber_groups.size()) {
-          logger->logMessage(STRING_FORMAT("[ %1% - %2% - %3% ] subscriber found %4%",
-                                           PURGE_SCAN_LOG_HEADER%monitor_info.pv_name % monitor_info.channel_destination % queue_metadata->subscriber_groups.size()));
+        int filtered_out = 0;
+        //take in consideration only the consuemr that are not filter ot from the regex
+        for(auto &cg: queue_metadata->subscriber_groups) {
+          if(excludeConsumer(cg->name)) {
+            filtered_out++;
+          } else if(!cg->subscribers.size()){
+            // we filter out also if the consumer gorup haven't any consumer
+            filtered_out++;
+          }
+        }
+        if (queue_metadata && (queue_metadata->subscriber_groups.size()-filtered_out)) {
+
+          logger->logMessage(
+              STRING_FORMAT("[ %1% - %2% - %3% ] subscriber found %4%",
+                            PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination % (queue_metadata->subscriber_groups.size()-filtered_out)));
 
           purge_ts_set_flag = -1;
         } else {
@@ -76,32 +101,34 @@ MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
             // set the purge timestamp
             purge_ts_set_flag = 1;
             logger->logMessage(STRING_FORMAT("[ %1% - %2% - %3% ] no subscriber found, set timestamp for purege timeout",
-                                             PURGE_SCAN_LOG_HEADER%monitor_info.pv_name % monitor_info.channel_destination));
+                                             PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination));
           } else {
             // we have to check if the timeout is expired
             logger->logMessage(STRING_FORMAT("[ %1% - %2% - %3% ] Check if we need to delete the monitor queue",
-                                             PURGE_SCAN_LOG_HEADER%monitor_info.pv_name % monitor_info.channel_destination),
+                                             PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination),
                                LogLevel::ERROR);
             if (isTimeoutExperid(monitor_info)) {
               try {
-                logger->logMessage(STRING_FORMAT("[ %1% - %2% - %3% ] Stop monitor", PURGE_SCAN_LOG_HEADER%monitor_info.pv_name % monitor_info.channel_destination),
-                                   LogLevel::ERROR);
+                logger->logMessage(
+                    STRING_FORMAT("[ %1% - %2% - %3% ] Stop monitor", PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination),
+                    LogLevel::ERROR);
                 handler_broadcaster.broadcast(MonitorHandlerData{MonitorHandlerAction::Stop, monitor_info});
 
-                logger->logMessage(STRING_FORMAT("[ %1% - %2% - %3% ] delete queue", PURGE_SCAN_LOG_HEADER%monitor_info.pv_name % monitor_info.channel_destination),
-                                   LogLevel::ERROR);
+                logger->logMessage(
+                    STRING_FORMAT("[ %1% - %2% - %3% ] delete queue", PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination),
+                    LogLevel::ERROR);
                 publisher->deleteQueue(monitor_info.channel_destination);
 
                 // remove the channel monitor form the database
                 node_configuration_db->removeChannelMonitor({monitor_info});
               } catch (...) {
-                logger->logMessage(
-                    STRING_FORMAT("[ %1% - %2% - %3% ] Error during the stop of the monitor", PURGE_SCAN_LOG_HEADER%monitor_info.pv_name % monitor_info.channel_destination),
-                    LogLevel::ERROR);
+                logger->logMessage(STRING_FORMAT("[ %1% - %2% - %3% ] Error during the stop of the monitor",
+                                                 PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination),
+                                   LogLevel::ERROR);
               }
             } else {
-              logger->logMessage(
-                  STRING_FORMAT("[ %1% - %2% - %3% ] waiting for timeout exceed", PURGE_SCAN_LOG_HEADER%monitor_info.pv_name % monitor_info.channel_destination));
+              logger->logMessage(STRING_FORMAT("[ %1% - %2% - %3% ] waiting for timeout exceed",
+                                               PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination));
             }
           }
         }

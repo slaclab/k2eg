@@ -30,7 +30,7 @@ using namespace k2eg::service::scheduler;
 namespace po = boost::program_options;
 namespace fs = std::filesystem;
 
-const std::string DEFAULT_CRON_STRING = "* * * * * *"; //every seconds
+const std::string DEFAULT_CRON_STRING = "* * * * * *";  // every seconds
 
 ProgramOptions::ProgramOptions() {
   const std::string actual_path = fs::path(fs::current_path()) / "k2eg.sqlite";
@@ -53,13 +53,18 @@ ProgramOptions::ProgramOptions() {
       NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT,
       po::value<bool>()->default_value(true),
       "Specify when the a queue purged when the monitor that push data onto is stopped")(
+      NC_MONITOR_CONSUMER_FILTEROUT_REGEX,
+      po::value<std::vector<std::string>>()->multitoken(),
+      "Specify regular expression to used to filter out consumer group from those used to calculate the number of active consumer of monitor queue")(
       PUB_SERVER_ADDRESS, po::value<std::string>(), "Publisher server address")(
       PUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for publisher implementation driver")(
       SUB_SERVER_ADDRESS, po::value<std::string>(), "Subscriber server address")(
       SUB_GROUP_ID, po::value<std::string>()->default_value("k2eg-default-group"), "Subscriber group id")(
       SUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for subscriber implementation driver")(
       STORAGE_PATH, po::value<std::string>()->default_value(actual_path), "The path where the storage files are saved")(
-      MONITOR_WORKER_SCHEDULE_CRON_CONFIGURATION, po::value<std::string>()->default_value(DEFAULT_CRON_STRING), "The cron string forconfigure the monitor checking scheduler")(
+      MONITOR_WORKER_SCHEDULE_CRON_CONFIGURATION,
+      po::value<std::string>()->default_value(DEFAULT_CRON_STRING),
+      "The cron string forconfigure the monitor checking scheduler")(
       SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS, po::value<uint>()->default_value(60), "The number of second for which the scheduler thread are going to sleep")(
       SCHEDULER_THREAD_NUMBER, po::value<uint>()->default_value(1), "The number of the scheduler worker")(
       METRIC_ENABLE, po::value<bool>()->default_value(false), "Enable metric management")(
@@ -155,13 +160,14 @@ ProgramOptions::getNodeControllerConfiguration() {
   // node controller configuration
   return std::make_unique<const NodeControllerConfiguration>(NodeControllerConfiguration{
       .monitor_command_configuration =
-      // monitor command configuration
-          MonitorCommandConfiguration{
-            .cron_scheduler_monitor_check = GET_OPTION(MONITOR_WORKER_SCHEDULE_CRON_CONFIGURATION, std::string, DEFAULT_CRON_STRING),
-            // monitor command checker configurtion
-            .monitor_checker_configuration = MonitorCheckerConfiguration{
-                                          .monitor_expiration_timeout     = GET_OPTION(NC_MONITOR_EXPIRATION_TIMEOUT, int64_t, 60 * 60),
-                                          .purge_queue_on_monitor_timeout = GET_OPTION(NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT, bool, true)}}});
+          // monitor command configuration
+      MonitorCommandConfiguration{
+          .cron_scheduler_monitor_check = GET_OPTION(MONITOR_WORKER_SCHEDULE_CRON_CONFIGURATION, std::string, DEFAULT_CRON_STRING),
+          // monitor command checker configurtion
+          .monitor_checker_configuration = MonitorCheckerConfiguration{
+              .monitor_expiration_timeout     = GET_OPTION(NC_MONITOR_EXPIRATION_TIMEOUT, int64_t, 60 * 60),
+              .purge_queue_on_monitor_timeout = GET_OPTION(NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT, bool, true),
+              .filter_out_regex               = GET_OPTION(NC_MONITOR_CONSUMER_FILTEROUT_REGEX, std::vector<std::string>, std::vector<std::string>())}}});
 }
 
 ConstPublisherConfigurationUPtr
@@ -188,10 +194,8 @@ ProgramOptions::getMetricConfiguration() {
 ConstSchedulerConfigurationUPtr
 ProgramOptions::getSchedulerConfiguration() {
   return std::make_unique<const SchedulerConfiguration>(
-    SchedulerConfiguration{
-      .check_every_amount_of_seconds = GET_OPTION(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS, unsigned int, 60),
-      .thread_number = GET_OPTION(SCHEDULER_THREAD_NUMBER, unsigned int, 1)}
-    );
+      SchedulerConfiguration{.check_every_amount_of_seconds = GET_OPTION(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS, unsigned int, 60),
+                             .thread_number                 = GET_OPTION(SCHEDULER_THREAD_NUMBER, unsigned int, 1)});
 }
 
 const std::string
