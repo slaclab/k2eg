@@ -34,7 +34,10 @@ using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
 
 #pragma region MonitorCommandWorker
-#define MONITOR_TASK_NAME "monitor-task"
+#define MAINTANACE_TASK_NAME "maintanance-task"
+#define STARTUP_MONITOR_TASK_NAME "startup-task"
+#define STARTUP_MONITOR_TASK_NAME_CRON "* * * * * *"
+
 MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& monitor_command_configuration,
                                            EpicsServiceManagerShrdPtr         epics_service_manager,
                                            NodeConfigurationShrdPtr           node_configuration_db)
@@ -54,12 +57,18 @@ MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& mo
   monitor_checker_token = monitor_checker_shrd_ptr->addHandler(std::bind(&MonitorCommandWorker::handleMonitorCheckEvents, this, std::placeholders::_1));
 
   // start checker timing
-  auto task = MakeTaskShrdPtr(
-      MONITOR_TASK_NAME, 
+  auto task_periodic_maintanance = MakeTaskShrdPtr(
+      MAINTANACE_TASK_NAME, 
       monitor_command_configuration.cron_scheduler_monitor_check, 
-      std::bind(&MonitorCommandWorker::handlePeriodicTask, this)
+      std::bind(&MonitorCommandWorker::handlePeriodicTask, this, std::placeholders::_1)
     );
-  ServiceResolver<Scheduler>::resolve()->addTask(task);
+  ServiceResolver<Scheduler>::resolve()->addTask(task_periodic_maintanance);
+  auto task_restart_monitor = MakeTaskShrdPtr(
+      STARTUP_MONITOR_TASK_NAME, 
+      STARTUP_MONITOR_TASK_NAME_CRON, 
+      std::bind(&MonitorCommandWorker::handleRestartMonitorTask, this, std::placeholders::_1)
+    );
+  ServiceResolver<Scheduler>::resolve()->addTask(task_restart_monitor);
 }
 
 MonitorCommandWorker::~MonitorCommandWorker() {
@@ -76,35 +85,33 @@ MonitorCommandWorker::~MonitorCommandWorker() {
   // dispose the token for the event
   epics_handler_token.reset();
   monitor_checker_token.reset();
-  logger->logMessage("[ Automatic Task ] remove periodic task from scheduler", LogLevel::DEBUG);
-  bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(MONITOR_TASK_NAME);
-  if(!erased) {
-    logger->logMessage("[ Automatic Task ] remove periodic unsuccessfully", LogLevel::ERROR);
-  }
+  logger->logMessage("Remove periodic task from scheduler", LogLevel::DEBUG);
+  bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(MAINTANACE_TASK_NAME);
+  logger->logMessage(STRING_FORMAT("Remove periodic maintanance : %1%", erased));
+
+  erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(STARTUP_MONITOR_TASK_NAME);
+  logger->logMessage(STRING_FORMAT("Remove startup task: %1%", erased));
+}
+
+void 
+MonitorCommandWorker::handleRestartMonitorTask(TaskProperties& task_properties) {
+  std::lock_guard<std::mutex> lock(periodic_task_mutex);
+  logger->logMessage("[ Automatic Task ] Restart monitor requests");
+  task_properties.completed = !(starting_up = monitor_checker_shrd_ptr->scanForRestart());
 }
 
 void
-MonitorCommandWorker::handlePeriodicTask() {
+MonitorCommandWorker::handlePeriodicTask(TaskProperties& task_properties) {
   std::lock_guard<std::mutex> lock(periodic_task_mutex);
-  if(starting_up) {
-    logger->logMessage("[ Automatic Task ] Restart monitor requests");
-    auto processed = monitor_checker_shrd_ptr->scanForRestart();
-    // when all monitor has been restarted we can remove the startup flag
-    starting_up = processed!=0;
-    if(!starting_up) {
-      logger->logMessage("[ Automatic Task ] Startup completed");
-    }
-  } else {
-    logger->logMessage("[ Automatic Task ] Checking active monitor");
-    auto processed = monitor_checker_shrd_ptr->scanForMonitorToStop();
-    if(!processed) monitor_checker_shrd_ptr->resetMonitorToProcess();
-  }
-  
+  logger->logMessage("[ Automatic Task ] Checking active monitor");
+  auto processed = monitor_checker_shrd_ptr->scanForMonitorToStop();
+  if(!processed) monitor_checker_shrd_ptr->resetMonitorToProcess();
 }
 
 void 
 MonitorCommandWorker::executePeriodicTask() {
-  handlePeriodicTask();
+  TaskProperties task_properties;
+  handlePeriodicTask(task_properties);
 }
 
 void
@@ -130,7 +137,7 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
     case MonitorHandlerAction::Stop: {
       // got stop event
       // remove topic to channel
-      logger->logMessage(STRING_FORMAT("Activate monitor on '%1%' for topic '%2%'", checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
+      logger->logMessage(STRING_FORMAT("Stop monitor on '%1%' for topic '%2%'", checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
       auto itr = std::find_if(std::begin(vec_ref), std::end(vec_ref), [&checker_event_data](auto& info_topic) {
         return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
       });
