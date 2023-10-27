@@ -160,7 +160,7 @@ TEST(ProgramOptions, NodeControllerConfiguration) {
     auto node_controller_configuration = opt->getNodeControllerConfiguration();
     EXPECT_EQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.monitor_expiration_timeout, 60);
     EXPECT_EQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.purge_queue_on_monitor_timeout, false);
-    EXPECT_EQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.filter_out_regex.size(), 3);
+    EXPECT_EQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.filter_out_regex.size(), 1);
     EXPECT_STREQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.filter_out_regex[0].c_str(), "regex1");
 }
 #endif //__linux__
