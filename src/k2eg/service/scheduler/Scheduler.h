@@ -5,21 +5,24 @@
 #include <k2eg/service/scheduler/Task.h>
 #include <sys/types.h>
 
+#include <array>
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
 #include <mutex>
 #include <thread>
+#include <vector>
 
 namespace k2eg::service::scheduler {
 typedef std::deque<TaskShrdPtr> TaskQueue;
+typedef std::vector<TaskShrdPtr> TaskVector;
 #define THREAD_SLEEP_SECONDS 60
 
 struct SchedulerConfiguration {
-    // wakeup thread after a specific amount of secondds
-    unsigned int check_every_amount_of_seconds = THREAD_SLEEP_SECONDS;
-    // the number of thread for the scheduler
-    unsigned int thread_number;
+  // wakeup thread after a specific amount of secondds
+  unsigned int check_every_amount_of_seconds = THREAD_SLEEP_SECONDS;
+  // the number of thread for the scheduler
+  unsigned int thread_number;
 };
 DEFINE_PTR_TYPES(SchedulerConfiguration)
 
@@ -28,21 +31,24 @@ DEFINE_PTR_TYPES(SchedulerConfiguration)
 */
 class Scheduler {
   ConstSchedulerConfigurationUPtr configuration;
-  std::mutex               tasks_queue_mtx;
-  std::mutex               thread_wait_mtx;
-  std::condition_variable  cv;
-  std::condition_variable  cv_remove_item;
-  std::set<std::string>   task_name_to_remove;
-  TaskQueue  tasks_queue;
-  std::vector<std::thread> thread_group;
-  std::time_t              time_to_wakeup;
+  std::mutex                      tasks_queue_mtx;
+  std::mutex                      thread_wait_mtx;
+  std::condition_variable         cv;
+  std::condition_variable         cv_remove_item;
+  std::set<std::string>           task_name_to_remove;
+  TaskQueue                       tasks_queue;
+  TaskVector                      running_task_vector;
+  std::vector<std::thread>        thread_group;
+  std::vector<std::thread>        thread_group_cur_job;
+  std::time_t                     time_to_wakeup;
 
-  bool                     processing;
-  bool                     new_taks_submitted;
-  void                     scheduleTask();
-  std::chrono::system_clock::time_point getNewWaitUntilTimePoint();  
+  bool                                  processing;
+  bool                                  new_taks_submitted;
+  void                                  scheduleTask(int thread_index);
+  std::chrono::system_clock::time_point getNewWaitUntilTimePoint();
+
  public:
-  Scheduler(ConstSchedulerConfigurationUPtr configuration); 
+  Scheduler(ConstSchedulerConfigurationUPtr configuration);
   ~Scheduler() = default;
   void start();
   void stop();

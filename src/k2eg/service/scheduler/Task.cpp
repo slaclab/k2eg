@@ -2,7 +2,7 @@
 
 using namespace k2eg::service::scheduler;
 
-Task::Task(const std::string& name, const std::string& cron_expr, std::function<void()> handler):
+Task::Task(const std::string& name, const std::string& cron_expr, TaskHandlerFunction handler):
 name(name),
 cron_expr(cron::make_cron(cron_expr)),
 next_schedule(cron::cron_next(this->cron_expr, std::time(0))),
@@ -27,7 +27,7 @@ void
 Task::execute() {
     try{
         // execute  
-        handler();
+        handler(task_properties);
         // if all is gone ok calculate next timestamp for task
         next_schedule = cron::cron_next(this->cron_expr, std::time(0));
     } catch(...){
@@ -35,3 +35,8 @@ Task::execute() {
        next_schedule = std::time(0)+RESCHEDULE_TIMEOUT;
     }
 }
+
+ bool 
+ Task::isCompleted() const {
+    return task_properties.completed;
+ }

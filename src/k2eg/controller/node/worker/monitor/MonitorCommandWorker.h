@@ -75,6 +75,7 @@ DEFINE_MAP_FOR_TYPE(std::string, std::vector<ChannelTopicMonitorInfoUPtr>, Chann
 class MonitorCommandWorker : public CommandWorker {
     const MonitorCommandConfiguration monitor_command_configuration;
     mutable std::shared_mutex channel_map_mtx;
+    mutable std::mutex periodic_task_mutex;
     ChannelTopicsMap channel_topics_map;
     k2eg::controller::node::configuration::NodeConfigurationShrdPtr node_configuration_db;
     k2eg::service::log::ILoggerShrdPtr logger;
@@ -85,13 +86,13 @@ class MonitorCommandWorker : public CommandWorker {
     // Handler's liveness token
     k2eg::common::BroadcastToken epics_handler_token;
     k2eg::common::BroadcastToken monitor_checker_token;
+    std::atomic_bool starting_up;
+
     void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstMonitorCommandShrdPtr cmd);
     void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
     void handleMonitorCheckEvents(MonitorHandlerData checker_event_data);
-    std::atomic_bool starting_up;
-
-    std::mutex periodic_task_mutex;
-    void handlePeriodicTask();
+    void handleRestartMonitorTask(k2eg::service::scheduler::TaskProperties& task_properties);
+    void handlePeriodicTask(k2eg::service::scheduler::TaskProperties& task_properties);
 public:
     MonitorCommandWorker(
       const MonitorCommandConfiguration& monitor_command_configuration,

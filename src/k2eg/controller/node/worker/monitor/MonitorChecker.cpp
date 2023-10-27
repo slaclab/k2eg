@@ -56,12 +56,12 @@ MonitorChecker::scanForRestart(size_t element_to_process) {
       });
 }
 
-bool 
+bool
 MonitorChecker::excludeConsumer(std::string consumer_group_name) {
   bool exclude = false;
-  for(auto &r: vec_fillout_regex) {
+  for (auto& r : vec_fillout_regex) {
     exclude = std::regex_match(consumer_group_name, r);
-    if(exclude) break;
+    if (exclude) break;
   }
   return exclude;
 }
@@ -79,21 +79,20 @@ MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
             STRING_FORMAT("[ %1% - %2% - %3% ] check metadata", PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination));
 
         auto queue_metadata = publisher->getQueueMetadata(monitor_info.channel_destination);
-        int filtered_out = 0;
-        //take in consideration only the consuemr that are not filter ot from the regex
-        for(auto &cg: queue_metadata->subscriber_groups) {
-          if(excludeConsumer(cg->name)) {
+        int  filtered_out   = 0;
+        // take in consideration only the consuemr that are not filter ot from the regex
+        for (auto& cg : queue_metadata->subscriber_groups) {
+          if (excludeConsumer(cg->name)) {
             filtered_out++;
-          } else if(!cg->subscribers.size()){
+          } else if (!cg->subscribers.size()) {
             // we filter out also if the consumer gorup haven't any consumer
             filtered_out++;
           }
         }
-        if (queue_metadata && (queue_metadata->subscriber_groups.size()-filtered_out)) {
-
-          logger->logMessage(
-              STRING_FORMAT("[ %1% - %2% - %3% ] subscriber found %4%",
-                            PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination % (queue_metadata->subscriber_groups.size()-filtered_out)));
+        if (queue_metadata && (queue_metadata->subscriber_groups.size() - filtered_out)) {
+          logger->logMessage(STRING_FORMAT(
+              "[ %1% - %2% - %3% ] subscriber found %4%",
+              PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination % (queue_metadata->subscriber_groups.size() - filtered_out)));
 
           purge_ts_set_flag = -1;
         } else {
@@ -105,19 +104,19 @@ MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
           } else {
             // we have to check if the timeout is expired
             logger->logMessage(STRING_FORMAT("[ %1% - %2% - %3% ] Check if we need to delete the monitor queue",
-                                             PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination),
-                               LogLevel::ERROR);
+                                             PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination));
             if (isTimeoutExperid(monitor_info)) {
               try {
                 logger->logMessage(
-                    STRING_FORMAT("[ %1% - %2% - %3% ] Stop monitor", PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination),
-                    LogLevel::ERROR);
+                    STRING_FORMAT("[ %1% - %2% - %3% ] Stop monitor", PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination));
                 handler_broadcaster.broadcast(MonitorHandlerData{MonitorHandlerAction::Stop, monitor_info});
 
-                logger->logMessage(
-                    STRING_FORMAT("[ %1% - %2% - %3% ] delete queue", PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination),
-                    LogLevel::ERROR);
-                publisher->deleteQueue(monitor_info.channel_destination);
+                // check if we need to delete the also the topic of the monitor
+                if (monitor_checker_configuration.purge_queue_on_monitor_timeout) {
+                  logger->logMessage(
+                      STRING_FORMAT("[ %1% - %2% - %3% ] delete queue", PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination));
+                  publisher->deleteQueue(monitor_info.channel_destination);
+                }
 
                 // remove the channel monitor form the database
                 node_configuration_db->removeChannelMonitor({monitor_info});
