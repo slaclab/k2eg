@@ -295,22 +295,18 @@ RDKafkaPublisher::scan_groups(const rd_kafka_ListConsumerGroups_result_t *list, 
     int                                    is_simple_consumer_group = rd_kafka_ConsumerGroupListing_is_simple_consumer_group(group);
     const struct rd_kafka_group_list      *grplistp                 = nullptr;
 
-    // printf("Group \"%s\", is simple %" PRId32
-    //        ", "
-    //        "state %s",
-    //        group_id,
-    //        is_simple_consumer_group,
-    //        rd_kafka_consumer_group_state_name(state));
-    // printf("\n");
-    q_desc_ref.subscriber_groups.push_back(
-      get_group_info(group_id)
-    );
-    
+    auto group_info = get_group_info(group_id);
+    if(group_info->subscribers.size()) {
+      // printf("Group \"%s\", is simple %" PRId32
+      //   ", "
+      //   "state %s",
+      //   group_id,
+      //   is_simple_consumer_group,
+      //   rd_kafka_consumer_group_state_name(state));
+      // printf("\n");
+      q_desc_ref.subscriber_groups.push_back(std::move(group_info));
+    }
   }
-  // for (i = 0; i < result_error_cnt; i++) {
-  //   const rd_kafka_error_t *error = errors[i];
-  //   printf("Error[%" PRId32 "]: %s\n", rd_kafka_error_code(error), rd_kafka_error_string(error));
-  // }
   return 0;
 }
 

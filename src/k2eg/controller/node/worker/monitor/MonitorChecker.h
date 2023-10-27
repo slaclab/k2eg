@@ -6,6 +6,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
+#include <vector>
+#include <string>
+#include <regex>
 
 #include "k2eg/common/types.h"
 #include "k2eg/controller/node/configuration/NodeConfiguration.h"
@@ -22,6 +25,10 @@ struct MonitorCheckerConfiguration {
   int64_t monitor_expiration_timeout;
   // if true the queue is pruged when monitor is stopped
   bool purge_queue_on_monitor_timeout;
+
+  // regex to filterout consumer for which used to count
+  // when a queue is used or not
+  std::vector<std::string> filter_out_regex;
 };
 
 // the type of the monitor events
@@ -54,12 +61,13 @@ class MonitorChecker {
   configuration::NodeConfigurationShrdPtr       node_configuration_db;
   k2eg::service::scheduler::SchedulerShrdPtr    scheduler;
   k2eg::common::broadcaster<MonitorHandlerData> handler_broadcaster;
+  std::vector<std::regex>                       vec_fillout_regex;
   std::mutex                                    op_mux;
   // timeout in second that when expired the queue can be purged and moitor stopped
   int64_t                                                                                     expiration_timeout;
   std::set<k2eg::service::data::repository::ChannelMonitorType, ChannelMonitorTypeComparator> to_stop;
   bool isTimeoutExperid(const k2eg::service::data::repository::ChannelMonitorType& monitor_info);
-
+  bool excludeConsumer(std::string consumer_group_name);
  public:
   MonitorChecker(const MonitorCheckerConfiguration& monitor_checker_configuration, configuration::NodeConfigurationShrdPtr node_configuration_db);
   ~MonitorChecker();

@@ -152,12 +152,15 @@ TEST(ProgramOptions, NodeControllerConfiguration) {
     const char* argv[1] = {"epics-k2eg-test"};
     // set environment variable for test
     clearenv();
-    setenv("EPICS_k2eg_nc-monitor-expiration-timeout", "60", 1);
-    setenv("EPICS_k2eg_nc-purge-queue-on-exp-timeout", "false", 1);
+    setenv(std::string("EPICS_k2eg_").append(NC_MONITOR_EXPIRATION_TIMEOUT).c_str(), "60", 1);
+    setenv(std::string("EPICS_k2eg_").append(NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT).c_str(), "false", 1);
+    setenv(std::string("EPICS_k2eg_").append(NC_MONITOR_CONSUMER_FILTEROUT_REGEX).c_str(), "regex1", 1);
     std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
     EXPECT_NO_THROW(opt->parse(argc, argv););
     auto node_controller_configuration = opt->getNodeControllerConfiguration();
     EXPECT_EQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.monitor_expiration_timeout, 60);
     EXPECT_EQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.purge_queue_on_monitor_timeout, false);
+    EXPECT_EQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.filter_out_regex.size(), 3);
+    EXPECT_STREQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.filter_out_regex[0].c_str(), "regex1");
 }
 #endif //__linux__
