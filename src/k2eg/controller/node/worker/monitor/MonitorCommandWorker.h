@@ -88,7 +88,10 @@ class MonitorCommandWorker : public CommandWorker {
     k2eg::common::BroadcastToken monitor_checker_token;
     std::atomic_bool starting_up;
 
-    void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstMonitorCommandShrdPtr cmd);
+    const std::string get_queue_for_pv(const std::string& pv_name);
+    void manage_single_monitor(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
+    void manage_multiple_monitor(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
+    void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstCommandShrdPtr cmd);
     void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
     void handleMonitorCheckEvents(MonitorHandlerData checker_event_data);
     void handleRestartMonitorTask(k2eg::service::scheduler::TaskProperties& task_properties);

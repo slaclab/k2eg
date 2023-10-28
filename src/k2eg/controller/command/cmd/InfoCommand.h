@@ -14,23 +14,20 @@ namespace k2eg::controller::command::cmd {
 */
 
 struct InfoCommand : public Command {
-    std::string reply_topic;
-    std::string reply_id;
+  std::string pv_name;
 };
 DEFINE_PTR_TYPES(InfoCommand)
 
-
-static void tag_invoke(boost::json::value_from_tag, boost::json::value &jv,  InfoCommand const &c) {
- jv = {
-        {"serialization", serialization_to_string(c.serialization)},
-        {"pv_name", c.pv_name},
-        {"protocol", c.protocol},
-        {"reply_topic", c.reply_topic},
-        {"reply_id", c.reply_id},
-    };
+static void
+tag_invoke(boost::json::value_from_tag, boost::json::value &jv, InfoCommand const &c) {
+  jv = {
+      {"serialization", serialization_to_string(c.serialization)},
+      {"pv_name", c.pv_name},
+      {"protocol", c.protocol},
+      {"reply_topic", c.reply_topic},
+      {"reply_id", c.reply_id},
+  };
 }
-}
+}  // namespace k2eg::controller::command::cmd
 
-
-
-#endif // K2EG_CONTROLLER_COMMAND_CMD_INFOCOMMAND_H_
+#endif  // K2EG_CONTROLLER_COMMAND_CMD_INFOCOMMAND_H_

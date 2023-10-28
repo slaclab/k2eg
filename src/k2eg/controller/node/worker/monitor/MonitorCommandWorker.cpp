@@ -7,6 +7,7 @@
 #include <functional>
 #include <mutex>
 
+#include "k2eg/controller/command/cmd/Command.h"
 #include "k2eg/controller/command/cmd/MonitorCommand.h"
 #include "k2eg/controller/node/worker/CommandWorker.h"
 #include "k2eg/controller/node/worker/monitor/MonitorChecker.h"
@@ -34,8 +35,8 @@ using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
 
 #pragma region MonitorCommandWorker
-#define MAINTANACE_TASK_NAME "maintanance-task"
-#define STARTUP_MONITOR_TASK_NAME "startup-task"
+#define MAINTANACE_TASK_NAME           "maintanance-task"
+#define STARTUP_MONITOR_TASK_NAME      "startup-task"
 #define STARTUP_MONITOR_TASK_NAME_CRON "* * * * * *"
 
 MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& monitor_command_configuration,
@@ -57,31 +58,27 @@ MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& mo
   monitor_checker_token = monitor_checker_shrd_ptr->addHandler(std::bind(&MonitorCommandWorker::handleMonitorCheckEvents, this, std::placeholders::_1));
 
   // start checker timing
-  auto task_periodic_maintanance = MakeTaskShrdPtr(
-      MAINTANACE_TASK_NAME, 
-      monitor_command_configuration.cron_scheduler_monitor_check, 
-      std::bind(&MonitorCommandWorker::handlePeriodicTask, this, std::placeholders::_1)
-    );
+  auto task_periodic_maintanance = MakeTaskShrdPtr(MAINTANACE_TASK_NAME,
+                                                   monitor_command_configuration.cron_scheduler_monitor_check,
+                                                   std::bind(&MonitorCommandWorker::handlePeriodicTask, this, std::placeholders::_1));
   ServiceResolver<Scheduler>::resolve()->addTask(task_periodic_maintanance);
   auto task_restart_monitor = MakeTaskShrdPtr(
-      STARTUP_MONITOR_TASK_NAME, 
-      STARTUP_MONITOR_TASK_NAME_CRON, 
-      std::bind(&MonitorCommandWorker::handleRestartMonitorTask, this, std::placeholders::_1)
-    );
+      STARTUP_MONITOR_TASK_NAME, STARTUP_MONITOR_TASK_NAME_CRON, std::bind(&MonitorCommandWorker::handleRestartMonitorTask, this, std::placeholders::_1));
   ServiceResolver<Scheduler>::resolve()->addTask(task_restart_monitor);
 }
 
 MonitorCommandWorker::~MonitorCommandWorker() {
-  //dipose all still live monitor
+  // dipose all still live monitor
   logger->logMessage("[ Exing Worker ] stop all still live monitor");
-  for(auto& mon_vec_for_pv: channel_topics_map) {
+  for (auto& mon_vec_for_pv : channel_topics_map) {
     logger->logMessage(STRING_FORMAT("[ Exing Worker ] Stop all monitor for pv '%1%'", mon_vec_for_pv.first));
-    for(auto & monitor_info: mon_vec_for_pv.second) {
-      logger->logMessage(STRING_FORMAT("[ Exing Worker ] Stop monitor for pv '%1%' with target '%2%'", monitor_info->cmd.pv_name%monitor_info->cmd.channel_destination));
+    for (auto& monitor_info : mon_vec_for_pv.second) {
+      logger->logMessage(
+          STRING_FORMAT("[ Exing Worker ] Stop monitor for pv '%1%' with target '%2%'", monitor_info->cmd.pv_name % monitor_info->cmd.channel_destination));
       epics_service_manager->monitorChannel(monitor_info->cmd.pv_name, false, monitor_info->cmd.channel_protocol);
     }
   }
- 
+
   // dispose the token for the event
   epics_handler_token.reset();
   monitor_checker_token.reset();
@@ -93,7 +90,7 @@ MonitorCommandWorker::~MonitorCommandWorker() {
   logger->logMessage(STRING_FORMAT("Remove startup task: %1%", erased));
 }
 
-void 
+void
 MonitorCommandWorker::handleRestartMonitorTask(TaskProperties& task_properties) {
   std::lock_guard<std::mutex> lock(periodic_task_mutex);
   logger->logMessage("[ Automatic Task ] Restart monitor requests");
@@ -105,10 +102,10 @@ MonitorCommandWorker::handlePeriodicTask(TaskProperties& task_properties) {
   std::lock_guard<std::mutex> lock(periodic_task_mutex);
   logger->logMessage("[ Automatic Task ] Checking active monitor");
   auto processed = monitor_checker_shrd_ptr->scanForMonitorToStop();
-  if(!processed) monitor_checker_shrd_ptr->resetMonitorToProcess();
+  if (!processed) monitor_checker_shrd_ptr->resetMonitorToProcess();
 }
 
-void 
+void
 MonitorCommandWorker::executePeriodicTask() {
   TaskProperties task_properties;
   handlePeriodicTask(task_properties);
@@ -119,14 +116,15 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
   auto& vec_ref = channel_topics_map[checker_event_data.monitor_type.pv_name];
   switch (checker_event_data.action) {
     case MonitorHandlerAction::Start: {
-      logger->logMessage(STRING_FORMAT("Activate monitor on '%1%' for topic '%2%'", checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
+      logger->logMessage(STRING_FORMAT("Activate monitor on '%1%' for topic '%2%'",
+                                       checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
       // got start event
       if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&checker_event_data](auto& info_topic) {
             return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
           }) == std::end(vec_ref)) {
         channel_topics_map[checker_event_data.monitor_type.pv_name].push_back(
             MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
-         epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, true, checker_event_data.monitor_type.channel_protocol);
+        epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, true, checker_event_data.monitor_type.channel_protocol);
       } else {
         logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated",
                                          checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
@@ -137,7 +135,8 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
     case MonitorHandlerAction::Stop: {
       // got stop event
       // remove topic to channel
-      logger->logMessage(STRING_FORMAT("Stop monitor on '%1%' for topic '%2%'", checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
+      logger->logMessage(STRING_FORMAT("Stop monitor on '%1%' for topic '%2%'",
+                                       checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
       auto itr = std::find_if(std::begin(vec_ref), std::end(vec_ref), [&checker_event_data](auto& info_topic) {
         return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
       });
@@ -155,41 +154,69 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
 
 void
 MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
-  if (command->type != CommandType::monitor) return;
+  if (starting_up) {
+    logger->logMessage("[ Starting up ] Comamnd cannot be executed");
+    manageReply(-2, "Command cannot be executed, k2eg monitor worker is starting", command);
+    return;
+  }
+  switch (command->type) {
+    case CommandType::monitor: manage_single_monitor(command); break;
+    case CommandType::multi_monitor: manage_multiple_monitor(command); break;
+    default: break;
+  }
+}
+
+void
+MonitorCommandWorker::manage_single_monitor(k2eg::controller::command::cmd::ConstCommandShrdPtr command) {
   bool activate = false;
   auto cmd_ptr  = static_pointer_cast<const MonitorCommand>(command);
   if (cmd_ptr->activate) {
-    if(cmd_ptr->monitor_destination_topic.empty()) {
+    if (cmd_ptr->monitor_destination_topic.empty()) {
       logger->logMessage(STRING_FORMAT("No destination topic found on monitor command for %1%", cmd_ptr->pv_name), LogLevel::ERROR);
       manageReply(-1, "Empty destination topic", cmd_ptr);
       return;
-    }
-
-    if(starting_up) {
-        logger->logMessage(STRING_FORMAT("[ Restarting ] Comamnd for  start monitor on %1% to %2%", cmd_ptr->pv_name%cmd_ptr->monitor_destination_topic), LogLevel::INFO);
-        manageReply(-2, "Command cannot be executed, k2eg monitor worker is starting", cmd_ptr);
-        return;
     }
     // manageStartMonitorCommand(cmd_ptr);
     monitor_checker_shrd_ptr->storeMonitorData({ChannelMonitorType{.pv_name             = cmd_ptr->pv_name,
                                                                    .event_serialization = static_cast<std::uint8_t>(cmd_ptr->serialization),
                                                                    .channel_protocol    = cmd_ptr->protocol,
                                                                    .channel_destination = cmd_ptr->monitor_destination_topic}});
-    manageReply(0, "Monitor activated", cmd_ptr);
+    manageReply(0, STRING_FORMAT("Monitor activated for %1%", cmd_ptr->pv_name), cmd_ptr);
   } else {
-    logger->logMessage(STRING_FORMAT("Deactivation for monitor is deprecated[%1%-%2%]", cmd_ptr->pv_name % cmd_ptr->monitor_destination_topic),
-                       LogLevel::ERROR);
+    const std::string error_message = STRING_FORMAT("Deactivation for monitor is deprecated[%1%-%2%]", cmd_ptr->pv_name % cmd_ptr->monitor_destination_topic);
+    logger->logMessage(error_message, LogLevel::ERROR);
+    manageReply(-1, error_message, cmd_ptr);
   }
 }
 
-bool 
+const std::string
+MonitorCommandWorker::get_queue_for_pv(const std::string& pv_name) {
+  return std::regex_replace(pv_name, std::regex(":"), "_");
+}
+
+void
+MonitorCommandWorker::manage_multiple_monitor(k2eg::controller::command::cmd::ConstCommandShrdPtr command) {
+  bool                            activate = false;
+  auto                            cmd_ptr  = static_pointer_cast<const MultiMonitorCommand>(command);
+  std::vector<ChannelMonitorType> monitor_command_vec;
+  std::ranges::for_each(cmd_ptr->pv_name_list, [&cmd_ptr, &monitor_command_vec, this](const std::string& pv_name) {
+    monitor_command_vec.push_back(ChannelMonitorType{.pv_name             = pv_name,
+                                                     .event_serialization = static_cast<std::uint8_t>(cmd_ptr->serialization),
+                                                     .channel_protocol    = cmd_ptr->protocol,
+                                                     .channel_destination = get_queue_for_pv(pv_name)});
+  });
+  monitor_checker_shrd_ptr->storeMonitorData(monitor_command_vec);
+  manageReply(0, "Monitor activated", cmd_ptr);
+}
+
+bool
 MonitorCommandWorker::isReady() {
   return !starting_up;
 }
 
 void
-MonitorCommandWorker::manageReply(const std::int8_t error_code, const std::string& error_message, ConstMonitorCommandShrdPtr cmd) {
-  logger->logMessage(STRING_FORMAT("%1% [pv:%2%]", error_message % cmd->pv_name), LogLevel::ERROR);
+MonitorCommandWorker::manageReply(const std::int8_t error_code, const std::string& error_message, ConstCommandShrdPtr cmd) {
+  logger->logMessage(error_message, LogLevel::ERROR);
   if (cmd->reply_topic.empty() || cmd->reply_id.empty()) {
     return;
   } else {
@@ -197,7 +224,7 @@ MonitorCommandWorker::manageReply(const std::int8_t error_code, const std::strin
     if (!serialized_message) {
       logger->logMessage("Invalid serialized message", LogLevel::FATAL);
     } else {
-      publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "monitor-operation", cmd->pv_name, serialized_message),
+      publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "monitor-operation", "monitor-error-key", serialized_message),
                              {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
     }
   }
