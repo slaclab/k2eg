@@ -324,7 +324,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=NodeController.MonitorCommandMultiPV*"],
+            "args": ["--gtest_filter=NodeController.RandomCommand*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
