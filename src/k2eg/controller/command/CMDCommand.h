@@ -35,6 +35,7 @@ to_json_string(cmd::ConstCommandShrdPtr c) {
     case cmd::CommandType::get: return BOOST_JSON_TO_STRIN(cmd::GetCommand, c);
     case cmd::CommandType::info: return BOOST_JSON_TO_STRIN(cmd::InfoCommand, c);
     case cmd::CommandType::monitor: return BOOST_JSON_TO_STRIN(cmd::MonitorCommand, c);
+    case cmd::CommandType::multi_monitor: return BOOST_JSON_TO_STRIN(cmd::MultiMonitorCommand, c);
     case cmd::CommandType::put: return BOOST_JSON_TO_STRIN(cmd::PutCommand, c);
     case cmd::CommandType::unknown: return "Unknown";
   }

@@ -35,8 +35,9 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
   logger = ServiceResolver<ILogger>::resolve();
 
   // register worker for command type
-  worker_resolver.registerObjectInstance(CommandType::monitor,
-                                         std::make_shared<MonitorCommandWorker>(this->node_controller_configuration->monitor_command_configuration, ServiceResolver<EpicsServiceManager>::resolve(), node_configuration));
+  auto monitor_command_worker = std::make_shared<MonitorCommandWorker>(this->node_controller_configuration->monitor_command_configuration, ServiceResolver<EpicsServiceManager>::resolve(), node_configuration);
+  worker_resolver.registerObjectInstance(CommandType::monitor, monitor_command_worker);
+  worker_resolver.registerObjectInstance(CommandType::multi_monitor, monitor_command_worker);
   worker_resolver.registerObjectInstance(CommandType::get, std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
   worker_resolver.registerObjectInstance(CommandType::put, std::make_shared<PutCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
 }
