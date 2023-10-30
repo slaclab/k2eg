@@ -22,7 +22,7 @@ TEST(DataStorage, Default) {
     EXPECT_NO_THROW(toShared(storage->getChannelRepository())
                         ->insert({.pv_name = "channel::a",
                                   .event_serialization = static_cast<uint8_t>(SerializationType::JSON),
-                                  .channel_protocol = "pva",
+                                //   .channel_protocol = "pva",
                                   .channel_destination = "dest"}););
     auto found_channel = toShared(storage->getChannelRepository())
                              ->getChannelMonitor({.pv_name = "channel::a",
@@ -31,7 +31,7 @@ TEST(DataStorage, Default) {
     EXPECT_EQ(found_channel.has_value(), true);
     EXPECT_STREQ(found_channel->get()->pv_name.c_str(), "channel::a");
     EXPECT_EQ(found_channel->get()->event_serialization, static_cast<uint8_t>(SerializationType::JSON));
-    EXPECT_STREQ(found_channel->get()->channel_protocol.c_str(), "pva");
+    // EXPECT_STREQ(found_channel->get()->channel_protocol.c_str(), "pva");
     EXPECT_STREQ(found_channel->get()->channel_destination.c_str(), "dest");
 }
 
@@ -50,18 +50,18 @@ TEST(DataStorage, MultiThreading) {
                 std::string pv_name = "channel::" + std::to_string(t_id);
                 EXPECT_NO_THROW(toShared(t_storage->getChannelRepository())
                                     ->insert({.pv_name = pv_name,
-                                              .channel_protocol = "pv",
+                                            //   .channel_protocol = "pv",
                                               .channel_destination = "dest"}););
                 auto found_channel =
                     toShared(t_storage->getChannelRepository())
                         ->getChannelMonitor({.pv_name = pv_name,
-                                             .channel_protocol = "pv",
+                                            //  .channel_protocol = "pv",
                                              .channel_destination = "dest"});
 
                 EXPECT_EQ(found_channel.has_value(), true);
                 EXPECT_STREQ(found_channel->get()->pv_name.c_str(),
                              pv_name.c_str());
-                EXPECT_STREQ(found_channel->get()->channel_protocol.c_str(), "pv");
+                // EXPECT_STREQ(found_channel->get()->channel_protocol.c_str(), "pv");
                 EXPECT_STREQ(found_channel->get()->channel_destination.c_str(), "dest");
                 t_latch.count_down();
             })));
@@ -84,7 +84,7 @@ TEST(DataStorage, ChannelProcessingHandler) {
         EXPECT_NO_THROW(
             toShared(storage->getChannelRepository())
                 ->insert({.pv_name = "channel",
-                          .channel_protocol = "pv",
+                        //   .channel_protocol = "pv",
                           .channel_destination = "dest_" + std::to_string(idx)}););
     }
 
@@ -115,7 +115,7 @@ TEST(DataStorage, ChannelProcessingHandlerLimitedNumberOfItem) {
         EXPECT_NO_THROW(
             toShared(storage->getChannelRepository())
                 ->insert({.pv_name = "channel",
-                          .channel_protocol = "pv",
+                        //   .channel_protocol = "pv",
                           .channel_destination = "dest_" + std::to_string(idx)}););
     }
 

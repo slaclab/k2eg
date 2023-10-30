@@ -26,6 +26,7 @@ typedef std::function<void(EpicsServiceManagerHandlerParamterType)> EpicsService
 Represent a PV with his name and field
 */
 struct PV {
+    std::string protocol;
     std::string name;
     std::string field;
 };
@@ -46,11 +47,11 @@ class EpicsServiceManager {
 public:
     explicit EpicsServiceManager();
     ~EpicsServiceManager();
-    void addChannel(const std::string& pv_name, const std::string& protocol = "pva");
+    void addChannel(const std::string& pv_name_uri);
     void removeChannel(const std::string& pv_name);
-    void monitorChannel(const std::string& pv_name, bool activate, const std::string& protocol);
-    ConstGetOperationUPtr getChannelData(const std::string& pv_name, const std::string& protocol = "pva");
-    ConstPutOperationUPtr putChannelData(const std::string& pv_name, const std::string& value, const std::string& protocol = "pva");
+    void monitorChannel(const std::string& pv_identification, bool activate);
+    ConstGetOperationUPtr getChannelData(const std::string& pv_name_uri);
+    ConstPutOperationUPtr putChannelData(const std::string& pv_name, const std::string& value);
     size_t getChannelMonitoredSize();
     /*
     give some sanitizaiton to epics pv names patter <pvname>.<value>

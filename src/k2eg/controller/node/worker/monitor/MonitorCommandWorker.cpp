@@ -75,7 +75,7 @@ MonitorCommandWorker::~MonitorCommandWorker() {
     for (auto& monitor_info : mon_vec_for_pv.second) {
       logger->logMessage(
           STRING_FORMAT("[ Exing Worker ] Stop monitor for pv '%1%' with target '%2%'", monitor_info->cmd.pv_name % monitor_info->cmd.channel_destination));
-      epics_service_manager->monitorChannel(monitor_info->cmd.pv_name, false, monitor_info->cmd.channel_protocol);
+      epics_service_manager->monitorChannel(monitor_info->cmd.pv_name, false);
     }
   }
 
@@ -130,7 +130,7 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
           }) == std::end(vec_ref)) {
         channel_topics_map[checker_event_data.monitor_type.pv_name].push_back(
             MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
-        epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, true, checker_event_data.monitor_type.channel_protocol);
+        epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, true);
       } else {
         logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated",
                                          checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
@@ -148,7 +148,7 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
       });
       if (itr != std::end(vec_ref)) {
         vec_ref.erase(itr);
-        epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, false, checker_event_data.monitor_type.channel_protocol);
+        epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, false);
       } else {
         logger->logMessage(STRING_FORMAT("No active monitor on '%1%' for topic '%2%'",
                                          checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
@@ -185,7 +185,7 @@ MonitorCommandWorker::manage_single_monitor(k2eg::controller::command::cmd::Cons
     // manageStartMonitorCommand(cmd_ptr);
     monitor_checker_shrd_ptr->storeMonitorData({ChannelMonitorType{.pv_name             = cmd_ptr->pv_name,
                                                                    .event_serialization = static_cast<std::uint8_t>(cmd_ptr->serialization),
-                                                                   .channel_protocol    = cmd_ptr->protocol,
+                                                                  //  .channel_protocol    = cmd_ptr->protocol,
                                                                    .channel_destination = cmd_ptr->monitor_destination_topic}});
     manageReply(0, STRING_FORMAT("Monitor activated for %1%", cmd_ptr->pv_name), cmd_ptr);
   } else {
@@ -208,7 +208,7 @@ MonitorCommandWorker::manage_multiple_monitor(k2eg::controller::command::cmd::Co
   std::ranges::for_each(cmd_ptr->pv_name_list, [&cmd_ptr, &monitor_command_vec, this](const std::string& pv_name) {
     monitor_command_vec.push_back(ChannelMonitorType{.pv_name             = pv_name,
                                                      .event_serialization = static_cast<std::uint8_t>(cmd_ptr->serialization),
-                                                     .channel_protocol    = cmd_ptr->protocol,
+                                                    //  .channel_protocol    = cmd_ptr->protocol,
                                                      .channel_destination = get_queue_for_pv(pv_name)});
   });
   monitor_checker_shrd_ptr->storeMonitorData(monitor_command_vec);

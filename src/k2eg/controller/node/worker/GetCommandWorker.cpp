@@ -40,10 +40,10 @@ GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
   if (command->type != CommandType::get) { return; }
 
   ConstGetCommandShrdPtr g_ptr = static_pointer_cast<const GetCommand>(command);
-  logger->logMessage(STRING_FORMAT("Perform get command for %1% with protocol %2% on topic %3% with sertype: %4%",
-                                   g_ptr->pv_name % g_ptr->protocol % g_ptr->reply_topic % serialization_to_string(g_ptr->serialization)),
+  logger->logMessage(STRING_FORMAT("Perform get command for %1% on topic %2% with sertype: %3%",
+                                   g_ptr->pv_name % g_ptr->reply_topic % serialization_to_string(g_ptr->serialization)),
                      LogLevel::DEBUG);
-  auto get_op = epics_service_manager->getChannelData(g_ptr->pv_name, g_ptr->protocol);
+  auto get_op = epics_service_manager->getChannelData(g_ptr->pv_name);
   if (!get_op) {
     manageFaultyReply(-1, "PV name malformed", g_ptr);
   } else {

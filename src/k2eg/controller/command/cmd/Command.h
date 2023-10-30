@@ -28,7 +28,7 @@ command_type_to_string(CommandType t) noexcept {
 
 #define KEY_COMMAND            "command"
 #define KEY_SERIALIZATION      "serialization"
-#define KEY_PROTOCOL           "protocol"
+// #define KEY_PROTOCOL           "protocol"
 #define KEY_PV_NAME            "pv_name"
 #define KEY_PV_NAME_LIST       "pv_name_list"
 #define KEY_ACTIVATE           "activate"
@@ -45,7 +45,6 @@ struct Command {
   k2eg::common::SerializationType serialization;
   std::string                     reply_topic;
   std::string                     reply_id;
-  std::string                     protocol;
 };
 DEFINE_PTR_TYPES(Command)
 
@@ -61,8 +60,7 @@ tag_invoke(boost::json::value_from_tag, boost::json::value &jv, Command const &c
   jv = {
     {"serialization", serialization_to_string(c.serialization)}, 
     {"reply_topic", c.reply_topic},
-    {"reply_id", c.reply_id},
-    {"protocol", c.protocol}
+    {"reply_id", c.reply_id}
   };
 }
 

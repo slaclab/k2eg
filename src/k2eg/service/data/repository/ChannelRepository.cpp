@@ -48,8 +48,7 @@ ChannelRepository::remove(const ChannelMonitorType& channel_description) {
 bool
 ChannelRepository::isPresent(const ChannelMonitorType& new_cannel) const {
   auto result = data_storage.getLockedStorage().get()->count<ChannelMonitorType>(
-      where(c(&ChannelMonitorType::pv_name) == new_cannel.pv_name and c(&ChannelMonitorType::channel_protocol) == new_cannel.channel_protocol and
-            c(&ChannelMonitorType::channel_destination) == new_cannel.channel_destination));
+      where(c(&ChannelMonitorType::pv_name) == new_cannel.pv_name and c(&ChannelMonitorType::channel_destination) == new_cannel.channel_destination));
   return result != 0;
 }
 
@@ -75,7 +74,7 @@ ChannelMonitorDistinctResultType
 ChannelRepository::getDistinctByNameProtocol() const {
   auto locked_instance = data_storage.getLockedStorage();
   auto lstorage        = locked_instance.get();
-  auto result          = lstorage->select(distinct(columns(&ChannelMonitorType::pv_name, &ChannelMonitorType::channel_protocol)));
+  auto result          = lstorage->select(distinct(columns(&ChannelMonitorType::pv_name)));
   return result;
 }
 

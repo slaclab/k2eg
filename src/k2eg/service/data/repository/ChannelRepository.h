@@ -14,7 +14,6 @@ struct ChannelMonitorType {
     int64_t id = -1;
     std::string pv_name;
     std::uint8_t event_serialization;
-    std::string channel_protocol;
     std::string channel_destination;
     bool processed = false;
     int64_t counter = 1;
@@ -30,7 +29,6 @@ inline ChannelMonitorType toChannelMonitor(const k2eg::controller::command::cmd:
     return ChannelMonitorType {
         .pv_name = acquire_command.pv_name, 
         .event_serialization = static_cast<std::uint8_t>(acquire_command.serialization),
-        .channel_protocol = acquire_command.protocol,
         .channel_destination = acquire_command.monitor_destination_topic
     };
 }
@@ -41,7 +39,6 @@ inline  k2eg::controller::command::cmd::ConstCommandShrdPtr  fromChannelMonitor(
         static_cast<k2eg::common::SerializationType>(command.event_serialization),
         "",
         "",
-        command.channel_protocol,
         command.pv_name, 
         true,
         command.channel_destination
@@ -50,7 +47,7 @@ inline  k2eg::controller::command::cmd::ConstCommandShrdPtr  fromChannelMonitor(
 
 typedef std::unique_ptr<ChannelMonitorType> ChannelMonitorTypeUPtr;
 typedef std::function<void(uint32_t index, const ChannelMonitorType&)> ChannelMonitorTypeProcessHandler;
-typedef std::vector<std::tuple<std::string, std::string>> ChannelMonitorDistinctResultType;
+typedef std::vector<std::tuple<std::string>> ChannelMonitorDistinctResultType;
 class ChannelRepository {
     friend class k2eg::service::data::DataStorage;
     DataStorage& data_storage;
