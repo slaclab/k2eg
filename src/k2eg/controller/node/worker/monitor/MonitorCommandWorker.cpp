@@ -93,8 +93,11 @@ MonitorCommandWorker::~MonitorCommandWorker() {
 void
 MonitorCommandWorker::handleRestartMonitorTask(TaskProperties& task_properties) {
   std::lock_guard<std::mutex> lock(periodic_task_mutex);
-  logger->logMessage("[ Automatic Task ] Restart monitor requests");
+  logger->logMessage("[ Startup Task ] Restart monitor requests");
   task_properties.completed = !(starting_up = monitor_checker_shrd_ptr->scanForRestart());
+  if(!starting_up) {
+    logger->logMessage("[ Startup Task ] Startup completed");
+  }
 }
 
 void
@@ -102,7 +105,10 @@ MonitorCommandWorker::handlePeriodicTask(TaskProperties& task_properties) {
   std::lock_guard<std::mutex> lock(periodic_task_mutex);
   logger->logMessage("[ Automatic Task ] Checking active monitor");
   auto processed = monitor_checker_shrd_ptr->scanForMonitorToStop();
-  if (!processed) monitor_checker_shrd_ptr->resetMonitorToProcess();
+  if (!processed){
+    monitor_checker_shrd_ptr->resetMonitorToProcess();
+    logger->logMessage("[ Automatic Task ] All monitor has been checked");
+  }
 }
 
 void
