@@ -235,6 +235,7 @@ exstractJsonObjectThatContainsKey(std::vector<PublishMessageSharedPtr>& messages
   for (int idx = 0; idx < messages.size(); idx++) {
     if (messages[idx]->getQueue().compare(published_on_topic) != 0) continue;
     auto json_obj = getJsonObject(*messages[idx]);
+    std::cout<<json_obj<< std::endl;
     if (json_obj.contains(key_to_find)) { return json_obj; }
   }
   return boost::json::object();

@@ -17,7 +17,6 @@ using namespace k2eg::common;
 using namespace k2eg::service::epics_impl;
 
 #define SELECT_PROVIDER(p)      (p.find("pva") == 0 ? *pva_provider : *ca_provider)
-#define CHANNEL_MAP_KEY(pv_uri) STRING_FORMAT("%1%://%2%", pv_uri->protocol%pv_uri->name)
 
 EpicsServiceManager::EpicsServiceManager() : end_processing(false), processing_pool(2) {
   pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
@@ -36,12 +35,11 @@ EpicsServiceManager::addChannel(const std::string& pv_name_uri) {
   std::unique_lock guard(channel_map_mutex);
   auto             sanitized_pv = sanitizePVName(pv_name_uri);
   if (!sanitized_pv) return;
-  if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end()) { return; }
-
   try {
-    auto pv_map_key                               = CHANNEL_MAP_KEY(sanitized_pv);
-    channel_map[pv_map_key]                        = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name);
-    ConstMonitorOperationShrdPtr monitor_operation = channel_map[pv_map_key]->monitor();
+
+    if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end()) { return; }
+    channel_map[sanitized_pv->name]                        = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name);
+    ConstMonitorOperationShrdPtr monitor_operation = channel_map[sanitized_pv->name]->monitor();
     // lock and insert in queue
     processing_pool.push_task(&EpicsServiceManager::task, this, monitor_operation);
   } catch (std::exception& ex) {
@@ -71,11 +69,10 @@ EpicsServiceManager::removeChannel(const std::string& pv_name_uri) {
   std::lock_guard guard(channel_map_mutex);
   auto            sanitized_pv = sanitizePVName(pv_name_uri);
   if (!sanitized_pv) return;
-  auto pv_map_key = CHANNEL_MAP_KEY(sanitized_pv);
-  channel_map.erase(pv_map_key);
+  channel_map.erase(sanitized_pv->name);
 
   std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
-  pv_to_remove.insert(pv_map_key);
+  pv_to_remove.insert(sanitized_pv->name);
 }
 
 void

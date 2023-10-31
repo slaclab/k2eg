@@ -119,7 +119,12 @@ MonitorCommandWorker::executePeriodicTask() {
 
 void
 MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_data) {
-  auto& vec_ref = channel_topics_map[checker_event_data.monitor_type.pv_name];
+   auto sanitized_pv = epics_service_manager->sanitizePVName(checker_event_data.monitor_type.pv_name);
+  if(!sanitized_pv) {
+    logger->logMessage(STRING_FORMAT("Error on sanitization for '%1%'", checker_event_data.monitor_type.pv_name ));
+    return;
+  }
+  auto& vec_ref = channel_topics_map[sanitized_pv->name];
   switch (checker_event_data.action) {
     case MonitorHandlerAction::Start: {
       logger->logMessage(STRING_FORMAT("Activate monitor on '%1%' for topic '%2%'",
@@ -128,7 +133,7 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
       if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&checker_event_data](auto& info_topic) {
             return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
           }) == std::end(vec_ref)) {
-        channel_topics_map[checker_event_data.monitor_type.pv_name].push_back(
+        channel_topics_map[sanitized_pv->name].push_back(
             MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
         epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, true);
       } else {
@@ -206,10 +211,16 @@ MonitorCommandWorker::manage_multiple_monitor(k2eg::controller::command::cmd::Co
   auto                            cmd_ptr  = static_pointer_cast<const MultiMonitorCommand>(command);
   std::vector<ChannelMonitorType> monitor_command_vec;
   std::ranges::for_each(cmd_ptr->pv_name_list, [&cmd_ptr, &monitor_command_vec, this](const std::string& pv_name) {
+    //extract all pv component
+    auto sanitized_pv = epics_service_manager->sanitizePVName(pv_name);
+    if(!sanitized_pv) {
+      logger->logMessage(STRING_FORMAT("Error on sanitization for '%1%'", pv_name));
+      return;
+    }
     monitor_command_vec.push_back(ChannelMonitorType{.pv_name             = pv_name,
                                                      .event_serialization = static_cast<std::uint8_t>(cmd_ptr->serialization),
                                                     //  .channel_protocol    = cmd_ptr->protocol,
-                                                     .channel_destination = get_queue_for_pv(pv_name)});
+                                                     .channel_destination = get_queue_for_pv(sanitized_pv->name)});
   });
   monitor_checker_shrd_ptr->storeMonitorData(monitor_command_vec);
   manageReply(0, "Monitor activated", cmd_ptr);
