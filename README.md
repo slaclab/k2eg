@@ -21,14 +21,13 @@ Actual implementation receive command and interpret command and uses only JSON s
 - [X] Put Command
     - Scalar
     - ScalarArray
-- [ ] Info Command
 
 ### Functional Task List
 - [x] JSON Serialization
 - [X] MSGPack Binary serialization
 - [X] MSGPack compact serialization
+- [X] Multithreading EPICS Monitor
 - [ ] Cluster implementation
-- [ ] Multithreading EPICS Monitor
 ```
 For the serialization and message format see documentation [here](doc/message-format.md)
 ## Application Architecture
@@ -134,8 +133,7 @@ This implemets the base caget|pvaget fucntion of epics command, if possible will
 {
     "command": "get",
     "serialization": "json|msgpack",
-    "protocol": "pva|ca",
-    "pv_name": "channel::a",
+    "pv_name": "(pva|ca)://PV_NAME",
     "reply_topic": "reply-destination-topic",
     "reply_id": "reply id"
 }
@@ -149,34 +147,34 @@ Monitor Activation
 {
     "command": "monitor",
     "serialization": "json|msgpack",
-    "protocol": "pva|ca",
-    "pv_name": "pv name",
+    "pv_name": "(pva|ca)://PV_NAME",
     "reply_topic": "reply-destination-topic",
     "reply_id":"reply id",
-    "activate": true,
     "monitor_destination_topic":"alternate-destination-topic"
 }
 ```
 
-Monitor deactivation
+Multi Monitor Activation
 ```json
 {
     "command": "monitor",
-    "pv_name": "pv name",
+    "serialization": "json|msgpack",
+    "pv_name": ["(pva|ca)://PV_NAME", ....],
     "reply_topic": "reply-destination-topic",
     "reply_id":"reply id",
-    "activate": false,
     "monitor_destination_topic":"alternate-destination-topic"
 }
 ```
+
+The Monitor deactivation is managed by k2eg itself
+
 ### Put command
 Put comamdn permit to change the value field of a PV. The value need to be string that will be automatically converted to the type of the
 PV. The put command can send a reply with the result of the put operation, in this case the ***dest_topic*** field si mandatory and the ***reply_id*** field is nto mandatory and it is forwarded, into the reply message.
 ```json
 {
     "command": "monitor",
-    "pv_name": "pv name",
-    "protocol": "pva|ca",
+    "pv_name": "(pva|ca)://PV_NAME.attribute",
     "value": "pv new value",
     "reply_topic": "reply-destination-topic",
     "reply_id":"reply id"
