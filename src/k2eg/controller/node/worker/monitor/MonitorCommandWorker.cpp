@@ -233,7 +233,7 @@ MonitorCommandWorker::isReady() {
 
 void
 MonitorCommandWorker::manageReply(const std::int8_t error_code, const std::string& error_message, ConstCommandShrdPtr cmd) {
-  logger->logMessage(error_message, LogLevel::ERROR);
+  logger->logMessage(error_message);
   if (cmd->reply_topic.empty() || cmd->reply_id.empty()) {
     return;
   } else {
