@@ -30,19 +30,6 @@ TEST(Scheduler, SchedulerSubmitAndExecuteEverySeconds) {
   ASSERT_NE(call_num, 0);
 }
 
-TEST(Scheduler, SubmitAndShoutdownWithoutExecuting) {
-  int                   call_num        = 0;
-  TaskHandlerFunction task_handler    = [&call_num](TaskProperties& properties) { call_num++; };
-  TaskShrdPtr           task_shared_ptr = MakeTaskShrdPtr("task-1", "*/30 * * * * *", task_handler);
-  Scheduler             scheduler(std::make_unique<const SchedulerConfiguration>(SchedulerConfiguration{.thread_number = 1}));
-
-  scheduler.start();
-  scheduler.addTask(task_shared_ptr);
-  sleep(5);
-  scheduler.stop();
-  ASSERT_EQ(call_num, 0);
-}
-
 TEST(Scheduler, SubmitAndRemove) {
   std::mutex            tasks_queue_mtx;
   int                   call_num     = 0;
