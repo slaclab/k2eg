@@ -31,7 +31,6 @@ command_type_to_string(CommandType t) noexcept {
 // #define KEY_PROTOCOL           "protocol"
 #define KEY_PV_NAME            "pv_name"
 #define KEY_PV_NAME_LIST       "pv_name_list"
-#define KEY_ACTIVATE           "activate"
 #define KEY_REPLY_TOPIC        "reply_topic"
 #define KEY_MONITOR_DEST_TOPIC "monitor_dest_topic"
 #define KEY_VALUE              "value"

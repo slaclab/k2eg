@@ -67,77 +67,57 @@ MapToCommand::parse(const object& obj) {
   ConstCommandShrdPtr result = nullptr;
   switch (getCMDType(obj)) {
     case CommandType::monitor: {
-      if (auto activation = obj.if_contains(KEY_ACTIVATE); activation != nullptr && activation->is_bool()) {
-        const std::string       reply_id    = check_for_reply_id(obj, logger);
-        const std::string       reply_topic = check_reply_topic(obj, logger);
-        const SerializationType ser_type    = check_for_serialization(obj, SerializationType::JSON, logger);
-        std::string             event_destination_topic;
-        if (auto v = obj.if_contains(KEY_MONITOR_DEST_TOPIC); v != nullptr && v->is_string()) {
-          event_destination_topic = v->as_string();
-        } else {
-          // by default uses the reply topic as monitor event
-          event_destination_topic = reply_topic;
-        }
+      const std::string       reply_id    = check_for_reply_id(obj, logger);
+      const std::string       reply_topic = check_reply_topic(obj, logger);
+      const SerializationType ser_type    = check_for_serialization(obj, SerializationType::JSON, logger);
+      std::string             event_destination_topic;
+      if (auto v = obj.if_contains(KEY_MONITOR_DEST_TOPIC); v != nullptr && v->is_string()) {
+        event_destination_topic = v->as_string();
+      } else {
+        // by default uses the reply topic as monitor event
+        event_destination_topic = reply_topic;
+      }
+      if (!event_destination_topic.empty()) {
+        if (auto fields = checkFields(obj, {{KEY_PV_NAME, kind::string}}); fields != nullptr) {
+          result = std::make_shared<MonitorCommand>(MonitorCommand{CommandType::monitor,
+                                                                    ser_type,
+                                                                    reply_topic,
+                                                                    reply_id,
+                                                                  //  std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
+                                                                    std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
+                                                                    true,
 
-        if (activation->as_bool()) {
-          if (!event_destination_topic.empty()) {
-            if (auto fields = checkFields(obj, {{KEY_PV_NAME, kind::string}}); fields != nullptr) {
-              result = std::make_shared<MonitorCommand>(MonitorCommand{CommandType::monitor,
-                                                                       ser_type,
-                                                                       reply_topic,
-                                                                       reply_id,
-                                                                      //  std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
-                                                                       std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
-                                                                       true,
-
-                                                                       event_destination_topic});
-            } else {
-              logger->logMessage("Missing key for the AquireCommand: " + serialize(obj), LogLevel::ERROR);
-            }
-          } else {
-            logger->logMessage("Impossible to determinate the event destination topic: " + serialize(obj), LogLevel::ERROR);
-          }
+                                                                    event_destination_topic});
         } else {
-          if (auto fields = checkFields(obj, {{KEY_PV_NAME, kind::string}}); fields != nullptr) {
-            result = std::make_shared<MonitorCommand>(MonitorCommand{CommandType::monitor,
-                                                                     ser_type,
-                                                                     reply_topic,
-                                                                     reply_id,
-                                                                     "",
-                                                                    //  std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
-                                                                     false,
-                                                                     event_destination_topic});
-          } else {
-            logger->logMessage("Missing key for the AquireCommand: " + serialize(obj), LogLevel::ERROR);
-          }
+          logger->logMessage("Missing key for the AquireCommand: " + serialize(obj), LogLevel::ERROR);
         }
+      } else {
+        logger->logMessage("Impossible to determinate the event destination topic: " + serialize(obj), LogLevel::ERROR);
       }
       break;
     }
 
     case CommandType::multi_monitor: {
-      if (auto activation = obj.if_contains(KEY_ACTIVATE); activation != nullptr && activation->is_bool()) {
-        const std::string       reply_id    = check_for_reply_id(obj, logger);
-        const std::string       reply_topic = check_reply_topic(obj, logger);
-        const SerializationType ser_type    = check_for_serialization(obj, SerializationType::JSON, logger);
-        if (auto fields = checkFields(obj, {{KEY_PV_NAME_LIST, kind::array}}); fields != nullptr) {
-          std::vector<std::string> pv_name_list;
-          auto                     json_array = std::any_cast<boost::json::array>(fields->find(KEY_PV_NAME_LIST)->second);
-          // find all stirng in the vector
-          for (auto& element : json_array) {
-            if (element.kind() != kind::string) continue;
-            pv_name_list.push_back(value_to<std::string>(element));
-          }
-          if (pv_name_list.size()) {
-            // we can create the command
-            result = std::make_shared<MultiMonitorCommand>(MultiMonitorCommand{
-                CommandType::multi_monitor, ser_type, reply_topic, reply_id, pv_name_list});
-          } else {
-            logger->logMessage("The array should not be empty: " + serialize(obj), LogLevel::ERROR);
-          }
-        } else {
-          logger->logMessage("Missing key for the AquireCommand: " + serialize(obj), LogLevel::ERROR);
+      const std::string       reply_id    = check_for_reply_id(obj, logger);
+      const std::string       reply_topic = check_reply_topic(obj, logger);
+      const SerializationType ser_type    = check_for_serialization(obj, SerializationType::JSON, logger);
+      if (auto fields = checkFields(obj, {{KEY_PV_NAME_LIST, kind::array}}); fields != nullptr) {
+        std::vector<std::string> pv_name_list;
+        auto                     json_array = std::any_cast<boost::json::array>(fields->find(KEY_PV_NAME_LIST)->second);
+        // find all stirng in the vector
+        for (auto& element : json_array) {
+          if (element.kind() != kind::string) continue;
+          pv_name_list.push_back(value_to<std::string>(element));
         }
+        if (pv_name_list.size()) {
+          // we can create the command
+          result = std::make_shared<MultiMonitorCommand>(MultiMonitorCommand{
+              CommandType::multi_monitor, ser_type, reply_topic, reply_id, pv_name_list});
+        } else {
+          logger->logMessage("The array should not be empty: " + serialize(obj), LogLevel::ERROR);
+        }
+      } else {
+        logger->logMessage("Missing key for the AquireCommand: " + serialize(obj), LogLevel::ERROR);
       }
       break;
     }

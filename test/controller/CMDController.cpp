@@ -195,7 +195,7 @@ CMDControllerCommandHandler acquire_test_default_ser = [](ConstCommandShrdPtrVec
   ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->monitor_destination_topic.compare("topic-dest"), 0);
 };
 boost::json::value acquire_default_ser = {
-    {KEY_COMMAND, "monitor"}, {KEY_ACTIVATE, true}, {KEY_PV_NAME, "pva://channel::a"}, {KEY_REPLY_TOPIC, "topic-dest"}};
+    {KEY_COMMAND, "monitor"}, {KEY_PV_NAME, "pva://channel::a"}, {KEY_REPLY_TOPIC, "topic-dest"}};
 
 CMDControllerCommandHandler acquire_test_specific_monitor_dest_topic = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
@@ -208,7 +208,7 @@ CMDControllerCommandHandler acquire_test_specific_monitor_dest_topic = [](ConstC
   ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->monitor_destination_topic.compare("monitor-topic-dest"), 0);
 };
 boost::json::value acquire_specific_monitor_dest_topic = {
-    {KEY_COMMAND, "monitor"}, {KEY_ACTIVATE, true}, {KEY_PV_NAME, "pva://channel::a"}, {KEY_REPLY_TOPIC, "topic-dest"}, {KEY_MONITOR_DEST_TOPIC, "monitor-topic-dest"}};
+    {KEY_COMMAND, "monitor"}, {KEY_PV_NAME, "pva://channel::a"}, {KEY_REPLY_TOPIC, "topic-dest"}, {KEY_MONITOR_DEST_TOPIC, "monitor-topic-dest"}};
 
 CMDControllerCommandHandler acquire_test_json = [](ConstCommandShrdPtrVec received_command) {
   ASSERT_EQ(received_command.size(), 1);
@@ -220,7 +220,6 @@ CMDControllerCommandHandler acquire_test_json = [](ConstCommandShrdPtrVec receiv
   ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->monitor_destination_topic.compare("topic-dest"), 0);
 };
 boost::json::value acquire_json = {{KEY_COMMAND, "monitor"},
-                                   {KEY_ACTIVATE, true},
                                    {KEY_SERIALIZATION, "json"},
                                   //  {KEY_PROTOCOL, "pva"},
                                    {KEY_PV_NAME, "pva://channel::a"},
@@ -237,7 +236,6 @@ CMDControllerCommandHandler acquire_test_msgpack = [](ConstCommandShrdPtrVec rec
   ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->monitor_destination_topic.compare("topic-dest"), 0);
 };
 boost::json::value acquire_msgpack = {{KEY_COMMAND, "monitor"},
-                                      {KEY_ACTIVATE, true},
                                       {KEY_SERIALIZATION, "msgpack"},
                                       // {KEY_PROTOCOL, "pva"},
                                       {KEY_PV_NAME, "pva://channel::a"},
@@ -254,7 +252,6 @@ CMDControllerCommandHandler acquire_test_msgpack_compact = [](ConstCommandShrdPt
   ASSERT_EQ(reinterpret_cast<const MonitorCommand*>(received_command[0].get())->monitor_destination_topic.compare("topic-dest"), 0);
 };
 boost::json::value acquire_msgpack_compact = {{KEY_COMMAND, "monitor"},
-                                              {KEY_ACTIVATE, true},
                                               {KEY_SERIALIZATION, "msgpack-compact"},
                                               // {KEY_PROTOCOL, "pva"},
                                               {KEY_PV_NAME, "pva://channel::a"},
