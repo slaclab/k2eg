@@ -95,9 +95,7 @@ MonitorCommandWorker::handleRestartMonitorTask(TaskProperties& task_properties) 
   std::lock_guard<std::mutex> lock(periodic_task_mutex);
   logger->logMessage("[ Startup Task ] Restart monitor requests");
   task_properties.completed = !(starting_up = monitor_checker_shrd_ptr->scanForRestart());
-  if(!starting_up) {
-    logger->logMessage("[ Startup Task ] Startup completed");
-  }
+  if (!starting_up) { logger->logMessage("[ Startup Task ] Startup completed"); }
 }
 
 void
@@ -105,7 +103,7 @@ MonitorCommandWorker::handlePeriodicTask(TaskProperties& task_properties) {
   std::lock_guard<std::mutex> lock(periodic_task_mutex);
   logger->logMessage("[ Automatic Task ] Checking active monitor");
   auto processed = monitor_checker_shrd_ptr->scanForMonitorToStop();
-  if (!processed){
+  if (!processed) {
     monitor_checker_shrd_ptr->resetMonitorToProcess();
     logger->logMessage("[ Automatic Task ] All monitor has been checked");
   }
@@ -119,9 +117,9 @@ MonitorCommandWorker::executePeriodicTask() {
 
 void
 MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_data) {
-   auto sanitized_pv = epics_service_manager->sanitizePVName(checker_event_data.monitor_type.pv_name);
-  if(!sanitized_pv) {
-    logger->logMessage(STRING_FORMAT("Error on sanitization for '%1%'", checker_event_data.monitor_type.pv_name ));
+  auto sanitized_pv = epics_service_manager->sanitizePVName(checker_event_data.monitor_type.pv_name);
+  if (!sanitized_pv) {
+    logger->logMessage(STRING_FORMAT("Error on sanitization for '%1%'", checker_event_data.monitor_type.pv_name));
     return;
   }
   auto& vec_ref = channel_topics_map[sanitized_pv->name];
@@ -133,8 +131,7 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
       if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&checker_event_data](auto& info_topic) {
             return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
           }) == std::end(vec_ref)) {
-        channel_topics_map[sanitized_pv->name].push_back(
-            MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
+        channel_topics_map[sanitized_pv->name].push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
         epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, true);
       } else {
         logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated",
@@ -181,23 +178,17 @@ void
 MonitorCommandWorker::manage_single_monitor(k2eg::controller::command::cmd::ConstCommandShrdPtr command) {
   bool activate = false;
   auto cmd_ptr  = static_pointer_cast<const MonitorCommand>(command);
-  if (cmd_ptr->activate) {
-    if (cmd_ptr->monitor_destination_topic.empty()) {
-      logger->logMessage(STRING_FORMAT("No destination topic found on monitor command for %1%", cmd_ptr->pv_name), LogLevel::ERROR);
-      manageReply(-1, "Empty destination topic", cmd_ptr);
-      return;
-    }
-    // manageStartMonitorCommand(cmd_ptr);
-    monitor_checker_shrd_ptr->storeMonitorData({ChannelMonitorType{.pv_name             = cmd_ptr->pv_name,
-                                                                   .event_serialization = static_cast<std::uint8_t>(cmd_ptr->serialization),
-                                                                  //  .channel_protocol    = cmd_ptr->protocol,
-                                                                   .channel_destination = cmd_ptr->monitor_destination_topic}});
-    manageReply(0, STRING_FORMAT("Monitor activated for %1%", cmd_ptr->pv_name), cmd_ptr);
-  } else {
-    const std::string error_message = STRING_FORMAT("Deactivation for monitor is deprecated[%1%-%2%]", cmd_ptr->pv_name % cmd_ptr->monitor_destination_topic);
-    logger->logMessage(error_message, LogLevel::ERROR);
-    manageReply(-1, error_message, cmd_ptr);
+  if (cmd_ptr->monitor_destination_topic.empty()) {
+    logger->logMessage(STRING_FORMAT("No destination topic found on monitor command for %1%", cmd_ptr->pv_name), LogLevel::ERROR);
+    manageReply(-1, "Empty destination topic", cmd_ptr);
+    return;
   }
+  // manageStartMonitorCommand(cmd_ptr);
+  monitor_checker_shrd_ptr->storeMonitorData({ChannelMonitorType{.pv_name             = cmd_ptr->pv_name,
+                                                                 .event_serialization = static_cast<std::uint8_t>(cmd_ptr->serialization),
+                                                                 //  .channel_protocol    = cmd_ptr->protocol,
+                                                                 .channel_destination = cmd_ptr->monitor_destination_topic}});
+  manageReply(0, STRING_FORMAT("Monitor activated for %1%", cmd_ptr->pv_name), cmd_ptr);
 }
 
 const std::string
@@ -211,15 +202,15 @@ MonitorCommandWorker::manage_multiple_monitor(k2eg::controller::command::cmd::Co
   auto                            cmd_ptr  = static_pointer_cast<const MultiMonitorCommand>(command);
   std::vector<ChannelMonitorType> monitor_command_vec;
   std::ranges::for_each(cmd_ptr->pv_name_list, [&cmd_ptr, &monitor_command_vec, this](const std::string& pv_name) {
-    //extract all pv component
+    // extract all pv component
     auto sanitized_pv = epics_service_manager->sanitizePVName(pv_name);
-    if(!sanitized_pv) {
+    if (!sanitized_pv) {
       logger->logMessage(STRING_FORMAT("Error on sanitization for '%1%'", pv_name));
       return;
     }
     monitor_command_vec.push_back(ChannelMonitorType{.pv_name             = pv_name,
                                                      .event_serialization = static_cast<std::uint8_t>(cmd_ptr->serialization),
-                                                    //  .channel_protocol    = cmd_ptr->protocol,
+                                                     //  .channel_protocol    = cmd_ptr->protocol,
                                                      .channel_destination = get_queue_for_pv(sanitized_pv->name)});
   });
   monitor_checker_shrd_ptr->storeMonitorData(monitor_command_vec);

@@ -56,6 +56,9 @@ CMDController::consume() {
           } else {
             // incrementing bad command metric
             metric.incrementCounter(ICMDControllerMetricCounterType::BadCommand);
+            // log the bad received command
+            logger->logMessage(STRING_FORMAT("Bad received command: %1%", std::string(message->data.get(), message->data_len)),
+                             LogLevel::ERROR);
           }
         } catch (std::exception& ex) {
           logger->logMessage(STRING_FORMAT("Error: '%1%' parsing command: %2%", std::string(ex.what()) % std::string(message->data.get(), message->data_len)),
