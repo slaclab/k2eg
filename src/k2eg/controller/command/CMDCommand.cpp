@@ -21,6 +21,8 @@ MapToCommand::getCMDType(const object& obj) {
     const auto cmd = v->as_string();
     if (cmd.compare("monitor") == 0)
       return CommandType::monitor;
+    else if (cmd.compare("multi-monitor") == 0)
+      return CommandType::multi_monitor;
     else if (cmd.compare("get") == 0)
       return CommandType::get;
     else if (cmd.compare("put") == 0)
@@ -85,8 +87,6 @@ MapToCommand::parse(const object& obj) {
                                                                     reply_id,
                                                                   //  std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
                                                                     std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
-                                                                    true,
-
                                                                     event_destination_topic});
         } else {
           logger->logMessage("Missing key for the AquireCommand: " + serialize(obj), LogLevel::ERROR);

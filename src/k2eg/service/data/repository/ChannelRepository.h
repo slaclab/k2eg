@@ -39,8 +39,7 @@ inline  k2eg::controller::command::cmd::ConstCommandShrdPtr  fromChannelMonitor(
         static_cast<k2eg::common::SerializationType>(command.event_serialization),
         "",
         "",
-        command.pv_name, 
-        true,
+        command.pv_name,
         command.channel_destination
     });
 }

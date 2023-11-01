@@ -275,7 +275,7 @@ TEST(NodeController, MonitorCommandJsonSerByDefault) {
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)) { sleep(1); }
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{
-      CommandType::monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+      CommandType::monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
 
   work_done.wait();
   // reduce the number of consumer
@@ -315,7 +315,7 @@ TEST(NodeController, MonitorCommandSpecifySpecificMonitorEventTopic) {
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)) { sleep(1); }
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
-      MonitorCommand{CommandType::monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", true, "alternate_topic"})}););
+      MonitorCommand{CommandType::monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp","alternate_topic"})}););
 
   work_done.wait();
 
@@ -358,7 +358,7 @@ TEST(NodeController, MonitorCommandMsgPackSer) {
   while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)) { sleep(1); }
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{
-      CommandType::monitor, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+      CommandType::monitor, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
 
   work_done.wait();
   // reduce the number of consumer
@@ -400,7 +400,7 @@ TEST(NodeController, MonitorCommandMsgPackCompactSer) {
   while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)) { sleep(1); }
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{
-      CommandType::monitor, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+      CommandType::monitor, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
 
   work_done.wait();
   // stop acquire
@@ -437,13 +437,13 @@ TEST(NodeController, MonitorCommandAfterReboot) {
   std::latch work_done{2};
   std::latch work_done_2{5};
   auto       publisher       = std::make_shared<DummyPublisher>(work_done);
-  auto       node_controller = initBackend(publisher, true, true);
+  auto       node_controller = initBackend(publisher, true);
 
   while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)) { sleep(1); }
 
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{
-      CommandType::monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", true, KAFKA_TOPIC_ACQUIRE_IN})}););
+      CommandType::monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
 
   work_done.wait();
   // we need to have publish some message
@@ -951,7 +951,7 @@ TEST(NodeController, RandomCommand) {
       case 0: {
         std::this_thread::sleep_for(std::chrono::milliseconds(uniform_dist_sleep(e1)));
         EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(
-            MonitorCommand{CommandType::monitor, SerializationType::JSON, "", "", "pva://channel:ramp:ramp", true})}););
+            MonitorCommand{CommandType::monitor, SerializationType::JSON, "", "", "pva://channel:ramp:ramp"})}););
         break;
       }
       case 1: {
