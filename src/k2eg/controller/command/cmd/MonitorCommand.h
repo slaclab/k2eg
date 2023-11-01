@@ -23,7 +23,7 @@ static void
 tag_invoke(boost::json::value_from_tag, boost::json::value& jv, MonitorCommand const& c) {
   jv = {{"serialization", serialization_to_string(c.serialization)},
         {"pv_name", c.pv_name},
-        {"protocol", c.protocol},
+        // {"protocol", c.protocol},
         {"activate", c.activate},
         {"reply_id", c.reply_id},
         {"reply_topic", c.reply_topic},
@@ -39,7 +39,7 @@ static void
 tag_invoke(boost::json::value_from_tag, boost::json::value& jv, MultiMonitorCommand const& c) {
   jv = {{"serialization", serialization_to_string(c.serialization)},
         {"pv_name", c.pv_name_list},
-        {"protocol", c.protocol},
+        // {"protocol", c.protocol},
         {"reply_id", c.reply_id},
         {"reply_topic", c.reply_topic}};
 }

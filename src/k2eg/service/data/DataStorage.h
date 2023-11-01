@@ -21,7 +21,7 @@ initStorage(const std::string &path) {
                                  make_column("id", &repository::ChannelMonitorType::id, primary_key().autoincrement()),
                                  make_column("pv_name", &repository::ChannelMonitorType::pv_name),
                                  make_column("event_serialization", &repository::ChannelMonitorType::event_serialization),
-                                 make_column("channel_protocol", &repository::ChannelMonitorType::channel_protocol),
+                                //  make_column("channel_protocol", &repository::ChannelMonitorType::channel_protocol),
                                  make_column("channel_destination", &repository::ChannelMonitorType::channel_destination),
                                  make_column("processed", &repository::ChannelMonitorType::processed),
                                  make_column("start_purge_ts", &repository::ChannelMonitorType::start_purge_ts)));

@@ -1,3 +1,4 @@
+#include <k2eg/common/utility.h>
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
@@ -15,6 +16,8 @@
 using namespace k2eg::common;
 using namespace k2eg::service::epics_impl;
 
+#define SELECT_PROVIDER(p)      (p.find("pva") == 0 ? *pva_provider : *ca_provider)
+
 EpicsServiceManager::EpicsServiceManager() : end_processing(false), processing_pool(2) {
   pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
   ca_provider  = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
@@ -27,22 +30,23 @@ EpicsServiceManager::~EpicsServiceManager() {
   ca_provider->reset();
 }
 
-#define SELECT_PROVIDER(p) (protocol.find("pva") == 0 ? *pva_provider : *ca_provider)
-
 void
-EpicsServiceManager::addChannel(const std::string& pv_name, const std::string& protocol) {
+EpicsServiceManager::addChannel(const std::string& pv_name_uri) {
   std::unique_lock guard(channel_map_mutex);
-  if (auto search = channel_map.find(pv_name); search != channel_map.end()) { return; }
+  auto             sanitized_pv = sanitizePVName(pv_name_uri);
+  if (!sanitized_pv) return;
   try {
-    channel_map[pv_name]                           = std::make_shared<EpicsChannel>(SELECT_PROVIDER(protocol), pv_name);
-    ConstMonitorOperationShrdPtr monitor_operation = channel_map[pv_name]->monitor();
+
+    if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end()) { return; }
+    channel_map[sanitized_pv->name]                        = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name);
+    ConstMonitorOperationShrdPtr monitor_operation = channel_map[sanitized_pv->name]->monitor();
     // lock and insert in queue
     processing_pool.push_task(&EpicsServiceManager::task, this, monitor_operation);
   } catch (std::exception& ex) {
-    channel_map.erase(pv_name);
+    channel_map.erase(sanitized_pv->name);
     throw ex;
   } catch (...) {
-    channel_map.erase(pv_name);
+    channel_map.erase(sanitized_pv->name);
     throw std::runtime_error("Unknown error during channel registration");
   }
 }
@@ -61,54 +65,56 @@ EpicsServiceManager::getMonitoredChannels() {
 }
 
 void
-EpicsServiceManager::removeChannel(const std::string& pv_name) {
+EpicsServiceManager::removeChannel(const std::string& pv_name_uri) {
   std::lock_guard guard(channel_map_mutex);
-  channel_map.erase(pv_name);
+  auto            sanitized_pv = sanitizePVName(pv_name_uri);
+  if (!sanitized_pv) return;
+  channel_map.erase(sanitized_pv->name);
 
   std::lock_guard<std::mutex> lock(monitor_op_queue_mutx);
-  pv_to_remove.insert(pv_name);
+  pv_to_remove.insert(sanitized_pv->name);
 }
 
 void
-EpicsServiceManager::monitorChannel(const std::string& pv_name, bool activate, const std::string& protocol) {
+EpicsServiceManager::monitorChannel(const std::string& pv_identification, bool activate) {
   if (activate) {
-    addChannel(pv_name, protocol);
+    addChannel(pv_identification);
   } else {
-    removeChannel(pv_name);
+    removeChannel(pv_identification);
   }
 }
 
 ConstGetOperationUPtr
-EpicsServiceManager::getChannelData(const std::string& pv_name, const std::string& protocol) {
+EpicsServiceManager::getChannelData(const std::string& pv_name_uri) {
   ConstGetOperationUPtr result;
   std::unique_lock      guard(channel_map_mutex);
+  auto                  sanitized_pv = sanitizePVName(pv_name_uri);
   // give a sanitization on pvname, the value will be not used cause k2eg return always all information
-  auto pv = sanitizePVName(pv_name);
-  if(!pv) {return ConstGetOperationUPtr();}
-  if (auto search = channel_map.find(pv->name); search != channel_map.end()) {
+  if (!sanitized_pv) { return ConstGetOperationUPtr(); }
+  if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end()) {
     // the same channel is in monitor so we can use it
     result = search->second->get();
   } else {
     // allocate channel and return data
-    auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), pv->name);
+    auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name);
     result       = channel->get();
   }
   return result;
 }
 
 ConstPutOperationUPtr
-EpicsServiceManager::putChannelData(const std::string& pv_name, const std::string& value, const std::string& protocol) {
+EpicsServiceManager::putChannelData(const std::string& pv_name_uri, const std::string& value) {
   ConstPutOperationUPtr result;
   std::unique_lock      guard(channel_map_mutex);
 
-  auto pv = sanitizePVName(pv_name);
-  if(!pv) {return ConstPutOperationUPtr();}
+  auto pv = sanitizePVName(pv_name_uri);
+  if (!pv) { return ConstPutOperationUPtr(); }
   if (auto search = channel_map.find(pv->name); search != channel_map.end()) {
     // the same channel is in monitor so we can use it
     result = search->second->put(pv->field, value);
   } else {
     // allocate channel and return data
-    auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(protocol), pv->name);
+    auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(pv->protocol), pv->name);
     result       = channel->put(pv->field, value);
   }
   return result;
@@ -161,26 +167,27 @@ EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op) {
 }
 
 // regex for IOC name
-std::regex pv_name_regex("^([a-zA-Z0-9-_]+(?::[a-zA-Z0-9-_]+)*)(\\.([a-zA-Z0-9-_]+(?:\\.[a-zA-Z0-9_]+)*))?$");
-
+std::regex pv_name_regex("^(pva?|ca)://([a-zA-Z0-9-_]+(?::[a-zA-Z0-9-_]+)*)(\\.([a-zA-Z0-9-_]+(?:\\.[a-zA-Z0-9_]+)*))?$");
 PVUPtr
 EpicsServiceManager::sanitizePVName(const std::string& pv_name) {
   std::smatch match;
+  std::string protocol;
   std::string base_pv_name;
   std::string field_name = "value";
   // Use std::regex_match to check if pvName matches regExp
-  if (!std::regex_match(pv_name, match, pv_name_regex)) {
-    return PVUPtr();
-  }
+  if (!std::regex_match(pv_name, match, pv_name_regex)) { return PVUPtr(); }
 
   size_t matches = match.size();
   // Access the groups: match[1] is the PV name without field, match[3] is the field including the '.'
-  if (matches > 1) { base_pv_name = match[1].str(); }
+  if (matches > 2) {
+    protocol     = match[1].str();
+    base_pv_name = match[2].str();
+  }
   // try to decode the multy dot field part
-  if (match.size() == 4) {
-    std::string tmp = match[3].str();
+  if (match.size() == 5) {
+    std::string tmp = match[4].str();
     // Remove the '.' from the start of the field name
     if (!tmp.empty()) { field_name = tmp; }
   }
-  return std::make_unique<PV>(PV{base_pv_name, field_name});
+  return std::make_unique<PV>(PV{protocol, base_pv_name, field_name});
 }

@@ -197,13 +197,22 @@ struct HandlerClass {
   handler(EpicsServiceManagerHandlerParamterType event) {
     event_received = event;
     work_done.count_down();
-  }
+  } 
 };
+
+TEST(Epics, EpicsServiceManagerPVSanitizationfailWithNoProtocol) {
+  PVUPtr                pv_desc;
+  std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
+  EXPECT_NO_THROW(pv_desc = manager->sanitizePVName("VGXX-L3B-1602-PLOG"););
+  EXPECT_EQ(pv_desc, nullptr);
+  manager.reset();
+}
 
 TEST(Epics, EpicsServiceManagerPVSanitizationUppercaseAndDash) {
   PVUPtr                pv_desc;
   std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-  EXPECT_NO_THROW(pv_desc = manager->sanitizePVName("VGXX-L3B-1602-PLOG"););
+  EXPECT_NO_THROW(pv_desc = manager->sanitizePVName("pva://VGXX-L3B-1602-PLOG"););
+  EXPECT_STREQ(pv_desc->protocol.c_str(), "pva");
   EXPECT_STREQ(pv_desc->name.c_str(), "VGXX-L3B-1602-PLOG");
   EXPECT_STREQ(pv_desc->field.c_str(), "value");
   manager.reset();
@@ -212,7 +221,8 @@ TEST(Epics, EpicsServiceManagerPVSanitizationUppercaseAndDash) {
 TEST(Epics, EpicsServiceManagerPVSanitization) {
   PVUPtr                pv_desc;
   std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-  EXPECT_NO_THROW(pv_desc = manager->sanitizePVName("variable:a.HIHI"););
+  EXPECT_NO_THROW(pv_desc = manager->sanitizePVName("ca://variable:a.HIHI"););
+  EXPECT_STREQ(pv_desc->protocol.c_str(), "ca");
   EXPECT_STREQ(pv_desc->name.c_str(), "variable:a");
   EXPECT_STREQ(pv_desc->field.c_str(), "HIHI");
   manager.reset();
@@ -229,7 +239,8 @@ TEST(Epics, EpicsServiceManagerPVSanitizationWithNoName) {
 TEST(Epics, EpicsServiceManagerPVSanitizationOkWithMultipleLevelStructure) {
   PVUPtr                pv_desc;
   std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-  EXPECT_NO_THROW(pv_desc = manager->sanitizePVName("variable:a.root.field"););
+  EXPECT_NO_THROW(pv_desc = manager->sanitizePVName("pva://variable:a.root.field"););
+  EXPECT_STREQ(pv_desc->protocol.c_str(), "pva");
   EXPECT_STREQ(pv_desc->name.c_str(), "variable:a");
   EXPECT_STREQ(pv_desc->field.c_str(), "root.field");
   manager.reset();
@@ -240,7 +251,7 @@ TEST(Epics, EpicsServiceManagerMonitorOk) {
   k2eg::common::BroadcastToken         handler_tok;
   std::unique_ptr<EpicsServiceManager> monitor = std::make_unique<EpicsServiceManager>();
   EXPECT_NO_THROW(handler_tok = monitor->addHandler(std::bind(&HandlerClass::handler, &handler, std::placeholders::_1)););
-  EXPECT_NO_THROW(monitor->addChannel("channel:ramp:ramp"););
+  EXPECT_NO_THROW(monitor->addChannel("pva://channel:ramp:ramp"););
   handler.work_done.wait();
   EXPECT_EQ(handler.event_received->event_data->size() > 0, true);
   monitor.reset();
@@ -251,7 +262,7 @@ TEST(Epics, EpicsServiceManagerWrongMonitoredDevices) {
   k2eg::common::BroadcastToken         handler_tok;
   std::unique_ptr<EpicsServiceManager> monitor = std::make_unique<EpicsServiceManager>();
   EXPECT_NO_THROW(handler_tok = monitor->addHandler(std::bind(&HandlerClass::handler, &handler, std::placeholders::_1)););
-  EXPECT_NO_THROW(monitor->addChannel("ca", "wrong::device"););
+  EXPECT_NO_THROW(monitor->addChannel("pva://wrong::device"););
   std::this_thread::sleep_for(std::chrono::milliseconds(250));
   EXPECT_EQ(handler.event_received->event_timeout->size() == 0, true);
   monitor.reset();
@@ -259,7 +270,7 @@ TEST(Epics, EpicsServiceManagerWrongMonitoredDevices) {
 
 TEST(Epics, EpicsServiceManagerAddRemove) {
   std::unique_ptr<EpicsServiceManager> monitor = std::make_unique<EpicsServiceManager>();
-  EXPECT_NO_THROW(monitor->addChannel("wrong::device", "pva"););
+  EXPECT_NO_THROW(monitor->addChannel("pva://wrong::device"););
   EXPECT_NO_THROW(monitor->removeChannel("wrong::device"););
   EXPECT_EQ(monitor->getChannelMonitoredSize(), 0);
   monitor.reset();
@@ -281,13 +292,13 @@ TEST(Epics, EpicsServiceManagerGetPut) {
   ConstPutOperationUPtr                put_op_a;
   ConstPutOperationUPtr                put_op_b;
   std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-  EXPECT_NO_THROW(put_op_a = manager->putChannelData("variable:a","1"););
+  EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://variable:a","1"););
   WHILE(put_op_a->isDone(), false);
-  EXPECT_NO_THROW(put_op_b = manager->putChannelData("variable:b", "2"););
+  EXPECT_NO_THROW(put_op_b = manager->putChannelData("pva://variable:b", "2"););
   WHILE(put_op_b->isDone(), false);
   // give time to update
   std::this_thread::sleep_for(std::chrono::seconds(1));
-  EXPECT_NO_THROW(sum_data = manager->getChannelData("variable:sum"););
+  EXPECT_NO_THROW(sum_data = manager->getChannelData("pva://variable:sum"););
   WHILE(sum_data->isDone(), false);
   EXPECT_EQ(sum_data->getChannelData()->data->getSubField<epics::pvData::PVDouble>("value")->get(), 3);
   manager.reset();
@@ -298,9 +309,9 @@ TEST(Epics, EpicsServiceManagerGetPutWaveForm) {
   ConstPutOperationUPtr                put_op_a;
   ConstPutOperationUPtr                put_op_b;
   std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-  EXPECT_NO_THROW(put_op_a = manager->putChannelData("channel:waveform", "1 2 3 4 5 6 7 8"););
+  EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://channel:waveform", "1 2 3 4 5 6 7 8"););
   WHILE(put_op_a->isDone(), false);
-  EXPECT_NO_THROW(sum_data = manager->getChannelData("channel:waveform"););
+  EXPECT_NO_THROW(sum_data = manager->getChannelData("pva://channel:waveform"););
   WHILE(sum_data->isDone(), false);
   epics::pvData::PVScalarArray::const_shared_pointer arr_result;
   EXPECT_NO_THROW(arr_result = sum_data->getChannelData()->data->getSubField<epics::pvData::PVScalarArray>("value"));
@@ -323,7 +334,7 @@ TEST(Epics, EpicsServiceManagerPutWrongField) {
   ConstPutOperationUPtr                put_op_a;
   ConstPutOperationUPtr                put_op_b;
   std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-  EXPECT_NO_THROW(put_op_a = manager->putChannelData("variable:a.HIHI", "100"););
+  EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://variable:a.HIHI", "100"););
   WHILE(put_op_a->isDone(), false);
   EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::Fail);
   manager.reset();

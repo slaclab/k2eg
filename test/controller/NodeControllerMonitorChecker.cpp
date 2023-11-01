@@ -74,7 +74,7 @@ TEST(NodeControllerMonitorChecker, StartMonitoringSingle) {
     ASSERT_EQ(event_data.action, MonitorHandlerAction::Start);
   };
   auto event_token = checker->addHandler(checker_handler);
-  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pv", .event_serialization = 0, .channel_protocol = "prot-a", .channel_destination = "dest-a"}});
+  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pva://pv", .event_serialization = 0,.channel_destination = "dest-a"}});
   ASSERT_EQ(number_of_start_monitor, 1);
   deinitChecker();
 }
@@ -88,8 +88,8 @@ TEST(NodeControllerMonitorChecker, StartMonitoringSingleEventOnTwoSameMonitorReq
     ASSERT_EQ(event_data.action, MonitorHandlerAction::Start);
   };
   auto event_token = checker->addHandler(checker_handler);
-  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pv", .event_serialization = 0, .channel_protocol = "prot-a", .channel_destination = "dest-a"},
-                             ChannelMonitorType{.pv_name = "pv", .event_serialization = 0, .channel_protocol = "prot-b", .channel_destination = "dest-a"}});
+  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pva://pv", .event_serialization = 0,  .channel_destination = "dest-a"},
+                             ChannelMonitorType{.pv_name = "pva://pv", .event_serialization = 0,  .channel_destination = "dest-a"}});
   ASSERT_EQ(number_of_start_monitor, 1);
   deinitChecker();
 }
@@ -103,8 +103,8 @@ TEST(NodeControllerMonitorChecker, StartMonitoringDubleEventOnTwoSameMonitorRequ
     ASSERT_EQ(event_data.action, MonitorHandlerAction::Start);
   };
   auto event_token = checker->addHandler(checker_handler);
-  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pv", .event_serialization = 0, .channel_protocol = "prot-a", .channel_destination = "dest-a"},
-                             ChannelMonitorType{.pv_name = "pv", .event_serialization = 0, .channel_protocol = "prot-b", .channel_destination = "dest-b"}});
+  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pva://pv", .event_serialization = 0,  .channel_destination = "dest-a"},
+                             ChannelMonitorType{.pv_name = "pva://pv", .event_serialization = 0,  .channel_destination = "dest-b"}});
   ASSERT_EQ(number_of_start_monitor, 2);
   deinitChecker();
 }
@@ -121,7 +121,7 @@ TEST(NodeControllerMonitorChecker, ScanForMonitorToStop) {
     }
   };
   auto event_token = checker->addHandler(checker_handler);
-  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pv", .event_serialization = 0, .channel_protocol = "prot-a", .channel_destination = "dest-a"}});
+  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pva://pv", .event_serialization = 0,  .channel_destination = "dest-a"}});
   ASSERT_EQ(number_of_start_monitor, 1);
   // add a simulated consumer
   dynamic_cast<ControllerConsumerDummyPublisher*>(pub.get())->setConsumerNumber(1);
@@ -165,7 +165,7 @@ TEST(NodeControllerMonitorChecker, SimulateStartMonitorDuringAutomaticStop) {
     }
   });
   auto event_token = checker->addHandler(checker_handler);
-  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pv", .event_serialization = 0, .channel_protocol = "prot-a", .channel_destination = "dest-a"}});
+  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pva://pv", .event_serialization = 0, .channel_destination = "dest-a"}});
   // add a simulated consumer
   dynamic_cast<ControllerConsumerDummyPublisher*>(pub.get())->setConsumerNumber(1);
   while(start_received_signal == 0){sleep(1);}
@@ -176,7 +176,7 @@ TEST(NodeControllerMonitorChecker, SimulateStartMonitorDuringAutomaticStop) {
   checker->setPurgeTimeout(1);
   stop_received_signal.wait();
   //renable 
-  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pv", .event_serialization = 0, .channel_protocol = "prot-a", .channel_destination = "dest-a"}});
+  checker->storeMonitorData({ChannelMonitorType{.pv_name = "pva://pv", .event_serialization = 0, .channel_destination = "dest-a"}});
   // now we need to be called for the delete of the monitor
   while(start_received_signal == 1){sleep(1);}
   ASSERT_EQ(start_received_signal, 2);

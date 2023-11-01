@@ -22,7 +22,7 @@ static void
 tag_invoke(boost::json::value_from_tag, boost::json::value& jv, PutCommand const& c) {
   jv = {{"serialization", c.serialization},
         {"pv_name", c.pv_name},
-        {"protocol", c.protocol},
+        // {"protocol", c.protocol},
         {"reply_topic", c.reply_topic},
         {"value", c.value},
         {"reply_id", c.reply_id}};
