@@ -28,6 +28,22 @@ MonitorOperationImpl::poll(uint element_to_fetch) const {
     tmp_data->copy(*mon.root);
     received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, "", {pv_name, tmp_data}}));
   }
+  if(fetched==0 && force_update) {
+    if(!get_op) {
+      // force to update using a get operation
+      get_op = std::make_unique<SingleGetOperation>(channel, pv_name, field);
+    } else if(get_op->isDone()){
+      // the data is ready
+      auto data_from_get = get_op->getChannelData();
+      received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, "",  {pv_name, data_from_get->data}}));
+      get_op.reset();
+      force_update = false;
+    }
+  } else {
+    // destroy the get operation
+    get_op.reset();
+  }
+
   has_data = !mon.complete();
 }
 
