@@ -3,6 +3,7 @@
 
 #include <k2eg/common/types.h>
 #include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/epics/EpicsGetOperation.h>
 #include <k2eg/service/epics/PVStructureMerger.h>
 #include <pvData.h>
 #include <pva/client.h>
@@ -19,6 +20,8 @@ class MonitorOperation {
   friend class CombinedMonitorOperation;
 
   MonitorOperation() = default;
+protected:
+  bool force_update = false;
  public:
   virtual ~MonitorOperation()                                    = default;
   virtual void                 poll(uint element_to_fetch = 2) const = 0;
@@ -26,6 +29,7 @@ class MonitorOperation {
   virtual bool                 hasData() const                   = 0;
   virtual bool                 hasEvents() const                 = 0;
   virtual const std::string&   getPVName() const                 = 0;
+  void forceUpdate(){force_update = true;};
 };
 DEFINE_PTR_TYPES(MonitorOperation)
 

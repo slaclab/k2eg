@@ -84,6 +84,12 @@ EpicsServiceManager::monitorChannel(const std::string& pv_identification, bool a
   }
 }
 
+void 
+EpicsServiceManager::forceMonitorChannelUpdate(const std::string& pv_name) {
+  std::unique_lock guard(channel_map_mutex);
+
+}
+
 ConstGetOperationUPtr
 EpicsServiceManager::getChannelData(const std::string& pv_name_uri) {
   ConstGetOperationUPtr result;

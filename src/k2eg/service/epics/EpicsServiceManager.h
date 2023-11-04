@@ -50,6 +50,7 @@ public:
     void addChannel(const std::string& pv_name_uri);
     void removeChannel(const std::string& pv_name);
     void monitorChannel(const std::string& pv_identification, bool activate);
+    void forceMonitorChannelUpdate(const std::string& pv_name);
     ConstGetOperationUPtr getChannelData(const std::string& pv_name_uri);
     ConstPutOperationUPtr putChannelData(const std::string& pv_name, const std::string& value);
     size_t getChannelMonitoredSize();

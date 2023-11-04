@@ -251,7 +251,7 @@ MonitorCommandWorker::manageReply(const std::int8_t error_code, const std::strin
 void
 MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType event_received) {
 #ifdef __DEBUG__
-  logger->logMessage(STRING_FORMAT("Received epics monitor %1% events data", event_received->event_data->size()), LogLevel::TRACE);
+  logger->logMessage(STRING_FORMAT("Received epics monitor with %1% events data", event_received->event_data->size()), LogLevel::TRACE);
 #endif
   //----------update metric--------
   metric.incrementCounter(IEpicsMetricCounterType::MonitorData, event_received->event_data->size());
