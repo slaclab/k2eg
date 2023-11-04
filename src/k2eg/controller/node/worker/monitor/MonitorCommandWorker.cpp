@@ -132,6 +132,16 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
             return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
           }) == std::end(vec_ref)) {
         channel_topics_map[sanitized_pv->name].push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
+        logger->logMessage(STRING_FORMAT("Create topic for '%1%' with name '%2%'",
+                                         checker_event_data.monitor_type.pv_name % get_queue_for_pv(sanitized_pv->name)));
+        publisher->createQueue(QueueDescription{
+            .name = get_queue_for_pv(sanitized_pv->name),
+            .paritions = 1,
+            .replicas = 3,
+            .retention_time = 1000*60*60,
+            .retention_size = 1024*1024*50,
+        });
+        logger->logMessage(STRING_FORMAT("Start monitoring topic for '%1%'", checker_event_data.monitor_type.pv_name));
         epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, true);
       } else {
         logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated",
