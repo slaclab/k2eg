@@ -177,6 +177,28 @@ TEST(Epics, ChannelMonitorCombinedRequestCA) {
   EXPECT_NO_THROW(monitor_op.reset(););
 }
 
+TEST(Epics, ChannelMonitorCombinedRequestCAForceUpdateStalePv) {
+  INIT_CA_PROVIDER()
+  EpicsChannelUPtr                                 pc_a;
+  ConstPutOperationUPtr                            put_op;
+  ConstMonitorOperationShrdPtr                     monitor_op;
+  epics::pvData::PVStructure::const_shared_pointer val;
+  EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:a"););
+
+  EXPECT_NO_THROW(monitor_op = pc_a->monitor(););
+  WHILE_MONITOR(monitor_op, !monitor_op->hasData());
+  auto fetched = monitor_op->getEventData();
+  EXPECT_EQ(fetched->event_data->size(), 1);
+  EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
+
+  monitor_op->forceUpdate();
+  WHILE_MONITOR(monitor_op,! monitor_op->hasData());
+  fetched = monitor_op->getEventData();
+  EXPECT_EQ(fetched->event_data->size(), 1);
+  EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
+  EXPECT_NO_THROW(monitor_op.reset(););
+}
+
 TEST(Epics, ChannelCAMonitor) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr                                 pc_a;

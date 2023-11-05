@@ -9,6 +9,7 @@
 #include <pva/client.h>
 #include <sys/types.h>
 
+#include <atomic>
 #include <mutex>
 
 namespace k2eg::service::epics_impl {
@@ -22,7 +23,7 @@ class MonitorOperation {
   MonitorOperation() = default;
 
  protected:
-  mutable bool force_update = false;
+  mutable std::atomic_bool force_update = false;
 
  public:
   virtual ~MonitorOperation()                                        = default;
@@ -31,7 +32,7 @@ class MonitorOperation {
   virtual bool                 hasData() const                       = 0;
   virtual bool                 hasEvents() const                     = 0;
   virtual const std::string&   getPVName() const                     = 0;
-  void
+  virtual void
   forceUpdate() const {
     force_update = true;
   };
@@ -88,6 +89,7 @@ class CombinedMonitorOperation : public MonitorOperation {
   bool                 hasData() const OVERRIDE FINAL;
   bool                 hasEvents() const OVERRIDE FINAL;
   const std::string&   getPVName() const OVERRIDE FINAL;
+  void forceUpdate() const OVERRIDE FINAL;
 };
 DEFINE_PTR_TYPES(CombinedMonitorOperation)
 

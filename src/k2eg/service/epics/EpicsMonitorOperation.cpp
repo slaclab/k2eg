@@ -167,3 +167,9 @@ const std::string&
 CombinedMonitorOperation::getPVName() const {
   return monitor_principal_request->getPVName();
 }
+
+void 
+CombinedMonitorOperation::forceUpdate() const{
+  monitor_principal_request->forceUpdate();
+  monitor_additional_request->forceUpdate();
+}
