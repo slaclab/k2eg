@@ -59,42 +59,62 @@ k2eg rely upon boost program options to manage the startup option configuration.
 k2eg --help
 Epics k2eg:
   --help                                Produce help information
-  --conf-file arg (=0)                  Specify if we need to load 
+  --version                             Print the application version
+  --conf-file arg (=0)                  Specify if we need to load
                                         configuration from file
   --conf-file-name arg                  Specify the configuration file
-  --log-level arg (=info)               Specify the log level[error, info, 
-                                        debug, fatal]
-  --log-on-console                      Specify when the logger print in 
+  --log-level arg (=info)               Specify the log level[trace, debug,
+                                        info, error, fatal]
+  --log-on-console                      Specify when the logger print in
                                         console
   --log-on-file                         Specify when the logger print in file
   --log-file-name arg                   Specify the log file path
-  --log-file-max-size arg (=1)          Specify the maximum log file size in 
+  --log-file-max-size arg (=1)          Specify the maximum log file size in
                                         mbyte
   --log-on-syslog                       Specify when the logger print in syslog
                                         server
   --syslog-server arg                   Specify syslog hotsname
   --syslog-port arg (=514)              Specify syslog server port
-  --cmd-input-topic arg                 Specify the messages bus queue where 
-                                        the k2eg receive the configuration 
+  --cmd-input-topic arg                 Specify the messages bus queue where
+                                        the k2eg receive the configuration
                                         command
-  --cmd-max-fecth-element arg (=10)     The max number of command fetched per 
+  --cmd-max-fecth-element arg (=10)     The max number of command fetched per
                                         consume operation
-  --cmd-max-fecth-time-out arg (=100)   Specify the timeout for waith the 
+  --cmd-max-fecth-time-out arg (=250)   Specify the timeout for waith the
                                         command in microseconds
+  --nc-monitor-expiration-timeout arg (=3600)
+                                        Specify the amount of time with no
+                                        consumer on a queue after which monitor
+                                        can be stopped
+  --nc-purge-queue-on-exp-timeout arg (=1)
+                                        Specify when the a queue purged when
+                                        the monitor that push data onto is
+                                        stopped
+  --nc-monitor-consumer-filterout-regex arg
+                                        Specify regular expression to used to
+                                        filter out consumer group from those
+                                        used to calculate the number of active
+                                        consumer of monitor queue
   --pub-server-address arg              Publisher server address
-  --pub-impl-kv arg                     The key:value list for publisher 
+  --pub-impl-kv arg                     The key:value list for publisher
                                         implementation driver
   --sub-server-address arg              Subscriber server address
   --sub-group-id arg (=k2eg-default-group)
                                         Subscriber group id
-  --sub-impl-kv arg                     The key:value list for subscriber 
+  --sub-impl-kv arg                     The key:value list for subscriber
                                         implementation driver
-  --storage-path arg (=/workspace/k2eg.sqlite)
-                                        The path where the storage files are 
+  --storage-path arg (=/opt/app/k2eg.sqlite)
+                                        The path where the storage files are
                                         saved
+  --monitor-worker-cron-schedule arg    The cron string forconfigure the
+                                        monitor checking scheduler
+  --scheduler-check-delay-seconds arg (=60)
+                                        The number of second for which the
+                                        scheduler thread are going to sleep
+  --scheduler-thread-number arg (=1)    The number of the scheduler worker
   --metric-enable arg (=0)              Enable metric management
-  --metric-server-http-port arg (=8080) The port used for publish the http 
-                                        metric server 
+  --metric-server-http-port arg (=8080) The port used for publish the http
+                                        metric server
 ```
 
 There are two ohter different way to configure the application other to the common command line option and are:
