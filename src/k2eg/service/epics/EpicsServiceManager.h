@@ -54,7 +54,7 @@ class EpicsServiceManager {
     std::set<std::string> pv_to_remove;
     void task(ConstMonitorOperationShrdPtr monitor_op);
 public:
-    explicit EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config = std::unique_ptr<EpicsServiceManagerConfig>());
+    explicit EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config = std::make_unique<EpicsServiceManagerConfig>());
     ~EpicsServiceManager();
     void addChannel(const std::string& pv_name_uri);
     void removeChannel(const std::string& pv_name);
