@@ -5,6 +5,7 @@
 #include <k2eg/common/broadcaster.h>
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/Serialization.h>
+#include <cstdint>
 #include <k2eg/common/BS_thread_pool.hpp>
 
 #include <functional>
@@ -14,6 +15,7 @@
 #include <thread>
 #include <vector>
 #include <queue>
+#include "k2eg/service/epics/EpicsMonitorOperation.h"
 
 
 namespace k2eg::service::epics_impl {
@@ -32,7 +34,14 @@ struct PV {
 };
 DEFINE_PTR_TYPES(PV)
 
+struct EpicsServiceManagerConfig{
+    // the number of thread for execute the poll 
+    // on the epics monitor operation
+    std::int32_t thread_count = 1;
+};
+DEFINE_PTR_TYPES(EpicsServiceManagerConfig)
 class EpicsServiceManager {
+    ConstEpicsServiceManagerConfigUPtr config;
     std::mutex channel_map_mutex;
     std::map<std::string, std::shared_ptr<EpicsChannel>> channel_map;
     k2eg::common::broadcaster<EpicsServiceManagerHandlerParamterType> handler_broadcaster;
@@ -45,7 +54,7 @@ class EpicsServiceManager {
     std::set<std::string> pv_to_remove;
     void task(ConstMonitorOperationShrdPtr monitor_op);
 public:
-    explicit EpicsServiceManager();
+    explicit EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config = std::unique_ptr<EpicsServiceManagerConfig>());
     ~EpicsServiceManager();
     void addChannel(const std::string& pv_name_uri);
     void removeChannel(const std::string& pv_name);

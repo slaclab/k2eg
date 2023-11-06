@@ -23,7 +23,8 @@ void
 MonitorOperationImpl::poll(uint element_to_fetch) const {
   if (!has_data) return;
   int fetched = 0;
-  while (mon.poll() && (++fetched <= element_to_fetch)) {
+  while (mon.poll() /*&& (++fetched <= element_to_fetch)*/) {
+    ++fetched;
     auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
     tmp_data->copy(*mon.root);
     received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, "", {pv_name, tmp_data}}));

@@ -163,4 +163,16 @@ TEST(ProgramOptions, NodeControllerConfiguration) {
     EXPECT_EQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.filter_out_regex.size(), 1);
     EXPECT_STREQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.filter_out_regex[0].c_str(), "regex1");
 }
+
+TEST(ProgramOptions, EpicsManagerConfiguration) {
+    int argc = 1;
+    const char* argv[1] = {"epics-k2eg-test"};
+    // set environment variable for test
+    clearenv();
+    setenv(std::string("EPICS_k2eg_").append(EPICS_MONITOR_THREAD_COUNT).c_str(), "10", 1);
+    std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
+    EXPECT_NO_THROW(opt->parse(argc, argv););
+    auto epics_manager_configuration = opt->getEpicsManagerConfiguration();
+    EXPECT_EQ(epics_manager_configuration->thread_count, 10);
+}
 #endif //__linux__

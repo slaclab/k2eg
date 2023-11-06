@@ -18,7 +18,10 @@ using namespace k2eg::service::epics_impl;
 
 #define SELECT_PROVIDER(p)      (p.find("pva") == 0 ? *pva_provider : *ca_provider)
 
-EpicsServiceManager::EpicsServiceManager() : end_processing(false), processing_pool(2) {
+EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config) 
+: config(std::move(config))
+, end_processing(false)
+, processing_pool(this->config->thread_count) {
   pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
   ca_provider  = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
 }
