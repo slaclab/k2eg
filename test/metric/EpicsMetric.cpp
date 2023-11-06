@@ -94,5 +94,5 @@ TEST(Metric, EpicsMetricMonitorRates) {
   }
   auto metrics_string = getUrl("http://localhost:8080/metrics");
   ASSERT_NE(metrics_string.length(), 0);
-  ASSERT_NE(metrics_string.find("epics_ioc_operation_rate{evt_type=\"data\",op=\"data\"}"), -1);
+  ASSERT_NE(metrics_string.find("epics_ioc_operation_rate{evt_type=\"data\",op=\"monitor\"}"), -1);
 }
