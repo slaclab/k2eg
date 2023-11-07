@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
+#include <chrono>
 #include <cstddef>
+#include <thread>
 
 #include "metric.h"
 
@@ -79,4 +81,18 @@ TEST(Metric, EpicsMetricMonitorTimeout) {
   auto metrics_string = getUrl("http://localhost:8080/metrics");
   ASSERT_NE(metrics_string.length(), 0);
   ASSERT_NE(metrics_string.find("epics_ioc_operation{evt_type=\"disconnect\",op=\"monitor\"} 1"), -1);
+}
+
+TEST(Metric, EpicsMetricMonitorRates) {
+  IMetricServiceUPtr m_uptr;
+  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=8080});
+  EXPECT_NO_THROW(m_uptr = std::make_unique<PrometheusMetricService>(std::move(m_conf)));
+  auto& e_metric_ref = m_uptr->getEpicsMetric();
+  for(int idx = 0; idx < 1000; idx++) {
+    e_metric_ref.incrementCounter(IEpicsMetricCounterType::MonitorData);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  auto metrics_string = getUrl("http://localhost:8080/metrics");
+  ASSERT_NE(metrics_string.length(), 0);
+  ASSERT_NE(metrics_string.find("epics_ioc_operation_rate{evt_type=\"data\",op=\"monitor\"}"), -1);
 }

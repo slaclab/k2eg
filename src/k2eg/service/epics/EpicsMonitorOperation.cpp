@@ -23,11 +23,28 @@ void
 MonitorOperationImpl::poll(uint element_to_fetch) const {
   if (!has_data) return;
   int fetched = 0;
-  while (mon.poll() && (++fetched <= element_to_fetch)) {
+  while (mon.poll() /*&& (++fetched <= element_to_fetch)*/) {
+    ++fetched;
     auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
     tmp_data->copy(*mon.root);
     received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, "", {pv_name, tmp_data}}));
   }
+  if(fetched==0 && force_update) {
+    if(!get_op) {
+      // force to update using a get operation
+      get_op = std::make_unique<SingleGetOperation>(channel, pv_name, field);
+    } else if(get_op->isDone()){
+      // the data is ready
+      auto data_from_get = get_op->getChannelData();
+      received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, "",  {pv_name, data_from_get->data}}));
+      get_op.reset();
+      force_update = false;
+    }
+  } else {
+    // destroy the get operation
+    get_op.reset();
+  }
+
   has_data = !mon.complete();
 }
 
@@ -45,7 +62,7 @@ MonitorOperationImpl::monitorEvent(const pvac::MonitorEvent& evt) {
     // explicit call of 'mon.cancel' or subscription dropped
     case pvac::MonitorEvent::Cancel:
       if (mon.valid()) {
-        //mon is valid so we can continnue because this class is valid
+        //mon is valid so we can continue because this class is valid
         received_event->event_cancel->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Cancel, pv_name, evt.message, nullptr}));
       }
       break;
@@ -150,4 +167,10 @@ CombinedMonitorOperation::hasEvents() const {
 const std::string&
 CombinedMonitorOperation::getPVName() const {
   return monitor_principal_request->getPVName();
+}
+
+void 
+CombinedMonitorOperation::forceUpdate() const{
+  monitor_principal_request->forceUpdate();
+  monitor_additional_request->forceUpdate();
 }

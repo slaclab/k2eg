@@ -6,6 +6,7 @@
 #include <cassert>
 #include <functional>
 #include <mutex>
+#include <shared_mutex>
 
 #include "k2eg/controller/command/cmd/Command.h"
 #include "k2eg/controller/command/cmd/MonitorCommand.h"
@@ -122,6 +123,10 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
     logger->logMessage(STRING_FORMAT("Error on sanitization for '%1%'", checker_event_data.monitor_type.pv_name));
     return;
   }
+  // esclusive lock
+  std::unique_lock<std::shared_mutex> lock_pv_map(channel_map_mtx);
+
+  // access map for modify it
   auto& vec_ref = channel_topics_map[sanitized_pv->name];
   switch (checker_event_data.action) {
     case MonitorHandlerAction::Start: {
@@ -131,9 +136,20 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
       if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&checker_event_data](auto& info_topic) {
             return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
           }) == std::end(vec_ref)) {
-        channel_topics_map[sanitized_pv->name].push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
+        vec_ref.push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
+        logger->logMessage(
+            STRING_FORMAT("Create topic for '%1%' with name '%2%'", checker_event_data.monitor_type.pv_name % get_queue_for_pv(sanitized_pv->name)));
+        publisher->createQueue(QueueDescription{
+            .name           = get_queue_for_pv(sanitized_pv->name),
+            .paritions      = 1,
+            .replicas       = 3,
+            .retention_time = 1000 * 60 * 60,
+            .retention_size = 1024 * 1024 * 50,
+        });
+        logger->logMessage(STRING_FORMAT("Start monitoring topic for '%1%'", checker_event_data.monitor_type.pv_name));
         epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, true);
       } else {
+        epics_service_manager->forceMonitorChannelUpdate(checker_event_data.monitor_type.pv_name);
         logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated",
                                          checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
       }
@@ -151,6 +167,8 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
       if (itr != std::end(vec_ref)) {
         vec_ref.erase(itr);
         epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, false);
+        logger->logMessage(STRING_FORMAT("Monitor stopped on '%1%' for topic '%2%'",
+                                       checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
       } else {
         logger->logMessage(STRING_FORMAT("No active monitor on '%1%' for topic '%2%'",
                                          checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
@@ -241,7 +259,10 @@ MonitorCommandWorker::manageReply(const std::int8_t error_code, const std::strin
 void
 MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType event_received) {
 #ifdef __DEBUG__
-  logger->logMessage(STRING_FORMAT("Received epics monitor %1% events data", event_received->event_data->size()), LogLevel::TRACE);
+  logger->logMessage(STRING_FORMAT("Received epics monitor event count:\ndata: %1%\ncancel: %2%\ndisconnect: %3%\nfail: %4%",
+                                   event_received->event_data->size() % event_received->event_cancel->size() % event_received->event_disconnect->size() %
+                                       event_received->event_fail->size()),
+                     LogLevel::TRACE);
 #endif
   //----------update metric--------
   metric.incrementCounter(IEpicsMetricCounterType::MonitorData, event_received->event_data->size());

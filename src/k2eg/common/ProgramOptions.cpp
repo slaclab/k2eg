@@ -2,6 +2,7 @@
 #include <sys/types.h>
 
 #include <algorithm>
+#include <atomic>
 #include <boost/algorithm/string.hpp>
 #include <cstdint>
 #include <exception>
@@ -14,6 +15,7 @@
 #include "k2eg/controller/node/NodeController.h"
 #include "k2eg/controller/node/worker/monitor/MonitorChecker.h"
 #include "k2eg/controller/node/worker/monitor/MonitorCommandWorker.h"
+#include "k2eg/service/epics/EpicsServiceManager.h"
 #include "k2eg/service/metric/IMetricService.h"
 #include "k2eg/service/scheduler/Scheduler.h"
 
@@ -26,6 +28,7 @@ using namespace k2eg::controller::node::worker::monitor;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::metric;
 using namespace k2eg::service::scheduler;
+using namespace k2eg::service::epics_impl;
 
 namespace po = boost::program_options;
 namespace fs = std::filesystem;
@@ -56,6 +59,7 @@ ProgramOptions::ProgramOptions() {
       NC_MONITOR_CONSUMER_FILTEROUT_REGEX,
       po::value<std::vector<std::string>>()->multitoken(),
       "Specify regular expression to used to filter out consumer group from those used to calculate the number of active consumer of monitor queue")(
+      EPICS_MONITOR_THREAD_COUNT, po::value<std::int32_t>(), "Epics processing event thread count")(
       PUB_SERVER_ADDRESS, po::value<std::string>(), "Publisher server address")(
       PUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for publisher implementation driver")(
       SUB_SERVER_ADDRESS, po::value<std::string>(), "Subscriber server address")(
@@ -196,6 +200,12 @@ ProgramOptions::getSchedulerConfiguration() {
   return std::make_unique<const SchedulerConfiguration>(
       SchedulerConfiguration{.check_every_amount_of_seconds = GET_OPTION(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS, unsigned int, 60),
                              .thread_number                 = GET_OPTION(SCHEDULER_THREAD_NUMBER, unsigned int, 1)});
+}
+
+ConstEpicsServiceManagerConfigUPtr 
+ProgramOptions::getEpicsManagerConfiguration() {
+  return std::make_unique<const EpicsServiceManagerConfig>(
+      EpicsServiceManagerConfig{.thread_count = GET_OPTION(EPICS_MONITOR_THREAD_COUNT, std::int32_t, 1)});
 }
 
 const std::string

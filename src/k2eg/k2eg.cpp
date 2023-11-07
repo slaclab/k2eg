@@ -55,7 +55,7 @@ K2EGateway::setup(int argc, const char* argv[]) {
     logger->logMessage("Start Metric Service");
     ServiceResolver<IMetricService>::registerService(instanceMetricService(po->getMetricConfiguration()));
     logger->logMessage("Start EPICS service");
-    ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>());
+    ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>(po->getEpicsManagerConfiguration()));
     logger->logMessage("Start publisher service");
     ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(po->getPublisherConfiguration()));
     logger->logMessage("Start subscriber service");

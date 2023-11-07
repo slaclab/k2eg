@@ -3,11 +3,13 @@
 
 #include <k2eg/common/types.h>
 #include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/epics/EpicsGetOperation.h>
 #include <k2eg/service/epics/PVStructureMerger.h>
 #include <pvData.h>
 #include <pva/client.h>
 #include <sys/types.h>
 
+#include <atomic>
 #include <mutex>
 
 namespace k2eg::service::epics_impl {
@@ -19,13 +21,21 @@ class MonitorOperation {
   friend class CombinedMonitorOperation;
 
   MonitorOperation() = default;
+
+ protected:
+  mutable std::atomic_bool force_update = false;
+
  public:
-  virtual ~MonitorOperation()                                    = default;
+  virtual ~MonitorOperation()                                        = default;
   virtual void                 poll(uint element_to_fetch = 2) const = 0;
-  virtual EventReceivedShrdPtr getEventData() const              = 0;
-  virtual bool                 hasData() const                   = 0;
-  virtual bool                 hasEvents() const                 = 0;
-  virtual const std::string&   getPVName() const                 = 0;
+  virtual EventReceivedShrdPtr getEventData() const                  = 0;
+  virtual bool                 hasData() const                       = 0;
+  virtual bool                 hasEvents() const                     = 0;
+  virtual const std::string&   getPVName() const                     = 0;
+  virtual void
+  forceUpdate() const {
+    force_update = true;
+  };
 };
 DEFINE_PTR_TYPES(MonitorOperation)
 
@@ -35,6 +45,7 @@ class MonitorOperationImpl : public pvac::ClientChannel::MonitorCallback, public
   const std::string                    pv_name;
   mutable pvac::Monitor                mon;
   std::shared_ptr<pvac::ClientChannel> channel;
+  mutable GetOperationUPtr             get_op;
   mutable EventReceivedShrdPtr         received_event;
   mutable std::mutex                   ce_mtx;
   mutable bool                         has_data;
@@ -68,16 +79,17 @@ class CombinedMonitorOperation : public MonitorOperation {
                            const std::string&                   principal_request,
                            const std::string&                   additional_request);
   virtual ~CombinedMonitorOperation() = default;
-  virtual void         poll(uint element_to_fetch = 2) const OVERRIDE FINAL;
+  virtual void poll(uint element_to_fetch = 2) const OVERRIDE FINAL;
   /*
-  Return alway the princiapl latest data 
-  merged with at least the last received 
+  Return alway the princiapl latest data
+  merged with at least the last received
   addiotnal info
   */
   EventReceivedShrdPtr getEventData() const OVERRIDE FINAL;
   bool                 hasData() const OVERRIDE FINAL;
   bool                 hasEvents() const OVERRIDE FINAL;
   const std::string&   getPVName() const OVERRIDE FINAL;
+  void forceUpdate() const OVERRIDE FINAL;
 };
 DEFINE_PTR_TYPES(CombinedMonitorOperation)
 

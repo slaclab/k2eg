@@ -235,7 +235,7 @@ exstractJsonObjectThatContainsKey(std::vector<PublishMessageSharedPtr>& messages
   for (int idx = 0; idx < messages.size(); idx++) {
     if (messages[idx]->getQueue().compare(published_on_topic) != 0) continue;
     auto json_obj = getJsonObject(*messages[idx]);
-    std::cout<<json_obj<< std::endl;
+    //std::cout<<json_obj<< std::endl;
     if (json_obj.contains(key_to_find)) { return json_obj; }
   }
   return boost::json::object();
@@ -262,6 +262,16 @@ exstractMsgpackObjectThatContainsKey(std::vector<PublishMessageSharedPtr>& messa
     }
   }
   return msgpack::unpacked();
+}
+
+std::size_t
+countMessageOnTopic(std::vector<PublishMessageSharedPtr>& messages, const std::string& published_on_topic) {
+  std::size_t counter = 0;
+  for (int idx = 0; idx < messages.size(); idx++) {
+    if (messages[idx]->getQueue().compare(published_on_topic) != 0) continue;
+    counter++;
+  }
+  return counter;
 }
 
 TEST(NodeController, MonitorCommandJsonSerByDefault) {
@@ -302,6 +312,39 @@ TEST(NodeController, MonitorCommandJsonSerByDefault) {
 
   // check that we have json data
   EXPECT_NO_THROW(auto json_object = getJsonObject(*publisher->sent_messages[0]););
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
+TEST(NodeController, MonitorCommandJsonSerStalePV) {
+  // we have to wait for two monitor and two reply messages
+  std::latch                      work_done{4};
+  boost::json::object             reply_msg;
+  std::unique_ptr<NodeController> node_controller;
+  auto                            publisher = std::make_shared<DummyPublisher>(work_done);
+  node_controller                           = initBackend(publisher);
+
+  // add the number of reader from topic
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
+  while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)) { sleep(1); }
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{
+      CommandType::monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://variable:a", "variable_a"})}););
+  sleep(2);
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{
+      CommandType::monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://variable:a", "variable_a"})}););
+  sleep(2);
+  work_done.wait();
+  EXPECT_EQ(countMessageOnTopic(publisher->sent_messages, "variable_a"), 2);
+  // reduce the number of consumer
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(0);
+  // force call add purge timestamp to the monitor
+  node_controller->performManagementTask();
+  sleep(5);
+  // this close the emonitor
+  node_controller->performManagementTask();
+  // we need to have publish some message
+  size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+  EXPECT_NE(published, 0);
   // dispose all
   deinitBackend(std::move(node_controller));
 }
