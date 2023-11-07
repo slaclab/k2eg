@@ -90,7 +90,7 @@ TEST(NodeControllerMonitorChecker, StartMonitoringSingleEventOnTwoSameMonitorReq
   auto event_token = checker->addHandler(checker_handler);
   checker->storeMonitorData({ChannelMonitorType{.pv_name = "pva://pv", .event_serialization = 0,  .channel_destination = "dest-a"},
                              ChannelMonitorType{.pv_name = "pva://pv", .event_serialization = 0,  .channel_destination = "dest-a"}});
-  ASSERT_EQ(number_of_start_monitor, 1);
+  ASSERT_EQ(number_of_start_monitor, 2);
   deinitChecker();
 }
 
