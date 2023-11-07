@@ -301,6 +301,19 @@ TEST(Epics, EpicsServiceManagerMonitorOk) {
   monitor.reset();
 }
 
+TEST(Epics, EpicsServiceManagerMonitorStalePVOk) {
+  HandlerClass                         handler(2);
+  k2eg::common::BroadcastToken         handler_tok;
+  std::unique_ptr<EpicsServiceManager> monitor = std::make_unique<EpicsServiceManager>();
+  EXPECT_NO_THROW(handler_tok = monitor->addHandler(std::bind(&HandlerClass::handler, &handler, std::placeholders::_1)););
+  EXPECT_NO_THROW(monitor->addChannel("ca://variable:a"););
+  sleep(2);
+  EXPECT_NO_THROW(monitor->forceMonitorChannelUpdate("ca://variable:a"););
+  handler.work_done.wait();
+  EXPECT_EQ(handler.event_received->event_data->size() > 0, true);
+  monitor.reset();
+}
+
 TEST(Epics, EpicsServiceManagerWrongMonitoredDevices) {
   HandlerClass                         handler(0);
   k2eg::common::BroadcastToken         handler_tok;

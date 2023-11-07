@@ -39,9 +39,7 @@ MonitorChecker::storeMonitorData(const ChannelMonitorTypeConstVector& channel_de
   std::lock_guard guard(op_mux);
   auto            result = node_configuration_db->addChannelMonitor(channel_descriptions);
   if (handler_broadcaster.targets.size() == 0) return;
-  for (int idx = 0; idx < result.size(); idx++) {
-    if (result[idx]) { handler_broadcaster.broadcast(MonitorHandlerData{MonitorHandlerAction::Start, channel_descriptions[idx]}); }
-  }
+  for (int idx = 0; idx < result.size(); idx++) { handler_broadcaster.broadcast(MonitorHandlerData{MonitorHandlerAction::Start, channel_descriptions[idx]}); }
 }
 
 size_t

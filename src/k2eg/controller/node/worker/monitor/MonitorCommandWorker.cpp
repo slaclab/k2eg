@@ -136,7 +136,7 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
       if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&checker_event_data](auto& info_topic) {
             return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
           }) == std::end(vec_ref)) {
-        channel_topics_map[sanitized_pv->name].push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
+        vec_ref.push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
         logger->logMessage(
             STRING_FORMAT("Create topic for '%1%' with name '%2%'", checker_event_data.monitor_type.pv_name % get_queue_for_pv(sanitized_pv->name)));
         publisher->createQueue(QueueDescription{
@@ -149,6 +149,7 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
         logger->logMessage(STRING_FORMAT("Start monitoring topic for '%1%'", checker_event_data.monitor_type.pv_name));
         epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, true);
       } else {
+        epics_service_manager->forceMonitorChannelUpdate(checker_event_data.monitor_type.pv_name);
         logger->logMessage(STRING_FORMAT("Monitor for '%1%' for topic '%2%' already activated",
                                          checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
       }

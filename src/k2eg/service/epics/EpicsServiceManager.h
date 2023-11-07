@@ -5,12 +5,14 @@
 #include <k2eg/common/broadcaster.h>
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/Serialization.h>
+#include <atomic>
 #include <cstdint>
 #include <k2eg/common/BS_thread_pool.hpp>
 
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <shared_mutex>
 #include <thread>
 #include <vector>
@@ -39,27 +41,38 @@ struct EpicsServiceManagerConfig{
     // on the epics monitor operation
     std::int32_t thread_count = 1;
 };
+
+// describe a channel ellement in map per each PV
+struct ChannelMapElement {
+    std::shared_ptr<EpicsChannel> channel;
+    bool to_force;
+    bool to_erase;
+};
+DEFINE_PTR_TYPES(ChannelMapElement)
+typedef std::unique_lock<std::shared_mutex> WriteLockCM;
+typedef std::unique_lock<std::shared_mutex> ReadLockCM;
+
 DEFINE_PTR_TYPES(EpicsServiceManagerConfig)
 class EpicsServiceManager {
     ConstEpicsServiceManagerConfigUPtr config;
-    std::mutex channel_map_mutex;
-    std::map<std::string, std::shared_ptr<EpicsChannel>> channel_map;
+    std::shared_mutex channel_map_mutex;
+    std::map<std::string, ChannelMapElement> channel_map;
+    std::set<std::string> pv_to_remove;
+    std::set<std::string> pv_to_force;
     k2eg::common::broadcaster<EpicsServiceManagerHandlerParamterType> handler_broadcaster;
     std::unique_ptr<pvac::ClientProvider> pva_provider;
     std::unique_ptr<pvac::ClientProvider> ca_provider;
     bool end_processing;
     BS::thread_pool processing_pool;
-    // monitor handler queue
-    std::mutex monitor_op_queue_mutx;
-    std::set<std::string> pv_to_remove;
+    
     void task(ConstMonitorOperationShrdPtr monitor_op);
 public:
     explicit EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config = std::make_unique<EpicsServiceManagerConfig>());
     ~EpicsServiceManager();
     void addChannel(const std::string& pv_name_uri);
-    void removeChannel(const std::string& pv_name);
+    void removeChannel(const std::string& pv_name_uri);
     void monitorChannel(const std::string& pv_identification, bool activate);
-    void forceMonitorChannelUpdate(const std::string& pv_name);
+    void forceMonitorChannelUpdate(const std::string& pv_name_uri);
     ConstGetOperationUPtr getChannelData(const std::string& pv_name_uri);
     ConstPutOperationUPtr putChannelData(const std::string& pv_name, const std::string& value);
     size_t getChannelMonitoredSize();
