@@ -35,17 +35,23 @@ void
 EpicsServiceManager::addChannel(const std::string& pv_name_uri) {
   auto sanitized_pv = sanitizePVName(pv_name_uri);
   if (!sanitized_pv) return;
-  WriteLockCM write_lock(channel_map_mutex);
+
   try {
-    if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end()) { return; }
-    channel_map[sanitized_pv->name] = ChannelMapElement{
-        .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
-        .to_force = false,
-        .to_erase = false,
-    };
-    ConstMonitorOperationShrdPtr monitor_operation = channel_map[sanitized_pv->name].channel->monitor();
-    // lock and insert in queue
-    processing_pool.push_task(&EpicsServiceManager::task, this, monitor_operation);
+    {
+      WriteLockCM write_lock(channel_map_mutex);
+      if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end()) { return; }
+      channel_map[sanitized_pv->name] = ChannelMapElement{
+          .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
+          .to_force = false,
+          .to_erase = false,
+      };
+    }
+    {
+      ReadLockCM write_lock(channel_map_mutex);
+      ConstMonitorOperationShrdPtr monitor_operation = channel_map[sanitized_pv->name].channel->monitor();
+      // lock and insert in queue
+      processing_pool.push_task(&EpicsServiceManager::task, this, monitor_operation);
+    }
   } catch (std::exception& ex) {
     channel_map.erase(sanitized_pv->name);
     throw ex;

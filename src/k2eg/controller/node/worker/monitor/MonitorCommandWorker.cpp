@@ -123,11 +123,12 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
     logger->logMessage(STRING_FORMAT("Error on sanitization for '%1%'", checker_event_data.monitor_type.pv_name));
     return;
   }
-  // esclusive lock
-  std::unique_lock<std::shared_mutex> lock_pv_map(channel_map_mtx);
 
-  // access map for modify it
-  auto& vec_ref = channel_topics_map[sanitized_pv->name];
+  // access map for modify it  // esclusive lock
+  std::unique_lock<std::shared_mutex> lock_pv_map(channel_map_mtx);
+  auto&                               vec_ref = channel_topics_map[sanitized_pv->name];
+  lock_pv_map.unlock();
+
   switch (checker_event_data.action) {
     case MonitorHandlerAction::Start: {
       logger->logMessage(STRING_FORMAT("Activate monitor on '%1%' for topic '%2%'",
@@ -136,7 +137,11 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
       if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&checker_event_data](auto& info_topic) {
             return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
           }) == std::end(vec_ref)) {
-        vec_ref.push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
+        {
+          std::unique_lock<std::shared_mutex> lock_pv_map(channel_map_mtx);
+          vec_ref.push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
+        }
+
         logger->logMessage(
             STRING_FORMAT("Create topic for '%1%' with name '%2%'", checker_event_data.monitor_type.pv_name % get_queue_for_pv(sanitized_pv->name)));
         publisher->createQueue(QueueDescription{
@@ -165,10 +170,13 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
         return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
       });
       if (itr != std::end(vec_ref)) {
-        vec_ref.erase(itr);
+        {
+          std::unique_lock<std::shared_mutex> lock_pv_map(channel_map_mtx);
+          vec_ref.erase(itr);
+        }
         epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, false);
         logger->logMessage(STRING_FORMAT("Monitor stopped on '%1%' for topic '%2%'",
-                                       checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
+                                         checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
       } else {
         logger->logMessage(STRING_FORMAT("No active monitor on '%1%' for topic '%2%'",
                                          checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
@@ -270,11 +278,12 @@ MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType e
   metric.incrementCounter(IEpicsMetricCounterType::MonitorDisconnect, event_received->event_disconnect->size());
   metric.incrementCounter(IEpicsMetricCounterType::MonitorFail, event_received->event_fail->size());
 
-  std::shared_lock slock(channel_map_mtx);
   // cache the various serilized message for each serializaiton type
   std::map<SerializationType, ConstSerializedMessageShrdPtr> local_serialization_cache;
   for (auto& event : *event_received->event_data) {
     // publisher
+    std::shared_lock slock(channel_map_mtx);
+
     for (auto& info_topic : channel_topics_map[event->channel_data.pv_name]) {
       logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", event->channel_data.pv_name % info_topic->cmd.channel_destination), LogLevel::TRACE);
       if (!local_serialization_cache.contains(static_cast<SerializationType>(info_topic->cmd.event_serialization))) {

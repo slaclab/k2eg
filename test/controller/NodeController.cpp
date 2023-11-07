@@ -548,6 +548,82 @@ TEST(NodeController, MonitorCommandMultiPV) {
   deinitBackend(std::move(node_controller));
 }
 
+TEST(NodeController, MonitorCommandMultiPVStress) {
+  std::latch                      work_done{21};
+  boost::json::object             reply_msg;
+  std::unique_ptr<NodeController> node_controller;
+  auto                            publisher = std::make_shared<DummyPublisher>(work_done);
+  node_controller                           = initBackend(publisher, true , true);
+
+  // add the number of reader from topic
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
+  while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)) { sleep(1); }
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MultiMonitorCommand>(MultiMonitorCommand{
+      CommandType::multi_monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", 
+      {
+      "pva://channel:ramp:ramp",
+      "pva://channel:ramp:ramp_1",
+      "pva://channel:ramp:ramp_2",
+      "pva://channel:ramp:ramp_3",
+      "pva://channel:ramp:ramp_4",
+      "pva://channel:ramp:ramp_5",
+      "pva://channel:ramp:ramp_6",
+      "pva://channel:ramp:ramp_7",
+      "pva://channel:ramp:ramp_8",
+      "pva://channel:ramp:ramp_9",
+      "pva://channel:ramp:ramp_10",
+      "pva://channel:ramp:ramp_11",
+      "pva://channel:ramp:ramp_12",
+      "pva://channel:ramp:ramp_13",
+      "pva://channel:ramp:ramp_14",
+      "pva://channel:ramp:ramp_15",
+      "pva://channel:ramp:ramp_16",
+      "pva://channel:ramp:ramp_17",
+      "pva://channel:ramp:ramp_18",
+      "pva://channel:ramp:ramp_19",
+      "pva://channel:ramp:ramp_20",
+      "pva://channel:ramp:ramp_21",
+      "pva://channel:ramp:ramp_22",
+      "pva://channel:ramp:ramp_23",
+      "pva://channel:ramp:ramp_24",
+      "pva://channel:ramp:ramp_25",
+      "pva://channel:ramp:ramp_26",
+      "pva://channel:ramp:ramp_27",
+      "pva://channel:ramp:ramp_28",
+      "pva://channel:ramp:ramp_29",
+      "pva://channel:ramp:ramp_30",
+      "pva://channel:ramp:ramp_31",
+      "pva://channel:ramp:ramp_32",
+      "pva://channel:ramp:ramp_33",
+      "pva://channel:ramp:ramp_34",
+      "pva://channel:ramp:ramp_35",
+      "pva://channel:ramp:ramp_36",
+      "pva://channel:ramp:ramp_37",
+      "pva://channel:ramp:ramp_38",
+      "pva://channel:ramp:ramp_39"},})}););
+
+  work_done.wait();
+  // reduce the number of consumer
+  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(0);
+  // force call add purge timestamp to the monitor
+  node_controller->performManagementTask();
+  sleep(5);
+  // this close the emonitor
+  node_controller->performManagementTask();
+  // we need to have publish some message
+  size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+  EXPECT_NE(published, 0);
+  // check if we have received an event for 'variable:a' pv on 'variable_a' topic
+  EXPECT_NO_THROW(reply_msg = exstractJsonObjectThatContainsKey(publisher->sent_messages, "channel:ramp:ramp", "channel_ramp_ramp"));
+  EXPECT_EQ(reply_msg.contains("channel:ramp:ramp"), true);
+
+  // check if we have received an event for 'variable:b' pv on 'variable_b' topic
+  EXPECT_NO_THROW(reply_msg = exstractJsonObjectThatContainsKey(publisher->sent_messages, "channel:ramp:ramp_1", "channel_ramp_ramp_1"));
+  EXPECT_EQ(reply_msg.contains("channel:ramp:ramp_1"), true);
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
 TEST(NodeController, GetCommandJson) {
   boost::json::object             json_object;
   std::latch                      work_done{1};

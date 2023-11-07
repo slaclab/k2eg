@@ -36,10 +36,11 @@ MonitorChecker::addHandler(CheckerEventHandler handler) {
 
 void
 MonitorChecker::storeMonitorData(const ChannelMonitorTypeConstVector& channel_descriptions) {
-  std::lock_guard guard(op_mux);
-  auto            result = node_configuration_db->addChannelMonitor(channel_descriptions);
-  if (handler_broadcaster.targets.size() == 0) return;
-  for (int idx = 0; idx < result.size(); idx++) { handler_broadcaster.broadcast(MonitorHandlerData{MonitorHandlerAction::Start, channel_descriptions[idx]}); }
+  {
+    std::lock_guard guard(op_mux);
+    node_configuration_db->addChannelMonitor(channel_descriptions);
+  }
+  for (int idx = 0; idx < channel_descriptions.size(); idx++) { handler_broadcaster.broadcast(MonitorHandlerData{MonitorHandlerAction::Start, channel_descriptions[idx]}); }
 }
 
 size_t
