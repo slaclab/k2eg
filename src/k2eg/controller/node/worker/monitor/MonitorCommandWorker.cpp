@@ -118,15 +118,15 @@ MonitorCommandWorker::executePeriodicTask() {
 
 void
 MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_data) {
+
   auto sanitized_pv = epics_service_manager->sanitizePVName(checker_event_data.monitor_type.pv_name);
   if (!sanitized_pv) {
     logger->logMessage(STRING_FORMAT("Error on sanitization for '%1%'", checker_event_data.monitor_type.pv_name));
     return;
   }
-  // esclusive lock
-  std::unique_lock<std::shared_mutex> lock_pv_map(channel_map_mtx);
 
-  // access map for modify it
+  // access map for modify it  // esclusive lock
+  std::unique_lock<std::shared_mutex> lock_pv_map(channel_map_mtx);
   auto& vec_ref = channel_topics_map[sanitized_pv->name];
   switch (checker_event_data.action) {
     case MonitorHandlerAction::Start: {
@@ -270,12 +270,13 @@ MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType e
   metric.incrementCounter(IEpicsMetricCounterType::MonitorDisconnect, event_received->event_disconnect->size());
   metric.incrementCounter(IEpicsMetricCounterType::MonitorFail, event_received->event_fail->size());
 
-  std::shared_lock slock(channel_map_mtx);
   // cache the various serilized message for each serializaiton type
   std::map<SerializationType, ConstSerializedMessageShrdPtr> local_serialization_cache;
   for (auto& event : *event_received->event_data) {
     // publisher
-    for (auto& info_topic : channel_topics_map[event->channel_data.pv_name]) {
+    std::shared_lock slock(channel_map_mtx);
+ 
+    for (auto& info_topic :  channel_topics_map[event->channel_data.pv_name]) {
       logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", event->channel_data.pv_name % info_topic->cmd.channel_destination), LogLevel::TRACE);
       if (!local_serialization_cache.contains(static_cast<SerializationType>(info_topic->cmd.event_serialization))) {
         // cache new serialized message
