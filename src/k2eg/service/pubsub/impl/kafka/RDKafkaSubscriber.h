@@ -28,7 +28,7 @@ namespace k2eg::service::pubsub::impl::kafka
         virtual void setQueue(const k2eg::common::StringVector &queue);
         virtual void addQueue(const k2eg::common::StringVector &queue);
         virtual void commit(const bool& async = false);
-        virtual int getMsg(SubscriberInterfaceElementVector &dataVector, unsigned int m_num, unsigned int timeo = 10);
+        virtual int getMsg(SubscriberInterfaceElementVector &dataVector, unsigned int m_num, unsigned int timeo = 250);
     };
 
 }
