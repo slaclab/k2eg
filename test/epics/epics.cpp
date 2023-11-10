@@ -120,6 +120,22 @@ TEST(Epics, ChannelMonitor) {
   EXPECT_NO_THROW(monitor_op.reset(););
 }
 
+TEST(Epics, ChannelMonitorWrongPv) {
+  INIT_PVA_PROVIDER()
+  EpicsChannelUPtr                                 pc_a;
+  ConstPutOperationUPtr                            put_op;
+  ConstMonitorOperationShrdPtr                     monitor_op;
+  epics::pvData::PVStructure::const_shared_pointer val;
+  EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_pva_provider, "pad:pv"););
+  // enable monitor
+  EXPECT_NO_THROW(monitor_op = pc_a->monitor(););
+  WHILE_MONITOR(monitor_op, !monitor_op->hasEvents());
+  auto fetched = monitor_op->getEventData();
+  EXPECT_EQ(fetched->event_fail->size(), 1);
+
+  EXPECT_NO_THROW(monitor_op.reset(););
+}
+
 TEST(Epics, ChannelMonitorForceUpdateStalePv) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr                                 pc_a;
