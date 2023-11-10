@@ -92,5 +92,7 @@ PutOperation::connectEvent(const pvac::ConnectEvent& evt) {
     op = channel->put(this, pv_req);
   } else {
     // pv not found manage has disconnected
+    this->evt.event = pvac::GetEvent::Fail;
+    this->evt.message = "Connection Error";
   }
 }

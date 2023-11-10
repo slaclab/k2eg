@@ -83,6 +83,8 @@ SingleGetOperation::connectEvent(const pvac::ConnectEvent& evt) {
   if (evt.connected) { op = channel->get(this, pvd::createRequest(field)); }
   else {
     // pv not found manage has disconnected
+    this->evt.event = pvac::GetEvent::Fail;
+    this->evt.message = "Connection Error";
   }
 }
 
