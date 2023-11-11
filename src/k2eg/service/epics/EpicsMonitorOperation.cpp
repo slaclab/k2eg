@@ -18,6 +18,7 @@ MonitorOperationImpl::MonitorOperationImpl(std::shared_ptr<pvac::ClientChannel> 
 
 MonitorOperationImpl::~MonitorOperationImpl() {
   if (mon) { mon.cancel(); }
+  channel->reset();
 }
 void
 MonitorOperationImpl::poll(uint element_to_fetch) const {

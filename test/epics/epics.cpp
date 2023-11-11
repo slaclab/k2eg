@@ -312,7 +312,9 @@ TEST(Epics, EpicsServiceManagerMonitorOk) {
   std::unique_ptr<EpicsServiceManager> monitor = std::make_unique<EpicsServiceManager>();
   EXPECT_NO_THROW(handler_tok = monitor->addHandler(std::bind(&HandlerClass::handler, &handler, std::placeholders::_1)););
   EXPECT_NO_THROW(monitor->addChannel("pva://channel:ramp:ramp"););
-  handler.work_done.wait();
+  while (handler.event_received->event_data->size() == 0) {
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
   EXPECT_EQ(handler.event_received->event_data->size() > 0, true);
   monitor.reset();
 }
@@ -336,8 +338,21 @@ TEST(Epics, EpicsServiceManagerWrongMonitoredDevices) {
   std::unique_ptr<EpicsServiceManager> monitor = std::make_unique<EpicsServiceManager>();
   EXPECT_NO_THROW(handler_tok = monitor->addHandler(std::bind(&HandlerClass::handler, &handler, std::placeholders::_1)););
   EXPECT_NO_THROW(monitor->addChannel("pva://wrong::device"););
-  std::this_thread::sleep_for(std::chrono::milliseconds(250));
+  std::this_thread::sleep_for(std::chrono::seconds(2));
   EXPECT_EQ(handler.event_received->event_timeout->size() == 0, true);
+  monitor.reset();
+}
+
+TEST(Epics, EpicsServiceManagerUnreachableMonitoredDevices) {
+  HandlerClass                         handler(0);
+  k2eg::common::BroadcastToken         handler_tok;
+  std::unique_ptr<EpicsServiceManager> monitor = std::make_unique<EpicsServiceManager>();
+  EXPECT_NO_THROW(handler_tok = monitor->addHandler(std::bind(&HandlerClass::handler, &handler, std::placeholders::_1)););
+  EXPECT_NO_THROW(monitor->addChannel("pva://wrong:device"););
+  while (handler.event_received->event_fail->size() == 0) {
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
+  EXPECT_EQ(handler.event_received->event_fail->size() != 0, true);
   monitor.reset();
 }
 
