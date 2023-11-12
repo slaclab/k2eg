@@ -17,7 +17,7 @@
                 "--log-level=debug",
                 "--sub-server-address=kafka:9092",
                 "--pub-server-address=kafka:9092",
-                "--scheduler-check-delay-seconds=1",
+                "--scheduler-check-delay-seconds=60",
                 "--scheduler-thread-number=1",
                 "--monitor-worker-cron-schedule=*/30 * * * * *",
                 "--nc-monitor-expiration-timeout=3600",

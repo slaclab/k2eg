@@ -122,7 +122,7 @@ Scheduler::scheduleTask(int thread_index) {
         std::unique_lock<std::mutex> lock(thread_wait_mtx);
         new_taks_submitted = false;
         // Wait for a specific amount of time or until processing variable is true
-        cv.wait_for(lock, std::chrono::seconds(configuration->check_every_amount_of_seconds), [this] { return !processing || !new_taks_submitted; });
+        cv.wait_for(lock, std::chrono::seconds(configuration->check_every_amount_of_seconds), [this] { return !processing || new_taks_submitted; });
       }
     }
   }
