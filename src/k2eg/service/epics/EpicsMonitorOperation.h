@@ -40,7 +40,7 @@ class MonitorOperation {
 DEFINE_PTR_TYPES(MonitorOperation)
 
 // async monitor operation ofr a single set of field
-class MonitorOperationImpl : public pvac::ClientChannel::MonitorCallback, public MonitorOperation,  public pvac::ClientChannel::ConnectCallback  {
+class MonitorOperationImpl : public pvac::ClientChannel::MonitorCallback, public MonitorOperation, public pvac::ClientChannel::ConnectCallback {
   const std::string                    field;
   const std::string                    pv_name;
   mutable pvac::Monitor                mon;
@@ -55,7 +55,7 @@ class MonitorOperationImpl : public pvac::ClientChannel::MonitorCallback, public
   virtual ~MonitorOperationImpl();
   virtual void         monitorEvent(const pvac::MonitorEvent& evt) OVERRIDE FINAL;
   virtual void         poll(uint element_to_fetch = 2) const OVERRIDE FINAL;
-  virtual void          connectEvent(const pvac::ConnectEvent& evt) OVERRIDE FINAL;
+  virtual void         connectEvent(const pvac::ConnectEvent& evt) OVERRIDE FINAL;
   EventReceivedShrdPtr getEventData() const OVERRIDE FINAL;
   bool                 hasData() const OVERRIDE FINAL;
   bool                 hasEvents() const OVERRIDE FINAL;
@@ -90,7 +90,7 @@ class CombinedMonitorOperation : public MonitorOperation {
   bool                 hasData() const OVERRIDE FINAL;
   bool                 hasEvents() const OVERRIDE FINAL;
   const std::string&   getPVName() const OVERRIDE FINAL;
-  void forceUpdate() const OVERRIDE FINAL;
+  void                 forceUpdate() const OVERRIDE FINAL;
 };
 DEFINE_PTR_TYPES(CombinedMonitorOperation)
 
