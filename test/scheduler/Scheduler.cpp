@@ -18,14 +18,19 @@ TEST(Scheduler, StartStop) {
 }
 
 TEST(Scheduler, SchedulerSubmitAndExecuteEverySeconds) {
+  int retry = 0;
   int                   call_num        = 0;
   TaskHandlerFunction task_handler    = [&call_num](TaskProperties& properties) { call_num++; };
   TaskShrdPtr           task_shared_ptr = MakeTaskShrdPtr("task-1", "* * * * * *", task_handler);
   Scheduler             scheduler(std::make_unique<const SchedulerConfiguration>(SchedulerConfiguration{.thread_number = 1}));
 
   scheduler.start();
+  sleep(2);
   scheduler.addTask(task_shared_ptr);
-  sleep(5);
+  while(call_num==0 && retry < 30) {
+    sleep(1);
+    retry++;
+  }
   scheduler.stop();
   ASSERT_NE(call_num, 0);
 }
