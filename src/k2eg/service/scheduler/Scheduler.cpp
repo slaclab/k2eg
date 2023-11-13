@@ -13,7 +13,13 @@ using namespace k2eg::service::scheduler;
 using namespace std::chrono;
 
 Scheduler::Scheduler(ConstSchedulerConfigurationUPtr configuration)
-    : configuration(std::move(configuration)), running_task_vector(this->configuration->thread_number, nullptr) {}
+    : configuration(std::move(configuration)), running_task_vector(this->configuration->thread_number, nullptr),stop_wait_var(false) {}
+
+Scheduler::~Scheduler(){
+  if(processing){
+    stop();
+  }
+}
 
 void
 Scheduler::start() {
@@ -25,6 +31,7 @@ Scheduler::stop() {
   {
     std::lock_guard<std::mutex> lock(thread_wait_mtx);
     processing = false;
+    stop_wait_var = true;
   }
   cv.notify_one();
   for (auto& t : thread_group) { t.join(); }
@@ -37,7 +44,8 @@ Scheduler::addTask(TaskShrdPtr task_shrd_ptr) {
     tasks_queue.push_front(task_shrd_ptr);
     std::lock_guard<std::mutex> lock_for_Variable(thread_wait_mtx);
     // if the rpocesisng is not active
-    new_taks_submitted = true;
+    stop_wait_var = true;
+
   }
   // wakeup condition variable to update his wait_until value
   cv.notify_one();
@@ -120,9 +128,9 @@ Scheduler::scheduleTask(int thread_index) {
       // sleep for a while if we haven't new job to execute
       {
         std::unique_lock<std::mutex> lock(thread_wait_mtx);
-        new_taks_submitted = false;
         // Wait for a specific amount of time or until processing variable is true
-        cv.wait_for(lock, std::chrono::seconds(configuration->check_every_amount_of_seconds), [this] { return !processing || new_taks_submitted; });
+        cv.wait_for(lock, std::chrono::seconds(configuration->check_every_amount_of_seconds), [this] { return !processing || stop_wait_var; });
+        stop_wait_var = false;
       }
     }
   }
