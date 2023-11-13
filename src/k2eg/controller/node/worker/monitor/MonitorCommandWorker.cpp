@@ -149,9 +149,10 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
         logger->logMessage(
             STRING_FORMAT("Create topic for '%1%' with name '%2%'", checker_event_data.monitor_type.pv_name % get_queue_for_pv(sanitized_pv->name)));
         publisher->createQueue(QueueDescription{
+            // TODO apply somelogic here in future
             .name           = get_queue_for_pv(sanitized_pv->name),
             .paritions      = 1,
-            .replicas       = 3,
+            .replicas       = 1,
             .retention_time = 1000 * 60 * 60,
             .retention_size = 1024 * 1024 * 50,
         });
