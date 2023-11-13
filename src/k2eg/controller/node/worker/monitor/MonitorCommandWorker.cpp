@@ -64,7 +64,11 @@ MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& mo
                                                    std::bind(&MonitorCommandWorker::handlePeriodicTask, this, std::placeholders::_1));
   ServiceResolver<Scheduler>::resolve()->addTask(task_periodic_maintanance);
   auto task_restart_monitor = MakeTaskShrdPtr(
-      STARTUP_MONITOR_TASK_NAME, STARTUP_MONITOR_TASK_NAME_CRON, std::bind(&MonitorCommandWorker::handleRestartMonitorTask, this, std::placeholders::_1));
+      STARTUP_MONITOR_TASK_NAME, 
+      STARTUP_MONITOR_TASK_NAME_CRON, 
+      std::bind(&MonitorCommandWorker::handleRestartMonitorTask, this, std::placeholders::_1), 
+      -1 // start at applcaition boot time
+      );
   ServiceResolver<Scheduler>::resolve()->addTask(task_restart_monitor);
 }
 

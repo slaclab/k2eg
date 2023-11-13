@@ -2,10 +2,10 @@
 
 using namespace k2eg::service::scheduler;
 
-Task::Task(const std::string& name, const std::string& cron_expr, TaskHandlerFunction handler):
+Task::Task(const std::string& name, const std::string& cron_expr, TaskHandlerFunction handler, std::time_t starting_ts):
 name(name),
 cron_expr(cron::make_cron(cron_expr)),
-next_schedule(cron::cron_next(this->cron_expr, std::time(0))),
+next_schedule(cron::cron_next(this->cron_expr, starting_ts < 0?(std::time(0)-1000): starting_ts)),
 handler(handler){}
 
 bool 
