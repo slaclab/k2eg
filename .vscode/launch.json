@@ -17,7 +17,7 @@
                 "--log-level=debug",
                 "--sub-server-address=kafka:9092",
                 "--pub-server-address=kafka:9092",
-                "--scheduler-check-delay-seconds=1",
+                "--scheduler-check-delay-seconds=60",
                 "--scheduler-thread-number=1",
                 "--monitor-worker-cron-schedule=*/30 * * * * *",
                 "--nc-monitor-expiration-timeout=3600",
@@ -180,7 +180,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=Epics.*"],
+            "args": ["--gtest_filter=Epics.EpicsServiceManagerMonitorOk*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
@@ -268,7 +268,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=Scheduler.*"],
+            "args": ["--gtest_filter=Scheduler.SchedulerSubmitAndExecuteEverySeconds*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
@@ -324,7 +324,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=NodeController.MonitorCommandMultiPVStress*"],
+            "args": ["--gtest_filter=NodeController.*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

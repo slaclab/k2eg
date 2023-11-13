@@ -43,13 +43,13 @@ class Scheduler {
   std::time_t                     time_to_wakeup;
 
   bool                                  processing;
-  bool                                  new_taks_submitted;
+  bool                                  stop_wait_var;
   void                                  scheduleTask(int thread_index);
   std::chrono::system_clock::time_point getNewWaitUntilTimePoint();
 
  public:
   Scheduler(ConstSchedulerConfigurationUPtr configuration);
-  ~Scheduler() = default;
+  ~Scheduler();
   void start();
   void stop();
   void addTask(TaskShrdPtr task_shrd_ptr);

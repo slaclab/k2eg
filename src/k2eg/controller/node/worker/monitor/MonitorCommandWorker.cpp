@@ -69,17 +69,6 @@ MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& mo
 }
 
 MonitorCommandWorker::~MonitorCommandWorker() {
-  // dipose all still live monitor
-  logger->logMessage("[ Exing Worker ] stop all still live monitor");
-  for (auto& mon_vec_for_pv : channel_topics_map) {
-    logger->logMessage(STRING_FORMAT("[ Exing Worker ] Stop all monitor for pv '%1%'", mon_vec_for_pv.first));
-    for (auto& monitor_info : mon_vec_for_pv.second) {
-      logger->logMessage(
-          STRING_FORMAT("[ Exing Worker ] Stop monitor for pv '%1%' with target '%2%'", monitor_info->cmd.pv_name % monitor_info->cmd.channel_destination));
-      epics_service_manager->monitorChannel(monitor_info->cmd.pv_name, false);
-    }
-  }
-
   // dispose the token for the event
   epics_handler_token.reset();
   monitor_checker_token.reset();
@@ -89,6 +78,17 @@ MonitorCommandWorker::~MonitorCommandWorker() {
 
   erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(STARTUP_MONITOR_TASK_NAME);
   logger->logMessage(STRING_FORMAT("Remove startup task: %1%", erased));
+
+    // dipose all still live monitor
+  logger->logMessage("[ Dispose Worker ] stop all still live monitor");
+  for (auto& mon_vec_for_pv : channel_topics_map) {
+    logger->logMessage(STRING_FORMAT("[ Exing Worker ] Stop all monitor for pv '%1%'", mon_vec_for_pv.first));
+    for (auto& monitor_info : mon_vec_for_pv.second) {
+      logger->logMessage(
+          STRING_FORMAT("[ Dispose Worker ] Stop monitor for pv '%1%' with target '%2%'", monitor_info->cmd.pv_name % monitor_info->cmd.channel_destination));
+      epics_service_manager->monitorChannel(monitor_info->cmd.pv_name, false);
+    }
+  }
 }
 
 void

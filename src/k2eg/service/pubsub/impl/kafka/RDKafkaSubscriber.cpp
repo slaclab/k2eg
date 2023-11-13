@@ -71,8 +71,8 @@ RDKafkaSubscriber::getMsg(SubscriberInterfaceElementVector &messages, unsigned i
   // RDK_CONS_APP_ << "Entering getMsg";
   bool looping = true;
 
-  auto timeout_ms = std::chrono::microseconds(timeo);
-  auto end        = std::chrono::system_clock::now() + std::chrono::microseconds(timeo);
+  auto timeout_ms = std::chrono::milliseconds(timeo);
+  auto end        = std::chrono::system_clock::now() + std::chrono::milliseconds(timeo);
   while (messages.size() < m_num && looping) {
     std::unique_ptr<RdKafka::Message> msg(consumer->consume((int)timeout_ms.count()));
     if (!msg) continue;
@@ -80,7 +80,7 @@ RDKafkaSubscriber::getMsg(SubscriberInterfaceElementVector &messages, unsigned i
       case RdKafka::ERR__PARTITION_EOF: {
         // If partition EOF and have consumed messages, retry with timeout 1
         // This allows getting ready messages, while not waiting for new ones
-        if (messages.size() > 0) { timeout_ms = std::chrono::microseconds(1); }
+        if (messages.size() > 0) { timeout_ms = std::chrono::milliseconds(1); }
         msg.reset();
         break;
       }

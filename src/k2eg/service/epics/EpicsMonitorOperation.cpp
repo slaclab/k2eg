@@ -13,11 +13,12 @@ namespace pvd = epics::pvData;
 
 MonitorOperationImpl::MonitorOperationImpl(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field)
     : channel(channel), pv_name(pv_name), field(field), received_event(std::make_shared<EventReceived>()), has_data(false) {
-  mon = channel->monitor(this, pvd::createRequest(field));
+  channel->addConnectListener(this);
 }
 
 MonitorOperationImpl::~MonitorOperationImpl() {
   if (mon) { mon.cancel(); }
+  channel->reset();
 }
 void
 MonitorOperationImpl::poll(uint element_to_fetch) const {
@@ -46,6 +47,17 @@ MonitorOperationImpl::poll(uint element_to_fetch) const {
   }
 
   has_data = !mon.complete();
+}
+
+void
+MonitorOperationImpl::connectEvent(const pvac::ConnectEvent& evt) {
+  if (evt.connected) {
+    mon = channel->monitor(this, pvd::createRequest(field));
+  } else {
+    // pv not found manage has disconnected
+    std::lock_guard<std::mutex> l(ce_mtx);
+    received_event->event_fail->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Fail, pv_name, "PV is not reachable", nullptr}));
+  }
 }
 
 void

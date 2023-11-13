@@ -27,6 +27,8 @@ EpicsServiceManager::~EpicsServiceManager() {
   // remove all monitor handler
   end_processing = true;
   processing_pool.wait_for_tasks();
+  // remove pending channel
+  channel_map.clear();
   pva_provider->reset();
   ca_provider->reset();
 }
