@@ -16,6 +16,8 @@ PrometheusEpicsMetric::PrometheusEpicsMetric()
       ioc_read_write(BuildCounter().Name("k2eg_epics_ioc_operation").Help("Metric set for all Operation performed on the IOCs").Register(*registry)),
       ioc_read_write_rate(
           BuildGauge().Name("k2eg_epics_ioc_operation_rate").Help("Metric set for all Operation Rate performed on the IOCs").Register(*registry)),
+      ioc_pv_count(
+          BuildGauge().Name("k2eg_epics_ioc_pv_count").Help("Metric set for all pv counting information").Register(*registry)),
       get_ok_counter(ioc_read_write.Add({{"op", "get"}})),
       put_ok_counter(ioc_read_write.Add({{"op", "put"}})),
       monitor_event_data(ioc_read_write.Add({{"op", "monitor"}, {"evt_type", "data"}})),
@@ -23,6 +25,8 @@ PrometheusEpicsMetric::PrometheusEpicsMetric()
       monitor_event_fail(ioc_read_write.Add({{"op", "monitor"}, {"evt_type", "fail"}})),
       monitor_event_cancel(ioc_read_write.Add({{"op", "monitor"}, {"evt_type", "cancel"}})),
       monitor_event_disconnected(ioc_read_write.Add({{"op", "monitor"}, {"evt_type", "disconnect"}})),
+      total_monitor_pv(ioc_pv_count.Add({{"type", "total"}})),
+      active_monitor_pv(ioc_pv_count.Add({{"type", "active"}})),
       run_rate_thread(true),
       start_sample_ts(std::chrono::steady_clock::now()),
       rate_thread(&PrometheusEpicsMetric::calcRateThread, this),
@@ -62,5 +66,7 @@ PrometheusEpicsMetric::incrementCounter(IEpicsMetricCounterType type, double inc
     case IEpicsMetricCounterType::MonitorCancel: monitor_event_cancel.Increment(inc_value); break;
     case IEpicsMetricCounterType::MonitorDisconnect: monitor_event_disconnected.Increment(inc_value); break;
     case IEpicsMetricCounterType::MonitorTimeout: break;
+    case IEpicsMetricCounterType::TotalMonitor: total_monitor_pv.Set(inc_value); break;
+    case IEpicsMetricCounterType::ActiveMonitor: active_monitor_pv.Set(inc_value); break;
   }
 }

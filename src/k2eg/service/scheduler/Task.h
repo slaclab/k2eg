@@ -13,6 +13,8 @@ class Scheduler;
 #define RESCHEDULE_TIMEOUT 60 //seconds
 
 struct TaskProperties {
+    // let the scheduler run asap
+    bool run_asap = false;
     // when a task set this field to true, it will be automatically removed
     // and no more executed
     bool completed = false;

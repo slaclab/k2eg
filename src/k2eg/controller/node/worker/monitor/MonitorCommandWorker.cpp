@@ -4,6 +4,7 @@
 #include <k2eg/service/scheduler/Scheduler.h>
 
 #include <cassert>
+#include <execution>
 #include <functional>
 #include <mutex>
 #include <shared_mutex>
@@ -63,12 +64,11 @@ MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& mo
                                                    monitor_command_configuration.cron_scheduler_monitor_check,
                                                    std::bind(&MonitorCommandWorker::handlePeriodicTask, this, std::placeholders::_1));
   ServiceResolver<Scheduler>::resolve()->addTask(task_periodic_maintanance);
-  auto task_restart_monitor = MakeTaskShrdPtr(
-      STARTUP_MONITOR_TASK_NAME, 
-      STARTUP_MONITOR_TASK_NAME_CRON, 
-      std::bind(&MonitorCommandWorker::handleRestartMonitorTask, this, std::placeholders::_1), 
-      -1 // start at applcaition boot time
-      );
+  auto task_restart_monitor = MakeTaskShrdPtr(STARTUP_MONITOR_TASK_NAME,
+                                              STARTUP_MONITOR_TASK_NAME_CRON,
+                                              std::bind(&MonitorCommandWorker::handleRestartMonitorTask, this, std::placeholders::_1),
+                                              -1  // start at applcaition boot time
+  );
   ServiceResolver<Scheduler>::resolve()->addTask(task_restart_monitor);
 }
 
@@ -83,14 +83,14 @@ MonitorCommandWorker::~MonitorCommandWorker() {
   erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(STARTUP_MONITOR_TASK_NAME);
   logger->logMessage(STRING_FORMAT("Remove startup task: %1%", erased));
 
-    // dipose all still live monitor
+  // dipose all still live monitor
   logger->logMessage("[ Dispose Worker ] stop all still live monitor");
   for (auto& mon_vec_for_pv : channel_topics_map) {
     logger->logMessage(STRING_FORMAT("[ Exing Worker ] Stop all monitor for pv '%1%'", mon_vec_for_pv.first));
-    for (auto& monitor_info : mon_vec_for_pv.second) {
+    for (auto& monitor_info : mon_vec_for_pv.second.cmd_vec) {
       logger->logMessage(
-          STRING_FORMAT("[ Dispose Worker ] Stop monitor for pv '%1%' with target '%2%'", monitor_info->cmd.pv_name % monitor_info->cmd.channel_destination));
-      epics_service_manager->monitorChannel(monitor_info->cmd.pv_name, false);
+          STRING_FORMAT("[ Dispose Worker ] Stop monitor for pv '%1%' with target '%2%'", monitor_info.pv_name % monitor_info.channel_destination));
+      epics_service_manager->monitorChannel(monitor_info.pv_name, false);
     }
   }
 }
@@ -100,6 +100,7 @@ MonitorCommandWorker::handleRestartMonitorTask(TaskProperties& task_properties) 
   std::lock_guard<std::mutex> lock(periodic_task_mutex);
   logger->logMessage("[ Startup Task ] Restart monitor requests");
   task_properties.completed = !(starting_up = monitor_checker_shrd_ptr->scanForRestart());
+  task_properties.run_asap = true;
   if (!starting_up) { logger->logMessage("[ Startup Task ] Startup completed"); }
 }
 
@@ -130,7 +131,7 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
 
   // access map for modify it  // esclusive lock
   std::unique_lock<std::shared_mutex> lock_pv_map(channel_map_mtx);
-  auto&                               vec_ref = channel_topics_map[sanitized_pv->name];
+  auto&                               pv_monitor_info = channel_topics_map[sanitized_pv->name];
   lock_pv_map.unlock();
 
   switch (checker_event_data.action) {
@@ -138,12 +139,13 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
       logger->logMessage(STRING_FORMAT("Activate monitor on '%1%' for topic '%2%'",
                                        checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
       // got start event
-      if (std::find_if(std::begin(vec_ref), std::end(vec_ref), [&checker_event_data](auto& info_topic) {
-            return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
-          }) == std::end(vec_ref)) {
+      if (std::find_if(std::begin(pv_monitor_info.cmd_vec), std::end(pv_monitor_info.cmd_vec), [&checker_event_data](auto& info_topic) {
+            return info_topic.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
+          }) == std::end(pv_monitor_info.cmd_vec)) {
         {
           std::unique_lock<std::shared_mutex> lock_pv_map(channel_map_mtx);
-          vec_ref.push_back(MakeChannelTopicMonitorInfoUPtr(ChannelTopicMonitorInfo{checker_event_data.monitor_type}));
+          // add monitor infor to vector of the PV
+          pv_monitor_info.cmd_vec.push_back(checker_event_data.monitor_type);
         }
 
         logger->logMessage(
@@ -171,17 +173,23 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
       // remove topic to channel
       logger->logMessage(STRING_FORMAT("Stop monitor on '%1%' for topic '%2%'",
                                        checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
-      auto itr = std::find_if(std::begin(vec_ref), std::end(vec_ref), [&checker_event_data](auto& info_topic) {
-        return info_topic->cmd.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
+      auto itr = std::find_if(std::begin(pv_monitor_info.cmd_vec), std::end(pv_monitor_info.cmd_vec), [&checker_event_data](auto& info_topic) {
+        return info_topic.channel_destination.compare(checker_event_data.monitor_type.channel_destination) == 0;
       });
-      if (itr != std::end(vec_ref)) {
+      if (itr != std::end(pv_monitor_info.cmd_vec)) {
         {
           std::unique_lock<std::shared_mutex> lock_pv_map(channel_map_mtx);
-          vec_ref.erase(itr);
+          pv_monitor_info.cmd_vec.erase(itr);
         }
         epics_service_manager->monitorChannel(checker_event_data.monitor_type.pv_name, false);
         logger->logMessage(STRING_FORMAT("Monitor stopped on '%1%' for topic '%2%'",
                                          checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
+        if (pv_monitor_info.cmd_vec.size() == 0) {
+          // whe have to remove the key because no more monitor has been requested for the pv
+          std::unique_lock<std::shared_mutex> lock_pv_map(channel_map_mtx);
+          channel_topics_map.erase(sanitized_pv->name);
+          logger->logMessage(STRING_FORMAT("Removed pv information for '%1%'", checker_event_data.monitor_type.pv_name));
+        }
       } else {
         logger->logMessage(STRING_FORMAT("No active monitor on '%1%' for topic '%2%'",
                                          checker_event_data.monitor_type.pv_name % checker_event_data.monitor_type.channel_destination));
@@ -283,27 +291,46 @@ MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType e
   metric.incrementCounter(IEpicsMetricCounterType::MonitorDisconnect, event_received->event_disconnect->size());
   metric.incrementCounter(IEpicsMetricCounterType::MonitorFail, event_received->event_fail->size());
 
+  // check fail to connect pv
+  {
+    std::shared_lock slock(channel_map_mtx);
+    for (auto& event : *event_received->event_fail) { channel_topics_map[event->channel_data.pv_name].active = false; }
+  }
+
   // cache the various serilized message for each serializaiton type
   std::map<SerializationType, ConstSerializedMessageShrdPtr> local_serialization_cache;
   for (auto& event : *event_received->event_data) {
     // publisher
     std::shared_lock slock(channel_map_mtx);
 
-    for (auto& info_topic : channel_topics_map[event->channel_data.pv_name]) {
-      logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", event->channel_data.pv_name % info_topic->cmd.channel_destination), LogLevel::TRACE);
-      if (!local_serialization_cache.contains(static_cast<SerializationType>(info_topic->cmd.event_serialization))) {
+    // set channel as active
+    channel_topics_map[event->channel_data.pv_name].active = true;
+
+    // forward messages
+    for (auto& monitor_info : channel_topics_map[event->channel_data.pv_name].cmd_vec) {
+      logger->logMessage(STRING_FORMAT("Publish channel %1% on topic %2%", event->channel_data.pv_name % monitor_info.channel_destination), LogLevel::TRACE);
+      if (!local_serialization_cache.contains(static_cast<SerializationType>(monitor_info.event_serialization))) {
         // cache new serialized message
-        local_serialization_cache[static_cast<SerializationType>(info_topic->cmd.event_serialization)] =
-            serialize(event->channel_data, static_cast<SerializationType>(info_topic->cmd.event_serialization));
+        local_serialization_cache[static_cast<SerializationType>(monitor_info.event_serialization)] =
+            serialize(event->channel_data, static_cast<SerializationType>(monitor_info.event_serialization));
       }
-      publisher->pushMessage(MakeReplyPushableMessageUPtr(info_topic->cmd.channel_destination,
+      publisher->pushMessage(MakeReplyPushableMessageUPtr(monitor_info.channel_destination,
                                                           "monitor-message",
                                                           event->channel_data.pv_name,
-                                                          local_serialization_cache[static_cast<SerializationType>(info_topic->cmd.event_serialization)]),
+                                                          local_serialization_cache[static_cast<SerializationType>(monitor_info.event_serialization)]),
                              {// add header
-                              {"k2eg-ser-type", serialization_to_string(static_cast<SerializationType>(info_topic->cmd.event_serialization))}});
+                              {"k2eg-ser-type", serialization_to_string(static_cast<SerializationType>(monitor_info.event_serialization))}});
     }
   }
   publisher->flush(100);
+
+  {
+    std::shared_lock slock(channel_map_mtx);
+    int              active_pv =
+        std::count_if(std::execution::par, channel_topics_map.begin(), channel_topics_map.end(), [](const auto& pair) { return pair.second.active == true; });
+
+    metric.incrementCounter(IEpicsMetricCounterType::ActiveMonitor, active_pv);
+    metric.incrementCounter(IEpicsMetricCounterType::TotalMonitor, channel_topics_map.size());
+  }
 }
 #pragma endregion MonitorMessage

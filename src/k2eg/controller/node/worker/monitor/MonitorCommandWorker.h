@@ -3,6 +3,7 @@
 
 #include <k2eg/common/types.h>
 #include "k2eg/controller/command/cmd/MonitorCommand.h"
+#include "k2eg/service/data/repository/ChannelRepository.h"
 #include <k2eg/controller/node/configuration/NodeConfiguration.h>
 #include <k2eg/controller/node/worker/monitor/MonitorChecker.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
@@ -61,13 +62,13 @@ serializeMsgpack(const MonitorCommandReply& reply, common::MsgpackMessage& msgpa
 // contains the information for the forward
 // of the monitor data to a topic
 struct ChannelTopicMonitorInfo {
-    //k2eg::controller::command::cmd::ConstMonitorCommandShrdPtr cmd;
-    k2eg::service::data::repository::ChannelMonitorType cmd;
+    bool active = false;
+    std::vector<k2eg::service::data::repository::ChannelMonitorType> cmd_vec;
 };
 DEFINE_PTR_TYPES(ChannelTopicMonitorInfo);
 
 // map a channel to the topics where it need to be published
-DEFINE_MAP_FOR_TYPE(std::string, std::vector<ChannelTopicMonitorInfoUPtr>, ChannelTopicsMap);
+DEFINE_MAP_FOR_TYPE(std::string, ChannelTopicMonitorInfo, ChannelTopicsMap);
 
 //
 // ss the command handler for the management of the MonitorCommand
