@@ -13,6 +13,8 @@ class Scheduler;
 #define RESCHEDULE_TIMEOUT 60 //seconds
 
 struct TaskProperties {
+    // let the scheduler run asap
+    bool run_asap = false;
     // when a task set this field to true, it will be automatically removed
     // and no more executed
     bool completed = false;
@@ -32,7 +34,7 @@ class Task {
     TaskHandlerFunction handler;
     bool to_be_deleted = false;
  public:
-    Task(const std::string& name, const std::string& cron_expr, TaskHandlerFunction handler);
+    Task(const std::string& name, const std::string& cron_expr, TaskHandlerFunction handler, std::time_t starting_ts = std::time(0));
     void execute();
     bool canBeExecuted(const std::time_t& current_time);
     const std::string& getName();

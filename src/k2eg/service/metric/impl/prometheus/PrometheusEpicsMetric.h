@@ -24,6 +24,7 @@ class PrometheusEpicsMetric : public IEpicsMetric {
   std::shared_ptr<prometheus::Registry>    registry;
   prometheus::Family<prometheus::Counter>& ioc_read_write;
   prometheus::Family<prometheus::Gauge>&   ioc_read_write_rate;
+  prometheus::Family<prometheus::Gauge>&   ioc_pv_count;
   prometheus::Counter&                     get_ok_counter;
   prometheus::Counter&                     put_ok_counter;
   prometheus::Counter&                     monitor_event_data;
@@ -31,9 +32,11 @@ class PrometheusEpicsMetric : public IEpicsMetric {
   prometheus::Counter&                     monitor_event_fail;
   prometheus::Counter&                     monitor_event_cancel;
   prometheus::Counter&                     monitor_event_disconnected;
+  prometheus::Gauge&                       total_monitor_pv;
+  prometheus::Gauge&                       active_monitor_pv;
   PrometheusEpicsMetric();
 
-  bool run_rate_thread;
+  bool                                  run_rate_thread;
   std::chrono::steady_clock::time_point start_sample_ts;
   std::thread                           rate_thread;
   std::atomic<double>                   monitor_event_data_rate_sec_count;
