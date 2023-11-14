@@ -59,15 +59,10 @@ MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& mo
   // add monitor checker handler
   monitor_checker_token = monitor_checker_shrd_ptr->addHandler(std::bind(&MonitorCommandWorker::handleMonitorCheckEvents, this, std::placeholders::_1));
 
-  // start checker timing
-  auto task_periodic_maintanance = MakeTaskShrdPtr(MAINTANACE_TASK_NAME,
-                                                   monitor_command_configuration.cron_scheduler_monitor_check,
-                                                   std::bind(&MonitorCommandWorker::handlePeriodicTask, this, std::placeholders::_1));
-  ServiceResolver<Scheduler>::resolve()->addTask(task_periodic_maintanance);
   auto task_restart_monitor = MakeTaskShrdPtr(STARTUP_MONITOR_TASK_NAME,
                                               STARTUP_MONITOR_TASK_NAME_CRON,
                                               std::bind(&MonitorCommandWorker::handleRestartMonitorTask, this, std::placeholders::_1),
-                                              -1  // start at applcaition boot time
+                                              -1  // start at application boot time
   );
   ServiceResolver<Scheduler>::resolve()->addTask(task_restart_monitor);
 }
@@ -100,8 +95,15 @@ MonitorCommandWorker::handleRestartMonitorTask(TaskProperties& task_properties) 
   std::lock_guard<std::mutex> lock(periodic_task_mutex);
   logger->logMessage("[ Startup Task ] Restart monitor requests");
   task_properties.completed = !(starting_up = monitor_checker_shrd_ptr->scanForRestart());
-  task_properties.run_asap = true;
-  if (!starting_up) { logger->logMessage("[ Startup Task ] Startup completed"); }
+  task_properties.run_asap  = true;
+  if (!starting_up) {
+    logger->logMessage("[ Startup Task ] Startup completed");
+    // start checker timing
+    auto task_periodic_maintanance = MakeTaskShrdPtr(MAINTANACE_TASK_NAME,
+                                                     monitor_command_configuration.cron_scheduler_monitor_check,
+                                                     std::bind(&MonitorCommandWorker::handlePeriodicTask, this, std::placeholders::_1));
+    ServiceResolver<Scheduler>::resolve()->addTask(task_periodic_maintanance);
+  }
 }
 
 void

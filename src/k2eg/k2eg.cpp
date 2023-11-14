@@ -60,14 +60,14 @@ K2EGateway::setup(int argc, const char* argv[]) {
     ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(po->getPublisherConfiguration()));
     logger->logMessage("Start subscriber service");
     ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(po->getSubscriberConfiguration()));
-    logger->logMessage("Start Scheduler Service");
+    logger->logMessage("Init Scheduler Service");
     ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(po->getSchedulerConfiguration()));
-    ServiceResolver<Scheduler>::resolve()->start();
     logger->logMessage("Start node controller");
     node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
     logger->logMessage("Start command controller");
     cmd_controller = std::make_unique<CMDController>(po->getCMDControllerConfiguration(), std::bind(&K2EGateway::commandReceived, this, std::placeholders::_1));
-
+    logger->logMessage("Start Scheduler Service");
+    ServiceResolver<Scheduler>::resolve()->start();
     //wait for termination request
     cv.wait(lk, [this] { return this->quit; });
 
