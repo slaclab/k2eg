@@ -2,28 +2,28 @@
 #define k2eg_CONTROLLER_NODE_WORKER_MonitorCommandWORKER_H_
 
 #include <k2eg/common/types.h>
-#include "k2eg/controller/command/cmd/MonitorCommand.h"
-#include "k2eg/service/data/repository/ChannelRepository.h"
 #include <k2eg/controller/node/configuration/NodeConfiguration.h>
-#include <k2eg/controller/node/worker/monitor/MonitorChecker.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
+#include <k2eg/controller/node/worker/monitor/MonitorChecker.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
-
 #include <k2eg/service/log/ILogger.h>
-#include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/pubsub/IPublisher.h>
 
+#include <atomic>
 #include <mutex>
 #include <shared_mutex>
 #include <string>
 #include <vector>
-#include <atomic>
+
+#include "k2eg/controller/command/cmd/MonitorCommand.h"
+#include "k2eg/service/data/repository/ChannelRepository.h"
 
 namespace k2eg::controller::node::worker::monitor {
 
-struct MonitorCommandConfiguration{
+struct MonitorCommandConfiguration {
   // the cron stirng for schedule the monitor
-  std::string cron_scheduler_monitor_check;
+  std::string                 cron_scheduler_monitor_check;
   MonitorCheckerConfiguration monitor_checker_configuration;
 };
 DEFINE_PTR_TYPES(MonitorCommandConfiguration)
@@ -32,7 +32,7 @@ DEFINE_PTR_TYPES(MonitorCommandConfiguration)
 Monitor reply message
 */
 struct MonitorCommandReply : public k2eg::controller::node::worker::CommandReply {
-    const std::string message;
+  const std::string message;
 };
 DEFINE_PTR_TYPES(MonitorCommandReply)
 
@@ -62,8 +62,8 @@ serializeMsgpack(const MonitorCommandReply& reply, common::MsgpackMessage& msgpa
 // contains the information for the forward
 // of the monitor data to a topic
 struct ChannelTopicMonitorInfo {
-    bool active = false;
-    std::vector<k2eg::service::data::repository::ChannelMonitorType> cmd_vec;
+  bool                                                             active = false;
+  std::vector<k2eg::service::data::repository::ChannelMonitorType> cmd_vec;
 };
 DEFINE_PTR_TYPES(ChannelTopicMonitorInfo);
 
@@ -74,40 +74,43 @@ DEFINE_MAP_FOR_TYPE(std::string, ChannelTopicMonitorInfo, ChannelTopicsMap);
 // ss the command handler for the management of the MonitorCommand
 //
 class MonitorCommandWorker : public CommandWorker {
-    const MonitorCommandConfiguration monitor_command_configuration;
-    mutable std::shared_mutex channel_map_mtx;
-    mutable std::mutex periodic_task_mutex;
-    ChannelTopicsMap channel_topics_map;
-    k2eg::controller::node::configuration::NodeConfigurationShrdPtr node_configuration_db;
-    k2eg::service::log::ILoggerShrdPtr logger;
-    k2eg::service::pubsub::IPublisherShrdPtr publisher;
-    k2eg::service::metric::IEpicsMetric& metric;
-    k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
-    MonitorCheckerShrdPtr monitor_checker_shrd_ptr;
-    // Handler's liveness token
-    k2eg::common::BroadcastToken epics_handler_token;
-    k2eg::common::BroadcastToken monitor_checker_token;
-    std::atomic_bool starting_up;
-
-    const std::string get_queue_for_pv(const std::string& pv_name);
-    void manage_single_monitor(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
-    void manage_multiple_monitor(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
-    void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstCommandShrdPtr cmd);
-    void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
-    void handleMonitorCheckEvents(MonitorHandlerData checker_event_data);
-    void handleRestartMonitorTask(k2eg::service::scheduler::TaskProperties& task_properties);
-    void handlePeriodicTask(k2eg::service::scheduler::TaskProperties& task_properties);
-public:
-    MonitorCommandWorker(
-      const MonitorCommandConfiguration& monitor_command_configuration,
-      k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager,
-      k2eg::controller::node::configuration::NodeConfigurationShrdPtr node_configuration_db);
-    virtual ~MonitorCommandWorker();
-    void executePeriodicTask();
-    void processCommand(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
-    bool isReady();
+  const MonitorCommandConfiguration                               monitor_command_configuration;
+  mutable std::shared_mutex                                       channel_map_mtx;
+  mutable std::mutex                                              periodic_task_mutex;
+  ChannelTopicsMap                                                channel_topics_map;
+  k2eg::controller::node::configuration::NodeConfigurationShrdPtr node_configuration_db;
+  k2eg::service::log::ILoggerShrdPtr                              logger;
+  k2eg::service::pubsub::IPublisherShrdPtr                        publisher;
+  k2eg::service::metric::IEpicsMetric&                            metric;
+  k2eg::service::epics_impl::EpicsServiceManagerShrdPtr           epics_service_manager;
+  MonitorCheckerShrdPtr                                           monitor_checker_shrd_ptr;
+  // Handler's liveness token
+  k2eg::common::BroadcastToken          epics_handler_token;
+  k2eg::common::BroadcastToken          monitor_checker_token;
+  std::atomic_bool                      starting_up;
+  //thread for manage the update of the pv counting metrics
+  bool                                  run_rate_thread;
+  std::chrono::steady_clock::time_point start_sample_ts;
+  std::thread                           rate_thread;
+  const std::string                     get_queue_for_pv(const std::string& pv_name);
+  void                                  manage_single_monitor(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
+  void                                  manage_multiple_monitor(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
+  void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstCommandShrdPtr cmd);
+  void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
+  void handleMonitorCheckEvents(MonitorHandlerData checker_event_data);
+  void handleRestartMonitorTask(k2eg::service::scheduler::TaskProperties& task_properties);
+  void handlePeriodicTask(k2eg::service::scheduler::TaskProperties& task_properties);
+  void calcPVCount();
+ public:
+  MonitorCommandWorker(const MonitorCommandConfiguration&                              monitor_command_configuration,
+                       k2eg::service::epics_impl::EpicsServiceManagerShrdPtr           epics_service_manager,
+                       k2eg::controller::node::configuration::NodeConfigurationShrdPtr node_configuration_db);
+  virtual ~MonitorCommandWorker();
+  void executePeriodicTask();
+  void processCommand(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
+  bool isReady();
 };
 
-} // namespace k2eg::controller::node::worker
+}  // namespace k2eg::controller::node::worker::monitor
 
-#endif // k2eg_CONTROLLER_NODE_WORKER_MonitorCommandWORKER_H_
+#endif  // k2eg_CONTROLLER_NODE_WORKER_MonitorCommandWORKER_H_

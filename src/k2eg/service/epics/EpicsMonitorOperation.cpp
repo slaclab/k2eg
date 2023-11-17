@@ -56,7 +56,7 @@ MonitorOperationImpl::connectEvent(const pvac::ConnectEvent& evt) {
   } else {
     // pv not found manage has disconnected
     std::lock_guard<std::mutex> l(ce_mtx);
-    received_event->event_fail->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Fail, pv_name, "PV is not reachable", nullptr}));
+    received_event->event_fail->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Fail, "PV is not reachable", {pv_name, nullptr}}));
   }
 }
 
@@ -98,9 +98,9 @@ MonitorOperationImpl::monitorEvent(const pvac::MonitorEvent& evt) {
 EventReceivedShrdPtr
 MonitorOperationImpl::getEventData() const {
   std::lock_guard<std::mutex> l(ce_mtx);
-  auto                        resutl = received_event;
+  auto                        result = received_event;
   received_event                     = std::make_shared<EventReceived>();
-  return resutl;
+  return result;
 }
 
 bool
