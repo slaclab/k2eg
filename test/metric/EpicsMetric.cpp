@@ -96,3 +96,22 @@ TEST(Metric, EpicsMetricMonitorRates) {
   ASSERT_NE(metrics_string.length(), 0);
   ASSERT_NE(metrics_string.find("epics_ioc_operation_rate{evt_type=\"data\",op=\"monitor\"}"), -1);
 }
+
+TEST(Metric, EpicsMetricMonitorCount) {
+  IMetricServiceUPtr m_uptr;
+  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=8080});
+  EXPECT_NO_THROW(m_uptr = std::make_unique<PrometheusMetricService>(std::move(m_conf)));
+  auto& e_metric_ref = m_uptr->getEpicsMetric();
+  e_metric_ref.incrementCounter(IEpicsMetricCounterType::TotalMonitor, 10);
+  e_metric_ref.incrementCounter(IEpicsMetricCounterType::ActiveMonitor, 5);
+  auto metrics_string = getUrl("http://localhost:8080/metrics");
+  ASSERT_NE(metrics_string.length(), 0);
+  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_count{type=\"total\"} 10"), -1);
+  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_count{type=\"active\"} 5"), -1);
+  e_metric_ref.incrementCounter(IEpicsMetricCounterType::TotalMonitor, 5);
+  e_metric_ref.incrementCounter(IEpicsMetricCounterType::ActiveMonitor, 4);
+  metrics_string = getUrl("http://localhost:8080/metrics");
+  ASSERT_NE(metrics_string.length(), 0);
+  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_count{type=\"total\"} 5"), -1);
+  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_count{type=\"active\"} 4"), -1);
+}

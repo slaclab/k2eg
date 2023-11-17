@@ -51,7 +51,8 @@ MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& mo
       metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric()),
       epics_service_manager(epics_service_manager),
       monitor_checker_shrd_ptr(MakeMonitorCheckerShrdPtr(monitor_command_configuration.monitor_checker_configuration, node_configuration_db)),
-      starting_up(true) {
+      starting_up(true),
+      run_rate_thread(false) {
   // reset all processed element present in the monitor database
   monitor_checker_shrd_ptr->resetMonitorToProcess();
   // add epics monitor handler
@@ -71,10 +72,16 @@ MonitorCommandWorker::~MonitorCommandWorker() {
   // dispose the token for the event
   epics_handler_token.reset();
   monitor_checker_token.reset();
-  logger->logMessage("Remove periodic task from scheduler", LogLevel::DEBUG);
+  logger->logMessage("[ Shoutdown ] Stop metrics update thread");
+  
+  // stop metric monitor
+  run_rate_thread = false;
+  rate_thread.join();
+
+  // remove automated task from the scheduler
+  logger->logMessage("[ Shoutdown ] Remove periodic task from scheduler");
   bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(MAINTANACE_TASK_NAME);
   logger->logMessage(STRING_FORMAT("Remove periodic maintanance : %1%", erased));
-
   erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(STARTUP_MONITOR_TASK_NAME);
   logger->logMessage(STRING_FORMAT("Remove startup task: %1%", erased));
 
@@ -103,6 +110,11 @@ MonitorCommandWorker::handleRestartMonitorTask(TaskProperties& task_properties) 
                                                      monitor_command_configuration.cron_scheduler_monitor_check,
                                                      std::bind(&MonitorCommandWorker::handlePeriodicTask, this, std::placeholders::_1));
     ServiceResolver<Scheduler>::resolve()->addTask(task_periodic_maintanance);
+
+    logger->logMessage("[ Startup Task ] Startup thread for udpate pv countmetrics");
+
+    start_sample_ts = std::chrono::steady_clock::now();
+    rate_thread     = std::thread(&MonitorCommandWorker::calcPVCount, this);
   }
 }
 
@@ -296,7 +308,10 @@ MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType e
   // check fail to connect pv
   {
     std::shared_lock slock(channel_map_mtx);
-    for (auto& event : *event_received->event_fail) { channel_topics_map[event->channel_data.pv_name].active = false; }
+    for (auto& event : *event_received->event_fail) {
+      channel_topics_map[event->channel_data.pv_name].active = false;
+      logger->logMessage(STRING_FORMAT("PV %1% is not connected", event->channel_data.pv_name), LogLevel::TRACE);
+    }
   }
 
   // cache the various serilized message for each serializaiton type
@@ -325,14 +340,24 @@ MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType e
     }
   }
   publisher->flush(100);
+}
 
-  {
-    std::shared_lock slock(channel_map_mtx);
-    int              active_pv =
-        std::count_if(std::execution::par, channel_topics_map.begin(), channel_topics_map.end(), [](const auto& pair) { return pair.second.active == true; });
+void
+MonitorCommandWorker::calcPVCount() {
+  while (run_rate_thread) {
+    double rate_per_sec = 0;
+    auto   end_time     = std::chrono::steady_clock::now();
+    auto   elapsed      = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_sample_ts);
+    if (elapsed.count() >= 5) {
+      start_sample_ts = end_time;
+      std::shared_lock slock(channel_map_mtx);
+      int              active_pv =
+          std::count_if(std::execution::par, channel_topics_map.begin(), channel_topics_map.end(), [](const auto& pair) { return pair.second.active == true; });
 
-    metric.incrementCounter(IEpicsMetricCounterType::ActiveMonitor, active_pv);
-    metric.incrementCounter(IEpicsMetricCounterType::TotalMonitor, channel_topics_map.size());
+      metric.incrementCounter(IEpicsMetricCounterType::ActiveMonitor, active_pv);
+      metric.incrementCounter(IEpicsMetricCounterType::TotalMonitor, channel_topics_map.size());
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(1));
   }
 }
 #pragma endregion MonitorMessage
