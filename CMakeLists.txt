@@ -20,7 +20,7 @@ message(STATUS "GIT_EXECUTABLE='${GIT_EXECUTABLE}'")
 message(STATUS "Using compiler ${CMAKE_CXX_COMPILER_ID}_${CMAKE_CXX_COMPILER_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
-set(BOOST_VERSION 1.77.0)
+set(BOOST_VERSION 1.81.0)
 set(EPICS_VERSION R7.0.7)
 set(LIBLZ4_VERSION v1.9.2)
 set(LIBRDKAFKA_VERSION v2.1.0)
@@ -177,6 +177,10 @@ if(WIN32)
 elseif(UNIX)
   set(BOOST_BOOTSTRAP_CMD ./${BOOST_GIT_REPO_DIR}/bootstrap.sh)
   set(BOOST_BUILD_CMD ./${BOOST_GIT_REPO_DIR}/b2)
+endif()
+
+if(APPLE)
+set(BOOST_BUILD_CMD ${BOOST_BUILD_CMD} toolset=clang )
 endif()
 
 ExternalProject_Add(

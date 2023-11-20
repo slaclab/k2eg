@@ -19,3 +19,5 @@ kafka/*
 .gitignore
 kafka-consumer.kafka
 kafka-producer.kafka
+.idea
+src/k2eg/config.h
