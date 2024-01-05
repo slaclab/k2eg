@@ -111,8 +111,9 @@ MonitorCommandWorker::handleRestartMonitorTask(TaskProperties& task_properties) 
                                                      std::bind(&MonitorCommandWorker::handlePeriodicTask, this, std::placeholders::_1));
     ServiceResolver<Scheduler>::resolve()->addTask(task_periodic_maintanance);
 
+    // activate thread for metric
     logger->logMessage("[ Startup Task ] Startup thread for udpate pv countmetrics");
-
+    run_rate_thread = true;
     start_sample_ts = std::chrono::steady_clock::now();
     rate_thread     = std::thread(&MonitorCommandWorker::calcPVCount, this);
   }
@@ -310,7 +311,7 @@ MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType e
     std::shared_lock slock(channel_map_mtx);
     for (auto& event : *event_received->event_fail) {
       channel_topics_map[event->channel_data.pv_name].active = false;
-      logger->logMessage(STRING_FORMAT("PV %1% is not connected", event->channel_data.pv_name), LogLevel::TRACE);
+      logger->logMessage(STRING_FORMAT("PV %1% is not connected", event->channel_data.pv_name), LogLevel::DEBUG);
     }
   }
 
@@ -321,7 +322,11 @@ MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType e
     std::shared_lock slock(channel_map_mtx);
 
     // set channel as active
-    channel_topics_map[event->channel_data.pv_name].active = true;
+    if(!channel_topics_map[event->channel_data.pv_name].active) {
+      channel_topics_map[event->channel_data.pv_name].active = true;
+      logger->logMessage(STRING_FORMAT("PV %1% is connected", event->channel_data.pv_name), LogLevel::DEBUG);
+    }
+    
 
     // forward messages
     for (auto& monitor_info : channel_topics_map[event->channel_data.pv_name].cmd_vec) {
