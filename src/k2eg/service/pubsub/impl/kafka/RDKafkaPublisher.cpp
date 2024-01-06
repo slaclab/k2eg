@@ -93,7 +93,8 @@ RDKafkaPublisher::deinit() {
 int
 RDKafkaPublisher::flush(const int timeo) {
   // RDK_PUB_DBG_ << "Flushing... ";
-  while (producer->outq_len() > 0) { producer->poll(timeo); }
+  // while (producer->outq_len() > 0) { producer->poll(timeo); }
+  producer->poll(timeo);
   // RDK_PUB_DBG_ << "Flushing...done ";
   return 0;
 }
