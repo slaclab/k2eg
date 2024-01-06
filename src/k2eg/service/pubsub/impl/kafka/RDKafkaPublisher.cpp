@@ -57,6 +57,8 @@ RDKafkaPublisher::init() {
   RDK_CONF_SET(conf, "bootstrap.servers", configuration->server_address.c_str())
   RDK_CONF_SET(conf, "compression.type", "snappy")
   RDK_CONF_SET(conf, "linger.ms", "5")
+  RDK_CONF_SET(conf, "batch.size", "1048576")
+  
   RDK_CONF_SET(conf, "dr_cb", this);
 
   if (configuration->custom_impl_parameter.size() > 0) {
@@ -83,7 +85,8 @@ RDKafkaPublisher::autoPoll() {
 
 void
 RDKafkaPublisher::deinit() {
-  producer->flush(100);
+  int retry = 100;
+  while (producer->outq_len() > 0 && retry>0) { producer->poll(1000); retry--;}
   if (_auto_poll) {
     _stop_inner_thread = true;
     auto_poll_thread.join();
@@ -92,8 +95,9 @@ RDKafkaPublisher::deinit() {
 
 int
 RDKafkaPublisher::flush(const int timeo) {
+  //int retry = 3;
   // RDK_PUB_DBG_ << "Flushing... ";
-  // while (producer->outq_len() > 0) { producer->poll(timeo); }
+  //while (producer->outq_len() > 0 && retry>0) { producer->poll(timeo); retry--;}
   producer->poll(timeo);
   // RDK_PUB_DBG_ << "Flushing...done ";
   return 0;
