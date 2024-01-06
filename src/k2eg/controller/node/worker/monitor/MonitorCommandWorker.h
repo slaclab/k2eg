@@ -101,6 +101,7 @@ class MonitorCommandWorker : public CommandWorker {
   void handleRestartMonitorTask(k2eg::service::scheduler::TaskProperties& task_properties);
   void handlePeriodicTask(k2eg::service::scheduler::TaskProperties& task_properties);
   void calcPVCount();
+  void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
  public:
   MonitorCommandWorker(const MonitorCommandConfiguration&                              monitor_command_configuration,
                        k2eg::service::epics_impl::EpicsServiceManagerShrdPtr           epics_service_manager,

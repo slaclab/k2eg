@@ -90,8 +90,7 @@ Pushable reply message
 */
 class ReplyPushableMessage : public k2eg::service::pubsub::PublishMessage {
   const std::string                           queue;
-  const std::string&                          type;
-  const std::string                           request_type;
+  const std::string                           type;
   const std::string                           distribution_key;
   k2eg::common::ConstSerializedMessageShrdPtr message;
   k2eg::common::ConstDataUPtr                 message_data;

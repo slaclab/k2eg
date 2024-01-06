@@ -3,7 +3,6 @@
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/scheduler/Scheduler.h>
 
-#include <cassert>
 #include <execution>
 #include <functional>
 #include <mutex>
@@ -13,7 +12,7 @@
 #include "k2eg/controller/command/cmd/MonitorCommand.h"
 #include "k2eg/controller/node/worker/CommandWorker.h"
 #include "k2eg/controller/node/worker/monitor/MonitorChecker.h"
-#include "k2eg/service/epics/EpicsChannel.h"
+
 #include "k2eg/service/log/ILogger.h"
 #include "k2eg/service/metric/IMetricService.h"
 #include "k2eg/service/pubsub/IPublisher.h"
@@ -66,6 +65,16 @@ MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& mo
                                               -1  // start at application boot time
   );
   ServiceResolver<Scheduler>::resolve()->addTask(task_restart_monitor);
+
+  publisher->setCallBackForReqType(
+    "monitor-message", 
+    std::bind(
+      &MonitorCommandWorker::publishEvtCB, 
+      this, 
+      std::placeholders::_1,
+      std::placeholders::_2,
+      std::placeholders::_3)
+    );
 }
 
 MonitorCommandWorker::~MonitorCommandWorker() {
@@ -134,6 +143,18 @@ void
 MonitorCommandWorker::executePeriodicTask() {
   TaskProperties task_properties;
   handlePeriodicTask(task_properties);
+}
+
+void
+MonitorCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* const msg, const std::string& error_message){
+  switch (type) {
+    case OnDelivery:break;
+    case OnSent:break;
+    case OnError: {
+      logger->logMessage(error_message, LogLevel::ERROR);
+      break;
+    }
+  }
 }
 
 void
