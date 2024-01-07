@@ -189,8 +189,8 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
         publisher->createQueue(QueueDescription{
             // TODO apply somelogic here in future
             .name           = get_queue_for_pv(sanitized_pv->name),
-            .paritions      = 1,
-            .replicas       = 1,
+            .paritions      = 3,
+            .replicas       = 3,
             .retention_time = 1000 * 60 * 60,
             .retention_size = 1024 * 1024 * 50,
         });
