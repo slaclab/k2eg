@@ -26,7 +26,7 @@ ReplyPushableMessage::getDistributionKey() {
 }
 const std::string&
 ReplyPushableMessage::getReqType() {
-  return request_type;
+  return type;
 }
 
 bool 

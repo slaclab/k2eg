@@ -35,18 +35,15 @@ RDKafkaPublisher::dr_cb(RdKafka::Message &message) {
 
   switch (message.status()) {
     case RdKafka::Message::MSG_STATUS_NOT_PERSISTED:
-      if (cb_handler) cb_handler(OnError, message_managed.get());
+      if (cb_handler) cb_handler(OnError, message_managed.get(), message.errstr());
       break;
     case RdKafka::Message::MSG_STATUS_POSSIBLY_PERSISTED:
-      if (cb_handler) cb_handler(OnError, message_managed.get());
+      if (cb_handler) cb_handler(OnError, message_managed.get(), message.errstr());
       break;
     case RdKafka::Message::MSG_STATUS_PERSISTED:
-      if (cb_handler) cb_handler(OnSent, message_managed.get());
+      if (cb_handler) cb_handler(OnSent, message_managed.get(), "");
       break;
     default: break;
-  }
-  if (message.status() != RdKafka::Message::MSG_STATUS_PERSISTED) {
-    // std::cerr << message.errstr() << std::flush;
   }
 }
 
@@ -56,8 +53,8 @@ RDKafkaPublisher::init() {
   // RDK_CONF_SET(conf, "debug", "cgrp,topic,fetch,protocol", RDK_PUB_ERR_)
   RDK_CONF_SET(conf, "bootstrap.servers", configuration->server_address.c_str())
   RDK_CONF_SET(conf, "compression.type", "snappy")
-  RDK_CONF_SET(conf, "linger.ms", "5")
-  RDK_CONF_SET(conf, "batch.size", "1048576")
+  //RDK_CONF_SET(conf, "linger.ms", "5")
+  //RDK_CONF_SET(conf, "batch.size", "1048576")
   
   RDK_CONF_SET(conf, "dr_cb", this);
 

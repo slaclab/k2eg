@@ -22,7 +22,11 @@
                 "--scheduler-thread-number=1",
                 "--monitor-worker-cron-schedule=*/1 * * * * *",
                 "--nc-monitor-expiration-timeout=1",
-                "--nc-purge-queue-on-exp-timeout=true"],
+                "--nc-purge-queue-on-exp-timeout=true",
+                "--pub-impl-kv=debug:cgrp,topic,fetch",
+                "--pub-impl-kv=linger.ms:1",
+                "--pub-impl-kv=batch.size:1048576"
+            ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.vscode/.env",

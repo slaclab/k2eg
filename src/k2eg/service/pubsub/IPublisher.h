@@ -42,7 +42,7 @@ typedef std::vector<PublishMessageUniquePtr> PublisherMessageVector;
 typedef enum EventType { OnDelivery, OnSent, OnError } EventType;
 
 // Callback called after the message has been sent
-typedef std::function<void(EventType, PublishMessage* const)> EventCallback;
+typedef std::function<void(EventType, PublishMessage* const, const std::string& error_message)> EventCallback;
 typedef std::map<std::string, EventCallback> MapEvtHndlrForReqType;
 typedef std::pair<std::string, EventCallback> MapEvtHndlrForReqTypePair;
 typedef std::map<std::string,std::string> PublisherHeaders;
