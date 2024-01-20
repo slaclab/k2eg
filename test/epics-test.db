@@ -221,3 +221,22 @@ record (waveform,"channel:waveform")
     field(PINI, "YES")
 }
 
+# fake ioc for NTTable
+record(calc, "RAND_NUMBER") {
+    field(CALC, "RNDM")  # Random number
+    field(SCAN, "1 second")
+}
+
+record(stringin, "RAND_STRING") {
+    field(SCAN, "1 second")
+    field(INP, "LITERAL:Random String")  # Example random string
+}
+
+record(pvAccess, "MY_NT_TABLE") {
+    field(DESC, "Example NTTable with Random Data")
+    field(ASG, "DEFAULT")
+    field(SCAN, "Passive")
+    info(NDType, "NTTable")
+    info(NDAttr0, "Column1 DOUBLE RAND_NUMBER")
+    info(NDAttr1, "Column2 STRING RAND_STRING")
+}

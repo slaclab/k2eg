@@ -36,6 +36,20 @@ services:
     image: ghcr.io/bisegni/epics-base-docker-image:main
     volumes:
       - ../test/epics-test.db:/db/softioc.db
+  
+  epics-pva-complex:
+    build:
+      context: ../docker
+      dockerfile: Dockerfile.epics.test
+    volumes:
+      - .:/app
+    command: 
+        - /bin/bash
+        - -c
+        - |
+          tmux new-session -d "python /app/k2eg-mailbox-server.py"
+          tmux new-session -d "python /app/update_iocs.py"
+          tail -f /dev/null
 
   # epics_ca:
   #   image: ghcr.io/bisegni/epics-base-docker-image:main
