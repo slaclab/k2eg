@@ -359,3 +359,27 @@ TEST(Epics, SerializationMsgpackCompactWaveform) {
   EXPECT_EQ(object_vector[1].type, msgpack::type::ARRAY);
   //["variable:sum",7,0,0,"NO_ALARM",1681706068,208836822,0,0,0,"","",0,0,["Default","String","Binary","Decimal","Hex","Exponential","Engineering"],0,0,0,0,nan,nan,nan,nan,0,0,0,0,0]
 }
+
+TEST(Epics, SerializationNTTableMsgpack) {
+  INIT_PVA_PROVIDER()
+  EpicsChannelUPtr      pc;
+  ConstGetOperationUPtr get_op;
+  ConstDataUPtr         ser_value;
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "K2EG:TEST:TWISS"););
+  // EXPECT_NO_THROW(pc->connect());
+  EXPECT_NO_THROW(get_op = pc->get(););
+  WHILE(get_op->isDone(), false);
+  EXPECT_NO_THROW(ser_value = serialize(*get_op->getChannelData(), SerializationType::Msgpack)->data(););
+  EXPECT_NE(ser_value, nullptr);
+  EXPECT_NE(ser_value->data(), nullptr);
+  EXPECT_NE(ser_value->size(), 0);
+  msgpack::object_handle obj;
+  EXPECT_NO_THROW(obj = msgpack::unpack(ser_value->data(), ser_value->size()););
+  std::cout << obj.get() << std::endl;
+  EXPECT_EQ(msgpack::type::ARRAY, obj->type);
+  auto object_vector = obj.get().as<MsgpackObjectVector>();
+  EXPECT_EQ(object_vector.size(), 28);
+  EXPECT_EQ(object_vector[0].type, msgpack::type::STR);
+  EXPECT_EQ(object_vector[1].type, msgpack::type::POSITIVE_INTEGER);
+
+}

@@ -1,2 +1,7 @@
-FROM ghcr.io/bisegni/epics-base-docker-image:main
-COPY test/epics-test.db /db/softioc.db
+FROM --platform=linux/amd64 ghcr.io/epics-containers/epics-base-linux-developer:7.0.7ec3
+RUN apt update && apt install -y tmux
+RUN pip install numpy p4p pyepics
+COPY test/epics-test.db /app/epics-test.db
+COPY test/k2eg-mailbox-server.py /app/k2eg-mailbox-server.py
+COPY test/update_iocs.py /app/update_iocs.py
+CMD ["tail", "-f", "/dev/null"]
