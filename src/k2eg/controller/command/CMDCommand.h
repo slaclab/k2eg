@@ -79,12 +79,9 @@ check_for_serialization(const boost::json::object& o, common::SerializationType 
     }
     auto cmd = v->as_string();
     std::transform(cmd.begin(), cmd.end(), cmd.begin(), [](unsigned char c) { return std::tolower(c); });
-    if (cmd.compare("json") == 0)
-      ser_type = common::SerializationType::JSON;
-    else if (cmd.compare("msgpack") == 0)
+    if (cmd.compare("msgpack") == 0){
       ser_type = common::SerializationType::Msgpack;
-    else if (cmd.compare("msgpack-compact") == 0)
-      ser_type = common::SerializationType::MsgpackCompact;
+    }
   }
   return ser_type;
 }

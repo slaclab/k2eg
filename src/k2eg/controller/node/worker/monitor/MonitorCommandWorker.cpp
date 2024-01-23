@@ -82,10 +82,6 @@ MonitorCommandWorker::~MonitorCommandWorker() {
   epics_handler_token.reset();
   monitor_checker_token.reset();
   logger->logMessage("[ Shoutdown ] Stop metrics update thread");
-  
-  // stop metric monitor
-  run_rate_thread = false;
-  rate_thread.join();
 
   // remove automated task from the scheduler
   logger->logMessage("[ Shoutdown ] Remove periodic task from scheduler");
@@ -93,6 +89,10 @@ MonitorCommandWorker::~MonitorCommandWorker() {
   logger->logMessage(STRING_FORMAT("Remove periodic maintanance : %1%", erased));
   erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(STARTUP_MONITOR_TASK_NAME);
   logger->logMessage(STRING_FORMAT("Remove startup task: %1%", erased));
+
+  // stop metric monitor
+  run_rate_thread = false;
+  if(rate_thread.joinable()) rate_thread.join();
 
   // dipose all still live monitor
   logger->logMessage("[ Dispose Worker ] stop all still live monitor");
@@ -238,8 +238,13 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
 void
 MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
   if (starting_up) {
-    logger->logMessage("[ Starting up ] Comamnd cannot be executed");
+    logger->logMessage("[ Starting up ] Comamnd cannot be executed", LogLevel::ERROR);
     manageReply(-2, "Command cannot be executed, k2eg monitor worker is starting", command);
+    return;
+  }
+  if(!has_serialization_for_type(command->serialization)) {
+    logger->logMessage(STRING_FORMAT("No serializer found for type %1%", serialization_to_string(command->serialization)), LogLevel::ERROR);
+    manageReply(-3, "No serializer found", command);
     return;
   }
   switch (command->type) {

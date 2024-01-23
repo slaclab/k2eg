@@ -63,6 +63,7 @@ SingleGetOperation::SingleGetOperation(std::shared_ptr<pvac::ClientChannel> chan
 
 SingleGetOperation::~SingleGetOperation() {
   if(op){op.cancel();};
+  channel->removeConnectListener(this);
 }
 
 void

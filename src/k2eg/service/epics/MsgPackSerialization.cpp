@@ -1,21 +1,24 @@
-#include <k2eg/service/epics/MsgPackSerialization.h>
-#include <k2eg/controller/command/cmd/Command.h>
-#include <pv/bitSet.h>
-
-#include <memory>
-#include <sstream>
-#include "k2eg/common/JsonSerialization.h"
 #include "k2eg/common/MsgpackSerialization.h"
 
+#include <k2eg/controller/command/cmd/Command.h>
+#include <k2eg/service/epics/MsgPackSerialization.h>
+#include <pv/bitSet.h>
 #include <pvType.h>
+
+#include <cstdint>
+#include <memory>
+#include <sstream>
+
+#include "k2eg/common/JsonSerialization.h"
+#include "pvData.h"
 
 using namespace k2eg::service::epics_impl;
 using namespace k2eg::common;
 namespace pvd = epics::pvData;
 
-void 
+void
 MsgPackSerializer::serialize(const ChannelData& message, SerializedMessage& serialized_message) {
-  MsgpackMessage& mp_msg = dynamic_cast<MsgpackMessage&>(serialized_message);
+  MsgpackMessage&                   mp_msg = dynamic_cast<MsgpackMessage&>(serialized_message);
   msgpack::packer<msgpack::sbuffer> packer(mp_msg.getBuffer());
   packer.pack(message.pv_name);
   // process root structure
@@ -27,10 +30,10 @@ SerializedMessageShrdPtr
 MsgPackSerializer::serialize(const ChannelData& message, const std::string& reply_id) {
   auto                              result = std::make_shared<MsgpackMessage>();
   msgpack::packer<msgpack::sbuffer> packer(result->getBuffer());
-  if(reply_id.empty()) {
+  if (reply_id.empty()) {
     packer.pack_map(1);
   } else {
-    // add reply id at the beginning  
+    // add reply id at the beginning
     packer.pack_map(2);
     packer.pack(KEY_REPLY_ID);
     packer.pack(reply_id);
@@ -189,6 +192,14 @@ MsgPackSerializer::processStructure(const epics::pvData::PVStructure* structure,
         processStructureArray(static_cast<const pvd::PVStructureArray*>(fld)->view(), packer);
         break;
       }
+      case pvd::Type::union_: {
+        processUnion(static_cast<const pvd::PVUnion*>(fld), packer);
+        break;
+      }
+      case pvd::Type::unionArray: {
+        processUnionArray(static_cast<const pvd::PVUnionArray*>(fld)->view(), packer);
+        break;
+      }
     }
   }
 }
@@ -197,4 +208,43 @@ void
 MsgPackSerializer::processStructureArray(pvd::PVStructureArray::const_svector structure_array, msgpack::packer<msgpack::sbuffer>& packer) {
   packer.pack_array(structure_array.size());
   for (size_t i = 0, N = structure_array.size(); i < N; i++) { processStructure(structure_array[i].get(), packer); }
+}
+
+void
+MsgPackSerializer::processUnion(const pvd::PVUnion* union_, msgpack::packer<msgpack::sbuffer>& packer) {
+  if (!union_ || !union_->get()) {
+    // Handle null or empty union
+    packer.pack_nil();
+    return;
+  }
+  // Get the selected field
+  auto selectedField = union_->get();
+
+  // Get the name of the selected field (if available)
+  const std::string& fieldName = selectedField->getFieldName();
+  if(!fieldName.empty()) {
+    packer.pack_map(1);  // Packing one key-value pair
+    // Pack the name of the selected field and the field itself
+    packer.pack(std::string_view(fieldName));
+  }
+
+  // Serialize the selected field based on its type
+  auto fieldType = selectedField->getField()->getType();
+  switch (fieldType) {
+    case pvd::Type::scalar: processScalar(static_cast<const pvd::PVScalar*>(selectedField.get()), packer); break;
+    case pvd::Type::scalarArray: processScalarArray(static_cast<const pvd::PVScalarArray*>(selectedField.get()), packer); break;
+    case pvd::Type::structure: processStructure(static_cast<const pvd::PVStructure*>(selectedField.get()), packer); break;
+    case pvd::Type::structureArray: processStructureArray(static_cast<const pvd::PVStructureArray*>(selectedField.get())->view(), packer); break;
+    case pvd::Type::union_: processUnion(static_cast<const pvd::PVUnion*>(selectedField.get()), packer); break;
+    // Add other cases if necessary
+    default:
+      // Handle unknown type if necessary
+      break;
+  }
+}
+
+void
+MsgPackSerializer::processUnionArray(const pvd::PVUnionArray::const_svector union_array, msgpack::packer<msgpack::sbuffer>& packer) {
+  packer.pack_array(union_array.size());
+  for (size_t i = 0, N = union_array.size(); i < N; i++) { processUnion(union_array[i].get(), packer); }
 }

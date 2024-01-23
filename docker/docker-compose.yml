@@ -6,8 +6,8 @@ version: '3.8'
 services:
   epics_pva:
     build:
-      context: ../docker
-      dockerfile: Dockerfile.epics
+      context: ../
+      dockerfile: docker/Dockerfile.epics
     command: 
         - /bin/bash
         - -c

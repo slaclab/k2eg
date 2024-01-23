@@ -227,15 +227,6 @@ JsonSerializer::processStructure(const epics::pvData::PVStructure* structure, co
       case pvd::Type::unionArray: {
         const pvd::PVUnionArray*         U = static_cast<const pvd::PVUnionArray*>(fld);
         pvd::PVUnionArray::const_svector arr(U->view());
-
-        // for(size_t i=0, N=arr.size(); i<N; i++) {
-        //     if(arr[i])
-        //         show_field(A, arr[i].get(), 0);
-        //     else
-        //         yg(yajl_gen_null(A.handle));
-        // }
-
-        // yg(yajl_gen_array_close(A.handle));
         break;
       }
     }

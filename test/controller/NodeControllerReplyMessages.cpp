@@ -38,7 +38,7 @@ TEST(NodeControllerReplyMessages, GetCommandReplyJson) {
   ConstGetOperationUPtr get_op;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
   EXPECT_NO_THROW(get_op = pc->get(););
-  WHILE(get_op->isDone(), false);
+  WHILE_OP(get_op, false);
   GetCommandReply cr            = {0, "rep_id", get_op->getChannelData()};
   auto            serialization = serialize(cr, SerializationType::JSON);
   EXPECT_NE(serialization, nullptr);
@@ -57,7 +57,7 @@ TEST(NodeControllerReplyMessages, GetCommandReplyMsgpack) {
   ConstGetOperationUPtr get_op;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
   EXPECT_NO_THROW(get_op = pc->get(););
-  WHILE(get_op->isDone(), false);
+  WHILE_OP(get_op, false);
   GetCommandReply cr            = {0, "rep_id", get_op->getChannelData()};
   auto            serialization = serialize(cr, SerializationType::Msgpack);
   EXPECT_NE(serialization, nullptr);
@@ -87,7 +87,7 @@ TEST(NodeControllerReplyMessages, GetCommandReplyMsgpackCompact) {
   ConstGetOperationUPtr get_op;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
   EXPECT_NO_THROW(get_op = pc->get(););
-  WHILE(get_op->isDone(), false);
+  WHILE_OP(get_op, false);
   GetCommandReply cr            = {0, "rep_id", get_op->getChannelData()};
   auto            serialization = serialize(cr, SerializationType::MsgpackCompact);
   EXPECT_NE(serialization, nullptr);
@@ -118,7 +118,7 @@ TEST(NodeControllerReplyMessages, PutCommandReplyJson) {
   ConstGetOperationUPtr get_op;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
   EXPECT_NO_THROW(get_op = pc->get(););
-  WHILE(get_op->isDone(), false);
+  WHILE_OP(get_op, false);
   PutCommandReply cr            = {0, "rep_id"};
   auto            serialization = serialize(cr, SerializationType::JSON);
   EXPECT_NE(serialization, nullptr);
@@ -131,7 +131,7 @@ TEST(NodeControllerReplyMessages, PutCommandReplyMsgpack) {
   ConstGetOperationUPtr get_op;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
   EXPECT_NO_THROW(get_op = pc->get(););
-  WHILE(get_op->isDone(), false);
+  WHILE_OP(get_op, false);
   PutCommandReply cr            = {0, "rep_id"};
   auto            serialization = serialize(cr, SerializationType::Msgpack);
   EXPECT_NE(serialization, nullptr);
@@ -146,7 +146,7 @@ TEST(NodeControllerReplyMessages, PutCommandReplyMsgpackCompact) {
   ConstGetOperationUPtr get_op;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
   EXPECT_NO_THROW(get_op = pc->get(););
-  WHILE(get_op->isDone(), false);
+  WHILE_OP(get_op, false);
   PutCommandReply cr            = {0, "rep_id"};
   auto            serialization = serialize(cr, SerializationType::MsgpackCompact);
   EXPECT_NE(serialization, nullptr);
@@ -161,7 +161,7 @@ TEST(NodeControllerReplyMessages, PutCommandReplyWithMessage) {
   ConstGetOperationUPtr get_op;
   EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
   EXPECT_NO_THROW(get_op = pc->get(););
-  WHILE(get_op->isDone(), false);
+  WHILE_OP(get_op, false);
   PutCommandReply cr            = {0, "rep_id", "error-message"};
   auto            serialization = serialize(cr, SerializationType::MsgpackCompact);
   EXPECT_NE(serialization, nullptr);
