@@ -8,16 +8,14 @@ services:
     build:
       context: ../
       dockerfile: docker/Dockerfile.epics
-    logging:
-      driver: none
-      
-  # epics-ca:
-  #   build:
-  #     context: ../
-  #     dockerfile: docker/Dockerfile.epics_ca
-  #   entrypoint: /opt/execute-ca-ioc.sh /db/softioc.db
-  #   logging:
-  #     driver: none
+    command: 
+        - /bin/bash
+        - -c
+        - |
+          tmux new-session -d "softIocPVA -d /app/epics-test.db"
+          tmux new-session -d "python /app/k2eg-mailbox-server.py"
+          tmux new-session -d "python /app/update_iocs.py"
+          tail -f /dev/null
 
   zookeeper:
     image: bitnami/zookeeper:3.8.1

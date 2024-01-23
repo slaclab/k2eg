@@ -16,7 +16,10 @@ PutOperation::PutOperation(std::shared_ptr<pvac::ClientChannel>          channel
   channel->addConnectListener(this);
 }
 
-PutOperation::~PutOperation() { if(op){op.cancel();} }
+PutOperation::~PutOperation() { 
+  if(op){op.cancel();}
+  channel->removeConnectListener(this);
+}
 void
 PutOperation::putBuild(const epics::pvData::StructureConstPtr& build, pvac::ClientChannel::PutCallback::Args& args) {
   // At this point we have the user provided value string 'value'

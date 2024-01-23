@@ -4,7 +4,7 @@
 #include <k2eg/common/types.h>
 
 namespace k2eg::common {
-enum class SerializationType : std::uint8_t { Unknown, JSON, Msgpack, MsgpackCompact };
+enum class SerializationType : std::uint8_t { Unknown, Msgpack, MsgpackCompact, JSON};
 inline constexpr const char *
 serialization_to_string(SerializationType t) noexcept {
   switch (t) {

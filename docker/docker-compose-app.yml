@@ -42,7 +42,6 @@ services:
           /app/local/bin/wait
           /app/local/bin/linux-x86_64/pvget channel:ramp:ramp
           /app/local/bin/k2eg-test
-        
     depends_on:
       - epics-pva
       - kafka

@@ -221,3 +221,23 @@ record (waveform,"channel:waveform")
     field(PINI, "YES")
 }
 
+record(ai, "K2EG:TEST:IMAGESIZE") 
+{
+    field(DESC, "Size for the image")
+}
+record(ai, "K2EG:TEST:TEMPERATURE") 
+{
+    field(DESC, "A temperature for testing")
+    field(HIGH, 90)
+    field(HSV, "MINOR")
+    field(HIHI, 100)
+    field(HHSV, "MAJOR")
+    field(LOW, 40)
+    field(LSV, "MINOR")
+    field(LOLO, 30)
+    field(LLSV, "MAJOR")
+}
+record(ai, "K2EG:TEST:IMAGESIZE") 
+{
+    field(DESC, "Size for the image")
+}

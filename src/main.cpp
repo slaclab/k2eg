@@ -6,7 +6,6 @@
 #include <iostream>
 
 k2eg::K2EGateway g;
-
 void event_handler(int signum) {
     if ((signum == SIGABRT) || (signum == SIGSEGV)) {
         std::cerr << "INTERNAL ERROR, please provide log, Catch SIGNAL: " << signum;

@@ -7,8 +7,8 @@
     std::unique_ptr<pvac::ClientProvider> test_ca_provider = std::make_unique<pvac::ClientProvider>("ca", \
      epics::pvAccess::ConfigurationBuilder().add("PATH", "build/local/bin/linux-x86_64").push_map().push_env().build());
 
-#define WHILE(x, v) \
-  do { std::this_thread::sleep_for(std::chrono::milliseconds(250)); } while (x == v)
+#define WHILE_OP(x, v) \
+  do { std::this_thread::sleep_for(std::chrono::milliseconds(250)); } while (x->isDone() == v)
 
 #define WHILE_MONITOR(monitor_op, cond) \
  do { monitor_op->poll(); } while (cond)
