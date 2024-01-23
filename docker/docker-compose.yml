@@ -4,7 +4,7 @@ version: '3.8'
 #  redis-data:
 #    null
 services:
-  epics_pva:
+  epics-pva:
     build:
       context: ../
       dockerfile: docker/Dockerfile.epics
