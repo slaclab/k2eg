@@ -49,7 +49,7 @@ PutCommandWorker::processCommand(ConstCommandShrdPtr command) {
 
 void
 PutCommandWorker::manageReply(const std::int8_t error_code, const std::string& error_message, ConstPutCommandShrdPtr cmd) {
-  logger->logMessage(STRING_FORMAT("%1% [pv:%2% value:%3%]", error_message % cmd->pv_name % cmd->value), LogLevel::ERROR);
+  logger->logMessage(STRING_FORMAT("%1% [pv:%2% value:%3%]", error_message % cmd->pv_name % cmd->value), LogLevel::DEBUG);
   if (cmd->reply_topic.empty() || cmd->reply_id.empty()) {
     return;
   } else {
