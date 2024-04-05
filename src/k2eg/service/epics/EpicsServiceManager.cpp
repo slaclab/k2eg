@@ -211,7 +211,8 @@ EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op) {
     // exit withous submiting again the task
     return;
   }
-
+  // give some time of relaxing
+  std::this_thread::sleep_for(std::chrono::microseconds(100));
   // re-enque
   processing_pool.push_task(&EpicsServiceManager::task, this, monitor_op);
 }

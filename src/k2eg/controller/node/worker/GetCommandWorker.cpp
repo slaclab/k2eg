@@ -71,6 +71,7 @@ GetCommandWorker::manageFaultyReply(const std::int8_t error_code, const std::str
 
 void
 GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
+  logger->logMessage(STRING_FORMAT("Checking get operation for ", get_info->cmd->pv_name ), LogLevel::DEBUG);
   // check for timeout
   if (get_info->isTimeout()) {
     manageFaultyReply(-3, "Timeout operation", get_info->cmd);
@@ -112,5 +113,7 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
       }
     }
   }
+  // give some time of relaxing
+  std::this_thread::sleep_for(std::chrono::microseconds(100));
 }
 #pragma endregion GetCommandWorker

@@ -6,6 +6,8 @@
 #include <k2eg/service/epics/EpicsPutOperation.h>
 
 #include <boost/json.hpp>
+#include <chrono>
+#include <iostream>
 #include <memory>
 
 using namespace k2eg::controller::node::worker;
@@ -49,7 +51,7 @@ PutCommandWorker::processCommand(ConstCommandShrdPtr command) {
 
 void
 PutCommandWorker::manageReply(const std::int8_t error_code, const std::string& error_message, ConstPutCommandShrdPtr cmd) {
-  logger->logMessage(STRING_FORMAT("%1% [pv:%2% value:%3%]", error_message % cmd->pv_name % cmd->value), LogLevel::DEBUG);
+  logger->logMessage(STRING_FORMAT("%1% [pv:%2% value:%3%]", error_message % cmd->pv_name % cmd->value), (error_code==0?LogLevel::INFO:LogLevel::ERROR));
   if (cmd->reply_topic.empty() || cmd->reply_id.empty()) {
     return;
   } else {
@@ -65,6 +67,7 @@ PutCommandWorker::manageReply(const std::int8_t error_code, const std::string& e
 
 void
 PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
+  logger->logMessage(STRING_FORMAT("Checking put operation for %1%", put_info->cmd->pv_name ), LogLevel::DEBUG);
   // check for timeout
   if (put_info->isTimeout()) {
     manageReply(-3, "Timeout operation", put_info->cmd);
@@ -82,7 +85,7 @@ PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
         break;
       }
       case pvac::PutEvent::Cancel: {
-        manageReply(-2, "Put operation hs been cancelled", put_info->cmd);
+        manageReply(-2, "Put operation has been cancelled", put_info->cmd);
         break;
       }
       case pvac::PutEvent::Success: {
@@ -92,6 +95,8 @@ PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
       }
     }
   }
+  // give some time of relaxing
+  std::this_thread::sleep_for(std::chrono::microseconds(100));
 }
 
 k2eg::common::ConstSerializedMessageShrdPtr
