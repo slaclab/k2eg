@@ -67,7 +67,6 @@ PutCommandWorker::manageReply(const std::int8_t error_code, const std::string& e
 
 void
 PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
-  logger->logMessage(STRING_FORMAT("Checking put operation for %1%", put_info->cmd->pv_name ), LogLevel::DEBUG);
   // check for timeout
   if (put_info->isTimeout()) {
     manageReply(-3, "Timeout operation", put_info->cmd);
@@ -96,7 +95,7 @@ PutCommandWorker::checkPutCompletion(PutOpInfoShrdPtr put_info) {
     }
   }
   // give some time of relaxing
-  std::this_thread::sleep_for(std::chrono::microseconds(100));
+  std::this_thread::sleep_for(std::chrono::microseconds(500));
 }
 
 k2eg::common::ConstSerializedMessageShrdPtr
