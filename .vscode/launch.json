@@ -34,6 +34,10 @@
                 {
                     "name": "LD_LIBRARY_PATH",
                     "value": "$LD_LIBRARY_PATH:${workspaceFolder}/build/local/lib"
+                },
+                {
+                    "name": "ASAN_OPTION",
+                    "value": "verbosity=1"
                 }
             ],
             "externalConsole": false,

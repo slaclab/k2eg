@@ -104,35 +104,37 @@ EpicsServiceManager::forceMonitorChannelUpdate(const std::string& pv_name_uri) {
 ConstGetOperationUPtr
 EpicsServiceManager::getChannelData(const std::string& pv_name_uri) {
   ConstGetOperationUPtr result;
-  ReadLockCM            read_lock(channel_map_mutex);
+  WriteLockCM           write_lock(channel_map_mutex);
   auto                  sanitized_pv = sanitizePVName(pv_name_uri);
   // give a sanitization on pvname, the value will be not used cause k2eg return always all information
   if (!sanitized_pv) { return ConstGetOperationUPtr(); }
-  if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end()) {
-    // the same channel is in monitor so we can use it
-    result = search->second.channel->get();
-  } else {
-    // allocate channel and return data
-    auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name);
-    result       = channel->get();
+  if (auto search = channel_map.find(sanitized_pv->name); search == channel_map.end()) {
+    channel_map[sanitized_pv->name] = ChannelMapElement{
+          .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
+          .to_force = false,
+          .to_erase = false,
+    };
   }
+    // allocate channel and return data
+  result    = channel_map[sanitized_pv->name].channel->get();
   return result;
 }
 
 ConstPutOperationUPtr
 EpicsServiceManager::putChannelData(const std::string& pv_name_uri, const std::string& value) {
   ConstPutOperationUPtr result;
-  ReadLockCM            read_lock(channel_map_mutex);
-  auto                  pv = sanitizePVName(pv_name_uri);
-  if (!pv) { return ConstPutOperationUPtr(); }
-  if (auto search = channel_map.find(pv->name); search != channel_map.end()) {
-    // the same channel is in monitor so we can use it
-    result = search->second.channel->put(pv->field, value);
-  } else {
-    // allocate channel and return data
-    auto channel = std::make_unique<EpicsChannel>(SELECT_PROVIDER(pv->protocol), pv->name);
-    result       = channel->put(pv->field, value);
+  WriteLockCM           write_lock(channel_map_mutex);
+  auto                  sanitized_pv = sanitizePVName(pv_name_uri);
+  if (!sanitized_pv) { return ConstPutOperationUPtr(); }
+  if (auto search = channel_map.find(sanitized_pv->name); search == channel_map.end()) {
+    channel_map[sanitized_pv->name] = ChannelMapElement{
+          .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
+          .to_force = false,
+          .to_erase = false,
+    };
   }
+  // allocate channel and return data
+  result = channel_map[sanitized_pv->name].channel->put(sanitized_pv->field, value);
   return result;
 }
 

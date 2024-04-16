@@ -45,8 +45,8 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/configuration/coverage.cmake)
 #manage Address sanitizer
 if(${ENABLE_ASAN})
   message(STATUS "Enable address sanitizer")
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=address -fsanitize=leak -static-libasan")
-  set (CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=address -fsanitize=leak -static-libasan")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=address -static-libasan")
+  set (CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=address -static-libasan")
 endif()
 
 configure_file(k2eg.h.in ../src/k2eg/config.h)
