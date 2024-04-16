@@ -190,7 +190,7 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
             // TODO apply somelogic here in future
             .name           = get_queue_for_pv(sanitized_pv->name),
             .paritions      = 3,
-            .replicas       = 3,
+            .replicas       = 1, // put default to 1 need to be calculated with more compelx logic for higher values
             .retention_time = 1000 * 60 * 60,
             .retention_size = 1024 * 1024 * 50,
         });

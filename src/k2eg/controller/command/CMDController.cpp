@@ -78,8 +78,8 @@ CMDController::consume() {
       }
       received_message.clear();
     }
-    // check 250 milliseconds
-    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    // give some sleep time milliseconds
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 }
 

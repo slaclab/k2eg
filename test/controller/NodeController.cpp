@@ -165,8 +165,8 @@ wait_forPublished_message_size(DummyPublisherNoSignal& publisher, unsigned int r
   std::chrono::duration<long, std::milli> tout       = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
   bool                                    waiting    = true;
   while (waiting) {
-    waiting = publisher.getQueueMessageSize() <= requested_size;
-    waiting = waiting && (tout.count() <= timeout_ms);
+    waiting = publisher.getQueueMessageSize() < requested_size;
+    waiting = waiting && (tout.count() < timeout_ms);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     end_time = std::chrono::steady_clock::now();
     tout     = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -1049,6 +1049,48 @@ TEST(NodeController, PutCommandOnWrongPVCheckReply) {
   EXPECT_STREQ(map_reply[KEY_REPLY_ID].as<std::string>().c_str(), "PUT_REPLY_ID");
   EXPECT_EQ(map_reply.contains("message"), true);
   EXPECT_NE(map_reply["message"].as<std::string>().size(), 0);
+  // dispose all
+  deinitBackend(std::move(node_controller));
+}
+
+TEST(NodeController, PutCommandMultithreadCheck) {
+  typedef std::map<std::string, msgpack::object> Map;
+  typedef std::vector<msgpack::object>           Vec;
+  msgpack::unpacked                              msgpack_unpacked;
+  msgpack::object                                msgpack_object;
+  ConstChannelDataUPtr                           value_readout;
+  auto                                           publisher = std::make_shared<DummyPublisherNoSignal>();
+  // set environment variable for test
+  auto node_controller = initBackend(publisher);
+
+//this should wait the tiemout
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{
+      CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID_1", "pva://channel:wrong_pv_name", "8 0 0 0 0 0 0 0 0"})}););
+  // this should coplete first
+  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{
+      CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID_2", "pva://variable:b", "1"})}););
+  // give some time for the timeout
+  wait_forPublished_message_size(*publisher, 2, 100000);
+  EXPECT_EQ(publisher->sent_messages.size(), 2);
+
+  // the fisr completed should be the second one
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+  msgpack_object = msgpack_unpacked.get();
+  EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
+  auto map_reply = msgpack_object.as<Map>();
+  EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
+  EXPECT_STREQ(map_reply[KEY_REPLY_ID].as<std::string>().c_str(), "PUT_REPLY_ID_2");
+
+
+  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[1]););
+  msgpack_object = msgpack_unpacked.get();
+  EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
+  map_reply = msgpack_object.as<Map>();
+  EXPECT_EQ(map_reply.contains("error"), true);
+  EXPECT_EQ(map_reply["error"].as<int>(), -3);
+  EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
+  EXPECT_STREQ(map_reply[KEY_REPLY_ID].as<std::string>().c_str(), "PUT_REPLY_ID_1");
+
   // dispose all
   deinitBackend(std::move(node_controller));
 }

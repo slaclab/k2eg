@@ -77,10 +77,12 @@ check_for_serialization(const boost::json::object& o, common::SerializationType 
         l->logMessage("The kery serialization need to be a string", service::log::LogLevel::ERROR);
         return ser_type;
     }
-    auto cmd = v->as_string();
-    std::transform(cmd.begin(), cmd.end(), cmd.begin(), [](unsigned char c) { return std::tolower(c); });
-    if (cmd.compare("msgpack") == 0){
+    auto ser_type_str = v->as_string();
+    std::transform(ser_type_str.begin(), ser_type_str.end(), ser_type_str.begin(), [](unsigned char c) { return std::tolower(c); });
+    if (ser_type_str.compare("msgpack") == 0){
       ser_type = common::SerializationType::Msgpack;
+    } else if (ser_type_str.compare("json") == 0) {
+      ser_type = common::SerializationType::JSON;
     }
   }
   return ser_type;

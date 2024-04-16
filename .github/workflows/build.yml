@@ -54,9 +54,9 @@ jobs:
         needs: check-changed-file
         if: needs.check-changed-file.outputs.source_changed == 'true'
         runs-on: ubuntu-latest
-        container: docker.io/ubuntu:jammy
+        container: docker.io/ubuntu:22.04
         env:
-          BUILD_IMAGE: ubuntu:jammy
+          BUILD_IMAGE: ubuntu:22.04
           ARTIFACT_NAME: artifact-gcc-ubuntu
           BUILD_TYPE: Debug
         outputs:

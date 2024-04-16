@@ -6,6 +6,7 @@
 #include <chrono>
 #include <future>
 #include <iostream>
+#include <string>
 #include <thread>
 #include "k2eg/service/pubsub/IPublisher.h"
 
@@ -145,6 +146,55 @@ TEST(Kafka, KafkaSimplePubSub) {
   ASSERT_EQ(messages.at(0)->header.size(), 2);
   ASSERT_NE(messages.at(0)->header.find("key-1"), std::end(messages.at(0)->header));
   ASSERT_STREQ(messages.at(0)->header.find("key-1")->second.c_str(), "value-1");
+  ASSERT_NO_THROW(consumer->commit(););
+
+  std::string message_received(messages[0]->data.get(), messages[0]->data_len);
+  ASSERT_STREQ(message_received.c_str(), message_sent.c_str());
+}
+
+TEST(Kafka, KafkaSimplePubSubMultiple) {
+  SubscriberInterfaceElementVector  messages;
+  std::unique_ptr<RDKafkaPublisher> producer =
+      std::make_unique<RDKafkaPublisher>(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "kafka:9092"}));
+  std::unique_ptr<RDKafkaSubscriber> consumer =
+      std::make_unique<RDKafkaSubscriber>(std::make_unique<const SubscriberConfiguration>(SubscriberConfiguration{.server_address = "kafka:9092"}));
+
+  std::string message_sent = "hello_" + UUID::generateUUIDLite();
+  ASSERT_NO_THROW(consumer->setQueue({TOPIC_TEST_NAME}));
+  // give some times to consumer to register
+  ASSERT_EQ(producer->createQueue(
+    QueueDescription{
+      .name = TOPIC_TEST_NAME,
+      .paritions = 1,
+      .retention_time = 1000*60*60,
+      .retention_size = 1024*2
+    }
+  ), 0);
+  ASSERT_EQ(consumer->getMsg(messages, 1, 1000), 0);
+  sleep(5);
+  auto iotaFuture = std::async(
+      std::launch::async,
+      [&message_sent](std::unique_ptr<IPublisher> producer) {
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        for (int idx = 0; idx <= 10; idx++) {
+          usleep(100000);
+          ASSERT_EQ(producer->pushMessage(std::move(PublishMessageUniquePtr(new Message(TOPIC_TEST_NAME, message_sent))), {{"counter", std::to_string(idx)},{"key-2", "value-2"}}), 0);
+        }
+        ASSERT_EQ(producer->flush(1000), 0);
+      },
+      std::move(producer));
+
+  ASSERT_EQ(consumer->getMsg(messages, 10, 1000), 0);
+  while (messages.size() < 10) {
+    ASSERT_EQ(consumer->getMsg(messages, 10, 1000), 0);
+  }
+  iotaFuture.wait();
+  ASSERT_EQ(messages.size(), 10);
+  for (int idx = 0; idx < 10; idx++) {
+    ASSERT_EQ(messages.at(idx)->header.size(), 2);
+    ASSERT_NE(messages.at(idx)->header.find("counter"), std::end(messages.at(idx)->header));
+    ASSERT_STREQ(messages.at(idx)->header.find("counter")->second.c_str(), std::to_string(idx).c_str());
+  }
   ASSERT_NO_THROW(consumer->commit(););
 
   std::string message_received(messages[0]->data.get(), messages[0]->data_len);
