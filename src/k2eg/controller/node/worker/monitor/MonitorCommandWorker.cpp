@@ -151,7 +151,7 @@ MonitorCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* const
     case OnDelivery:break;
     case OnSent:break;
     case OnError: {
-      logger->logMessage(error_message, LogLevel::ERROR);
+      logger->logMessage(STRING_FORMAT("[publishEvtCB] %1%", error_message), LogLevel::ERROR);
       break;
     }
   }
