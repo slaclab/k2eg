@@ -23,7 +23,7 @@
                 "--monitor-worker-cron-schedule=*/1 * * * * *",
                 "--nc-monitor-expiration-timeout=10",
                 "--nc-purge-queue-on-exp-timeout=true",
-                "--pub-impl-kv=debug:cgrp,topic,fetch",
+                "--pub-impl-kv=debug:topic,msg,queue",
                 "--pub-impl-kv=linger.ms:1",
                 "--pub-impl-kv=batch.size:1048576"
             ],

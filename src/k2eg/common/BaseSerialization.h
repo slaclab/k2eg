@@ -2,7 +2,8 @@
 #define K2EG_COMMON_BASESERIALIZATION_H_
 
 #include <k2eg/common/types.h>
-
+#include <iostream>
+#include <ostream>
 namespace k2eg::common {
 enum class SerializationType : std::uint8_t { Unknown, Msgpack, MsgpackCompact, JSON};
 inline constexpr const char *

@@ -31,9 +31,32 @@ GetCommandWorker::GetCommandWorker(EpicsServiceManagerShrdPtr epics_service_mana
       logger(ServiceResolver<ILogger>::resolve()),
       publisher(ServiceResolver<IPublisher>::resolve()),
       metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric()),
-      epics_service_manager(epics_service_manager) {}
+      epics_service_manager(epics_service_manager) {
+        publisher->setCallBackForReqType(
+          "get-reply-message", 
+          std::bind(
+            &GetCommandWorker::publishEvtCB, 
+            this, 
+            std::placeholders::_1,
+            std::placeholders::_2,
+            std::placeholders::_3)
+          );
+      }
 
 GetCommandWorker::~GetCommandWorker() { processing_pool->wait_for_tasks(); }
+
+void
+GetCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* const msg, const std::string& error_message){
+  switch (type) {
+    case OnDelivery:break;
+    case OnSent:break;
+    case OnError: {
+      logger->logMessage(STRING_FORMAT("[GetCommandWorker::publishEvtCB] %1%", error_message), LogLevel::ERROR);
+      break;
+    }
+  }
+}
+
 
 void
 GetCommandWorker::processCommand(ConstCommandShrdPtr command) {
@@ -106,7 +129,7 @@ GetCommandWorker::checkGetCompletion(GetOpInfoShrdPtr get_info) {
           logger->logMessage("Invalid serialized message", LogLevel::FATAL);
           break;
         }
-        publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->cmd->reply_topic, "get-operation", get_info->cmd->pv_name, serialized_message),
+        publisher->pushMessage(MakeReplyPushableMessageUPtr(get_info->cmd->reply_topic, "get-reply-message", get_info->cmd->pv_name, serialized_message),
                                {{"k2eg-ser-type", serialization_to_string(get_info->cmd->serialization)}});
         break;
       }

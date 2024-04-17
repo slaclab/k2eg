@@ -100,7 +100,7 @@ class ReplyPushableMessage : public k2eg::service::pubsub::PublishMessage {
                        const std::string&                          type,
                        const std::string&                          distribution_key,
                        k2eg::common::ConstSerializedMessageShrdPtr message);
-  virtual ~ReplyPushableMessage() = default;
+  virtual ~ReplyPushableMessage();
   char*              getBufferPtr();
   const size_t       getBufferSize();
   const std::string& getQueue();
