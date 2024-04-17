@@ -8,6 +8,9 @@ ReplyPushableMessage::ReplyPushableMessage(const std::string&          queue,
                                            const std::string&          distribution_key,
                                            k2eg::common::ConstSerializedMessageShrdPtr  message)
     : type(type), queue(queue), distribution_key(distribution_key),message(message), message_data(this->message->data()) {}
+
+ReplyPushableMessage::~ReplyPushableMessage(){}
+
 char*
 ReplyPushableMessage::getBufferPtr() {
   return const_cast<char*>(message_data->data());

@@ -82,7 +82,7 @@ class RDKafkaPublisher : public IPublisher, RDKafkaBase, RdKafka::DeliveryReport
   int scan_groups(const rd_kafka_ListConsumerGroups_result_t *list, QueueMetadata& q_desc_ref);
   QueueSubscriberGroupInfoUPtr get_group_info(const char *group);
  protected:
-  void         dr_cb(RdKafka::Message& message);
+  virtual void dr_cb(RdKafka::Message& message);
   void         autoPoll();
   virtual void init();
   virtual void deinit();

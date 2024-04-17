@@ -14,7 +14,7 @@ using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
 
 RDKafkaPublisher::RDKafkaPublisher(ConstPublisherConfigurationUPtr configuration)
-    : IPublisher(std::move(configuration)), RDKafkaBase(), _stop_inner_thread(false), _auto_poll(false) {
+    : IPublisher(std::move(configuration)), RDKafkaBase(), _stop_inner_thread(false), _auto_poll(true) {
   init();
 }
 
