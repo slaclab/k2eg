@@ -15,7 +15,7 @@ COPY CMakeLists.txt /opt/app/
 COPY configuration/coverage.cmake /opt/app/configuration/coverage.cmake
 RUN  apt update \
     &&  apt install -y openssl curl libcurl4-openssl-dev
-RUN mkdir /opt/app/build && cd /opt/app/build && cmake -DCMAKE_BUILD_TYPE=Release .. && make install
+RUN mkdir /opt/app/build && cd /opt/app/build && cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_ASAN=0 .. && make install
 
 from ubuntu:jammy
 

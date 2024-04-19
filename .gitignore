@@ -19,3 +19,4 @@ kafka/*
 .gitignore
 kafka-consumer.kafka
 kafka-producer.kafka
+*.log
