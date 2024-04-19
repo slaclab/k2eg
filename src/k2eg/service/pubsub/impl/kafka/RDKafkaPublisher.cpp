@@ -388,7 +388,6 @@ RDKafkaPublisher::pushMessage(PublishMessageUniquePtr message, const std::map<st
     /* Headers are automatically deleted on produce() success. */
     delete kafka_headers;
     delete msg_ptr;
-    delete kafka_headers; 
     return -1;
   } else {
     // whe need to release the message memory becaus is not more owned by this
