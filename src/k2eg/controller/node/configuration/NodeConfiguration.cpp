@@ -74,6 +74,8 @@ size_t NodeConfiguration::iterateAllChannelMonitorForPurge(size_t element_to_pro
             found = channel_repository->getNextChannelMonitorToProcess(std::get<0>(ch));
         }
     }
+    // cleer the distinct name
+    distinct_name_prot.clear();
     return processed;
 }
 
