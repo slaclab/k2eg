@@ -47,6 +47,8 @@ if(${ENABLE_ASAN})
   message(STATUS "Enable address sanitizer")
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=address -static-libasan")
   set (CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=address -static-libasan")
+else()
+  message(STATUS "Disable address sanitizer")
 endif()
 
 configure_file(k2eg.h.in ../src/k2eg/config.h)

@@ -33,7 +33,7 @@ CMDController::consume() {
   SubscriberInterfaceElementVector received_message;
   while (run) {
     // fetch message
-    subscriber->getMsg(received_message, configuration->max_message_to_fetch, configuration->fetch_time_out);
+    //subscriber->getMsg(received_message, configuration->max_message_to_fetch, configuration->fetch_time_out);
     if (received_message.size()) {
       ConstCommandShrdPtrVec result_vec;
       std::for_each(received_message.begin(), received_message.end(), [&metric = metric, &logger = logger, &result_vec = result_vec](auto message) {

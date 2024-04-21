@@ -70,6 +70,7 @@ size_t
 MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
   logger->logMessage("[ Purge Scan ] Start scanning for monitor eviction");
   // scan al monitor to check what need to be
+  //TODO this raise memory leaks
   return node_configuration_db->iterateAllChannelMonitorForPurge(
       element_to_process,  // number of unprocessed element to check
       [this](const ChannelMonitorType& monitor_info, int& purge_ts_set_flag) {
