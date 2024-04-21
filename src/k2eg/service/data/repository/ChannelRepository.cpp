@@ -61,19 +61,25 @@ ChannelRepository::isPresent(const ChannelMonitorType& new_cannel) const {
 
 std::optional<ChannelMonitorTypeUPtr>
 ChannelRepository::getChannelMonitor(const ChannelMonitorType& channel_descirption) const {
-  auto result = data_storage.getLockedStorage().get()->get_all_pointer<ChannelMonitorType>(
+  auto               locked_instance = data_storage.getLockedStorage();
+  auto               lstorage        = locked_instance.get();
+  auto result = lstorage->get_all_pointer<ChannelMonitorType>(
       where(c(&ChannelMonitorType::pv_name) == channel_descirption.pv_name and
             c(&ChannelMonitorType::channel_destination) == channel_descirption.channel_destination));
+  lstorage->db_release_memory();
   return (result.size() == 0) ? std::optional<std::unique_ptr<ChannelMonitorType>>() : make_optional(std::make_unique<ChannelMonitorType>(*result[0]));
 }
 
 std::optional<ChannelMonitorTypeUPtr>
 ChannelRepository::getNextChannelMonitorToProcess(const std::string& pv_name) const {
-  auto result = data_storage.getLockedStorage().get()->get_all_pointer<ChannelMonitorType>(
+  auto               locked_instance = data_storage.getLockedStorage();
+  auto               lstorage        = locked_instance.get();
+  auto result = lstorage->get_all_pointer<ChannelMonitorType>(
     where(
       c(&ChannelMonitorType::pv_name) == pv_name and
       c(&ChannelMonitorType::processed) == false
     ), limit(1));
+  lstorage->db_release_memory();
   return (result.size() == 0) ? std::optional<std::unique_ptr<ChannelMonitorType>>() : make_optional(std::make_unique<ChannelMonitorType>(*result[0]));
 }
 
@@ -93,6 +99,7 @@ ChannelRepository::processAllChannelMonitor(const std::string& pv_name, ChannelM
   for (uint32_t idx = 0; auto& channel_description : lstorage->iterate<ChannelMonitorType>(where(c(&ChannelMonitorType::pv_name) == pv_name))) {
     handler(idx++, channel_description);
   }
+  lstorage->db_release_memory();
 }
 
 void
@@ -115,12 +122,14 @@ ChannelRepository::resetProcessStateChannel(const std::string& pv_name) {
   auto locked_instance = data_storage.getLockedStorage();
   auto lstorage        = locked_instance.get();
   lstorage->update_all(set(c(&ChannelMonitorType::processed) = false), where(c(&ChannelMonitorType::pv_name) == pv_name));
+  lstorage->db_release_memory();
 }
 void
 ChannelRepository::setProcessStateChannel(const int64_t id, bool process_state) {
   auto locked_instance = data_storage.getLockedStorage();
   auto lstorage        = locked_instance.get();
   lstorage->update_all(set(c(&ChannelMonitorType::processed) = process_state), where(c(&ChannelMonitorType::id) == id));
+  lstorage->db_release_memory();
 }
 
 void
@@ -133,6 +142,7 @@ ChannelRepository::setStartPurgeTimeStamp(int64_t monitor_id) {
   monitor_data.start_purge_ts = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
   // update monitor data
   lstorage->update(monitor_data);
+  lstorage->db_release_memory();
 }
 
 void
@@ -144,9 +154,13 @@ ChannelRepository::resetStartPurgeTimeStamp(int64_t monitor_id) {
   monitor_data.start_purge_ts = -1;
   // update monitor data
   lstorage->update(monitor_data);
+  lstorage->db_release_memory();
 }
 
 void
 ChannelRepository::removeAll() {
-  return data_storage.getLockedStorage().get()->remove_all<ChannelMonitorType>();
+  auto locked_instance = data_storage.getLockedStorage();
+  auto lstorage        = locked_instance.get();
+  lstorage->remove_all<ChannelMonitorType>();
+  lstorage->db_release_memory();
 }
