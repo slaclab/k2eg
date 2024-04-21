@@ -35,20 +35,27 @@ ChannelRepository::insert(const ChannelMonitorType& channel_description) {
     // update monitor data
     lstorage->update(monitor_data);
   }
+  lstorage->db_release_memory();
   return enabled;
 }
 
 void
 ChannelRepository::remove(const ChannelMonitorType& channel_description) {
-  auto locked_instance = data_storage.getLockedStorage();
-  locked_instance.get()->remove_all<ChannelMonitorType>(where(c(&ChannelMonitorType::pv_name) == channel_description.pv_name and
+  auto               locked_instance = data_storage.getLockedStorage();
+  auto               lstorage        = locked_instance.get();
+  lstorage->remove_all<ChannelMonitorType>(where(c(&ChannelMonitorType::pv_name) == channel_description.pv_name and
                                                               c(&ChannelMonitorType::channel_destination) == channel_description.channel_destination));
+  lstorage->db_release_memory();
 }
 
 bool
 ChannelRepository::isPresent(const ChannelMonitorType& new_cannel) const {
-  auto result = data_storage.getLockedStorage().get()->count<ChannelMonitorType>(
+  auto               locked_instance = data_storage.getLockedStorage();
+  auto               lstorage        = locked_instance.get();
+
+  auto result = lstorage->count<ChannelMonitorType>(
       where(c(&ChannelMonitorType::pv_name) == new_cannel.pv_name and c(&ChannelMonitorType::channel_destination) == new_cannel.channel_destination));
+  lstorage->db_release_memory();
   return result != 0;
 }
 
@@ -75,6 +82,7 @@ ChannelRepository::getDistinctByNameProtocol() const {
   auto locked_instance = data_storage.getLockedStorage();
   auto lstorage        = locked_instance.get();
   auto result          = lstorage->select(distinct(columns(&ChannelMonitorType::pv_name)));
+  lstorage->db_release_memory();
   return result;
 }
 
@@ -100,6 +108,7 @@ ChannelRepository::processUnprocessedChannelMonitor(const std::string&          
     // update node as processed
     lstorage->update_all(set(c(&ChannelMonitorType::processed) = true), where(c(&ChannelMonitorType::id) == channel_description.id));
   }
+  lstorage->db_release_memory();
 }
 void
 ChannelRepository::resetProcessStateChannel(const std::string& pv_name) {
