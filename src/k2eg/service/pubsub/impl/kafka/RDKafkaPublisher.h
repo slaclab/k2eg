@@ -20,6 +20,15 @@ struct RdKafkaTopicDeleter {
   }
 };
 
+
+struct RdKafkaMetadataDeleter {
+  void
+  operator()(const rd_kafka_metadata_t* metadata) {
+    rd_kafka_metadata_destroy(metadata);
+  }
+};
+
+
 struct RdKafkaQueueDeleter {
   void
   operator()(rd_kafka_queue_t* queue) {
