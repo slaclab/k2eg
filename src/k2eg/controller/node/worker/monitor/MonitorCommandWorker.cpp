@@ -121,7 +121,7 @@ MonitorCommandWorker::handleRestartMonitorTask(TaskProperties& task_properties) 
     ServiceResolver<Scheduler>::resolve()->addTask(task_periodic_maintanance);
 
     // activate thread for metric
-    logger->logMessage("[ Startup Task ] Startup thread for udpate pv countmetrics");
+    logger->logMessage("[ Startup Task ] Startup thread for udpate pv metrics");
     run_rate_thread = true;
     start_sample_ts = std::chrono::steady_clock::now();
     rate_thread     = std::thread(&MonitorCommandWorker::calcPVCount, this);

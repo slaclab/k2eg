@@ -43,9 +43,8 @@ getStorageFromWPtr(std::weak_ptr<Storage> ws) {
  * Contains lockable access to storage for multithreading operation
  */
 struct StorageLockedRef {
-  StorageLockedRef(std::unique_lock<std::recursive_mutex> &&s_lock, std::weak_ptr<Storage> &&ss_wptr)
-      : s_lock(std::move(s_lock)), ss_wptr(std::move(ss_wptr)) {}
-  std::weak_ptr<Storage> ss_wptr;
+  StorageLockedRef(std::unique_lock<std::recursive_mutex> &&s_lock, std::shared_ptr<Storage> ss_wptr)
+      : s_lock(std::move(s_lock)), ss_wptr(ss_wptr) {}
   /*
    * thelock is owned on the first call of this method
    * and is release when the StorageLockedRef instance
@@ -53,12 +52,13 @@ struct StorageLockedRef {
    */
   std::shared_ptr<Storage>
   get() {
-    // cquire lock
+    // acquire lock
     s_lock.lock();
-    return std::move(getStorageFromWPtr(ss_wptr));
+    return ss_wptr;
   }
 
  private:
+  std::shared_ptr<Storage> ss_wptr;
   std::unique_lock<std::recursive_mutex> s_lock;
 };
 
@@ -74,6 +74,7 @@ class DataStorage {
  public:
   DataStorage(const std::string &path);
   ~DataStorage() = default;
+  void freeMemory();
   std::weak_ptr<repository::ChannelRepository> getChannelRepository();
   /**
    * The result @StorageLockedRef reference should be used for single operation

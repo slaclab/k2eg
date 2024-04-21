@@ -36,14 +36,20 @@ DataStorage::DataStorage(const std::string &path)
         throw std::runtime_error("Error creating database");
     }
     storage->sync_schema();
+    storage->open_forever();
+}
+
+void DataStorage::freeMemory()
+{
+    storage->db_release_memory();
 }
 
 std::weak_ptr<repository::ChannelRepository> DataStorage::getChannelRepository()
 {
-    PUBLIC_SHARED_ENABLER(ChannelRepository)
     std::unique_lock<std::mutex> m(repository_access_mutex);
     if (!channel_repository_instance)
     {
+        PUBLIC_SHARED_ENABLER(ChannelRepository)
         channel_repository_instance = std::make_shared<ChannelRepositorySharedEnabler>(*this);
     }
     return channel_repository_instance;
@@ -52,8 +58,10 @@ std::weak_ptr<repository::ChannelRepository> DataStorage::getChannelRepository()
 StorageLockedRef DataStorage::getLockedStorage()
 {
     //create unique lock without owning the lock
-    return std::move(StorageLockedRef(
-            std::move(std::unique_lock<std::recursive_mutex>(storage_mutex, std::defer_lock)),
+    return std::move(
+        StorageLockedRef(
+            std::unique_lock<std::recursive_mutex>(storage_mutex, std::defer_lock),
             storage
-            ));
+        )
+    );
 }
