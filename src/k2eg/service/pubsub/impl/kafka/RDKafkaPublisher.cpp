@@ -254,7 +254,6 @@ RDKafkaPublisher::getQueueMetadata(const std::string &queue_name) {
   }
 
   rd_kafka_ListConsumerGroups(producer.get()->c_ptr(), admin_options.get(), queue.get());
-  // rd_kafka_event_t *event = ;
   std::unique_ptr<rd_kafka_event_t, RdKafkaEventDeleter> event_uptr(rd_kafka_queue_poll(queue.get(), -1), RdKafkaEventDeleter());                                              
   if (!event_uptr) {
     /* see yield call in stop() signal handler */
