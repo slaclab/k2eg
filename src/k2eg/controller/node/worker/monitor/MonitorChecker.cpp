@@ -77,10 +77,12 @@ MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
         try{
           std::lock_guard guard(op_mux);
           int  filtered_out   = 0;
+          std::string consumer_group_name;
           logger->logMessage(STRING_FORMAT("[ %1% - %2% - %3% ] check metadata", PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination));
           auto queue_metadata = publisher->getQueueMetadata(monitor_info.channel_destination);
           // take in consideration only the consuemr that are not filter ot from the regex
           for (auto& cg : queue_metadata->subscriber_groups) {
+            consumer_group_name.append(cg->name + ",");
             if (excludeConsumer(cg->name)) {
               filtered_out++;
             } else if (!cg->subscribers.size()) {
@@ -90,8 +92,10 @@ MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
           }
           if (queue_metadata && (queue_metadata->subscriber_groups.size() - filtered_out)) {
             logger->logMessage(STRING_FORMAT(
-                "[ %1% - %2% - %3% ] subscriber found %4%",
-                PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % monitor_info.channel_destination % (queue_metadata->subscriber_groups.size() - filtered_out)));
+                "[ %1% - %2% - %3% ] counting subscriber founds %4% [%5%]",
+                PURGE_SCAN_LOG_HEADER % monitor_info.pv_name % 
+                monitor_info.channel_destination % (queue_metadata->subscriber_groups.size() - filtered_out) %
+                consumer_group_name.substr(0, consumer_group_name.size() - 1)));
 
             purge_ts_set_flag = -1;
           } else {

@@ -47,7 +47,7 @@ if __name__ == "__main__":
             format="[%(levelname)-8s] %(message)s",
             level=logging.DEBUG,
         )
-        k = k2eg.dml('test', 'app')
+        k = k2eg.dml('test', 'app', "group-test")
         test_multiple_monitor(k)
         time.sleep(600)
     except k2eg.OperationError as e:
