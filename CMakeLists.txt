@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.5)
 project(k2eg)
 
 IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -204,6 +204,8 @@ ADD_DEPENDENCIES(${PROJECT_NAME}-test boost)
 
 # --------------------epics--------------------------
 MESSAGE(STATUS "Configure EPICS version ${EPICS_VERSION}")
+MESSAGE(STATUS "Configure EPICS includes: ${CMAKE_INSTALL_PREFIX}/include/os/${CMAKE_SYSTEM_NAME}, ${CMAKE_INSTALL_PREFIX}/include/pv, ${CMAKE_INSTALL_PREFIX}/include/pva")
+
 ExternalProject_Add(
   epics
   PREFIX ${CMAKE_CURRENT_BINARY_DIR}/epics
@@ -229,21 +231,25 @@ TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/i
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   MESSAGE(STATUS "Configure EPICS include for clang compiler")
+  MESSAGE(STATUS "Configure EPICS includes: ${CMAKE_INSTALL_PREFIX}/include/compiler/clang, ${CMAKE_INSTALL_PREFIX}/include/compiler/clang, ")
   TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/compiler/clang)
   TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/compiler/clang)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   # using GCC
   MESSAGE(STATUS "Configure EPICS include for gcc compiler")
+  MESSAGE(STATUS "Configure EPICS includes: ${CMAKE_INSTALL_PREFIX}/include/compiler/gcc, ${CMAKE_INSTALL_PREFIX}/include/compiler/gcc")
   TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/compiler/gcc)
   TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/compiler/gcc)
 endif()
 
 if(APPLE)
+  MESSAGE(STATUS "Configure EPICS includes: {CMAKE_INSTALL_PREFIX}/lib/darwin-x86, ${CMAKE_INSTALL_PREFIX}/lib/darwin-x86")  
   TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib/darwin-x86)
   TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/lib/darwin-x86)
 elseif(UNIX)
-  TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib/linux-x86_64)
-  TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/lib/linux-x86_64)
+  MESSAGE(STATUS "Configure EPICS includes: ${CMAKE_INSTALL_PREFIX}/lib/linux-x86_64, ${CMAKE_INSTALL_PREFIX}/lib/linux-x86_64")  
+  TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib/linux-aarch64)
+  TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/lib/linux-aarch64)
 endif()
 
 # ----------------kafka------------------

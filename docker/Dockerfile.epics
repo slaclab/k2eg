@@ -1,5 +1,5 @@
-FROM ghcr.io/epics-containers/epics-base-linux-developer:7.0.7ec3
-RUN apt update && apt install -y tmux
+FROM ghcr.io/epics-containers/epics-base-runtime:7.0.8ad3
+RUN apt update && apt install -y tmux python3 python3-pip
 RUN pip install numpy p4p pyepics
 COPY test/epics-test.db /app/epics-test.db
 COPY test/k2eg-mailbox-server.py /app/k2eg-mailbox-server.py
