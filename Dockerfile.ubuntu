@@ -1,5 +1,5 @@
 ARG TEST_IMAGE
-FROM ubuntu:jammy as builder
+FROM ubuntu:noble as builder
 LABEL maintainer="bisegni@slac.stanford.edu"
 LABEL org.opencontainers.image.description="Kafka To Epics Gateway"
 
@@ -17,7 +17,7 @@ RUN  apt update \
     &&  apt install -y openssl curl libcurl4-openssl-dev
 RUN mkdir /opt/app/build && cd /opt/app/build && cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_ASAN=0 .. && make install
 
-from ubuntu:jammy
+from ubuntu:noble
 
 RUN mkdir /opt/app
 WORKDIR /opt/app
