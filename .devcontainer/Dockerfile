@@ -1,4 +1,5 @@
 FROM ubuntu:noble
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV GITVERSION_VERSION=5.12.0
 RUN     apt update \
@@ -15,5 +16,6 @@ RUN cd /opt && tar zxvf gitversion-linux-x64-$GITVERSION_VERSION.tar.gz && \
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 3
 
 RUN useradd -rm -d /home/vscode -s /bin/bash -g root -G sudo -u 1001 developer
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 USER developer
 WORKDIR /home/vscode
