@@ -1,6 +1,6 @@
 #!/bin/bash
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/workspace/build/local/lib:/workspace/build/local/lib/linux-x86_64
-export PATH=$PATH:/workspace/build/local/bin:/workspace/build/local/bin/linux-x86_64
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/workspace/build/local/lib:/workspace/build/local/lib/linux-x86_64:/workspace/build/local/lib/linux-aarch64
+export PATH=$PATH:/workspace/build/local/bin:/workspace/build/local/bin/linux-x86_64:/workspace/build/local/bin/linux-aarch64
 # export EPICS_CA_ADDR_LIST="134.79.151.21:5068 172.21.40.10:5064 172.21.40.11:5064 172.21.40.12:5064 172.21.40.13:5064 172.21.40.14:5064 172.21.40.15:5064 134.79.216.44"
 # export EPICS_CA_AUTO_ADDR_LIST=NO
 # export EPICS_CA_REPEATER_PORT=5065
