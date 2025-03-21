@@ -147,7 +147,5 @@ Sqlite                    %5%
 SqliteORM                 %6%
 MsgPack                   %7%
 Prometheus                %8%
-)VERSION",
-                                      k2eg_VERSION % k2eg_BOOST_VERSION % k2eg_EPICS_VERSION %
-                                          k2eg_LIBLZ4_VERSION % k2eg_SQLITE_VERSION % k2eg_SQLITEORM_VERSION % k2eg_MSGPACK_VERSION % k2eg_PROMETHEUS_VERSION);
+)VERSION",k2eg_VERSION % k2eg_BOOST_VERSION % k2eg_EPICS_VERSION %k2eg_LIBLZ4_VERSION % k2eg_SQLITE_VERSION % k2eg_SQLITEORM_VERSION % k2eg_MSGPACK_VERSION % k2eg_PROMETHEUS_VERSION);
 }

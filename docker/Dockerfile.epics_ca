@@ -1,3 +1,0 @@
-FROM ghcr.io/bisegni/epics-base-docker-image:main
-COPY test/execute-ca-ioc.sh /opt/execute-ca-ioc.sh
-COPY test/epics-test-ca.db /db/softioc.db

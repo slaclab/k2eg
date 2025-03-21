@@ -40,23 +40,14 @@ jobs:
           with:
             name: Test Ubuntu / test_build
             status: success
-    test_ubuntu:
-      name: Test Ubuntu 
-      needs: [build_ubuntu] 
-      uses: ./.github/workflows/test.yml
-      with:
-        build_image: ${{ needs.build_ubuntu.outputs.build_image }}
-        artifact_name: ${{ needs.build_ubuntu.outputs.artifact_name }}
-        docker_compose_profile: app-ubuntu
-      secrets: inherit
     build_ubuntu:
         name: Build Ubuntu
         needs: check-changed-file
         if: needs.check-changed-file.outputs.source_changed == 'true'
         runs-on: ubuntu-latest
-        container: docker.io/ubuntu:22.04
+        container: docker.io/ubuntu:noble
         env:
-          BUILD_IMAGE: ubuntu:22.04
+          BUILD_IMAGE: ubuntu:noble
           ARTIFACT_NAME: artifact-gcc-ubuntu
           BUILD_TYPE: Debug
         outputs:
@@ -75,7 +66,7 @@ jobs:
               uses: actions/cache@v3
               with:
                path: build
-               key: ubuntu-kinetic-${{ hashFiles('CMakeLists.txt') }}
+               key: ubuntu-noble-${{ hashFiles('CMakeLists.txt') }}
             - name: Configure CMake
               run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DENABLE_ASAN=1
             - run: git config --global --add safe.directory '*'
@@ -83,13 +74,13 @@ jobs:
               run: cmake --build build --config ${{env.BUILD_TYPE}} --target install
             - name: Get log on failure
               if: ${{ failure() }}
-              uses: actions/upload-artifact@v3
+              uses: actions/upload-artifact@v4
               with:
                 name: ${{env.ARTIFACT_NAME}}-log
                 path: build/**/*.log
                 retention-days: 1
             - name: Archive artifacts
-              uses: actions/upload-artifact@v3
+              uses: actions/upload-artifact@v4
               with:
                 name: ${{env.ARTIFACT_NAME}}
                 path: |
@@ -100,3 +91,12 @@ jobs:
               uses: ouzi-dev/commit-status-updater@v2
               with:
                 status: success
+    test_ubuntu:
+      name: Test Ubuntu 
+      needs: [build_ubuntu] 
+      uses: ./.github/workflows/test.yml
+      with:
+        build_image: ${{ needs.build_ubuntu.outputs.build_image }}
+        artifact_name: ${{ needs.build_ubuntu.outputs.artifact_name }}
+        docker_compose_profile: app-ubuntu
+      secrets: inherit

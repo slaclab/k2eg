@@ -7,7 +7,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile.ubuntu
+      dockerfile: Dockerfile
     # env_file:
       # Ensure that the variables in .env match the same variables in devcontainer.json
       # - .env
@@ -33,6 +33,7 @@ services:
     # (Adding the "ports" property to this file will not forward from a Codespace.)
 
   epics_pva:
+    platform: linux/amd64
     build:
       context: ../
       dockerfile: docker/Dockerfile.epics
@@ -45,14 +46,8 @@ services:
           tmux new-session -d "python /app/update_iocs.py"
           tail -f /dev/null
 
-  # epics_ca:
-  #   image: ghcr.io/bisegni/epics-base-docker-image:main
-  #   entrypoint: /opt/execute-ca-ioc.sh /db/softioc.db
-  #   volumes:
-  #     - ../test/epics-test-ca.db:/db/softioc.db
-  #     - ../test/execute-ca-ioc.sh:/opt/execute-ca-ioc.sh
-
   zookeeper:
+    platform: linux/amd64
     image: bitnami/zookeeper:3.8.1
     # ports:
     #   - 2181:2181
@@ -60,6 +55,7 @@ services:
       - ALLOW_ANONYMOUS_LOGIN=yes
 
   kafka:
+    platform: linux/amd64
     image: bitnami/kafka:3.4.0
     # ports:
     #   - 9092:9092
