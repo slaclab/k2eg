@@ -198,7 +198,7 @@ ExternalProject_Add(
   LOG_INSTALL 1
 )
 
-SET(BUILD_LIBRARY ${BUILD_LIBRARY} boost_program_options boost_log boost_log_setup boost_thread boost_json boost_filesystem boost_regex boost_atomic boost_container boost_chrono)
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} boost_program_options boost_log boost_log_setup boost_thread boost_json boost_filesystem boost_atomic boost_container boost_chrono)
 ADD_DEPENDENCIES(${PROJECT_NAME} boost)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test boost)
 
