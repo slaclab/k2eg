@@ -15,6 +15,7 @@ using namespace k2eg::service::pubsub;
 
 using namespace k2eg::service::metric;
 
+namespace bs = boost::system;
 namespace bj = boost::json;
 
 CMDController::CMDController(ConstCMDControllerConfigUPtr configuration, CMDControllerCommandHandler cmd_handler)
@@ -38,7 +39,7 @@ CMDController::consume() {
       ConstCommandShrdPtrVec result_vec;
       std::for_each(received_message.begin(), received_message.end(), [&metric = metric, &logger = logger, &result_vec = result_vec](auto message) {
         if (!message->data_len) return;
-        bj::error_code  ec;
+        bs::error_code  ec;
         bj::object      command_description;
         bj::string_view value_str = bj::string_view(message->data.get(), message->data_len);
         try {

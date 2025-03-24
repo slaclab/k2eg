@@ -38,8 +38,8 @@
 #include "k2eg/service/pubsub/IPublisher.h"
 #include "msgpack/v3/object_fwd_decl.hpp"
 
+namespace bs = boost::system;
 namespace bj = boost::json;
-
 namespace fs = std::filesystem;
 
 using namespace k2eg::common;
@@ -217,12 +217,13 @@ deinitBackend(std::unique_ptr<NodeController> node_controller) {
 
 boost::json::object
 getJsonObject(PublishMessage& published_message) {
-  bj::error_code  ec;
+  bs::error_code  ec;
   bj::string_view value_str = bj::string_view(published_message.getBufferPtr(), published_message.getBufferSize());
   auto            result    = bj::parse(value_str, ec).as_object();
   if (ec) throw std::runtime_error("invalid json");
   return result;
 }
+
 msgpack::unpacked
 getMsgPackObject(PublishMessage& published_message) {
   msgpack::unpacked msg_upacked;

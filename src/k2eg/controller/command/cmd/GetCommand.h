@@ -17,7 +17,7 @@ struct GetCommand : public Command {
 DEFINE_PTR_TYPES(GetCommand)
 static void
 tag_invoke(boost::json::value_from_tag, boost::json::value& jv, GetCommand const& c) {
-  jv = {{"serialization", c.serialization},
+  jv = {{"serialization", serialization_to_string(c.serialization)},
         {"pv_name", c.pv_name},
         // {"protocol", c.protocol},
         {"reply_topic", c.reply_topic},
