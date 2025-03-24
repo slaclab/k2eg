@@ -7,8 +7,7 @@ namespace k2eg::controller::command::cmd {
 /**
  *     {
         "command", "put",
-        "protocol", "pva|ca",
-        "pv_name", "channel::a"
+        "pv_name", "[pva|ca]<pv name>"
         "value", value"
         }
 */

@@ -8,18 +8,19 @@
 #include <k2eg/controller/command/cmd/InfoCommand.h>
 #include <k2eg/controller/command/cmd/MonitorCommand.h>
 #include <k2eg/controller/command/cmd/PutCommand.h>
+#include <k2eg/controller/command/cmd/SnapshotCommand.h>
 
 #include <any>
-#include <boost/json.hpp>
-#include <map>
+
 #include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
 
-#include "boost/json/object.hpp"
-#include "boost/json/value.hpp"
-#include "k2eg/service/log/ILogger.h"
+#include <boost/json.hpp>
+#include <boost/json/value.hpp>
+#include <boost/json/object.hpp>
+#include <k2eg/service/log/ILogger.h>
 
 namespace k2eg::controller::command {
 #define JSON_VALUE_TO(t, v) boost::json::value_to<t>(v)
@@ -37,6 +38,7 @@ to_json_string(cmd::ConstCommandShrdPtr c) {
     case cmd::CommandType::monitor: return BOOST_JSON_TO_STRIN(cmd::MonitorCommand, c);
     case cmd::CommandType::multi_monitor: return BOOST_JSON_TO_STRIN(cmd::MultiMonitorCommand, c);
     case cmd::CommandType::put: return BOOST_JSON_TO_STRIN(cmd::PutCommand, c);
+    case cmd::CommandType::snapshot: return BOOST_JSON_TO_STRIN(cmd::SnapshotCommand, c);
     case cmd::CommandType::unknown: return "Unknown";
   }
   return "Unknown";
