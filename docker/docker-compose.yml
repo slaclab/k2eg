@@ -5,13 +5,13 @@ version: '3.8'
 #    null
 services:
   epics-pva:
-    image: ghcr.io/epics-containers/epics-base-developer:7.0.8ad3
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.epics_ci_cd
     command: 
         - /bin/bash
         - -c
         - |
-          apt update && apt install -y tmux python3 python3-pip
-          pip install numpy p4p pyepics
           tmux new-session -d "softIocPVA -d /app/epics-test.db"
           tmux new-session -d "python /app/k2eg-mailbox-server.py"
           tmux new-session -d "python /app/update_iocs.py"
