@@ -11,7 +11,7 @@ COPY --from=0 /opt/local /opt/local
 ARG TARGETARCH
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
       PLATFORM=linux-aarch64; else \
-      PLATFORM=linux-amd64; fi && \
+      PLATFORM=linux-x86_64; fi && \
       echo "export EPICS_PLATFORM=${PLATFORM}" > /opt/epics-var.sh && \
       echo "export PATH=/opt/local/bin:/opt/local/bin/${PLATFORM}:\$PATH" >> /opt/epics-var.sh && \
       echo "export LD_LIBRARY_PATH=/opt/local/lib:/opt/local/lib/${PLATFORM}:\$LD_LIBRARY_PATH" >> /opt/epics-var.sh
