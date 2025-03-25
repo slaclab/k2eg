@@ -1,5 +1,5 @@
 #include <k2eg/common/utility.h>
-#include <k2eg/controller/node/worker/monitor/MonitorCommandWorker.h>
+#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/scheduler/Scheduler.h>
 

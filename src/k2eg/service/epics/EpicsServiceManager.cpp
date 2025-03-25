@@ -4,13 +4,12 @@
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
 #include <k2eg/service/epics/EpicsPutOperation.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
+#include <ranges>
 
-#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <memory>
 #include <mutex>
-#include <ranges>
 #include <regex>
 
 using namespace k2eg::common;
@@ -49,7 +48,7 @@ EpicsServiceManager::addChannel(const std::string& pv_name_uri) {
       };
     }
     {
-      ReadLockCM write_lock(channel_map_mutex);
+      ReadLockCM                   write_lock(channel_map_mutex);
       ConstMonitorOperationShrdPtr monitor_operation = channel_map[sanitized_pv->name].channel->monitor();
       // lock and insert in queue
       processing_pool.push_task(&EpicsServiceManager::task, this, monitor_operation);
@@ -72,7 +71,7 @@ EpicsServiceManager::getMonitoredChannels() {
   return result;
 #elif __GNUC_PREREQ(11, 0)
   auto kv = std::views::keys(channel_map);
-  return {kv.begin(), kv.end()};
+  return k2eg::common::StringVector(kv.begin(), kv.end());
 #endif
 }
 
@@ -101,6 +100,24 @@ EpicsServiceManager::forceMonitorChannelUpdate(const std::string& pv_name_uri) {
   if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end()) { search->second.to_force = true; }
 }
 
+ConstMonitorOperationShrdPtr
+EpicsServiceManager::getMonitorOp(const std::string& pv_name_uri) {
+  auto sanitized_pv = sanitizePVName(pv_name_uri);
+  if (!sanitized_pv) return ConstMonitorOperationUPtr();
+
+  ConstMonitorOperationShrdPtr result;
+  ReadLockCM                read_lock(channel_map_mutex);
+  if (auto search = channel_map.find(sanitized_pv->name); search == channel_map.end()) {
+    channel_map[sanitized_pv->name] = ChannelMapElement{
+        .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
+        .to_force = false,
+        .to_erase = false,
+    };
+  }
+  result = channel_map[sanitized_pv->name].channel->monitor();
+  return result;
+}
+
 ConstGetOperationUPtr
 EpicsServiceManager::getChannelData(const std::string& pv_name_uri) {
   ConstGetOperationUPtr result;
@@ -110,13 +127,13 @@ EpicsServiceManager::getChannelData(const std::string& pv_name_uri) {
   if (!sanitized_pv) { return ConstGetOperationUPtr(); }
   if (auto search = channel_map.find(sanitized_pv->name); search == channel_map.end()) {
     channel_map[sanitized_pv->name] = ChannelMapElement{
-          .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
-          .to_force = false,
-          .to_erase = false,
+        .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
+        .to_force = false,
+        .to_erase = false,
     };
   }
-    // allocate channel and return data
-  result    = channel_map[sanitized_pv->name].channel->get();
+  // allocate channel and return data
+  result = channel_map[sanitized_pv->name].channel->get();
   return result;
 }
 
@@ -128,9 +145,9 @@ EpicsServiceManager::putChannelData(const std::string& pv_name_uri, const std::s
   if (!sanitized_pv) { return ConstPutOperationUPtr(); }
   if (auto search = channel_map.find(sanitized_pv->name); search == channel_map.end()) {
     channel_map[sanitized_pv->name] = ChannelMapElement{
-          .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
-          .to_force = false,
-          .to_erase = false,
+        .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
+        .to_force = false,
+        .to_erase = false,
     };
   }
   // allocate channel and return data
@@ -193,7 +210,7 @@ EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op) {
     // try to fetch a specific number of 'data' event only
 
     if ((to_delete = channel_map[monitor_op->getPVName()].to_erase) == false) {
-      // monitor can be processed becase is not goingto be deleted
+      // monitor can be processed becase is not going to be deleted
       if (channel_map[monitor_op->getPVName()].to_force) {
         // i need to force the update
         monitor_op->forceUpdate();

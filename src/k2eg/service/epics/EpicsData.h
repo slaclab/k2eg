@@ -6,7 +6,6 @@
 #include <pv/pvData.h>
 
 #include <memory>
-#include <set>
 namespace k2eg::service::epics_impl {
 
 // Epics Channel Data

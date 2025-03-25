@@ -5,7 +5,6 @@
 #include <k2eg/controller/command/CMDCommand.h>
 #include <k2eg/service/pubsub/IPublisher.h>
 
-#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <k2eg/common/BS_thread_pool.hpp>

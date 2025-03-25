@@ -3,7 +3,6 @@
 
 #include <memory>
 #include <mutex>
-#include <ostream>
 
 #include "k2eg/service/epics/EpicsData.h"
 #include "k2eg/service/epics/EpicsGetOperation.h"

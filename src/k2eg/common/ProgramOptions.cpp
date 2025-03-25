@@ -14,7 +14,7 @@
 
 #include "k2eg/controller/node/NodeController.h"
 #include "k2eg/controller/node/worker/monitor/MonitorChecker.h"
-#include "k2eg/controller/node/worker/monitor/MonitorCommandWorker.h"
+#include "k2eg/controller/node/worker/MonitorCommandWorker.h"
 #include "k2eg/service/epics/EpicsServiceManager.h"
 #include "k2eg/service/metric/IMetricService.h"
 #include "k2eg/service/scheduler/Scheduler.h"
