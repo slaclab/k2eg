@@ -86,45 +86,54 @@ SnapshotCommandWorker::manageFaultyReply(const std::int8_t error_code, const std
   }
 }
 
-void
-SnapshotCommandWorker::checkGetCompletion(SnapshotOpInfoShrdPtr snapshot_info) {
-  if (snapshot_info->isTimeout()) {
-    // manageFaultyReply(-3, "Timeout operation", snapshot_info->cmd);
-    // we comeplted the time window so check if all data is arrived or not
-    std::vector<ConstChannelDataShrdPtr> snapshot_data;
-    for (std::size_t i = 0; i < snapshot_info->v_mon_ops.size(); ++i) {
-      auto m_op = snapshot_info->v_mon_ops[i];
-      // Use 'i' as the index if needed
-      MonitorEventShrdPtr evt_shrd_ptr;
-      // fetch data
-      m_op->poll();
-      if (!m_op->hasData()) {
-        // get last appendend event
-        evt_shrd_ptr = m_op->getEventData()->event_data->back();
-      } else {
-        // force it
-        m_op->forceUpdate();
-        m_op->poll();
-        if (!m_op->getEventData()->event_data->empty()) { evt_shrd_ptr = m_op->getEventData()->event_data->back(); }
-      }
-
-      if (evt_shrd_ptr) {
-        // Pass the correct member (e.g., pv) from evt_shrd_ptr->channel_data
-        publishSnapshotReply(snapshot_info->cmd, i, MakeChannelDataUPtr(evt_shrd_ptr->channel_data));
-      } else {
-        // TODO what to do here?
-      }
-      // send message to terminate the operation
-      publishEndSnapshotReply(snapshot_info->cmd);  
+void SnapshotCommandWorker::checkGetCompletion(SnapshotOpInfoShrdPtr snapshot_info) {
+    bool pending = false;
+    if (!snapshot_info->isTimeout()) {
+        // Process monitors before timeout using processed_index to annotate completed ones.
+        for (std::size_t i = 0; i < snapshot_info->v_mon_ops.size(); ++i) {
+            // check if PV has been already consumed
+            if (snapshot_info->processed_index.test(i)) {
+                continue;
+            }
+            // try to get data from poll
+            auto m_op = snapshot_info->v_mon_ops[i];
+            m_op->poll();
+            if (m_op->hasData()) {
+                // we have data so we can send it to the client
+                auto evt_shrd_ptr = m_op->getEventData()->event_data->back();
+                publishSnapshotReply(snapshot_info->cmd, static_cast<std::uint32_t>(i), MakeChannelDataUPtr(evt_shrd_ptr->channel_data));
+                // set the index as processed
+                snapshot_info->processed_index.set(i, true);
+            }
+        }
+        // give some time to relax
+        std::this_thread::sleep_for(std::chrono::microseconds(10));
+        // check if we have done all the PVs
+        if (!snapshot_info->processed_index.all()) {
+            // there still are PVs that have not been received, so resubmit the task
+            processing_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, snapshot_info);
+        } else {
+            // in this case we have comepleted the snapshot so we can send the completion message to the client before the snapshot
+            publishEndSnapshotReply(snapshot_info->cmd);
+        }
+    } else { // At timeout, process unhandled monitors.
+        for (std::size_t i = 0; i < snapshot_info->v_mon_ops.size(); ++i) {
+            if (snapshot_info->processed_index.test(i)) {
+                continue;
+            }
+            // try to get data from poll forcing the update
+            auto m_op = snapshot_info->v_mon_ops[i];
+            m_op->forceUpdate();
+            m_op->poll();
+            if (m_op->hasData()) {
+                auto evt_shrd_ptr = m_op->getEventData()->event_data->back();
+                publishSnapshotReply(snapshot_info->cmd, static_cast<std::uint32_t>(i), MakeChannelDataUPtr(evt_shrd_ptr->channel_data));
+            } 
+            snapshot_info->processed_index.set(i, true);
+        }
+        // send completion message
+        publishEndSnapshotReply(snapshot_info->cmd);
     }
-    // serialzie and forward the message
-  }
-
-  // re-enque the op class
-  processing_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, snapshot_info);
-
-  // give some time of relaxing
-  std::this_thread::sleep_for(std::chrono::microseconds(10));
 }
 
 void

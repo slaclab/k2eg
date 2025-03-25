@@ -40,6 +40,8 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
 set(CMAKE_BINARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)
 set(SQLITE_INCLUDE ${CMAKE_INSTALL_PREFIX}/include)
 
+add_compile_options(-Wno-deprecated-declarations)
+
 #manage code coverage
 include(${CMAKE_CURRENT_SOURCE_DIR}/configuration/coverage.cmake)
 #manage Address sanitizer
