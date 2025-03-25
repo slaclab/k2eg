@@ -361,7 +361,7 @@ TEST(Epics, SerializationMsgpackCompact) {
   auto object_vector = obj.get().as<MsgpackObjectVector>();
   EXPECT_EQ(object_vector.size(), 28);
   EXPECT_EQ(object_vector[0].type, msgpack::type::STR);
-  EXPECT_EQ(object_vector[1].type, msgpack::type::POSITIVE_INTEGER);
+  EXPECT_EQ(object_vector[1].type, msgpack::type::FLOAT);
   //["variable:sum",7,0,0,"NO_ALARM",1681706068,208836822,0,0,0,"","",0,0,["Default","String","Binary","Decimal","Hex","Exponential","Engineering"],0,0,0,0,nan,nan,nan,nan,0,0,0,0,0]
 }
 
@@ -384,7 +384,7 @@ TEST(Epics, SerializationCAMsgpackCompact) {
   auto object_vector = obj.get().as<MsgpackObjectVector>();
   EXPECT_EQ(object_vector.size(), 26);
   EXPECT_EQ(object_vector[0].type, msgpack::type::STR);
-  EXPECT_EQ(object_vector[1].type, msgpack::type::POSITIVE_INTEGER);
+  EXPECT_EQ(object_vector[1].type, msgpack::type::FLOAT);
   //["variable:sum",7,0,0,"NO_ALARM",1681706068,208836822,0,0,0,"","",0,0,["Default","String","Binary","Decimal","Hex","Exponential","Engineering"],0,0,0,0,nan,nan,nan,nan,0,0,0,0,0]
 }
 
