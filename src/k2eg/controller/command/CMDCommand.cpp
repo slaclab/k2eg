@@ -16,6 +16,7 @@ using namespace k2eg::service;
 using namespace k2eg::service::log;
 using namespace boost::json;
 
+// compare two char ignoring the case
 bool ichar_equals(char a, char b)
 {
     return std::tolower(static_cast<unsigned char>(a)) ==
@@ -43,11 +44,14 @@ MapToCommand::getCMDType(const object& obj) {
   return CommandType::unknown;
 }
 
+// check if the current object has the needed field (with types)
+// if all required fields are found return a map with the key and the value
+// otherwise return nullptr
 FieldValuesMapUPtr
-MapToCommand::checkFields(const object& obj, const std::vector<std::tuple<std::string, kind>>& fields) {
+MapToCommand::checkFields(const object& obj, const std::vector<std::tuple<std::string, kind>>& required_fields) {
   FieldValuesMapUPtr result;
   FieldValuesMapUPtr result_tmp = std::make_unique<FieldValuesMap>();
-  std::for_each(begin(fields), end(fields), [&obj = obj, &result = result_tmp](const auto field) {
+  std::for_each(begin(required_fields), end(required_fields), [&obj = obj, &result = result_tmp](const auto field) {
     if (obj.if_contains(std::get<0>(field)) != nullptr) {
       auto v = obj.find(std::get<0>(field))->value();
       if (v.kind() == std::get<1>(field)) {
@@ -63,13 +67,14 @@ MapToCommand::checkFields(const object& obj, const std::vector<std::tuple<std::s
       }
     }
   });
-  if (fields.size() == result_tmp->size()) {
-    // we have faound all the key that we need
+  if (required_fields.size() == result_tmp->size()) {
+    // we have faound all the fields that we need
     result = std::move(result_tmp);
   }
   return result;
 }
 
+// parse a json object to get the command
 ConstCommandShrdPtr
 MapToCommand::parse(const object& obj) {
   auto logger = ServiceResolver<ILogger>::resolve();
@@ -178,6 +183,16 @@ MapToCommand::parse(const object& obj) {
       }
       break;
     }
+
+    case CommandType::snapshot: {
+      if (auto fields = checkFields(obj, {{KEY_PV_NAME, kind::string}, {KEY_REPLY_TOPIC, kind::string}}); fields != nullptr) {
+        //TODO: implement the snapshot command
+      } else {
+        logger->logMessage("Missing key for the SnapshotCommand: " + serialize(obj), LogLevel::ERROR);
+      }
+      break;
+    }
+
     case CommandType::unknown: {
       ServiceResolver<ILogger>::resolve()->logMessage("Command not found:" + serialize(obj), LogLevel::ERROR);
       break;

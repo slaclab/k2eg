@@ -44,6 +44,7 @@ to_json_string(cmd::ConstCommandShrdPtr c) {
   return "Unknown";
 }
 
+// Get the value for the reply topic if found
 inline std::string
 check_reply_topic(const boost::json::object& o, k2eg::service::log::ILoggerShrdPtr l) {
   std::string reply_topic;
@@ -57,7 +58,7 @@ check_reply_topic(const boost::json::object& o, k2eg::service::log::ILoggerShrdP
   return reply_topic;
 }
 
-
+// Get the value for the reply id if found
 inline std::string
 check_for_reply_id(const boost::json::object& o, k2eg::service::log::ILoggerShrdPtr l) {
   std::string rep_id;
@@ -71,6 +72,8 @@ check_for_reply_id(const boost::json::object& o, k2eg::service::log::ILoggerShrd
   return rep_id;
 }
 
+// Get the value for the serialization type if found
+// the default vlaue is return if the key is not found
 inline common::SerializationType
 check_for_serialization(const boost::json::object& o, common::SerializationType default_type, k2eg::service::log::ILoggerShrdPtr l) {
   common::SerializationType ser_type = default_type;
