@@ -33,7 +33,6 @@ services:
     # (Adding the "ports" property to this file will not forward from a Codespace.)
 
   epics_pva:
-    platform: linux/amd64
     build:
       context: ../
       dockerfile: docker/Dockerfile.epics
@@ -41,11 +40,24 @@ services:
         - /bin/bash
         - -c
         - |
-          tmux new-session -d "softIocPVA -d /app/epics-test.db"
-          tmux new-session -d "python /app/k2eg-mailbox-server.py"
-          tmux new-session -d "python /app/update_iocs.py"
+          tmux new-session -d "source /opt/epics-var.sh; softIocPVA -d /app/epics-test.db"
+          tmux new-session -d "source /opt/epics-var.sh; python3 /app/k2eg-mailbox-server.py"
           tail -f /dev/null
 
+  epics_updater:
+    platform: linux/amd64
+    image: python:3.10
+    command: 
+        - /bin/bash
+        - -c
+        - |
+          apt update
+          apt install -y tmux
+          pip install numpy p4p pyepics
+          tmux new-session -d "python3 /app/update_iocs.py"
+          tail -f /dev/null
+    volumes:
+      - ../test:/app
   zookeeper:
     platform: linux/amd64
     image: bitnami/zookeeper:3.8.1

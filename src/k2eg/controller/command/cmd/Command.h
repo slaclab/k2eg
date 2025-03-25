@@ -12,7 +12,7 @@
 namespace k2eg::controller::command::cmd {
 
 // are all the possible command
-enum class CommandType { monitor, multi_monitor, get, put, info, unknown };
+enum class CommandType { monitor, multi_monitor, get, put, info, snapshot,unknown };
 constexpr const char *
 command_type_to_string(CommandType t) noexcept {
   switch (t) {

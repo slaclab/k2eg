@@ -3,10 +3,11 @@
 #include <k2eg/service/log/ILogger.h>
 
 #include <vector>
+#include <cctype>    // std::tolower
 
-#include "boost/json/array.hpp"
-#include "k2eg/controller/command/cmd/Command.h"
-#include "k2eg/controller/command/cmd/MonitorCommand.h"
+#include <boost/json/array.hpp>
+#include <k2eg/controller/command/cmd/Command.h>
+#include <k2eg/controller/command/cmd/MonitorCommand.h>
 
 using namespace k2eg::common;
 using namespace k2eg::controller::command;
@@ -15,20 +16,29 @@ using namespace k2eg::service;
 using namespace k2eg::service::log;
 using namespace boost::json;
 
+bool ichar_equals(char a, char b)
+{
+    return std::tolower(static_cast<unsigned char>(a)) ==
+           std::tolower(static_cast<unsigned char>(b));
+}
+
+
 CommandType
 MapToCommand::getCMDType(const object& obj) {
   if (auto v = obj.if_contains(KEY_COMMAND)) {
     const auto cmd = v->as_string();
-    if (cmd.compare("monitor") == 0)
+    if (std::ranges::equal(cmd, "monitor", ichar_equals))
       return CommandType::monitor;
-    else if (cmd.compare("multi-monitor") == 0)
+    else if (std::ranges::equal(cmd, "multi-monitor", ichar_equals))
       return CommandType::multi_monitor;
-    else if (cmd.compare("get") == 0)
+    else if (std::ranges::equal(cmd, "get", ichar_equals))
       return CommandType::get;
-    else if (cmd.compare("put") == 0)
+    else if (std::ranges::equal(cmd, "put", ichar_equals))
       return CommandType::put;
-    else if (cmd.compare("info") == 0)
+    else if (std::ranges::equal(cmd, "info", ichar_equals))
       return CommandType::info;
+    else if (std::ranges::equal(cmd, "snapshot", ichar_equals))
+      return CommandType::snapshot;
   }
   return CommandType::unknown;
 }

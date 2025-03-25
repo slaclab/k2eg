@@ -7,7 +7,7 @@ services:
   epics-pva:
     build:
       context: ../
-      dockerfile: docker/Dockerfile.epics
+      dockerfile: docker/Dockerfile.epics_ci_cd
     command: 
         - /bin/bash
         - -c

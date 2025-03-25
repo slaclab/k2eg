@@ -7,8 +7,7 @@ namespace k2eg::controller::command::cmd {
  *     {
         "command", "monitor",
         "activate", true|false,
-        "protocol", "pva|ca",
-        "pv_name", "channel::a",
+        "pv_name", [pva|ca]<pv name>,
         "reply_topic", "reply_topic"
         }
 */
@@ -34,8 +33,11 @@ struct MultiMonitorCommand : public Command {
 DEFINE_PTR_TYPES(MultiMonitorCommand)
 static void
 tag_invoke(boost::json::value_from_tag, boost::json::value& jv, MultiMonitorCommand const& c) {
+  boost::json::array pv_array;
+  for (const auto& name : c.pv_name_list) { pv_array.emplace_back(name); }
+
   jv = {{"serialization", serialization_to_string(c.serialization)},
-        {"pv_name", c.pv_name_list},
+        {"pv_name_list", std::move(pv_array)},
         {"reply_id", c.reply_id},
         {"reply_topic", c.reply_topic}};
 }

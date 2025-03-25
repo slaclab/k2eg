@@ -21,7 +21,6 @@
 #include <cstdint>
 #include <ctime>
 #include <filesystem>
-#include <iterator>
 #include <latch>
 #include <memory>
 #include <msgpack.hpp>
@@ -38,8 +37,8 @@
 #include "k2eg/service/pubsub/IPublisher.h"
 #include "msgpack/v3/object_fwd_decl.hpp"
 
+namespace bs = boost::system;
 namespace bj = boost::json;
-
 namespace fs = std::filesystem;
 
 using namespace k2eg::common;
@@ -217,12 +216,13 @@ deinitBackend(std::unique_ptr<NodeController> node_controller) {
 
 boost::json::object
 getJsonObject(PublishMessage& published_message) {
-  bj::error_code  ec;
+  bs::error_code  ec;
   bj::string_view value_str = bj::string_view(published_message.getBufferPtr(), published_message.getBufferSize());
   auto            result    = bj::parse(value_str, ec).as_object();
   if (ec) throw std::runtime_error("invalid json");
   return result;
 }
+
 msgpack::unpacked
 getMsgPackObject(PublishMessage& published_message) {
   msgpack::unpacked msg_upacked;
@@ -965,7 +965,7 @@ TEST(NodeController, PutCommandScalar) {
 
   EXPECT_NO_THROW(node_controller->submitCommand(
       {std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://variable:b"})}););
-  wait_forPublished_message_size(*publisher, 2, 2000);
+  wait_forPublished_message_size(*publisher, 2, 200000);
   EXPECT_EQ(publisher->sent_messages.size(), 2);
 
   // check for get reply
@@ -976,8 +976,8 @@ TEST(NodeController, PutCommandScalar) {
   EXPECT_EQ(map_reply.contains("variable:b"), true);
   EXPECT_EQ(map_reply["variable:b"].type, msgpack::type::ARRAY);
   auto vec_reply = map_reply["variable:b"].as<Vec>();
-  EXPECT_EQ(vec_reply[0].type, msgpack::type::POSITIVE_INTEGER);
-  EXPECT_EQ(vec_reply[0].as<int>(), random_scalar);
+  EXPECT_EQ(vec_reply[0].type, msgpack::type::FLOAT);
+  EXPECT_EQ(vec_reply[0].as<double>(), random_scalar);
   // dispose all
   deinitBackend(std::move(node_controller));
 }

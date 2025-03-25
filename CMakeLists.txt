@@ -20,16 +20,16 @@ message(STATUS "GIT_EXECUTABLE='${GIT_EXECUTABLE}'")
 message(STATUS "Using compiler ${CMAKE_CXX_COMPILER_ID}_${CMAKE_CXX_COMPILER_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
-set(BOOST_VERSION 1.77.0)
+set(BOOST_VERSION 1.87.0)
 set(EPICS_VERSION R7.0.9)
 set(LIBLZ4_VERSION v1.9.2)
 set(LIBRDKAFKA_VERSION v2.3.0)
 set(SQLITE_VERSION version-3.41.2)
-set(SQLITEORM_VERSION v1.8.2)
-set(MSGPACK_VERSION cpp-6.0.0)
+set(SQLITEORM_VERSION v1.9.1)
+set(MSGPACK_VERSION cpp-7.0.0)
 set(CURL_VERSION curl-7_88_1)
 set(ZLIB_VERSION v1.2.13)
-set(PROMETHEUS_VERSION v1.1.0)
+set(PROMETHEUS_VERSION v1.3.0)
 SET(CRONCPP_VERSION v2023.03.30)
 set(GTEST_VERSION 1.8.0)
 
@@ -198,7 +198,7 @@ ExternalProject_Add(
   LOG_INSTALL 1
 )
 
-SET(BUILD_LIBRARY ${BUILD_LIBRARY} boost_program_options boost_log boost_log_setup boost_thread boost_json boost_filesystem boost_regex boost_atomic boost_container boost_chrono)
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} boost_program_options boost_log boost_log_setup boost_thread boost_json boost_filesystem boost_atomic boost_container boost_chrono)
 ADD_DEPENDENCIES(${PROJECT_NAME} boost)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test boost)
 
