@@ -1,15 +1,14 @@
-#include <k2eg/controller/node/NodeController.h>
-
-//------------ command include ----------
 #include <k2eg/common/utility.h>
+#include <k2eg/controller/node/NodeController.h>
 #include <k2eg/controller/node/worker/GetCommandWorker.h>
-#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
 #include <k2eg/controller/node/worker/PutCommandWorker.h>
-#include <k2eg/service/ServiceResolver.h>
+#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
+#include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 
-#include "k2eg/service/data/DataStorage.h"
-#include "k2eg/service/log/ILogger.h"
-#include "k2eg/service/metric/INodeControllerMetric.h"
+#include <k2eg/service/log/ILogger.h>
+#include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/data/DataStorage.h>
+#include <k2eg/service/metric/INodeControllerMetric.h>
 
 using namespace k2eg::controller::node;
 using namespace k2eg::controller::node::worker;
@@ -40,6 +39,7 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
   worker_resolver.registerObjectInstance(CommandType::multi_monitor, monitor_command_worker);
   worker_resolver.registerObjectInstance(CommandType::get, std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
   worker_resolver.registerObjectInstance(CommandType::put, std::make_shared<PutCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
+  worker_resolver.registerObjectInstance(CommandType::snapshot, std::make_shared<SnapshotCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
 }
 
 NodeController::~NodeController() { processing_pool->wait_for_tasks(); }

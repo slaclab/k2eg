@@ -9,18 +9,17 @@
 #include <k2eg/controller/command/cmd/MonitorCommand.h>
 #include <k2eg/controller/command/cmd/PutCommand.h>
 #include <k2eg/controller/command/cmd/SnapshotCommand.h>
+#include <k2eg/service/log/ILogger.h>
+#include <k2eg/service/pubsub/IPublisher.h>
 
 #include <any>
-
+#include <boost/json.hpp>
+#include <boost/json/object.hpp>
+#include <boost/json/value.hpp>
 #include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
-
-#include <boost/json.hpp>
-#include <boost/json/value.hpp>
-#include <boost/json/object.hpp>
-#include <k2eg/service/log/ILogger.h>
 
 namespace k2eg::controller::command {
 #define JSON_VALUE_TO(t, v) boost::json::value_to<t>(v)
@@ -78,13 +77,13 @@ inline common::SerializationType
 check_for_serialization(const boost::json::object& o, common::SerializationType default_type, k2eg::service::log::ILoggerShrdPtr l) {
   common::SerializationType ser_type = default_type;
   if (auto v = o.if_contains(KEY_SERIALIZATION)) {
-    if(!v->is_string()) {
-        l->logMessage("The kery serialization need to be a string", service::log::LogLevel::ERROR);
-        return ser_type;
+    if (!v->is_string()) {
+      l->logMessage("The kery serialization need to be a string", service::log::LogLevel::ERROR);
+      return ser_type;
     }
     auto ser_type_str = v->as_string();
     std::transform(ser_type_str.begin(), ser_type_str.end(), ser_type_str.begin(), [](unsigned char c) { return std::tolower(c); });
-    if (ser_type_str.compare("msgpack") == 0){
+    if (ser_type_str.compare("msgpack") == 0) {
       ser_type = common::SerializationType::Msgpack;
     } else if (ser_type_str.compare("json") == 0) {
       ser_type = common::SerializationType::JSON;
@@ -95,8 +94,8 @@ check_for_serialization(const boost::json::object& o, common::SerializationType 
 
 // Represent a pv with the record name
 struct PVName {
-    std::string pv_name;
-    std::string field_name;
+  std::string pv_name;
+  std::string field_name;
 };
 DEFINE_PTR_TYPES(PVName)
 
@@ -116,6 +115,7 @@ class MapToCommand {
 
  public:
   static cmd::ConstCommandShrdPtr parse(const boost::json::object& obj);
+  static void                     returnFailCommandParsing(k2eg::service::pubsub::IPublisher& publisher, const boost::json::object& obj);
 };
 
 }  // namespace k2eg::controller::command

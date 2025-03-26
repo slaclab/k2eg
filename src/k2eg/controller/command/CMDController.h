@@ -11,8 +11,6 @@
 #include <string>
 #include <thread>
 
-#include "k2eg/service/metric/ICMDControllerMetric.h"
-
 namespace k2eg::controller::command {
 // configuration
 struct CMDControllerConfig {
@@ -34,12 +32,13 @@ DEFINE_PTR_TYPES(CMDControllerConfig)
 typedef std::function<void(cmd::ConstCommandShrdPtrVec)> CMDControllerCommandHandler;
 
 /**
- * receive command and dispatch to other layer
+ * Receive command and dispatch to other layer
  */
 class CMDController {
   CMDControllerCommandHandler                         cmd_handler;
   std::shared_ptr<k2eg::service::log::ILogger>        logger;
   std::shared_ptr<k2eg::service::pubsub::ISubscriber> subscriber;
+  k2eg::service::pubsub::IPublisherShrdPtr            publisher;
   k2eg::service::metric::ICMDControllerMetric&        metric;
   std::thread                                         t_subscriber;
   bool                                                run;

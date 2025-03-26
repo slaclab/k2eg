@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.5)
 project(k2eg)
 
+# Set default install directory if not specified
 IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  SET(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/local CACHE PATH "default install directory" FORCE)
-ENDIF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  SET(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/local CACHE PATH "Default install directory" FORCE)
+ENDIF()
 
 include(ExternalProject)
 
@@ -33,13 +34,13 @@ set(PROMETHEUS_VERSION v1.3.0)
 SET(CRONCPP_VERSION v2023.03.30)
 set(GTEST_VERSION 1.8.0)
 
-# set(PROTOBUF_VERSION v22.0)
 set(CMAKE_BINARY_DIR ${CMAKE_INSTALL_PREFIX}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
 set(CMAKE_BINARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)
 set(SQLITE_INCLUDE ${CMAKE_INSTALL_PREFIX}/include)
 
+# Suppress deprecated-declarations warnings (e.g. from Boost)
 add_compile_options(-Wno-deprecated-declarations)
 
 #manage code coverage
@@ -171,8 +172,8 @@ TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC src)
 TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include)
 TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/lib)
 
-# --------------------boost--------------------------
-MESSAGE(STATUS "Configure boost version ${BOOST_VERSION}")
+# Configure Boost dependencies
+MESSAGE(STATUS "Configure Boost version ${BOOST_VERSION}")
 
 if(WIN32)
   set(BOOST_BOOTSTRAP_CMD ${BOOST_GIT_REPO_DIR}/bootstrap.bat)
@@ -205,7 +206,7 @@ SET(BUILD_LIBRARY ${BUILD_LIBRARY} boost_program_options boost_log boost_log_set
 ADD_DEPENDENCIES(${PROJECT_NAME} boost)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test boost)
 
-# --------------------epics--------------------------
+# Configure EPICS dependencies
 MESSAGE(STATUS "Configure EPICS version ${EPICS_VERSION}")
 MESSAGE(STATUS "Configure EPICS includes: ${CMAKE_INSTALL_PREFIX}/include/os/${CMAKE_SYSTEM_NAME}, ${CMAKE_INSTALL_PREFIX}/include/pv, ${CMAKE_INSTALL_PREFIX}/include/pva")
 
@@ -261,7 +262,7 @@ elseif(UNIX)
   endif()
 endif()
 
-# ----------------kafka------------------
+# Configure liblz4 dependencies
 MESSAGE(STATUS "Configure liblz4 version ${LIBLZ4_VERSION}")
 ExternalProject_Add(
   liblz4
@@ -280,6 +281,7 @@ ExternalProject_Add(
   LOG_BUILD ON
 )
 
+# Configure librdkafka dependencies
 MESSAGE(STATUS "Configure librdkafka version ${LIBRDKAFKA_VERSION}")
 ExternalProject_Add(
   librdkafka
@@ -308,7 +310,7 @@ ADD_DEPENDENCIES(librdkafka liblz4)
 ADD_DEPENDENCIES(${PROJECT_NAME} librdkafka liblz4)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test librdkafka liblz4)
 
-# ----------sqlite orm-----
+# Configure sqlite dependencies
 MESSAGE(STATUS "Configure sqlite version ${SQLITE_VERSION}")
 ExternalProject_Add(
   sqlite_dist
@@ -320,7 +322,7 @@ ExternalProject_Add(
   INSTALL_COMMAND make install
 )
 
-
+# Configure sqlite orm dependencies
 MESSAGE(STATUS "Configure sqlite orm version ${SQLITEORM_VERSION}")
 ExternalProject_Add(
   sqlite_orm
@@ -347,7 +349,7 @@ SET(BUILD_LIBRARY ${BUILD_LIBRARY} sqlite3)
 ADD_DEPENDENCIES(${PROJECT_NAME} sqlite_orm sqlite_dist)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test sqlite_orm sqlite_dist)
 
-# -------- Msgpack -----------
+# Configure msgpack dependencies
 MESSAGE(STATUS "Configure msgpack version ${MSGPACK_VERSION}")
 ExternalProject_Add(
   msgpack
@@ -373,7 +375,7 @@ ADD_DEPENDENCIES(msgpack boost)
 ADD_DEPENDENCIES(${PROJECT_NAME} msgpack)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test msgpack)
 
-# -------- ZLib -----------
+# Configure zlib dependencies
 MESSAGE(STATUS "Configure zlib version ${ZLIB_VERSION}")
 ExternalProject_Add(
   zlib
@@ -393,7 +395,7 @@ ExternalProject_Add(
 )
 SET(BUILD_LIBRARY ${BUILD_LIBRARY} z)
 
-# -------- Prometheus -----------
+# Configure prometheus dependencies
 MESSAGE(STATUS "Configure prometheus version ${PROMETHEUS_VERSION}")
 ExternalProject_Add(
   prometheus
@@ -420,7 +422,7 @@ SET(BUILD_LIBRARY ${BUILD_LIBRARY} prometheus-cpp-pull prometheus-cpp-core curl)
 ADD_DEPENDENCIES(${PROJECT_NAME} prometheus)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus)
 
-# ---------- cron scheduler-----
+# Configure cron scheduler dependencies
 ExternalProject_Add(
   croncpp
   GIT_REPOSITORY https://github.com/mariusbancila/croncpp.git
@@ -438,7 +440,7 @@ ExternalProject_Add(
 ADD_DEPENDENCIES(${PROJECT_NAME} croncpp)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test croncpp)
 
-# --------Google Test------
+# Configure Google Test dependencies
 message(STATUS "Setup GTest version ${GTEST_VERSION}")
 ExternalProject_Add(
   googletest
@@ -457,7 +459,8 @@ ADD_DEPENDENCIES(${PROJECT_NAME}-test googletest)
 ADD_DEFINITIONS(-DBOOST_LOG_DYN_LINK)
 ADD_DEFINITIONS(-DBOOST_ALL_DYN_LINK)
 
+# Link libraries and set include directories
 TARGET_LINK_LIBRARIES(${PROJECT_NAME} PUBLIC ${BUILD_LIBRARY} pthread)
 TARGET_LINK_LIBRARIES(${PROJECT_NAME}-test PUBLIC ${BUILD_LIBRARY} pthread gtest)
-MESSAGE(STATUS "Linked library: ${BUILD_LIBRARY}")
+MESSAGE(STATUS "Linked libraries: ${BUILD_LIBRARY}")
 MESSAGE(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")

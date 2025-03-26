@@ -1,17 +1,19 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_SNAPSHOTCOMMANDWORKER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_SNAPSHOTCOMMANDWORKER_H_
 
+#include <k2eg/controller/command/cmd/SnapshotCommand.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/epics/EpicsData.h>
+
+#include <vector>
 #include <stdint.h>
 
 #include <boost/dynamic_bitset.hpp>
-#include <vector>
 
-#include "k2eg/controller/command/cmd/SnapshotCommand.h"
-#include "k2eg/service/epics/EpicsData.h"
+
 
 namespace k2eg::controller::node::worker {
 
@@ -100,8 +102,10 @@ class SnapshotOpInfo : public WorkerAsyncOperation {
 };
 DEFINE_PTR_TYPES(SnapshotOpInfo)
 
-/*
- * is the worker that take care to manage the snapshot command
+/**
+ * Worker responsible for handling snapshot commands.
+ * It manages the lifecycle of the snapshot operation,
+ * including data collection and response publication.
  */
 class SnapshotCommandWorker : public CommandWorker {
   std::shared_ptr<BS::thread_pool>                      processing_pool;
@@ -109,17 +113,30 @@ class SnapshotCommandWorker : public CommandWorker {
   k2eg::service::pubsub::IPublisherShrdPtr              publisher;
   k2eg::service::metric::IEpicsMetric&                  metric;
   k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
+  // Receive event from publisher
   void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
+  // manage the snapshot command execution in a separate thread
   void checkGetCompletion(SnapshotOpInfoShrdPtr snapshot_info);
+  // send a faulty reply to the client
   void manageFaultyReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd);
+  // send the snapshot reply to the client for a pv index
+  /*
+  The function return the value of a pv in a specific index respect to the original list of PVs when it is ready
+  so the client could receive event in a different order than the original list of PVs and it need to reconsturct the
+  original list of PVs
+  */
   void publishSnapshotReply(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd,
                             std::uint32_t                                               pv_index,
                             service::epics_impl::ConstChannelDataUPtr                   pv_data);
+  /*
+  Is the final message that is sent to the client to notify that the snapshot has been completed
+  */
   void publishEndSnapshotReply(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd);
 
  public:
   SnapshotCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
   virtual ~SnapshotCommandWorker();
+  // process the command
   void processCommand(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 };
 

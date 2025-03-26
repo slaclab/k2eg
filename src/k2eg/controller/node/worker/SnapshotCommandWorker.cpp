@@ -1,11 +1,9 @@
+
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 #include <k2eg/service/ServiceResolver.h>
 
-#include <iterator>
-
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
-#include "k2eg/service/epics/EpicsData.h"
 
 using namespace k2eg::common;
 
@@ -17,8 +15,6 @@ using namespace k2eg::service;
 using namespace k2eg::service::log;
 using namespace k2eg::service::metric;
 using namespace k2eg::service::pubsub;
-using namespace k2eg::service::epics_impl;
-
 using namespace k2eg::service::epics_impl;
 
 SnapshotCommandWorker::SnapshotCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager)
@@ -47,7 +43,7 @@ SnapshotCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* cons
 
 void
 SnapshotCommandWorker::processCommand(ConstCommandShrdPtr command) {
-  if (command->type != CommandType::get) { return; }
+  if (command->type != CommandType::snapshot) { return; }
 
   ConstSnapshotCommandShrdPtr s_ptr = static_pointer_cast<const SnapshotCommand>(command);
 
@@ -66,8 +62,8 @@ SnapshotCommandWorker::processCommand(ConstCommandShrdPtr command) {
       v_mon_ops.push_back(mon_op);
     }
   }
-  // submit snapshot to processing pool with a timeout(process window) of 1000 ms
-  processing_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops), 1000));
+  // submit snapshot to processing pool
+  processing_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops)));
 }
 
 void
@@ -87,74 +83,73 @@ SnapshotCommandWorker::manageFaultyReply(const std::int8_t error_code, const std
 }
 
 void SnapshotCommandWorker::checkGetCompletion(SnapshotOpInfoShrdPtr snapshot_info) {
-    bool pending = false;
-    if (!snapshot_info->isTimeout()) {
-        // Process monitors before timeout using processed_index to annotate completed ones.
-        for (std::size_t i = 0; i < snapshot_info->v_mon_ops.size(); ++i) {
-            // check if PV has been already consumed
-            if (snapshot_info->processed_index.test(i)) {
-                continue;
-            }
-            // try to get data from poll
-            auto m_op = snapshot_info->v_mon_ops[i];
-            m_op->poll();
-            if (m_op->hasData()) {
-                // we have data so we can send it to the client
-                auto evt_shrd_ptr = m_op->getEventData()->event_data->back();
-                publishSnapshotReply(snapshot_info->cmd, static_cast<std::uint32_t>(i), MakeChannelDataUPtr(evt_shrd_ptr->channel_data));
-                // set the index as processed
-                snapshot_info->processed_index.set(i, true);
-            }
-        }
-        // give some time to relax
-        std::this_thread::sleep_for(std::chrono::microseconds(10));
-        // check if we have done all the PVs
-        if (!snapshot_info->processed_index.all()) {
-            // there still are PVs that have not been received, so resubmit the task
-            processing_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, snapshot_info);
-        } else {
-            // in this case we have comepleted the snapshot so we can send the completion message to the client before the snapshot
-            publishEndSnapshotReply(snapshot_info->cmd);
-        }
-    } else { // At timeout, process unhandled monitors.
-        for (std::size_t i = 0; i < snapshot_info->v_mon_ops.size(); ++i) {
-            if (snapshot_info->processed_index.test(i)) {
-                continue;
-            }
-            // try to get data from poll forcing the update
-            auto m_op = snapshot_info->v_mon_ops[i];
-            m_op->forceUpdate();
-            m_op->poll();
-            if (m_op->hasData()) {
-                auto evt_shrd_ptr = m_op->getEventData()->event_data->back();
-                publishSnapshotReply(snapshot_info->cmd, static_cast<std::uint32_t>(i), MakeChannelDataUPtr(evt_shrd_ptr->channel_data));
-            } 
-            snapshot_info->processed_index.set(i, true);
-        }
-        // send completion message
-        publishEndSnapshotReply(snapshot_info->cmd);
-    }
+  if (!snapshot_info->isTimeout()) {
+      // Process monitors before timeout using processed_index to annotate completed ones.
+      for (std::size_t i = 0; i < snapshot_info->v_mon_ops.size(); ++i) {
+          // check if PV has been already consumed
+          if (snapshot_info->processed_index.test(i)) {
+              continue;
+          }
+          // try to get data from poll
+          auto m_op = snapshot_info->v_mon_ops[i];
+          m_op->poll();
+          if (m_op->hasData()) {
+              // we have data so we can send it to the client
+              auto evt_shrd_ptr = m_op->getEventData()->event_data->back();
+              publishSnapshotReply(snapshot_info->cmd, static_cast<std::uint32_t>(i), MakeChannelDataUPtr(evt_shrd_ptr->channel_data));
+              // set the index as processed
+              snapshot_info->processed_index.set(i, true);
+          }
+      }
+      // give some time to relax
+      std::this_thread::sleep_for(std::chrono::microseconds(10));
+      // check if we have done all the PVs
+      if (!snapshot_info->processed_index.all()) {
+          // there still are PVs that have not been received, so resubmit the task
+          processing_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, snapshot_info);
+      } else {
+          // in this case we have comepleted the snapshot so we can send the completion message to the client before the snapshot
+          publishEndSnapshotReply(snapshot_info->cmd);
+      }
+  } else { // At timeout, process unhandled monitors.
+      for (std::size_t i = 0; i < snapshot_info->v_mon_ops.size(); ++i) {
+          if (snapshot_info->processed_index.test(i)) {
+              continue;
+          }
+          // try to get data from poll forcing the update
+          auto m_op = snapshot_info->v_mon_ops[i];
+          m_op->forceUpdate();
+          m_op->poll();
+          if (m_op->hasData()) {
+              auto evt_shrd_ptr = m_op->getEventData()->event_data->back();
+              publishSnapshotReply(snapshot_info->cmd, static_cast<std::uint32_t>(i), MakeChannelDataUPtr(evt_shrd_ptr->channel_data));
+          } 
+          snapshot_info->processed_index.set(i, true);
+      }
+      // send completion message
+      publishEndSnapshotReply(snapshot_info->cmd);
+  }
 }
 
 void
 SnapshotCommandWorker::publishSnapshotReply(ConstSnapshotCommandShrdPtr cmd, std::uint32_t pv_index, service::epics_impl::ConstChannelDataUPtr pv_data) {
-  // Pass the correct member (e.g., pv) from evt_shrd_ptr->channel_data
-  auto serialized_message = serialize(SnapshotCommandReply{0, cmd->reply_id, static_cast<std::int32_t>(pv_index), std::move(pv_data)}, cmd->serialization);
-  if (!serialized_message) {
-    logger->logMessage("Invalid serialized message", LogLevel::FATAL);
-  } else {
-    publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "snapshot-reply-message", "snapshot-dist-key", serialized_message),
-                           {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
-  }
+// Pass the correct member (e.g., pv) from evt_shrd_ptr->channel_data
+auto serialized_message = serialize(SnapshotCommandReply{0, cmd->reply_id, static_cast<std::int32_t>(pv_index), std::move(pv_data)}, cmd->serialization);
+if (!serialized_message) {
+  logger->logMessage("Invalid serialized message", LogLevel::FATAL);
+} else {
+  publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "snapshot-reply-message", "snapshot-dist-key", serialized_message),
+                         {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
+}
 }
 
 void
 SnapshotCommandWorker::publishEndSnapshotReply(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd) {
-  auto serialized_message = serialize(SnapshotCommandReply{0, cmd->reply_id, static_cast<std::int32_t>(-1), nullptr}, cmd->serialization);
-  if (!serialized_message) {
-    logger->logMessage("Invalid serialized message", LogLevel::FATAL);
-  } else {
-    publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "snapshot-reply-message", "snapshot-dist-key", serialized_message),
-                           {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
-  }
+auto serialized_message = serialize(CommandReply{1, cmd->reply_id}, cmd->serialization);
+if (!serialized_message) {
+  logger->logMessage("Invalid serialized message", LogLevel::FATAL);
+} else {
+  publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "snapshot-reply-message", "snapshot-dist-key", serialized_message),
+                         {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
+}
 }
