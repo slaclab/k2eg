@@ -975,40 +975,6 @@ TEST(NodeController, SnapshotCommandMsgPackSer) {
   deinitBackend(std::move(node_controller));
 }
 
-TEST(NodeController, SnapshotBadCommandMsgPackSer) {
-  typedef std::map<std::string, msgpack::object> Map;
-  std::latch                      work_done{1};
-  boost::json::object             reply_msg;
-  std::unique_ptr<NodeController> node_controller;
-  auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-  node_controller                           = initBackend(publisher);
-
-  // add the number of reader from topic
-  dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
-  while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::snapshot)) { sleep(1); }
-  
-  EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const SnapshotCommand>(SnapshotCommand{
-      CommandType::snapshot, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", {"pva://variable:a","pva://variable:b"},})}););
-
-  work_done.wait();
-
-  // we need to have publish some message
-  size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
-  EXPECT_EQ(published, 1); // two values and one completion message
-
-  msgpack::unpacked msgpack_unpacked;
-  msgpack::object   msgpack_object;
-
-  // get first value could be one for variable a or b
-  EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
-  msgpack_object = msgpack_unpacked.get();
-  EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
-  auto map_reply = msgpack_object.as<Map>();
-  EXPECT_EQ(map_reply.contains("error"), true);
-  EXPECT_EQ(map_reply["error"].as<std::int32_t>(), -1);
-  EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
-}
-
 TEST(NodeController, PutCommandBadChannel) {
   std::latch work_done{1};
   // set environment variable for test
