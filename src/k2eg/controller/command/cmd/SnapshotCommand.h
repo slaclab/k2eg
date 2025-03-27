@@ -15,7 +15,6 @@ Perform a snapshot of the current state of specific PV with determianted paramet
 }
 */
 struct SnapshotCommand : public Command {
-  std::string              snaphsot_user_id;
   std::vector<std::string> pv_name_list;
 };
 
@@ -28,7 +27,6 @@ tag_invoke(boost::json::value_from_tag, boost::json::value& jv, SnapshotCommand 
 
   jv = {{"serialization", serialization_to_string(c.serialization)},
         {"pv_name_list", std::move(pv_array)},
-        {"snapshot_id", c.snaphsot_user_id},
         {"reply_id", c.reply_id},
         {"reply_topic", c.reply_topic}
     };

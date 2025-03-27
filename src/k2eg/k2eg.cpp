@@ -14,6 +14,7 @@
 #include <k2eg/service/pubsub/pubsub.h>
 
 #include <cstdlib>
+#include "k2eg/service/pubsub/IPublisher.h"
 
 using namespace k2eg;
 using namespace k2eg::service;

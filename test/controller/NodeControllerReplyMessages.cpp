@@ -3,12 +3,11 @@
 #include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/controller/node/worker/GetCommandWorker.h>
 #include <k2eg/controller/node/worker/PutCommandWorker.h>
-#include <k2eg/controller/node/worker/monitor/MonitorCommandWorker.h>
-#include <map>
-
+#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
 #include <k2eg/common/BaseSerialization.h>
-#include <k2eg/controller/node/worker/monitor/MonitorCommandWorker.h>
+
 #include <msgpack/v3/object_fwd_decl.hpp>
+#include <map>
 
 #include "../epics/epics.h"
 

@@ -28,7 +28,6 @@ command_type_to_string(CommandType t) noexcept {
 
 #define KEY_COMMAND            "command"
 #define KEY_SERIALIZATION      "serialization"
-// #define KEY_PROTOCOL           "protocol"
 #define KEY_PV_NAME            "pv_name"
 #define KEY_PV_NAME_LIST       "pv_name_list"
 #define KEY_REPLY_TOPIC        "reply_topic"

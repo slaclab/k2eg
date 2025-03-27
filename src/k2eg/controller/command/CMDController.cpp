@@ -1,10 +1,12 @@
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/command/CMDController.h>
+#include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/metric/IMetricService.h>
 
 #include <boost/json.hpp>
 #include <chrono>
+#include "k2eg/service/pubsub/IPublisher.h"
 
 using namespace k2eg::controller::command;
 using namespace k2eg::controller::command::cmd;
@@ -18,11 +20,13 @@ using namespace k2eg::service::metric;
 namespace bs = boost::system;
 namespace bj = boost::json;
 
-CMDController::CMDController(ConstCMDControllerConfigUPtr configuration, CMDControllerCommandHandler cmd_handler)
+CMDController::CMDController(ConstCMDControllerConfigUPtr             configuration,
+                             CMDControllerCommandHandler              cmd_handler)
     : configuration(std::move(configuration)),
       cmd_handler(cmd_handler),
       logger(ServiceResolver<ILogger>::resolve()),
       subscriber(ServiceResolver<ISubscriber>::resolve()),
+      publisher(ServiceResolver<IPublisher>::resolve()),
       metric(ServiceResolver<IMetricService>::resolve()->getCMDControllerMetric()) {
   start();
 }
@@ -37,7 +41,7 @@ CMDController::consume() {
     subscriber->getMsg(received_message, configuration->max_message_to_fetch, configuration->fetch_time_out);
     if (received_message.size()) {
       ConstCommandShrdPtrVec result_vec;
-      std::for_each(received_message.begin(), received_message.end(), [&metric = metric, &logger = logger, &result_vec = result_vec](auto message) {
+      std::for_each(received_message.begin(), received_message.end(), [&metric = metric, &logger = logger, &result_vec = result_vec, this](auto message) {
         if (!message->data_len) return;
         bs::error_code  ec;
         bj::object      command_description;
@@ -58,8 +62,9 @@ CMDController::consume() {
             // incrementing bad command metric
             metric.incrementCounter(ICMDControllerMetricCounterType::BadCommand);
             // log the bad received command
-            logger->logMessage(STRING_FORMAT("Bad received command: %1%", std::string(message->data.get(), message->data_len)),
-                             LogLevel::ERROR);
+            logger->logMessage(STRING_FORMAT("Bad received command: %1%", std::string(message->data.get(), message->data_len)), LogLevel::ERROR);
+            // submit error to the client
+            MapToCommand::returnFailCommandParsing(*publisher, command_description);
           }
         } catch (std::exception& ex) {
           logger->logMessage(STRING_FORMAT("Error: '%1%' parsing command: %2%", std::string(ex.what()) % std::string(message->data.get(), message->data_len)),

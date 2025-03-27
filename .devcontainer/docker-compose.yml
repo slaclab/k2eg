@@ -6,8 +6,8 @@ version: '3.8'
 services:
   app:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: docker/DockerfileDevEnvironment
     # env_file:
       # Ensure that the variables in .env match the same variables in devcontainer.json
       # - .env
@@ -35,7 +35,7 @@ services:
   epics_pva:
     build:
       context: ../
-      dockerfile: docker/Dockerfile.epics
+      dockerfile: docker/DockerfileDevContainer.epics
     command: 
         - /bin/bash
         - -c

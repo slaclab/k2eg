@@ -361,7 +361,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=NodeController.PutCommandScalar*"],
+            "args": ["--gtest_filter=NodeController.SnapshotCommandWithMonitorMsgPackSer*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

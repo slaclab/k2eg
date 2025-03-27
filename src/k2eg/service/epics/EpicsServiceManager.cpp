@@ -4,13 +4,12 @@
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
 #include <k2eg/service/epics/EpicsPutOperation.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
+#include <ranges>
 
-#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <memory>
 #include <mutex>
-#include <ranges>
 #include <regex>
 
 using namespace k2eg::common;
@@ -24,10 +23,10 @@ EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr conf
   ca_provider  = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
 }
 EpicsServiceManager::~EpicsServiceManager() {
-  // remove all monitor handler
+  // Stop processing monitor tasks and wait for scheduled tasks to finish.
   end_processing = true;
   processing_pool.wait_for_tasks();
-  // remove pending channel
+  // Clear all registered channels and reset providers.
   channel_map.clear();
   pva_provider->reset();
   ca_provider->reset();
@@ -42,6 +41,7 @@ EpicsServiceManager::addChannel(const std::string& pv_name_uri) {
     {
       WriteLockCM write_lock(channel_map_mutex);
       if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end()) { return; }
+      // Register a new channel for the sanitized PV name.
       channel_map[sanitized_pv->name] = ChannelMapElement{
           .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
           .to_force = false,
@@ -49,12 +49,13 @@ EpicsServiceManager::addChannel(const std::string& pv_name_uri) {
       };
     }
     {
-      ReadLockCM write_lock(channel_map_mutex);
+      // Lock the channel map for reading and enqueue the monitor task.
+      ReadLockCM read_lock(channel_map_mutex);
       ConstMonitorOperationShrdPtr monitor_operation = channel_map[sanitized_pv->name].channel->monitor();
-      // lock and insert in queue
       processing_pool.push_task(&EpicsServiceManager::task, this, monitor_operation);
     }
   } catch (std::exception& ex) {
+    // In case of an error, remove the faulty channel and rethrow.
     channel_map.erase(sanitized_pv->name);
     throw ex;
   } catch (...) {
@@ -72,7 +73,7 @@ EpicsServiceManager::getMonitoredChannels() {
   return result;
 #elif __GNUC_PREREQ(11, 0)
   auto kv = std::views::keys(channel_map);
-  return {kv.begin(), kv.end()};
+  return k2eg::common::StringVector(kv.begin(), kv.end());
 #endif
 }
 
@@ -101,6 +102,24 @@ EpicsServiceManager::forceMonitorChannelUpdate(const std::string& pv_name_uri) {
   if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end()) { search->second.to_force = true; }
 }
 
+ConstMonitorOperationShrdPtr
+EpicsServiceManager::getMonitorOp(const std::string& pv_name_uri) {
+  auto sanitized_pv = sanitizePVName(pv_name_uri);
+  if (!sanitized_pv) return ConstMonitorOperationUPtr();
+
+  ConstMonitorOperationShrdPtr result;
+  ReadLockCM                read_lock(channel_map_mutex);
+  if (auto search = channel_map.find(sanitized_pv->name); search == channel_map.end()) {
+    channel_map[sanitized_pv->name] = ChannelMapElement{
+        .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
+        .to_force = false,
+        .to_erase = false,
+    };
+  }
+  result = channel_map[sanitized_pv->name].channel->monitor();
+  return result;
+}
+
 ConstGetOperationUPtr
 EpicsServiceManager::getChannelData(const std::string& pv_name_uri) {
   ConstGetOperationUPtr result;
@@ -110,13 +129,13 @@ EpicsServiceManager::getChannelData(const std::string& pv_name_uri) {
   if (!sanitized_pv) { return ConstGetOperationUPtr(); }
   if (auto search = channel_map.find(sanitized_pv->name); search == channel_map.end()) {
     channel_map[sanitized_pv->name] = ChannelMapElement{
-          .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
-          .to_force = false,
-          .to_erase = false,
+        .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
+        .to_force = false,
+        .to_erase = false,
     };
   }
-    // allocate channel and return data
-  result    = channel_map[sanitized_pv->name].channel->get();
+  // allocate channel and return data
+  result = channel_map[sanitized_pv->name].channel->get();
   return result;
 }
 
@@ -128,9 +147,9 @@ EpicsServiceManager::putChannelData(const std::string& pv_name_uri, const std::s
   if (!sanitized_pv) { return ConstPutOperationUPtr(); }
   if (auto search = channel_map.find(sanitized_pv->name); search == channel_map.end()) {
     channel_map[sanitized_pv->name] = ChannelMapElement{
-          .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
-          .to_force = false,
-          .to_erase = false,
+        .channel  = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
+        .to_force = false,
+        .to_erase = false,
     };
   }
   // allocate channel and return data
@@ -188,33 +207,31 @@ EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op) {
   if (end_processing) return;
   bool to_delete = false;
   {
-    // lock the map for read and produce event
+    // Lock channel_map for reading to check if the current monitor should be deleted or updated.
     ReadLockCM read_lock(channel_map_mutex);
-    // try to fetch a specific number of 'data' event only
-
     if ((to_delete = channel_map[monitor_op->getPVName()].to_erase) == false) {
-      // monitor can be processed becase is not goingto be deleted
+      // Process monitor update if not marked for deletion.
       if (channel_map[monitor_op->getPVName()].to_force) {
-        // i need to force the update
+        // Force update on the monitor before processing.
         monitor_op->forceUpdate();
         channel_map[monitor_op->getPVName()].to_force = false;
       }
-      // execute pool on monitor
+      // Poll for new monitor events.
       monitor_op->poll();
-      // if we have events fire them to listener
-      if (monitor_op->hasEvents() && handler_broadcaster.targets.size()) { handler_broadcaster.broadcast(monitor_op->getEventData()); }
+      // If events exist and listeners are registered, broadcast the event data.
+      if (monitor_op->hasEvents() && !handler_broadcaster.targets.empty()) {
+        handler_broadcaster.broadcast(monitor_op->getEventData());
+      }
     }
   }
 
   if (to_delete) {
     WriteLockCM write_lock(channel_map_mutex);
-    // remove the channel from map
+    // Remove the channel from the map if marked for deletion.
     channel_map.erase(monitor_op->getPVName());
-    // exit withous submiting again the task
-    return;
+    return; // Exit without resubmitting task.
   }
-  // give some time of relaxing
+  // Pause briefly then resubmit the monitor task.
   std::this_thread::sleep_for(std::chrono::microseconds(100));
-  // re-enque
   processing_pool.push_task(&EpicsServiceManager::task, this, monitor_op);
 }

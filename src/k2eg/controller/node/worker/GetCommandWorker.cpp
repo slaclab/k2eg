@@ -7,7 +7,6 @@
 
 #include "client.h"
 #include "k2eg/controller/node/worker/CommandWorker.h"
-#include "k2eg/service/epics/EpicsData.h"
 #include "k2eg/service/metric/IMetricService.h"
 
 using namespace k2eg::common;

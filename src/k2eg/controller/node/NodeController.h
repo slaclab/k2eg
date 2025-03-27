@@ -6,7 +6,7 @@
 #include <k2eg/controller/command/CMDCommand.h>
 #include <k2eg/controller/node/configuration/NodeConfiguration.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
-#include <k2eg/controller/node/worker/monitor/MonitorCommandWorker.h>
+#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/metric/IMetricService.h>
