@@ -50,7 +50,7 @@ SnapshotCommandWorker::processCommand(ConstCommandShrdPtr command) {
   // get all monitor operation for all pv that need to be part of the snapshot
   std::vector<service::epics_impl::ConstMonitorOperationShrdPtr> v_mon_ops;
   for (const auto& pv_uri : s_ptr->pv_name_list) {
-    logger->logMessage(STRING_FORMAT("Perepare snapshot monitor ops for '%1%' on topic %2% with sertype: %3%",
+    logger->logMessage(STRING_FORMAT("Perepare snapshot ops for '%1%' on topic %2% with sertype: %3%",
                                      pv_uri % s_ptr->reply_topic % serialization_to_string(s_ptr->serialization)),
                        LogLevel::DEBUG);
 

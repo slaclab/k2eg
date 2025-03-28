@@ -6,7 +6,6 @@
 #include <k2eg/controller/node/NodeController.h>
 
 #include <condition_variable>
-#include <memory>
 #include <mutex>
 #include <string>
 
@@ -24,7 +23,6 @@ class K2EGateway {
 
   int                                          setup(int argc, const char *argv[]);
   k2eg::service::metric::IMetricServiceShrdPtr instanceMetricService(k2eg::service::metric::ConstMetricConfigurationUPtr metric_conf);
-  void                                         commandReceived(k2eg::controller::command::cmd::ConstCommandShrdPtrVec received_command);
   const std::string                            getTextVersion(bool short_version = false);
 
  public:
