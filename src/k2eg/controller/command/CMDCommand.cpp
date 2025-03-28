@@ -28,17 +28,17 @@ CommandType
 MapToCommand::getCMDType(const object& obj) {
   if (auto v = obj.if_contains(KEY_COMMAND)) {
     const auto cmd = v->as_string();
-    if (std::ranges::equal(cmd, "monitor", ichar_equals))
+    if (cmd.compare("monitor") == 0)
       return CommandType::monitor;
-    else if (std::ranges::equal(cmd, "multi-monitor", ichar_equals))
+    else if (cmd.compare("multi-monitor") == 0)
       return CommandType::multi_monitor;
-    else if (std::ranges::equal(cmd, "get", ichar_equals))
+    else if (cmd.compare("get") == 0)
       return CommandType::get;
-    else if (std::ranges::equal(cmd, "put", ichar_equals))
+    else if (cmd.compare("put") == 0)
       return CommandType::put;
-    else if (std::ranges::equal(cmd, "info", ichar_equals))
+    else if (cmd.compare("info") == 0)
       return CommandType::info;
-    else if (std::ranges::equal(cmd, "snapshot", ichar_equals))
+    else if (cmd.compare("snapshot") == 0)
       return CommandType::snapshot;
   }
   return CommandType::unknown;

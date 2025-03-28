@@ -8,7 +8,6 @@ namespace k2eg::controller::command::cmd {
 Perform a snapshot of the current state of specific PV with determianted parameters
 {
     "command", "snapshot",
-    "snapshot_id", "<user generated custom id>",
     "pv_name_list", ["[pva|ca]<pv name>"", ...]
     "reply_topic", "reply_topic"
     "reply_id", "reply_topic"
