@@ -21,6 +21,7 @@ command_type_to_string(CommandType t) noexcept {
     case CommandType::monitor: return "monitor";
     case CommandType::multi_monitor: return "multi-monitor";
     case CommandType::put: return "put";
+    case CommandType::snapshot: return "snapshot";
     case CommandType::unknown: return "unknown";
   }
   return "undefined";
