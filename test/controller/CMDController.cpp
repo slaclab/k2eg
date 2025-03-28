@@ -310,7 +310,7 @@ CMDControllerCommandHandler snapshot_test = [](ConstCommandShrdPtrVec received_c
 };
 
 boost::json::value snapshot_json = {
-  {KEY_COMMAND, "snapshot"}, {KEY_PV_NAME_LIST, {"pva://channel::a", "pva://channel::b"}}, {KEY_REPLY_TOPIC, "topic-dest"}};
+  {KEY_COMMAND, "snapshot"}, {KEY_PV_NAME_LIST, {"pva://channel::a", "pva://channel::b"}}, {KEY_REPLY_TOPIC, "topic-dest"}, {KEY_REPLY_ID, "rep-id"}};
 
 boost::json::value bad_acquire_command = {{KEY_COMMAND, "monitor"}, {"destination", "topic-dest"}};
 
