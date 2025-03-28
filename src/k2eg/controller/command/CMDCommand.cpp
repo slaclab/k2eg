@@ -9,6 +9,7 @@
 #include <boost/json/array.hpp>
 #include <cctype>  // std::tolower
 #include <vector>
+#include "k2eg/controller/command/cmd/SnapshotCommand.h"
 
 using namespace k2eg::common;
 using namespace k2eg::controller::command;
@@ -191,7 +192,7 @@ MapToCommand::parse(const object& obj) {
         }
         if (pv_name_list.size()) {
           // we can create the command
-          result = std::make_shared<MultiMonitorCommand>(MultiMonitorCommand{CommandType::multi_monitor, ser_type, reply_topic, reply_id, pv_name_list});
+          result = std::make_shared<SnapshotCommand>(SnapshotCommand{CommandType::snapshot, ser_type, reply_topic, reply_id, pv_name_list});
         } else {
           logger->logMessage("The array should not be empty: " + serialize(obj), LogLevel::ERROR);
         }
