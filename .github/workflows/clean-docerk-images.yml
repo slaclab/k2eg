@@ -1,3 +1,4 @@
+name: Manages container images
 on:
     workflow_dispatch:
     schedule:
