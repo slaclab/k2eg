@@ -3,14 +3,20 @@ on:
     schedule:
       - cron: "5 * * * *"  # every hour
 jobs:
-  docker-hub-retention:
-    runs-on: [ubuntu-latest]
+  clean:
+    runs-on: ubuntu-latest
+    name: Delete old test images
     steps:
-        - uses: actions/delete-package-versions@v5
-          with: 
-            owner: 'slaclab'
-            package-name: 'k2eg/ubuntu'
-            package-type: 'docker'
-            token: ${{ secrets.DELETE_PACKAGES_TOKEN }}
-            min-versions-to-keep: 10
-            delete-only-untagged-versions: 'true'
+      - name: Clean docker images
+        uses: snok/container-retention-policy@v3.0.0
+        with:
+          account: slaclab
+          token: ${{ secrets.DELETE_PACKAGES_TOKEN }}
+          image-names: "k2eg/ubuntu k2eg/debian"
+          tag-selection: untagged
+          keep-n-most-recent: 5
+          cut-off: 2w
+          dry-run: true
+
+
+
