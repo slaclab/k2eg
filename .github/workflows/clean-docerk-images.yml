@@ -1,0 +1,19 @@
+on:
+    workflow_dispatch:
+    schedule:
+      - cron: "5 * * * *"  # every hour
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    name: Delete old test images
+    steps:
+      - name: Clean docker images
+        uses: snok/container-retention-policy@v3.0.0
+        with:
+          account: slaclab
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image-names: "k2eg/*"
+          tag-selection: untagged
+          keep-n-most-recent: 5
+          cut-off: 2w
+          dry-run: true
