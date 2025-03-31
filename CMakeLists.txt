@@ -32,6 +32,9 @@ set(CURL_VERSION curl-7_88_1)
 set(ZLIB_VERSION v1.2.13)
 set(PROMETHEUS_VERSION v1.3.0)
 SET(CRONCPP_VERSION v2023.03.30)
+set(PROTOBUF_VERSION v30.2)
+set(GRPC_VERSION v1.71.0)
+set(ETCD_CPP_VERSION v0.15.4)
 set(GTEST_VERSION 1.8.0)
 
 set(CMAKE_BINARY_DIR ${CMAKE_INSTALL_PREFIX}/bin)
@@ -422,6 +425,52 @@ SET(BUILD_LIBRARY ${BUILD_LIBRARY} prometheus-cpp-pull prometheus-cpp-core curl)
 ADD_DEPENDENCIES(${PROJECT_NAME} prometheus)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus)
 
+# -------------------------------
+# External Project: gRPC
+# -------------------------------
+ExternalProject_Add(
+    grpc_lib
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/grpc_lib
+    GIT_REPOSITORY    https://github.com/grpc/grpc.git
+    GIT_TAG           ${GRPC_VERSION}
+    GIT_PROGRESS 1
+    LOG_DOWNLOAD 1
+    LOG_UPDATE 1
+    LOG_CONFIGURE 1
+    LOG_BUILD 1
+    LOG_INSTALL 1
+    CMAKE_ARGS        -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+                      -DgRPC_INSTALL=ON
+                      -DgRPC_BUILD_TESTS=OFF
+                      -DgRPC_BUILD_CSHARP_EXT=OFF
+                      -DCMAKE_CXX_COMPILER:STRING=${CMAKE_CXX_COMPILER}
+                      -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+    INSTALL_COMMAND   make install
+)
+# SET(BUILD_LIBRARY ${BUILD_LIBRARY} grpc++ grpc)
+# ADD_DEPENDENCIES(${PROJECT_NAME} grpc_lib)
+# ADD_DEPENDENCIES(${PROJECT_NAME}-test grpc_lib)
+
+# -------------------------------
+# External Project: etcd-cpp-apiv3
+# -------------------------------
+ExternalProject_Add(etcd_cpp_apiv3
+    GIT_REPOSITORY    https://github.com/etcd-cpp-apiv3/etcd-cpp-apiv3.git
+    GIT_TAG           ${ETCD_CPP_VERSION}
+    GIT_PROGRESS 1
+    LOG_DOWNLOAD 1
+    LOG_UPDATE 1
+    LOG_CONFIGURE 1
+    LOG_BUILD 1
+    LOG_INSTALL 1
+    CMAKE_ARGS        -DCMAKE_INSTALL_PREFIX=${THIRD_PARTY_DIR}/etcd-cpp-apiv3
+                      -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    INSTALL_COMMAND   make install
+)
+ADD_DEPENDENCIES(etcd_cpp_apiv3 grpc_lib)
+ADD_DEPENDENCIES(${PROJECT_NAME} etcd_cpp_apiv3)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test etcd_cpp_apiv3)
+
 # Configure cron scheduler dependencies
 ExternalProject_Add(
   croncpp
@@ -455,6 +504,7 @@ ExternalProject_Add(
 )
 
 ADD_DEPENDENCIES(${PROJECT_NAME}-test googletest)
+
 
 ADD_DEFINITIONS(-DBOOST_LOG_DYN_LINK)
 ADD_DEFINITIONS(-DBOOST_ALL_DYN_LINK)

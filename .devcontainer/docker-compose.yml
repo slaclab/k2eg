@@ -32,6 +32,22 @@ services:
     # Use "forwardPorts" in **devcontainer.json** to forward an app port locally. 
     # (Adding the "ports" property to this file will not forward from a Codespace.)
 
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.21
+    environment:
+      - ETCD_NAME=etcd0
+      - ETCD_DATA_DIR=/etcd-data
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://etcd:2380
+      - ETCD_INITIAL_CLUSTER=etcd0=http://etcd:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+
+
   epics_pva:
     build:
       context: ../
@@ -43,6 +59,8 @@ services:
           tmux new-session -d "source /opt/epics-var.sh; softIocPVA -d /app/epics-test.db"
           tmux new-session -d "source /opt/epics-var.sh; python3 /app/k2eg-mailbox-server.py"
           tail -f /dev/null
+    volumes:
+      - etcd-data:/etcd-data
 
   epics_updater:
     platform: linux/amd64
@@ -82,3 +100,5 @@ services:
       - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
       - KAFKA_CFG_MESSAGE_MAX_BYTES=256000
+volumes:
+  etcd-data:
