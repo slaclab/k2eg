@@ -14,7 +14,7 @@
                 "--nc-monitor-consumer-filterout-regex=.*strimzi.*",
                 "--nc-monitor-consumer-filterout-regex=.*k2eg.*",
                 "--log-on-console",
-                "--cmd-input-topic=cmd-topic",
+                "--cmd-input-topic=cmd-topic-in",
                 "--log-level=debug",
                 "--sub-server-address=kafka:9092",
                 "--pub-server-address=kafka:9092",
@@ -29,7 +29,7 @@
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
-            "envFile": "${workspaceFolder}/.vscode/.env",
+            // "envFile": "${workspaceFolder}/.vscode/.env",
             "environment": [
                 {
                     "name": "LD_LIBRARY_PATH",
@@ -133,7 +133,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=k2egateway*"],
+            "args": ["--gtest_filter=k2egateway.CommandSubmission*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
@@ -161,7 +161,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=Kafka.KafkaSimplePubSubMultiple*"],
+            "args": ["--gtest_filter=Kafka.CreateTopic*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

@@ -66,7 +66,7 @@ K2EGateway::setup(int argc, const char* argv[]) {
     logger->logMessage("Start node controller");
     node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
     logger->logMessage("Start command controller");
-    cmd_controller = std::make_unique<CMDController>(po->getCMDControllerConfiguration(), std::bind(&K2EGateway::commandReceived, this, std::placeholders::_1));
+    cmd_controller = std::make_unique<CMDController>(po->getCMDControllerConfiguration(), std::bind(&NodeController::submitCommand, &(*node_controller), std::placeholders::_1));
     logger->logMessage("Start Scheduler Service");
     ServiceResolver<Scheduler>::resolve()->start();
     //wait for termination request
@@ -130,11 +130,6 @@ K2EGateway::isStopRequested() {
 const bool
 K2EGateway::isTerminated() {
   return terminated;
-}
-
-void
-K2EGateway::commandReceived(k2eg::controller::command::cmd::ConstCommandShrdPtrVec received_command) {
-  node_controller->submitCommand(received_command);
 }
 
 const std::string

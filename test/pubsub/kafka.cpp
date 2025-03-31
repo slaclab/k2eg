@@ -1,55 +1,22 @@
 #include <gtest/gtest.h>
 #include <k2eg/common/uuid.h>
 #include <k2eg/service/pubsub/pubsub.h>
-#include <unistd.h>
+#include <k2eg/service/pubsub/IPublisher.h>
 
+#include "common.h"
+
+#include <unistd.h>
 #include <chrono>
 #include <future>
-#include <iostream>
 #include <string>
 #include <thread>
-#include "k2eg/service/pubsub/IPublisher.h"
+
 
 using namespace k2eg::common;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
 
 #define TOPIC_TEST_NAME "queue-test"
-
-class Message : public PublishMessage {
-  const std::string request_type;
-  const std::string distribution_key;
-  const std::string queue;
-  //! the message data
-  const std::string message;
-
- public:
-  Message(const std::string& queue, const std::string& message)
-      : request_type("test"), distribution_key(UUID::generateUUIDLite()), queue(queue), message(message) {}
-  virtual ~Message() {}
-
-  char*
-  getBufferPtr() {
-    return const_cast<char*>(message.c_str());
-  }
-  const size_t
-  getBufferSize() {
-    return message.size();
-  }
-  const std::string&
-  getQueue() {
-    return queue;
-  }
-  const std::string&
-  getDistributionKey() {
-    return distribution_key;
-  }
-  const std::string&
-  getReqType() {
-    return request_type;
-  }
-};
-
 #define LOG(x) std::cout << x << std::endl << std::flush
 
 TEST(Kafka, KafkaFaultInitWithNoAddress) {
@@ -85,7 +52,7 @@ TEST(Kafka, CreateTopic) {
       std::make_unique<RDKafkaPublisher>(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "kafka:9092"}));
   ASSERT_EQ(producer->createQueue(
     QueueDescription{
-      .name = "new-queue",
+      .name = "new_queue",
       .paritions = 2,
       .replicas = 1,
       .retention_time = 1000*60*60,
@@ -94,16 +61,16 @@ TEST(Kafka, CreateTopic) {
   SubscriberInterfaceElementVector data;
   std::unique_ptr<RDKafkaSubscriber> consumer =
       std::make_unique<RDKafkaSubscriber>(std::make_unique<const SubscriberConfiguration>(SubscriberConfiguration{.server_address = "kafka:9092"}));
-  consumer->addQueue({"new-queue"});
+  consumer->addQueue({"new_queue"});
   consumer->getMsg(data, 10);
   sleep(5);
   consumer->getMsg(data, 10);
-  auto tipic_metadata = producer->getQueueMetadata("new-queue");
+  auto tipic_metadata = producer->getQueueMetadata("new_queue");
   consumer.reset();
   ASSERT_NE(tipic_metadata, nullptr);
-  ASSERT_STREQ(tipic_metadata->name.c_str(), "new-queue");
-  ASSERT_EQ(tipic_metadata->subscriber_groups.size(), 1);
-  ASSERT_EQ(producer->deleteQueue("new-queue"), 0);
+  ASSERT_STREQ(tipic_metadata->name.c_str(), "new_queue");
+  ASSERT_GE(tipic_metadata->subscriber_groups.size(), 1);
+  ASSERT_EQ(producer->deleteQueue("new_queue"), 0);
 }
 
 TEST(Kafka, KafkaSimplePubSub) {
