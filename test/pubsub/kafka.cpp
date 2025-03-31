@@ -1,55 +1,22 @@
 #include <gtest/gtest.h>
 #include <k2eg/common/uuid.h>
 #include <k2eg/service/pubsub/pubsub.h>
-#include <unistd.h>
+#include <k2eg/service/pubsub/IPublisher.h>
 
+#include "common.h"
+
+#include <unistd.h>
 #include <chrono>
 #include <future>
-#include <iostream>
 #include <string>
 #include <thread>
-#include "k2eg/service/pubsub/IPublisher.h"
+
 
 using namespace k2eg::common;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
 
 #define TOPIC_TEST_NAME "queue-test"
-
-class Message : public PublishMessage {
-  const std::string request_type;
-  const std::string distribution_key;
-  const std::string queue;
-  //! the message data
-  const std::string message;
-
- public:
-  Message(const std::string& queue, const std::string& message)
-      : request_type("test"), distribution_key(UUID::generateUUIDLite()), queue(queue), message(message) {}
-  virtual ~Message() {}
-
-  char*
-  getBufferPtr() {
-    return const_cast<char*>(message.c_str());
-  }
-  const size_t
-  getBufferSize() {
-    return message.size();
-  }
-  const std::string&
-  getQueue() {
-    return queue;
-  }
-  const std::string&
-  getDistributionKey() {
-    return distribution_key;
-  }
-  const std::string&
-  getReqType() {
-    return request_type;
-  }
-};
-
 #define LOG(x) std::cout << x << std::endl << std::flush
 
 TEST(Kafka, KafkaFaultInitWithNoAddress) {
