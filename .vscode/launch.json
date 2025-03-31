@@ -161,7 +161,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=Kafka.KafkaSimplePubSubMultiple*"],
+            "args": ["--gtest_filter=Kafka.CreateTopic*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

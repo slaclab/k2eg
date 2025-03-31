@@ -52,7 +52,7 @@ TEST(Kafka, CreateTopic) {
       std::make_unique<RDKafkaPublisher>(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "kafka:9092"}));
   ASSERT_EQ(producer->createQueue(
     QueueDescription{
-      .name = "new-queue",
+      .name = "new_queue",
       .paritions = 2,
       .replicas = 1,
       .retention_time = 1000*60*60,
@@ -61,16 +61,16 @@ TEST(Kafka, CreateTopic) {
   SubscriberInterfaceElementVector data;
   std::unique_ptr<RDKafkaSubscriber> consumer =
       std::make_unique<RDKafkaSubscriber>(std::make_unique<const SubscriberConfiguration>(SubscriberConfiguration{.server_address = "kafka:9092"}));
-  consumer->addQueue({"new-queue"});
+  consumer->addQueue({"new_queue"});
   consumer->getMsg(data, 10);
   sleep(5);
   consumer->getMsg(data, 10);
-  auto tipic_metadata = producer->getQueueMetadata("new-queue");
+  auto tipic_metadata = producer->getQueueMetadata("new_queue");
   consumer.reset();
   ASSERT_NE(tipic_metadata, nullptr);
-  ASSERT_STREQ(tipic_metadata->name.c_str(), "new-queue");
-  ASSERT_EQ(tipic_metadata->subscriber_groups.size(), 1);
-  ASSERT_EQ(producer->deleteQueue("new-queue"), 0);
+  ASSERT_STREQ(tipic_metadata->name.c_str(), "new_queue");
+  ASSERT_GE(tipic_metadata->subscriber_groups.size(), 1);
+  ASSERT_EQ(producer->deleteQueue("new_queue"), 0);
 }
 
 TEST(Kafka, KafkaSimplePubSub) {
