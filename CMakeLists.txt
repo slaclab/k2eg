@@ -32,6 +32,8 @@ set(CURL_VERSION curl-7_88_1)
 set(ZLIB_VERSION v1.2.13)
 set(PROMETHEUS_VERSION v1.3.0)
 SET(CRONCPP_VERSION v2023.03.30)
+SET(OATPP_VERSION 1.3.1)
+SET(OATPP_CONSUL_VERSION 1.3.0)
 set(GTEST_VERSION 1.8.0)
 
 set(CMAKE_BINARY_DIR ${CMAKE_INSTALL_PREFIX}/bin)
@@ -423,6 +425,7 @@ ADD_DEPENDENCIES(${PROJECT_NAME} prometheus)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus)
 
 # Configure cron scheduler dependencies
+MESSAGE(STATUS "Configure croncpp version ${CRONCPP_VERSION}")
 ExternalProject_Add(
   croncpp
   GIT_REPOSITORY https://github.com/mariusbancila/croncpp.git
@@ -439,6 +442,54 @@ ExternalProject_Add(
 #SET(BUILD_LIBRARY ${BUILD_LIBRARY} cron)
 ADD_DEPENDENCIES(${PROJECT_NAME} croncpp)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test croncpp)
+
+# -------------------------------
+# External Project: oatpp
+# -------------------------------
+MESSAGE(STATUS "Configure oatpp-framework version ${OATPP_VERSION}")
+ExternalProject_Add(
+    oatpp-framework
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/oatpp-framework
+    GIT_REPOSITORY    https://github.com/oatpp/oatpp.git
+    GIT_TAG           ${OATPP_VERSION}
+    GIT_PROGRESS      1
+    LOG_DOWNLOAD      1
+    LOG_UPDATE        1
+    LOG_CONFIGURE     1
+    LOG_BUILD         1
+    LOG_INSTALL       1
+    CMAKE_ARGS
+        -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+        -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+)
+
+# -------------------------------
+# External Project: oatpp-consul
+# -------------------------------
+MESSAGE(STATUS "Configure oatpp-consul version ${OATPP_CONSUL_VERSION}")
+ExternalProject_Add(
+    oatpp-consul
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/oatpp-consul
+    GIT_REPOSITORY    https://github.com/oatpp/oatpp-consul.git
+    GIT_TAG           ${OATPP_CONSUL_VERSION}
+    GIT_PROGRESS      1
+    LOG_DOWNLOAD      1
+    LOG_UPDATE        1
+    LOG_CONFIGURE     1
+    LOG_BUILD         1
+    LOG_INSTALL       1
+    CMAKE_ARGS
+        -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+        -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        ‑Doatpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/oatpp-consul
+)
+ADD_DEPENDENCIES(oatpp-consul oatpp-framework)
+ADD_DEPENDENCIES(${PROJECT_NAME} oatpp-consul)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test oatpp-consul)
 
 # Configure Google Test dependencies
 message(STATUS "Setup GTest version ${GTEST_VERSION}")
