@@ -429,8 +429,8 @@ ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus)
 # External Project: gRPC
 # -------------------------------
 ExternalProject_Add(
-    grpc_lib
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/grpc_lib
+    grpc-lib
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/grpc-lib
     GIT_REPOSITORY    https://github.com/grpc/grpc.git
     GIT_TAG           ${GRPC_VERSION}
     GIT_PROGRESS 1
@@ -467,7 +467,7 @@ ExternalProject_Add(etcd_cpp_apiv3
                       -DCMAKE_POSITION_INDEPENDENT_CODE=ON
     INSTALL_COMMAND   make install
 )
-ADD_DEPENDENCIES(etcd_cpp_apiv3 grpc_lib)
+ADD_DEPENDENCIES(etcd_cpp_apiv3 grpc-lib)
 ADD_DEPENDENCIES(${PROJECT_NAME} etcd_cpp_apiv3)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test etcd_cpp_apiv3)
 
