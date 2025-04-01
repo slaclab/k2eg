@@ -21,7 +21,7 @@ message(STATUS "GIT_EXECUTABLE='${GIT_EXECUTABLE}'")
 message(STATUS "Using compiler ${CMAKE_CXX_COMPILER_ID}_${CMAKE_CXX_COMPILER_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
-set(BOOST_VERSION 1.87.0)
+set(BOOST_VERSION 1.77.0)
 set(EPICS_VERSION R7.0.9)
 set(LIBLZ4_VERSION v1.9.2)
 set(LIBRDKAFKA_VERSION v2.3.0)
@@ -34,6 +34,7 @@ set(PROMETHEUS_VERSION v1.3.0)
 SET(CRONCPP_VERSION v2023.03.30)
 set(PROTOBUF_VERSION v30.2)
 set(GRPC_VERSION v1.71.0)
+SET(CPP_REST_SDK_VERSION v2.10.19)
 set(ETCD_CPP_VERSION v0.15.4)
 set(GTEST_VERSION 1.8.0)
 
@@ -196,7 +197,7 @@ ExternalProject_Add(
   BUILD_IN_SOURCE 1
   GIT_SUBMODULES_RECURSE true
   UPDATE_COMMAND ${BOOST_BOOTSTRAP_CMD}
-  BUILD_COMMAND ${BOOST_BUILD_CMD} cxxstd=17 --with-system --with-program_options --with-log --with-json link=shared install --prefix=${CMAKE_INSTALL_PREFIX}
+  BUILD_COMMAND ${BOOST_BUILD_CMD} cxxstd=17 --with-system --with-program_options --with-log --with-json --with-random --with-date_time link=shared install --prefix=${CMAKE_INSTALL_PREFIX}
   INSTALL_COMMAND ""
   LOG_DOWNLOAD 1
   LOG_UPDATE 1
@@ -447,14 +448,38 @@ ExternalProject_Add(
                       -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
     INSTALL_COMMAND   make install
 )
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} grpc++ grpc)
 # SET(BUILD_LIBRARY ${BUILD_LIBRARY} grpc++ grpc)
 # ADD_DEPENDENCIES(${PROJECT_NAME} grpc_lib)
 # ADD_DEPENDENCIES(${PROJECT_NAME}-test grpc_lib)
 
 # -------------------------------
+# External Project: cpp rest sdk
+# -------------------------------
+ExternalProject_Add(
+    cpprestsdk
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/cpprestsdk
+    GIT_REPOSITORY    https://github.com/microsoft/cpprestsdk.git
+    GIT_TAG           ${CPP_REST_SDK_VERSION}
+    GIT_PROGRESS 1
+    LOG_DOWNLOAD 1
+    LOG_UPDATE 1
+    LOG_CONFIGURE 1
+    LOG_BUILD 1
+    LOG_INSTALL 1
+    CMAKE_ARGS        -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+                      -DCMAKE_CXX_COMPILER:STRING=${CMAKE_CXX_COMPILER}
+                      -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+                      -DCMAKE_CXX_FLAGS="-Wno-format-truncation"
+    INSTALL_COMMAND   make install
+)
+ADD_DEPENDENCIES(cpprestsdk boost)
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} cpprest)
+# -------------------------------
 # External Project: etcd-cpp-apiv3
 # -------------------------------
 ExternalProject_Add(etcd_cpp_apiv3
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/etcd_cpp_apiv3
     GIT_REPOSITORY    https://github.com/etcd-cpp-apiv3/etcd-cpp-apiv3.git
     GIT_TAG           ${ETCD_CPP_VERSION}
     GIT_PROGRESS 1
@@ -465,9 +490,11 @@ ExternalProject_Add(etcd_cpp_apiv3
     LOG_INSTALL 1
     CMAKE_ARGS        -DCMAKE_INSTALL_PREFIX=${THIRD_PARTY_DIR}/etcd-cpp-apiv3
                       -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+                      -DCMAKE_CXX_COMPILER:STRING=${CMAKE_CXX_COMPILER}
+                      -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
     INSTALL_COMMAND   make install
 )
-ADD_DEPENDENCIES(etcd_cpp_apiv3 grpc-lib)
+ADD_DEPENDENCIES(etcd_cpp_apiv3 grpc-lib cpprestsdk)
 ADD_DEPENDENCIES(${PROJECT_NAME} etcd_cpp_apiv3)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test etcd_cpp_apiv3)
 
