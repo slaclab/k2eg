@@ -464,14 +464,23 @@ ExternalProject_Add(
         -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
 )
+FIND_PACKAGE(oatpp REQUIRED)
+MESSAGE(STATUS \toatpp_LIBRARIES_DIRS: ${oatpp_LIBRARIES_DIRS})
+MESSAGE(STATUS \toatpp_INCLUDE_DIRS: ${oatpp_INCLUDE_DIRS})
+MESSAGE(STATUS \toatpp_LIBRARIES: ${oatpp_LIBRARIES})
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${oatpp_INCLUDE_DIRS})
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${oatpp_INCLUDE_DIRS})
+TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC ${oatpp_LIBRARIES_DIRS})
+TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${oatpp_LIBRARIES_DIRS})
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} ${oatpp_LIBRARIES})
 
 # -------------------------------
 # External Project: oatpp-consul
 # -------------------------------
 MESSAGE(STATUS "Configure oatpp-consul version ${OATPP_CONSUL_VERSION}")
 ExternalProject_Add(
-    oatpp-consul
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/oatpp-consul
+    oatpp-consul-framework
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/oatpp-consul-framework
     GIT_REPOSITORY    https://github.com/oatpp/oatpp-consul.git
     GIT_TAG           ${OATPP_CONSUL_VERSION}
     GIT_PROGRESS      1
@@ -485,11 +494,20 @@ ExternalProject_Add(
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-        ‑Doatpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/oatpp-consul
+        # ‑Doatpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/oatpp-consul
 )
-ADD_DEPENDENCIES(oatpp-consul oatpp-framework)
-ADD_DEPENDENCIES(${PROJECT_NAME} oatpp-consul)
-ADD_DEPENDENCIES(${PROJECT_NAME}-test oatpp-consul)
+ADD_DEPENDENCIES(oatpp-consul-framework oatpp-framework)
+ADD_DEPENDENCIES(${PROJECT_NAME} oatpp-consul-framework)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test oatpp-consul-framework)
+FIND_PACKAGE(oatpp-consul REQUIRED CONFIG)
+MESSAGE(STATUS \toatpp-consul_LIBRARIES_DIRS: ${oatpp-consul_LIBRARIES_DIRS})
+MESSAGE(STATUS \toatpp-consul_INCLUDE_DIRS: ${oatpp-consul_INCLUDE_DIRS})
+MESSAGE(STATUS \toatpp-consul_LIBRARIES: ${oatpp-consul_LIBRARIES})
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${oatpp-consul_INCLUDE_DIRS})
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${oatpp-consul_INCLUDE_DIRS})
+TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC ${oatpp-consul_LIBRARIES_DIRS})
+TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${oatpp-consul_LIBRARIES_DIRS})
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} ${oatpp-consul_LIBRARIES})
 
 # Configure Google Test dependencies
 message(STATUS "Setup GTest version ${GTEST_VERSION}")
