@@ -32,8 +32,7 @@ set(CURL_VERSION curl-7_88_1)
 set(ZLIB_VERSION v1.2.13)
 set(PROMETHEUS_VERSION v1.3.0)
 SET(CRONCPP_VERSION v2023.03.30)
-SET(OATPP_VERSION 1.3.1)
-SET(OATPP_CONSUL_VERSION 1.3.0)
+SET(OATPP_VERSION 1.3.0)
 set(GTEST_VERSION 1.8.0)
 
 set(CMAKE_BINARY_DIR ${CMAKE_INSTALL_PREFIX}/bin)
@@ -466,25 +465,19 @@ ExternalProject_Add(
         -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
 )
-FIND_PACKAGE(oatpp REQUIRED)
-MESSAGE(STATUS \toatpp_LIBRARIES_DIRS: ${oatpp_LIBRARIES_DIRS})
-MESSAGE(STATUS \toatpp_INCLUDE_DIRS: ${oatpp_INCLUDE_DIRS})
-MESSAGE(STATUS \toatpp_LIBRARIES: ${oatpp_LIBRARIES})
-TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${oatpp_INCLUDE_DIRS})
-TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${oatpp_INCLUDE_DIRS})
-TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC ${oatpp_LIBRARIES_DIRS})
-TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${oatpp_LIBRARIES_DIRS})
-SET(BUILD_LIBRARY ${BUILD_LIBRARY} ${oatpp_LIBRARIES})
-
+MESSAGE(STATUS "oatpp include: ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp")
+MESSAGE(STATUS "oatpp lib: ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION}/oatpp")
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp)
 #-------------------------------
 #External Project: oatpp-curl
 #-------------------------------
-MESSAGE(STATUS "Configure oatpp-curl version curl-8_12_1")
+MESSAGE(STATUS "Configure oatpp-curl version ${OATPP_VERSION}")
 ExternalProject_Add(
   oatpp-curl-framework
     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/oatpp-curl-framework
     GIT_REPOSITORY    https://github.com/oatpp/oatpp-curl.git
-    GIT_TAG           1.3.0
+    GIT_TAG           ${OATPP_VERSION}
     GIT_PROGRESS      1
     LOG_DOWNLOAD      1
     LOG_UPDATE        1
@@ -497,23 +490,21 @@ ExternalProject_Add(
         -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
 )
-TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-1.3.0)
-TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-1.3.0)
-TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC  ${CMAKE_INSTALL_PREFIX}/lib/oatpp-1.3.0)
-TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC  ${CMAKE_INSTALL_PREFIX}/lib/oatpp-1.3.0)
 ADD_DEPENDENCIES(${PROJECT_NAME} oatpp-curl-framework)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test oatpp-curl-framework)
-SET(BUILD_LIBRARY ${BUILD_LIBRARY} oatpp-curl)
-
+MESSAGE(STATUS "oatpp-curl include: ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-curl")
+MESSAGE(STATUS "oatpp-curl lib: ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION}/oatpp-curl")
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-curl)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-curl)
 # -------------------------------
 # External Project: oatpp-consul
 # -------------------------------
-MESSAGE(STATUS "Configure oatpp-consul version ${OATPP_CONSUL_VERSION}")
+MESSAGE(STATUS "Configure oatpp-consul version ${OATPP_VERSION}")
 ExternalProject_Add(
     oatpp-consul-framework
     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/oatpp-consul-framework
     GIT_REPOSITORY    https://github.com/oatpp/oatpp-consul.git
-    GIT_TAG           ${OATPP_CONSUL_VERSION}
+    GIT_TAG           ${OATPP_VERSION}
     GIT_PROGRESS      1
     LOG_DOWNLOAD      1
     LOG_UPDATE        1
@@ -530,15 +521,13 @@ ExternalProject_Add(
 ADD_DEPENDENCIES(oatpp-consul-framework oatpp-curl-framework oatpp-framework)
 ADD_DEPENDENCIES(${PROJECT_NAME} oatpp-consul-framework)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test oatpp-consul-framework)
-FIND_PACKAGE(oatpp-consul REQUIRED CONFIG)
-MESSAGE(STATUS \toatpp-consul_LIBRARIES_DIRS: ${oatpp-consul_LIBRARIES_DIRS})
-MESSAGE(STATUS \toatpp-consul_INCLUDE_DIRS: ${oatpp-consul_INCLUDE_DIRS})
-MESSAGE(STATUS \toatpp-consul_LIBRARIES: ${oatpp-consul_LIBRARIES})
-TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${oatpp-consul_INCLUDE_DIRS})
-TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${oatpp-consul_INCLUDE_DIRS})
-TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC ${oatpp-consul_LIBRARIES_DIRS})
-TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${oatpp-consul_LIBRARIES_DIRS})
-SET(BUILD_LIBRARY ${BUILD_LIBRARY} ${oatpp-consul_LIBRARIES})
+MESSAGE(STATUS "oatpp-consul include: ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-consul")
+MESSAGE(STATUS "oatpp-consul lib: ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION}/oatpp-consul")
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-consul)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-consul)
+TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC  ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION})
+TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC  ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION})
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} oatpp-consul oatpp-curl oatpp)
 
 # Configure Google Test dependencies
 message(STATUS "Setup GTest version ${GTEST_VERSION}")
