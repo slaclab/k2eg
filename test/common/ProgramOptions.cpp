@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <stdlib.h>
 #include <string>
-#include <iostream>
+
 #include <k2eg/common/ProgramOptions.h>
 
 using namespace k2eg::common;
@@ -174,5 +174,18 @@ TEST(ProgramOptions, EpicsManagerConfiguration) {
     EXPECT_NO_THROW(opt->parse(argc, argv););
     auto epics_manager_configuration = opt->getEpicsManagerConfiguration();
     EXPECT_EQ(epics_manager_configuration->thread_count, 10);
+}
+
+TEST(ProgramOptions, ConfigurationServiceConfiguration) {
+    int argc = 1;
+    const char* argv[1] = {"k2eg-test"};
+    // set environment variable for test
+    clearenv();
+    setenv(std::string("EPICS_k2eg_").append(CONFIGURATION_SERVICE_HOST).c_str(), "consul", 1);
+    std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
+    EXPECT_NO_THROW(opt->parse(argc, argv););
+    auto conf = opt->getConfigurationServiceConfiguration();
+    EXPECT_STREQ(conf->config_server_host.c_str(), "consul");
+    EXPECT_EQ(conf->config_server_port, 8500);
 }
 #endif //__linux__

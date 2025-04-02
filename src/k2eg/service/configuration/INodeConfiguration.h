@@ -5,6 +5,7 @@
 
 #include <boost/json.hpp>
 #include <cstdint>
+#include <memory>
 #include <stdint.h>
 
 namespace k2eg::service::configuration {
@@ -13,8 +14,8 @@ namespace k2eg::service::configuration {
 is the configuration service config
 */
 struct ConfigurationServceiConfig {
-  std::string config_server_host;
-  std::int16_t config_server_port;
+  const std::string config_server_host;
+  const std::int16_t config_server_port;
 };
 DEFINE_PTR_TYPES(ConfigurationServceiConfig)
 
@@ -27,13 +28,18 @@ struct NodeConfiguration {
 DEFINE_PTR_TYPES(NodeConfiguration)
 
 // Function to convert a JSON object to a Config instance.
-inline ConstNodeConfigurationUPtr
+inline ConstNodeConfigurationShrdPtr
 config_from_json(const boost::json::object& obj) {
-  auto cfg = std::make_unique<NodeConfiguration>();
-  // Use value_to to extract values from the JSON object.
-  // cfg.host   = json::value_to<std::string>(obj.at("host"));
-  // cfg.port   = json::value_to<int>(obj.at("port"));
-  // cfg.use_ssl = json::value_to<bool>(obj.at("use_ssl"));
+  auto cfg = std::make_shared<NodeConfiguration>();
+  // read the pv_name_list vector from json 
+  if (auto v = obj.if_contains("pv_name_list")) {
+    auto json_array = v->as_array();
+    // find all stirng in the vector
+    for (auto& element : json_array) {
+      if (element.kind() != boost::json::kind::string) continue;
+      cfg->pv_name_list.push_back(boost::json::value_to<std::string>(element));
+    }
+  }
   return cfg;
 }
 
@@ -41,9 +47,12 @@ config_from_json(const boost::json::object& obj) {
 inline boost::json::object
 config_to_json(const NodeConfiguration& cfg) {
   boost::json::object obj;
-  // obj["host"]    = cfg.host;
-  // obj["port"]    = cfg.port;
-  // obj["use_ssl"] = cfg.use_ssl;
+  // write the pv_name_list vector to json
+  boost::json::array json_array;
+  for (const auto& name : cfg.pv_name_list) {
+    json_array.emplace_back(name);
+  }
+  obj["pv_name_list"] = std::move(json_array);
   return obj;
 }
 
@@ -58,8 +67,8 @@ class INodeConfiguration {
   INodeConfiguration(ConstConfigurationServceiConfigUPtr config) : config(std::move(config)) {};
   virtual ~INodeConfiguration() = default;
 
-  virtual ConstNodeConfigurationUPtr getNodeConfiguration() const                                        = 0;
-  virtual void                       setNodeConfiguration(ConstNodeConfigurationUPtr node_configuration) = 0;
+  virtual ConstNodeConfigurationShrdPtr getNodeConfiguration() const                                        = 0;
+  virtual bool                       setNodeConfiguration(ConstNodeConfigurationShrdPtr node_configuration) = 0;
 };
 
 }  // namespace k2eg::service::configuration

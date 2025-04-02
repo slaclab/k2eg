@@ -161,6 +161,7 @@ set(TEST_SOURCE_FILES
   test/metric/CMDMetric.cpp
   test/metric/NodeControllerMetric.cpp
   test/scheduler/Scheduler.cpp
+  test/configuration/ConsulConfigurationTest.cpp
   ${COMMON_SOURCE_FILES}
 )
 
@@ -490,6 +491,7 @@ ExternalProject_Add(
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -DBUILD_SHARED_LIBS=ON
 )
 MESSAGE(STATUS "oatpp include: ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp")
 MESSAGE(STATUS "oatpp lib: ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION}/oatpp")
@@ -516,7 +518,9 @@ ExternalProject_Add(
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -DBUILD_SHARED_LIBS=ON
 )
+ADD_DEPENDENCIES(oatpp-curl-framework oatpp-framework)
 ADD_DEPENDENCIES(${PROJECT_NAME} oatpp-curl-framework)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test oatpp-curl-framework)
 MESSAGE(STATUS "oatpp-curl include: ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-curl")
@@ -543,9 +547,9 @@ ExternalProject_Add(
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-        # ‑Doatpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/oatpp-consul
+        -DBUILD_SHARED_LIBS=ON
 )
-ADD_DEPENDENCIES(oatpp-consul-framework oatpp-curl-framework oatpp-framework)
+ADD_DEPENDENCIES(oatpp-consul-framework oatpp-curl-framework)
 ADD_DEPENDENCIES(${PROJECT_NAME} oatpp-consul-framework)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test oatpp-consul-framework)
 MESSAGE(STATUS "oatpp-consul include: ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-consul")
