@@ -7,7 +7,7 @@ IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 ENDIF()
 
 include(ExternalProject)
-
+include(FetchContent)
 # EXECUTE_PROCESS (
 #     COMMAND bash -c "../tools/manage-version.sh ../src/k2eg/version.h"
 #     OUTPUT_VARIABLE outVar
@@ -99,6 +99,8 @@ set(COMMON_SOURCE_FILES
 
   src/k2eg/service/scheduler/Scheduler.cpp
   src/k2eg/service/scheduler/Task.cpp
+
+  src/k2eg/service/configuration/impl/consul/ConsulNodeConfiguration.cpp
 
   src/k2eg/controller/command/CMDController.cpp
   src/k2eg/controller/command/CMDCommand.cpp
@@ -474,6 +476,35 @@ TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC ${oatpp_LIBRARIES_DIRS})
 TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${oatpp_LIBRARIES_DIRS})
 SET(BUILD_LIBRARY ${BUILD_LIBRARY} ${oatpp_LIBRARIES})
 
+#-------------------------------
+#External Project: oatpp-curl
+#-------------------------------
+MESSAGE(STATUS "Configure oatpp-curl version curl-8_12_1")
+ExternalProject_Add(
+  oatpp-curl-framework
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/oatpp-curl-framework
+    GIT_REPOSITORY    https://github.com/oatpp/oatpp-curl.git
+    GIT_TAG           1.3.0
+    GIT_PROGRESS      1
+    LOG_DOWNLOAD      1
+    LOG_UPDATE        1
+    LOG_CONFIGURE     1
+    LOG_BUILD         1
+    LOG_INSTALL       1
+    CMAKE_ARGS
+        -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+        -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-1.3.0)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-1.3.0)
+TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC  ${CMAKE_INSTALL_PREFIX}/lib/oatpp-1.3.0)
+TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC  ${CMAKE_INSTALL_PREFIX}/lib/oatpp-1.3.0)
+ADD_DEPENDENCIES(${PROJECT_NAME} oatpp-curl-framework)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test oatpp-curl-framework)
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} oatpp-curl)
+
 # -------------------------------
 # External Project: oatpp-consul
 # -------------------------------
@@ -496,7 +527,7 @@ ExternalProject_Add(
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
         # ‑Doatpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/oatpp-consul
 )
-ADD_DEPENDENCIES(oatpp-consul-framework oatpp-framework)
+ADD_DEPENDENCIES(oatpp-consul-framework oatpp-curl-framework oatpp-framework)
 ADD_DEPENDENCIES(${PROJECT_NAME} oatpp-consul-framework)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test oatpp-consul-framework)
 FIND_PACKAGE(oatpp-consul REQUIRED CONFIG)

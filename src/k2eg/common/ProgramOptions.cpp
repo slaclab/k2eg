@@ -29,51 +29,49 @@ using namespace k2eg::service::pubsub;
 using namespace k2eg::service::metric;
 using namespace k2eg::service::scheduler;
 using namespace k2eg::service::epics_impl;
+using namespace k2eg::service::configuration;
 
 namespace po = boost::program_options;
 namespace fs = std::filesystem;
 
 const std::string DEFAULT_CRON_STRING = "* * * * * *";  // every seconds
-
+// clang-format off
 ProgramOptions::ProgramOptions() {
   const std::string actual_path = fs::path(fs::current_path()) / "k2eg.sqlite";
-  options.add_options()(HELP, "Produce help information")(VERSION, "Print the application version")(
-      CONF_FILE, po::value<bool>()->default_value(false), "Specify if we need to load configuration from file")(
-      CONF_FILE_NAME, po::value<std::string>()->default_value(""), "Specify the configuration file")(
-      LOG_LEVEL, po::value<std::string>()->default_value("info"), "Specify the log level[trace, debug, info, error, fatal]")(
-      LOG_ON_CONSOLE, po::value<bool>()->default_value(true)->zero_tokens(), "Specify when the logger print in console")(
-      LOG_ON_FILE, po::value<bool>()->default_value(false)->zero_tokens(), "Specify when the logger print in file")(
-      LOG_FILE_NAME, po::value<std::string>(), "Specify the log file path")(
-      LOG_FILE_MAX_SIZE, po::value<int>()->default_value(1), "Specify the maximum log file size in mbyte")(
-      LOG_ON_SYSLOG, po::value<bool>()->default_value(false)->zero_tokens(), "Specify when the logger print in syslog server")(
-      SYSLOG_SERVER, po::value<std::string>(), "Specify syslog hotsname")(SYSLOG_PORT, po::value<int>()->default_value(514), "Specify syslog server port")(
-      CMD_INPUT_TOPIC, po::value<std::string>(), "Specify the messages bus queue where the k2eg receive the configuration command")(
-      CMD_MAX_FECTH_CMD, po::value<unsigned int>()->default_value(10), "The max number of command fetched per consume operation")(
-      CMD_MAX_FETCH_TIME_OUT, po::value<unsigned int>()->default_value(10), "Specify the timeout for waith the command in microseconds")(
-      NC_MONITOR_EXPIRATION_TIMEOUT,
-      po::value<int64_t>()->default_value(60 * 60),
-      "Specify the amount of time with no consumer on a queue after which monitor can be stopped")(
-      NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT,
-      po::value<bool>()->default_value(true),
-      "Specify when the a queue purged when the monitor that push data onto is stopped")(
-      NC_MONITOR_CONSUMER_FILTEROUT_REGEX,
-      po::value<std::vector<std::string>>()->multitoken(),
-      "Specify regular expression to used to filter out consumer group from those used to calculate the number of active consumer of monitor queue")(
-      EPICS_MONITOR_THREAD_COUNT, po::value<std::int32_t>(), "Epics processing event thread count")(
-      PUB_SERVER_ADDRESS, po::value<std::string>(), "Publisher server address")(
-      PUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for publisher implementation driver")(
-      SUB_SERVER_ADDRESS, po::value<std::string>(), "Subscriber server address")(
-      SUB_GROUP_ID, po::value<std::string>()->default_value("k2eg-default-group"), "Subscriber group id")(
-      SUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for subscriber implementation driver")(
-      STORAGE_PATH, po::value<std::string>()->default_value(actual_path), "The path where the storage files are saved")(
-      MONITOR_WORKER_SCHEDULE_CRON_CONFIGURATION,
-      po::value<std::string>()->default_value(DEFAULT_CRON_STRING),
-      "The cron string forconfigure the monitor checking scheduler")(
-      SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS, po::value<uint>()->default_value(60), "The number of second for which the scheduler thread are going to sleep")(
-      SCHEDULER_THREAD_NUMBER, po::value<uint>()->default_value(1), "The number of the scheduler worker")(
-      METRIC_ENABLE, po::value<bool>()->default_value(false), "Enable metric management")(
-      METRIC_HTTP_PORT, po::value<unsigned int>()->default_value(8080), "The port used for publish the http metric server");
+  options.add_options()
+      (HELP, "Produce help information")(VERSION, "Print the application version")
+      (CONF_FILE, po::value<bool>()->default_value(false), "Specify if we need to load configuration from file")
+      (CONF_FILE_NAME, po::value<std::string>()->default_value(""), "Specify the configuration file")
+      (LOG_LEVEL, po::value<std::string>()->default_value("info"), "Specify the log level[trace, debug, info, error, fatal]")
+      (LOG_ON_CONSOLE, po::value<bool>()->default_value(true)->zero_tokens(), "Specify when the logger print in console")
+      (LOG_ON_FILE, po::value<bool>()->default_value(false)->zero_tokens(), "Specify when the logger print in file")
+      (LOG_FILE_NAME, po::value<std::string>(), "Specify the log file path")
+      (LOG_FILE_MAX_SIZE, po::value<int>()->default_value(1), "Specify the maximum log file size in mbyte")
+      (LOG_ON_SYSLOG, po::value<bool>()->default_value(false)->zero_tokens(), "Specify when the logger print in syslog server")
+      (SYSLOG_SERVER, po::value<std::string>(), "Specify syslog hotsname")
+      (SYSLOG_PORT, po::value<int>()->default_value(514), "Specify syslog server port")
+      (CMD_INPUT_TOPIC, po::value<std::string>(), "Specify the messages bus queue where the k2eg receive the configuration command")
+      (CMD_MAX_FECTH_CMD, po::value<unsigned int>()->default_value(10), "The max number of command fetched per consume operation")
+      (CMD_MAX_FETCH_TIME_OUT, po::value<unsigned int>()->default_value(10), "Specify the timeout for waith the command in microseconds")
+      (NC_MONITOR_EXPIRATION_TIMEOUT, po::value<int64_t>()->default_value(60 * 60), "Specify the amount of time with no consumer on a queue after which monitor can be stopped")
+      (NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT, po::value<bool>()->default_value(true), "Specify when the a queue purged when the monitor that push data onto is stopped")
+      (NC_MONITOR_CONSUMER_FILTEROUT_REGEX, po::value<std::vector<std::string>>()->multitoken(), "Specify regular expression to used to filter out consumer group from those used to calculate the number of active consumer of monitor queue")
+      (EPICS_MONITOR_THREAD_COUNT, po::value<std::int32_t>(), "Epics processing event thread count")
+      (CONFIGURATION_SERVICE_HOST, po::value<std::string>(), "Configuration server hostname")
+      (CONFIGURATION_SERVICE_PORT, po::value<short>(), "Configuration server port")
+      (PUB_SERVER_ADDRESS, po::value<std::string>(), "Publisher server address")
+      (PUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for publisher implementation driver")
+      (SUB_SERVER_ADDRESS, po::value<std::string>(), "Subscriber server address")
+      (SUB_GROUP_ID, po::value<std::string>()->default_value("k2eg-default-group"), "Subscriber group id")
+      (SUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for subscriber implementation driver")
+      (STORAGE_PATH, po::value<std::string>()->default_value(actual_path), "The path where the storage files are saved")
+      (MONITOR_WORKER_SCHEDULE_CRON_CONFIGURATION, po::value<std::string>()->default_value(DEFAULT_CRON_STRING), "The cron string forconfigure the monitor checking scheduler")
+      (SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS, po::value<uint>()->default_value(60), "The number of second for which the scheduler thread are going to sleep")
+      (SCHEDULER_THREAD_NUMBER, po::value<uint>()->default_value(1), "The number of the scheduler worker")
+      (METRIC_ENABLE, po::value<bool>()->default_value(false), "Enable metric management")
+      (METRIC_HTTP_PORT, po::value<unsigned int>()->default_value(8080), "The port used for publish the http metric server");
 }
+// clang-format on
 
 void
 ProgramOptions::parse(int argc, const char* argv[]) {
@@ -206,6 +204,13 @@ ConstEpicsServiceManagerConfigUPtr
 ProgramOptions::getEpicsManagerConfiguration() {
   return std::make_unique<const EpicsServiceManagerConfig>(
       EpicsServiceManagerConfig{.thread_count = GET_OPTION(EPICS_MONITOR_THREAD_COUNT, std::int32_t, 1)});
+}
+
+ConstConfigurationServceiConfigUPtr 
+ProgramOptions::getConfigurationServiceConfiguration() {
+  return std::make_unique<const ::ConfigurationServceiConfig>(
+      ConfigurationServceiConfig{.config_server_host = GET_OPTION(CONFIGURATION_SERVICE_HOST, std::string, "localhost"),
+                                 .config_server_port = GET_OPTION(CONFIGURATION_SERVICE_PORT, short, static_cast<short>(8500))});
 }
 
 const std::string
