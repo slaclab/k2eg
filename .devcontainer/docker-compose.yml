@@ -18,7 +18,7 @@ services:
     #       - seccomp:unconfined
     #     cap_add:
     #       - SYS_PTRACE
-
+    network_mode: service:consul
     volumes:
       - ..:/workspace:cached
 

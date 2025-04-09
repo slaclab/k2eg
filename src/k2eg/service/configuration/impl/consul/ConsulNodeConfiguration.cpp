@@ -67,5 +67,6 @@ ConsuleNodeConfiguration::setNodeConfiguration(ConstNodeConfigurationShrdPtr nod
   // store configuration in Consul KV store
   auto json_obj = config_to_json(*node_configuration);
   auto json_str = boost::json::serialize(json_obj);
-  return client->kvPut(node_configuration_key, json_str);
+  auto res = client->kvPut(node_configuration_key, json_str);
+  return res;
 }

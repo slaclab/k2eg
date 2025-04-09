@@ -23,6 +23,7 @@ DEFINE_PTR_TYPES(ConfigurationServceiConfig)
 Is the node configuration
 */
 struct NodeConfiguration {
+  // the list of the pv managed by a node
   std::vector<std::string> pv_name_list;
 };
 DEFINE_PTR_TYPES(NodeConfiguration)
