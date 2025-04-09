@@ -26,7 +26,7 @@ NodeConfiguration::NodeConfiguration(DataStorageShrdPtr data_storage)
 void
 NodeConfiguration::loadNodeConfiguration() {
   auto logger = ServiceResolver<ILogger>::resolve();
-  logger->logMessage("Loading node configuration", LogLevel::INFO);
+  logger->logMessage("Fetch the node configuration", LogLevel::INFO);
   // load the fulll configuration
   node_configuration = node_configuration_service->getNodeConfiguration();
 
