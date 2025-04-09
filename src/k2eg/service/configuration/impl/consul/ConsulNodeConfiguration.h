@@ -23,8 +23,8 @@ public:
     ConsuleNodeConfiguration(ConstConfigurationServceiConfigUPtr config);
     virtual ~ConsuleNodeConfiguration();
 
-    ConstNodeConfigurationShrdPtr getNodeConfiguration() const override;
-    bool setNodeConfiguration(ConstNodeConfigurationShrdPtr node_configuration) override;
+    NodeConfigurationShrdPtr getNodeConfiguration() const override;
+    bool setNodeConfiguration(NodeConfigurationShrdPtr node_configuration) override;
 
 };
 }

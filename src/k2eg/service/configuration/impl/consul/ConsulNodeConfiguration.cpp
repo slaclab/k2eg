@@ -49,7 +49,7 @@ ConsuleNodeConfiguration::getNodeKey() {
   return STRING_FORMAT("k2eg-node/%1%/configuration", std::string(envHostname));
 }
 
-ConstNodeConfigurationShrdPtr
+NodeConfigurationShrdPtr
 ConsuleNodeConfiguration::getNodeConfiguration() const {
   auto json_value = client->kvGet(node_configuration_key);
   if (json_value == nullptr) { return nullptr; }
@@ -63,7 +63,7 @@ ConsuleNodeConfiguration::getNodeConfiguration() const {
 }
 
 bool
-ConsuleNodeConfiguration::setNodeConfiguration(ConstNodeConfigurationShrdPtr node_configuration) {
+ConsuleNodeConfiguration::setNodeConfiguration(NodeConfigurationShrdPtr node_configuration) {
   // store configuration in Consul KV store
   auto json_obj = config_to_json(*node_configuration);
   auto json_str = boost::json::serialize(json_obj);

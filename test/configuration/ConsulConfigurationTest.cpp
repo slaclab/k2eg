@@ -34,6 +34,7 @@ TEST(ConsulConfiguration, SetAndGetNodeConfiguration) {
     NodeConfiguration{
       .pv_monitor_info_map = {
         {"pv-1", std::make_shared<PVMonitorInfo>(PVMonitorInfo{"topic-1", 1})},
+        {"pv-2", std::make_shared<PVMonitorInfo>(PVMonitorInfo{"topic-1", 1})},
         {"pv-2", std::make_shared<PVMonitorInfo>(PVMonitorInfo{"topic-2", 2})},
         {"pv-3", std::make_shared<PVMonitorInfo>(PVMonitorInfo{"topic-3", 3})}
     }
@@ -43,9 +44,10 @@ TEST(ConsulConfiguration, SetAndGetNodeConfiguration) {
   ConstNodeConfigurationShrdPtr node_config = nullptr;
   ASSERT_NO_THROW(node_config = consul_config->getNodeConfiguration(););
   ASSERT_NE(node_config, nullptr);
-  ASSERT_EQ(node_config->pv_monitor_info_map.size(), 3);
+  ASSERT_EQ(node_config->pv_monitor_info_map.size(), 4);
   auto it = node_config->pv_monitor_info_map.begin();
   ASSERT_EQ(it++->first, "pv-1");
+  ASSERT_EQ(it++->first, "pv-2");
   ASSERT_EQ(it++->first, "pv-2");
   ASSERT_EQ(it++->first, "pv-3");
 

@@ -16,6 +16,7 @@ namespace k2eg::controller::node::configuration {
  */
 class NodeConfiguration {
     const k2eg::service::data::DataStorageShrdPtr data_storage;
+    k2eg::service::configuration::NodeConfigurationShrdPtr node_configuration;
     k2eg::service::configuration::INodeConfigurationShrdPtr node_configuration_service;
 public:
     NodeConfiguration(k2eg::service::data::DataStorageShrdPtr data_storage);
