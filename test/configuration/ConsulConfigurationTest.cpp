@@ -32,31 +32,31 @@ TEST(ConsulConfiguration, SetAndGetNodeConfiguration) {
 
   ASSERT_NO_THROW(consul_config->setNodeConfiguration(std::make_shared<NodeConfiguration>(
     NodeConfiguration{
-        .pv_name_list = {"pv-1", "pv-2", "pv-3"}
+        .monitor_pv_name_list = {"pv-1", "pv-2", "pv-3"}
     }
   )));
   // retrive the configuration
   ConstNodeConfigurationShrdPtr node_config = nullptr;
   ASSERT_NO_THROW(node_config = consul_config->getNodeConfiguration(););
   ASSERT_NE(node_config, nullptr);
-  ASSERT_EQ(node_config->pv_name_list.size(), 3);
-  ASSERT_EQ(node_config->pv_name_list[0], "pv-1");
-  ASSERT_EQ(node_config->pv_name_list[1], "pv-2");
-  ASSERT_EQ(node_config->pv_name_list[2], "pv-3");
+  ASSERT_EQ(node_config->monitor_pv_name_list.size(), 3);
+  ASSERT_EQ(node_config->monitor_pv_name_list[0], "pv-1");
+  ASSERT_EQ(node_config->monitor_pv_name_list[1], "pv-2");
+  ASSERT_EQ(node_config->monitor_pv_name_list[2], "pv-3");
 
   // update values
   ASSERT_NO_THROW(consul_config->setNodeConfiguration(std::make_shared<NodeConfiguration>(
     NodeConfiguration{
-        .pv_name_list = {"pv-1", "pv-2", "pv-3", "pv-4"}
+        .monitor_pv_name_list = {"pv-1", "pv-2", "pv-3", "pv-4"}
     }
   )));
   ASSERT_NO_THROW(node_config = consul_config->getNodeConfiguration(););
   ASSERT_NE(node_config, nullptr);
-  ASSERT_EQ(node_config->pv_name_list.size(), 3);
-  ASSERT_EQ(node_config->pv_name_list[0], "pv-1");
-  ASSERT_EQ(node_config->pv_name_list[1], "pv-2");
-  ASSERT_EQ(node_config->pv_name_list[2], "pv-3");
-  ASSERT_EQ(node_config->pv_name_list[3], "pv-4");
+  ASSERT_EQ(node_config->monitor_pv_name_list.size(), 4);
+  ASSERT_EQ(node_config->monitor_pv_name_list[0], "pv-1");
+  ASSERT_EQ(node_config->monitor_pv_name_list[1], "pv-2");
+  ASSERT_EQ(node_config->monitor_pv_name_list[2], "pv-3");
+  ASSERT_EQ(node_config->monitor_pv_name_list[3], "pv-4");
 
   ASSERT_NO_THROW(consul_config.reset(););
 }

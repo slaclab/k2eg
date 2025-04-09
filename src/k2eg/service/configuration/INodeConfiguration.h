@@ -20,11 +20,11 @@ struct ConfigurationServceiConfig {
 DEFINE_PTR_TYPES(ConfigurationServceiConfig)
 
 /*
-Is the node configuration
+Is the cluster node configuration
 */
 struct NodeConfiguration {
-  // the list of the pv managed by a node
-  std::vector<std::string> pv_name_list;
+  // the list of monitored PV names for the single node
+  std::vector<std::string> monitor_pv_name_list;
 };
 DEFINE_PTR_TYPES(NodeConfiguration)
 
@@ -38,7 +38,7 @@ config_from_json(const boost::json::object& obj) {
     // find all stirng in the vector
     for (auto& element : json_array) {
       if (element.kind() != boost::json::kind::string) continue;
-      cfg->pv_name_list.push_back(boost::json::value_to<std::string>(element));
+      cfg->monitor_pv_name_list.push_back(boost::json::value_to<std::string>(element));
     }
   }
   return cfg;
@@ -50,7 +50,7 @@ config_to_json(const NodeConfiguration& cfg) {
   boost::json::object obj;
   // write the pv_name_list vector to json
   boost::json::array json_array;
-  for (const auto& name : cfg.pv_name_list) {
+  for (const auto& name : cfg.monitor_pv_name_list) {
     json_array.emplace_back(name);
   }
   obj["pv_name_list"] = std::move(json_array);
