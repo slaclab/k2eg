@@ -47,7 +47,7 @@ size_t
 MonitorChecker::scanForRestart(size_t element_to_process) {
   logger->logMessage("[ Restart Scan ] Start scanning for monitor restart");
   // scan al monitor to check what need to be
-  return node_configuration_db->iterateAllChannelMonitorForPurge(
+  return node_configuration_db->iterateAllChannelMonitorForAction(
       element_to_process,  // number of unprocessed element to check
       [this](const ChannelMonitorType& monitor_info, int& purge_ts_set_flag) {
         logger->logMessage(STRING_FORMAT("[ Restart Scan - %1% - %2% ] reactivate monitor", monitor_info.pv_name % monitor_info.channel_destination));
@@ -71,7 +71,7 @@ MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
   logger->logMessage("[ Purge Scan ] Start scanning for monitor eviction");
   // scan al monitor to check what need to be
   //TODO this raise memory leaks
-  return node_configuration_db->iterateAllChannelMonitorForPurge(
+  return node_configuration_db->iterateAllChannelMonitorForAction(
       element_to_process,  // number of unprocessed element to check
       [this](const ChannelMonitorType& monitor_info, int& purge_ts_set_flag) {
         try{

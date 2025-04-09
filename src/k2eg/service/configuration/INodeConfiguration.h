@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <stdint.h>
+#include <map>
 
 namespace k2eg::service::configuration {
 
@@ -19,26 +20,42 @@ struct ConfigurationServceiConfig {
 };
 DEFINE_PTR_TYPES(ConfigurationServceiConfig)
 
+/// The informazion about serialziation and destination topic for a single PV
+typedef struct {
+  // serialization type
+  const std::string pv_destination_topic;
+  // destination topic
+  const std::uint8_t event_serialization;
+}PVMonitorInfo;
+DEFINE_PTR_TYPES(PVMonitorInfo)
+
+
+DEFINE_MAP_FOR_TYPE(std::string, PVMonitorInfoShrdPtr, PVMonitorInfoMap)
+
 /*
 Is the cluster node configuration
 */
-struct NodeConfiguration {
+typedef struct {
   // the list of monitored PV names for the single node
-  std::vector<std::string> monitor_pv_name_list;
-};
+  PVMonitorInfoMap pv_monitor_info_map;
+}NodeConfiguration;
 DEFINE_PTR_TYPES(NodeConfiguration)
 
 // Function to convert a JSON object to a Config instance.
 inline ConstNodeConfigurationShrdPtr
 config_from_json(const boost::json::object& obj) {
   auto cfg = std::make_shared<NodeConfiguration>();
-  // read the pv_name_list vector from json 
-  if (auto v = obj.if_contains("pv_name_list")) {
-    auto json_array = v->as_array();
-    // find all stirng in the vector
-    for (auto& element : json_array) {
-      if (element.kind() != boost::json::kind::string) continue;
-      cfg->monitor_pv_name_list.push_back(boost::json::value_to<std::string>(element));
+  if(auto it = obj.if_contains("pv_monitor_map")) {
+    if(it->is_object()) {
+      const auto& mapObj = it->as_object();
+      for(const auto& kv : mapObj) {
+        // Parse PVMonitorInfo from the JSON object value.
+        const auto& pvObj = kv.value().as_object();
+        std::string destTopic = boost::json::value_to<std::string>(pvObj.at("dest"));
+        std::uint8_t eventSerialization = static_cast<std::uint8_t>(boost::json::value_to<int>(pvObj.at("ser")));
+        auto pvMonitorInfo = std::make_shared<PVMonitorInfo>(PVMonitorInfo{destTopic, eventSerialization});
+        cfg->pv_monitor_info_map.insert(PVMonitorInfoMapPair(kv.key(), pvMonitorInfo));
+      }
     }
   }
   return cfg;
@@ -48,12 +65,15 @@ config_from_json(const boost::json::object& obj) {
 inline boost::json::object
 config_to_json(const NodeConfiguration& cfg) {
   boost::json::object obj;
-  // write the pv_name_list vector to json
-  boost::json::array json_array;
-  for (const auto& name : cfg.monitor_pv_name_list) {
-    json_array.emplace_back(name);
+  boost::json::object mapObj;
+  for (const auto& kv : cfg.pv_monitor_info_map) {
+    boost::json::object pvObj;
+    // Convert the PVMonitorInfo pointed by kv.second.
+    pvObj["dest"] = kv.second->pv_destination_topic;
+    pvObj["ser"] = kv.second->event_serialization;
+    mapObj[kv.first] = std::move(pvObj);
   }
-  obj["pv_name_list"] = std::move(json_array);
+  obj["pv_monitor_map"] = std::move(mapObj);
   return obj;
 }
 
@@ -71,7 +91,7 @@ class INodeConfiguration {
   virtual ConstNodeConfigurationShrdPtr getNodeConfiguration() const                                        = 0;
   virtual bool                       setNodeConfiguration(ConstNodeConfigurationShrdPtr node_configuration) = 0;
 };
-
+DEFINE_PTR_TYPES(INodeConfiguration)
 }  // namespace k2eg::service::configuration
 
 #endif  // K2EG_SERVICE_CONFIGURATION_INODECONFIGURATION_H_

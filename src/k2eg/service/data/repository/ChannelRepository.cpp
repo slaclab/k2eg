@@ -2,7 +2,6 @@
 #include <k2eg/service/data/repository/ChannelRepository.h>
 
 #include <chrono>
-#include <iostream>
 
 using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;

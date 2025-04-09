@@ -1,20 +1,41 @@
-#include <k2eg/controller/node/configuration/NodeConfiguration.h>
 #include <k2eg/common/utility.h>
+
+#include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/configuration/configuration.h>
+#include <k2eg/service/configuration/INodeConfiguration.h>
+#include <k2eg/service/data/repository/ChannelRepository.h>
+
+#include <k2eg/controller/node/configuration/NodeConfiguration.h>
+
+
 #include <cstddef>
 #include <optional>
-#include "k2eg/service/data/repository/ChannelRepository.h"
+
 
 using namespace k2eg::common;
 
 using namespace k2eg::controller::node::configuration;
 
+using namespace k2eg::service;
+
 using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
 
-NodeConfiguration::NodeConfiguration(DataStorageShrdPtr data_storage)
-    : data_storage(data_storage) {}
+namespace sc = k2eg::service::configuration;
 
-std::vector<bool> NodeConfiguration::addChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions) {
+NodeConfiguration::NodeConfiguration(DataStorageShrdPtr data_storage)
+    : data_storage(data_storage)
+    , node_configuration_service(ServiceResolver<sc::INodeConfiguration>::resolve()) {}
+
+
+void 
+:NodeConfiguration::loadNodeConfiguration(){
+    // load the fulll configuration
+    auto channel_repository = toShared(data_storage->getChannelRepository());
+}
+
+std::vector<bool> 
+NodeConfiguration::addChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions) {
     auto channel_repository = toShared(data_storage->getChannelRepository());
     std::vector<bool> result(channel_descriptions.size());
     int idx = 0;
@@ -24,14 +45,16 @@ std::vector<bool> NodeConfiguration::addChannelMonitor(const ChannelMonitorTypeC
     return result;
 }
 
-void NodeConfiguration::removeChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions) {
+void 
+NodeConfiguration::removeChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions) {
     auto channel_repository = toShared(data_storage->getChannelRepository());
     for(auto const &desc: channel_descriptions) {
         channel_repository->remove(desc);
     }
 }
 
-size_t NodeConfiguration::iterateAllChannelMonitor(size_t element_to_process, ChannelMonitorTypeHandler handle) {
+size_t 
+NodeConfiguration::iterateAllChannelMonitor(size_t element_to_process, ChannelMonitorTypeHandler handle) {
 auto channel_repository = toShared(data_storage->getChannelRepository());
     auto distinct_name_prot = channel_repository->getDistinctByNameProtocol();
     size_t processed = 0;
@@ -50,7 +73,8 @@ auto channel_repository = toShared(data_storage->getChannelRepository());
     return processed;   
 }
 
-size_t NodeConfiguration::iterateAllChannelMonitorForPurge(size_t element_to_process, ChannelMonitorTypeHandler purge_handler) {
+size_t 
+NodeConfiguration::iterateAllChannelMonitorForAction(size_t element_to_process, ChannelMonitorTypeHandler purge_handler) {
     auto channel_repository = toShared(data_storage->getChannelRepository());
     auto distinct_name_prot = channel_repository->getDistinctByNameProtocol();
     size_t processed = 0;
@@ -79,7 +103,8 @@ size_t NodeConfiguration::iterateAllChannelMonitorForPurge(size_t element_to_pro
     return processed;
 }
 
-void NodeConfiguration::resetAllChannelMonitorCheck() {
+void 
+NodeConfiguration::resetAllChannelMonitorCheck() {
     auto channel_repository = toShared(data_storage->getChannelRepository());
     auto distinct_name_prot = channel_repository->getDistinctByNameProtocol();
     for(auto &ch: distinct_name_prot) {

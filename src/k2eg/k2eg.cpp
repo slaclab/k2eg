@@ -1,22 +1,24 @@
-#include <k2eg/common/utility.h>
 #include <k2eg/config.h>
 #include <k2eg/version.h>
 #include <k2eg/k2eg.h>
-#include <k2eg/service/ServiceResolver.h>
-#include <k2eg/service/scheduler/Scheduler.h>
-#include <k2eg/service/data/DataStorage.h>
-#include <k2eg/service/epics/EpicsServiceManager.h>
+
+#include <k2eg/common/utility.h>
+
 #include <k2eg/service/log/ILogger.h>
+#include <k2eg/service/pubsub/pubsub.h>
+#include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/data/DataStorage.h>
+#include <k2eg/service/pubsub/IPublisher.h>
+#include <k2eg/service/scheduler/Scheduler.h>
 #include <k2eg/service/log/impl/BoostLogger.h>
 #include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/service/configuration/configuration.h>
 #include <k2eg/service/metric/impl/DummyMetricService.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
-#include <k2eg/service/pubsub/pubsub.h>
-#include <k2eg/service/configuration/configuration.h>
+#include <k2eg/service/configuration/impl/consul/ConsulNodeConfiguration.h>
 
 #include <cstdlib>
-#include "k2eg/service/configuration/impl/consul/ConsulNodeConfiguration.h"
-#include "k2eg/service/pubsub/IPublisher.h"
 
 using namespace k2eg;
 using namespace k2eg::service;

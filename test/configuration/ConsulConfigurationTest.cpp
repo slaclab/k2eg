@@ -32,31 +32,43 @@ TEST(ConsulConfiguration, SetAndGetNodeConfiguration) {
 
   ASSERT_NO_THROW(consul_config->setNodeConfiguration(std::make_shared<NodeConfiguration>(
     NodeConfiguration{
-        .monitor_pv_name_list = {"pv-1", "pv-2", "pv-3"}
+      .pv_monitor_info_map = {
+        {"pv-1", std::make_shared<PVMonitorInfo>(PVMonitorInfo{"topic-1", 1})},
+        {"pv-2", std::make_shared<PVMonitorInfo>(PVMonitorInfo{"topic-2", 2})},
+        {"pv-3", std::make_shared<PVMonitorInfo>(PVMonitorInfo{"topic-3", 3})}
+    }
     }
   )));
   // retrive the configuration
   ConstNodeConfigurationShrdPtr node_config = nullptr;
   ASSERT_NO_THROW(node_config = consul_config->getNodeConfiguration(););
   ASSERT_NE(node_config, nullptr);
-  ASSERT_EQ(node_config->monitor_pv_name_list.size(), 3);
-  ASSERT_EQ(node_config->monitor_pv_name_list[0], "pv-1");
-  ASSERT_EQ(node_config->monitor_pv_name_list[1], "pv-2");
-  ASSERT_EQ(node_config->monitor_pv_name_list[2], "pv-3");
+  ASSERT_EQ(node_config->pv_monitor_info_map.size(), 3);
+  auto it = node_config->pv_monitor_info_map.begin();
+  ASSERT_EQ(it++->first, "pv-1");
+  ASSERT_EQ(it++->first, "pv-2");
+  ASSERT_EQ(it++->first, "pv-3");
 
-  // update values
+  // Update the configuration with an additional PV
   ASSERT_NO_THROW(consul_config->setNodeConfiguration(std::make_shared<NodeConfiguration>(
-    NodeConfiguration{
-        .monitor_pv_name_list = {"pv-1", "pv-2", "pv-3", "pv-4"}
-    }
+      NodeConfiguration{
+          .pv_monitor_info_map = {
+              {"pv-1", std::make_shared<PVMonitorInfo>(PVMonitorInfo{"topic-1", 1})},
+              {"pv-2", std::make_shared<PVMonitorInfo>(PVMonitorInfo{"topic-2", 2})},
+              {"pv-3", std::make_shared<PVMonitorInfo>(PVMonitorInfo{"topic-3", 3})},
+              {"pv-4", std::make_shared<PVMonitorInfo>(PVMonitorInfo{"topic-4", 4})}
+          }
+      }
   )));
-  ASSERT_NO_THROW(node_config = consul_config->getNodeConfiguration(););
+  ASSERT_NO_THROW(node_config = consul_config->getNodeConfiguration());
   ASSERT_NE(node_config, nullptr);
-  ASSERT_EQ(node_config->monitor_pv_name_list.size(), 4);
-  ASSERT_EQ(node_config->monitor_pv_name_list[0], "pv-1");
-  ASSERT_EQ(node_config->monitor_pv_name_list[1], "pv-2");
-  ASSERT_EQ(node_config->monitor_pv_name_list[2], "pv-3");
-  ASSERT_EQ(node_config->monitor_pv_name_list[3], "pv-4");
+  ASSERT_EQ(node_config->pv_monitor_info_map.size(), 4);
+  
+  it = node_config->pv_monitor_info_map.begin();
+  ASSERT_EQ(it++->first, "pv-1");
+  ASSERT_EQ(it++->first, "pv-2");
+  ASSERT_EQ(it++->first, "pv-3");
+  ASSERT_EQ(it++->first, "pv-4");
 
-  ASSERT_NO_THROW(consul_config.reset(););
+  ASSERT_NO_THROW(consul_config.reset());
 }

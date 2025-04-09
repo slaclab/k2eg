@@ -32,6 +32,9 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
       metric(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric()) {
   // set logger
   logger = ServiceResolver<ILogger>::resolve();
+  
+  //load current node configuration
+  node_configuration->loadNodeConfiguration();
 
   // register worker for command type
   auto monitor_command_worker = std::make_shared<MonitorCommandWorker>(this->node_controller_configuration->monitor_command_configuration, ServiceResolver<EpicsServiceManager>::resolve(), node_configuration);
