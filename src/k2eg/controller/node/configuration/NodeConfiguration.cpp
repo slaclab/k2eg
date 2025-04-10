@@ -79,6 +79,7 @@ NodeConfiguration::addChannelMonitor(const ChannelMonitorTypeConstVector &channe
 void
 NodeConfiguration::removeChannelMonitor(const ChannelMonitorTypeConstVector &channel_descriptions) {
   auto channel_repository = toShared(data_storage->getChannelRepository());
+  //TODO remove from persistent configuration
   for (auto const &desc : channel_descriptions) { channel_repository->remove(desc); }
 }
 
