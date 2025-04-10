@@ -176,7 +176,7 @@ wait_forPublished_message_size(DummyPublisherNoSignal& publisher, unsigned int r
 #ifdef __linux__
 
 std::unique_ptr<NodeController>
-initBackend(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log = false) {
+initBackend(IPublisherShrdPtr pub, bool enable_debug_log = false) {
   int         argc    = 1;
   const char* argv[1] = {"epics-k2eg-test"};
   clearenv();
@@ -200,7 +200,9 @@ initBackend(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>());
   ServiceResolver<IPublisher>::registerService(pub);
   DataStorageUPtr storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");
-  if (clear_data) { toShared(storage->getChannelRepository())->removeAll(); }
+  // data should be alwasys erased becasue now the local databas eis only used at runtime the persistent
+  // data is stored on the central configuration management server
+  toShared(storage->getChannelRepository())->removeAll();
   return std::make_unique<NodeController>(opt->getNodeControllerConfiguration(), std::move(storage));
 }
 
@@ -481,7 +483,7 @@ TEST(NodeController, MonitorCommandAfterReboot) {
   std::latch work_done{2};
   std::latch work_done_2{5};
   auto       publisher       = std::make_shared<DummyPublisher>(work_done);
-  auto       node_controller = initBackend(publisher, true);
+  auto       node_controller = initBackend(publisher);
 
   while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)) { sleep(1); }
 
@@ -498,7 +500,7 @@ TEST(NodeController, MonitorCommandAfterReboot) {
   deinitBackend(std::move(node_controller));
 
   // reboot without delete database
-  node_controller = initBackend(std::make_shared<DummyPublisher>(work_done_2), false, true);
+  node_controller = initBackend(std::make_shared<DummyPublisher>(work_done_2), true);
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   // we have to wait for monitor event
   work_done_2.wait();
@@ -559,7 +561,7 @@ TEST(NodeController, MonitorCommandMultiPVStress) {
   boost::json::object             reply_msg;
   std::unique_ptr<NodeController> node_controller;
   auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-  node_controller                           = initBackend(publisher, true, true);
+  node_controller                           = initBackend(publisher, true);
 
   // add the number of reader from topic
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);

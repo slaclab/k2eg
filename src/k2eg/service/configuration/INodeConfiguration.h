@@ -38,6 +38,18 @@ Is the cluster node configuration
 typedef struct {
   // the list of monitored PV names for the single node
   PVMonitorInfoMap pv_monitor_info_map;
+
+  // check if the new PV name is already present for the specific configuration
+  bool isPresent(const std::string& pv_nam, const PVMonitorInfo& info) const {
+    auto range = pv_monitor_info_map.equal_range(pv_nam);
+    for (auto it = range.first; it != range.second; ++it) {
+        if (it->second->event_serialization == info.event_serialization &&
+            it->second->pv_destination_topic == info.pv_destination_topic) {
+            return true;
+        }
+    }
+    return false;
+  }
 }NodeConfiguration;
 DEFINE_PTR_TYPES(NodeConfiguration)
 

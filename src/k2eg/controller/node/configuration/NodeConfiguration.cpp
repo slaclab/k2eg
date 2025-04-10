@@ -39,18 +39,12 @@ NodeConfiguration::loadNodeConfiguration() {
   auto                          channel_repository = toShared(data_storage->getChannelRepository());
   auto                          channel_monitor    = node_configuration->pv_monitor_info_map;
   for (auto const &desc : channel_monitor) {
-    logger->logMessage(STRING_FORMAT("Loading pv %1% - ser: %2% - des: %3%", desc.first % desc.second->event_serialization % desc.second->pv_destination_topic),
+    auto data_insert_res = channel_repository->insert(ChannelMonitorType{.pv_name             = desc.first,
+                                                                         .event_serialization = static_cast<std::uint8_t>(desc.second->event_serialization),
+                                                                         .channel_destination = desc.second->pv_destination_topic});
+    logger->logMessage(STRING_FORMAT("Loading pv %1% - ser: %2% - des: %3% stored: %4%",
+                                     desc.first % desc.second->event_serialization % desc.second->pv_destination_topic % data_insert_res),
                        LogLevel::DEBUG);
-    channel_monitor_vector.push_back(ChannelMonitorType{.pv_name             = desc.first,
-                                                        .event_serialization = static_cast<std::uint8_t>(desc.second->event_serialization),
-                                                        .channel_destination = desc.second->pv_destination_topic});
-  }
-  // register the channel monitor on local database
-  auto reg_res = addChannelMonitor(channel_monitor_vector);
-  if (std::find(reg_res.begin(), reg_res.end(), false) != reg_res.end()) {
-    logger->logMessage("Error during channel monitor registration", LogLevel::ERROR);
-  } else {
-    logger->logMessage("Channel monitor registration completed", LogLevel::INFO);
   }
 }
 
@@ -59,7 +53,26 @@ NodeConfiguration::addChannelMonitor(const ChannelMonitorTypeConstVector &channe
   auto              channel_repository = toShared(data_storage->getChannelRepository());
   std::vector<bool> result(channel_descriptions.size());
   int               idx = 0;
-  for (auto const &desc : channel_descriptions) { result[idx++] = channel_repository->insert(desc); }
+
+  for (auto const &desc : channel_descriptions) {
+    // check if the channel is already present on the configuration
+    auto new_conf_for_pv = sc::MakePVMonitorInfoShrdPtr(sc::PVMonitorInfo{
+        .pv_destination_topic = desc.channel_destination, 
+        .event_serialization = static_cast<std::uint8_t>(desc.event_serialization)
+    });
+    if(!node_configuration->isPresent(desc.pv_name, *new_conf_for_pv)) {
+        // add new configuration to global
+        node_configuration->pv_monitor_info_map.insert(sc::PVMonitorInfoMapPair(desc.pv_name, new_conf_for_pv));
+        // register the new channel monitor into local database
+        result[idx++] = channel_repository->insert(desc);
+    } else {
+        result[idx++] = false;
+    }
+  }
+
+  // store the configuration on the server
+  node_configuration_service->setNodeConfiguration(node_configuration);
+  // return the result
   return result;
 }
 
