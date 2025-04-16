@@ -41,6 +41,7 @@ initChecker(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   } else {
     setenv("EPICS_k2eg_log-on-console", "false", 1);
   }
+  setenv(("EPICS_k2eg_" + std::string(CONFIGURATION_SERVICE_HOST)).c_str(), "consul", 1);
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   opt->parse(argc, argv);
   ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
