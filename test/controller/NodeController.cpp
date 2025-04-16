@@ -6,6 +6,7 @@
 #include <k2eg/controller/command/cmd/PutCommand.h>
 #include <k2eg/controller/node/NodeController.h>
 #include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/configuration/configuration.h>
 #include <k2eg/service/data/DataStorage.h>
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
@@ -55,6 +56,8 @@ using namespace k2eg::service::pubsub;
 using namespace k2eg::service::data;
 using namespace k2eg::service::scheduler;
 using namespace k2eg::service::epics_impl;
+using namespace k2eg::service::configuration;
+using namespace k2eg::service::configuration::impl::consul;
 
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
@@ -176,7 +179,7 @@ wait_forPublished_message_size(DummyPublisherNoSignal& publisher, unsigned int r
 #ifdef __linux__
 
 std::unique_ptr<NodeController>
-initBackend(IPublisherShrdPtr pub, bool enable_debug_log = false) {
+initBackend(IPublisherShrdPtr pub, bool enable_debug_log = false, bool reset_conf = false) {
   int         argc    = 1;
   const char* argv[1] = {"epics-k2eg-test"};
   clearenv();
@@ -186,6 +189,11 @@ initBackend(IPublisherShrdPtr pub, bool enable_debug_log = false) {
   } else {
     setenv("EPICS_k2eg_log-on-console", "false", 1);
   }
+
+  if(reset_conf){
+    setenv("EPICS_k2eg_configuration-reset-on-start", "true", 1);
+  }
+
   setenv("EPICS_k2eg_metric-server-http-port", std::to_string(++tcp_port).c_str(), 1);
   setenv(("EPICS_k2eg_" + std::string(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS)).c_str(), "1", 1);
   // set monitor expiration time out at minimum
@@ -193,6 +201,7 @@ initBackend(IPublisherShrdPtr pub, bool enable_debug_log = false) {
 
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   opt->parse(argc, argv);
+  ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsuleNodeConfiguration>(opt->getConfigurationServiceConfiguration()));
   ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(opt->getSchedulerConfiguration()));
   ServiceResolver<Scheduler>::resolve()->start();
   ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
@@ -215,6 +224,7 @@ deinitBackend(std::unique_ptr<NodeController> node_controller) {
   EXPECT_NO_THROW(ServiceResolver<ILogger>::resolve().reset(););
   EXPECT_NO_THROW(ServiceResolver<Scheduler>::resolve()->stop(););
   EXPECT_NO_THROW(ServiceResolver<Scheduler>::resolve().reset(););
+  EXPECT_NO_THROW(ServiceResolver<INodeConfiguration>::resolve().reset(););
 }
 
 boost::json::object
@@ -483,7 +493,7 @@ TEST(NodeController, MonitorCommandAfterReboot) {
   std::latch work_done{2};
   std::latch work_done_2{5};
   auto       publisher       = std::make_shared<DummyPublisher>(work_done);
-  auto       node_controller = initBackend(publisher);
+  auto       node_controller = initBackend(publisher, false, true);
 
   while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)) { sleep(1); }
 

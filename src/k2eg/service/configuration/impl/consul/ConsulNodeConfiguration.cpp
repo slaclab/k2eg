@@ -33,6 +33,19 @@ ConsuleNodeConfiguration::ConsuleNodeConfiguration(ConstConfigurationServceiConf
 
   // compos the configuration key
   node_configuration_key = getNodeKey();
+
+  if(config->reset_on_start) {
+    // remove the old configuration
+    client->kvDelete(node_configuration_key);
+  }
+  // in case this is the first time we are running check if we have a configuration
+  // and if not create a new one
+  try {
+    auto json_value = client->kvGet(node_configuration_key);
+  } catch (Client::Error& ex) {
+    // create a new configuration
+    setNodeConfiguration(std::make_shared<NodeConfiguration>());
+  }
 };
 
 ConsuleNodeConfiguration::~ConsuleNodeConfiguration() {
@@ -51,7 +64,7 @@ ConsuleNodeConfiguration::getNodeKey() {
 
 NodeConfigurationShrdPtr
 ConsuleNodeConfiguration::getNodeConfiguration() const {
-  auto json_value = client->kvGet(node_configuration_key);
+  oatpp::String json_value = client->kvGet(node_configuration_key);
   if (json_value == nullptr) { return nullptr; }
   auto json_str = json_value.getValue("");
   try {

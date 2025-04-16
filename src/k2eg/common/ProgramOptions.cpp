@@ -13,8 +13,8 @@
 #include <string>
 
 #include "k2eg/controller/node/NodeController.h"
-#include "k2eg/controller/node/worker/monitor/MonitorChecker.h"
 #include "k2eg/controller/node/worker/MonitorCommandWorker.h"
+#include "k2eg/controller/node/worker/monitor/MonitorChecker.h"
 #include "k2eg/service/epics/EpicsServiceManager.h"
 #include "k2eg/service/metric/IMetricService.h"
 #include "k2eg/service/scheduler/Scheduler.h"
@@ -59,6 +59,7 @@ ProgramOptions::ProgramOptions() {
       (EPICS_MONITOR_THREAD_COUNT, po::value<std::int32_t>(), "Epics processing event thread count")
       (CONFIGURATION_SERVICE_HOST, po::value<std::string>(), "Configuration server hostname")
       (CONFIGURATION_SERVICE_PORT, po::value<short>(), "Configuration server port")
+      (CONFIGURATION_SERVICE_RESET_ON_START, po::value<bool>(), "Reset the node at startup, as a new node")
       (PUB_SERVER_ADDRESS, po::value<std::string>(), "Publisher server address")
       (PUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for publisher implementation driver")
       (SUB_SERVER_ADDRESS, po::value<std::string>(), "Subscriber server address")
@@ -200,17 +201,17 @@ ProgramOptions::getSchedulerConfiguration() {
                              .thread_number                 = GET_OPTION(SCHEDULER_THREAD_NUMBER, unsigned int, 1)});
 }
 
-ConstEpicsServiceManagerConfigUPtr 
+ConstEpicsServiceManagerConfigUPtr
 ProgramOptions::getEpicsManagerConfiguration() {
-  return std::make_unique<const EpicsServiceManagerConfig>(
-      EpicsServiceManagerConfig{.thread_count = GET_OPTION(EPICS_MONITOR_THREAD_COUNT, std::int32_t, 1)});
+  return std::make_unique<const EpicsServiceManagerConfig>(EpicsServiceManagerConfig{.thread_count = GET_OPTION(EPICS_MONITOR_THREAD_COUNT, std::int32_t, 1)});
 }
 
-ConstConfigurationServceiConfigUPtr 
+ConstConfigurationServceiConfigUPtr
 ProgramOptions::getConfigurationServiceConfiguration() {
   return std::make_unique<const ::ConfigurationServceiConfig>(
       ConfigurationServceiConfig{.config_server_host = GET_OPTION(CONFIGURATION_SERVICE_HOST, std::string, "localhost"),
-                                 .config_server_port = GET_OPTION(CONFIGURATION_SERVICE_PORT, short, static_cast<short>(8500))});
+                                 .config_server_port = GET_OPTION(CONFIGURATION_SERVICE_PORT, short, static_cast<short>(8500)),
+                                 .reset_on_start     = GET_OPTION(CONFIGURATION_SERVICE_RESET_ON_START, bool, false)});
 }
 
 const std::string

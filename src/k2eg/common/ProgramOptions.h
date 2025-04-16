@@ -59,6 +59,7 @@ static const char* const EPICS_MONITOR_THREAD_COUNT = "epics-monitor-thread-coun
 
 static const char* const CONFIGURATION_SERVICE_HOST = "configuration-server-host";
 static const char* const CONFIGURATION_SERVICE_PORT = "configuration-server-port";
+static const char* const CONFIGURATION_SERVICE_RESET_ON_START = "configuration-reset-on-start";
 
 namespace k2eg
 {

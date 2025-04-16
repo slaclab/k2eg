@@ -17,6 +17,8 @@ is the configuration service config
 struct ConfigurationServceiConfig {
   const std::string config_server_host;
   const std::int16_t config_server_port;
+  // reset the configration on the start of the node
+  const bool reset_on_start;
 };
 DEFINE_PTR_TYPES(ConfigurationServceiConfig)
 
@@ -49,6 +51,17 @@ typedef struct {
         }
     }
     return false;
+  }
+
+  void removeFromKey(const std::string& key, const PVMonitorInfo& info) {
+    auto range = pv_monitor_info_map.equal_range(key);
+    for (auto it = range.first; it != range.second; ++it) {
+        if (it->second->event_serialization == info.event_serialization &&
+            it->second->pv_destination_topic == info.pv_destination_topic) {
+            pv_monitor_info_map.erase(it);
+            break;
+        }
+    }
   }
 }NodeConfiguration;
 DEFINE_PTR_TYPES(NodeConfiguration)
@@ -104,7 +117,7 @@ class INodeConfiguration {
   virtual ~INodeConfiguration() = default;
 
   virtual NodeConfigurationShrdPtr getNodeConfiguration() const                                        = 0;
-  virtual bool                       setNodeConfiguration(NodeConfigurationShrdPtr node_configuration) = 0;
+  virtual bool                     setNodeConfiguration(NodeConfigurationShrdPtr node_configuration) = 0;
 };
 DEFINE_PTR_TYPES(INodeConfiguration)
 }  // namespace k2eg::service::configuration

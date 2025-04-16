@@ -25,19 +25,24 @@ NodeConfiguration::NodeConfiguration(DataStorageShrdPtr data_storage)
 
 void
 NodeConfiguration::loadNodeConfiguration() {
+  ChannelMonitorTypeConstVector channel_monitor_vector;
+  auto                          channel_repository = toShared(data_storage->getChannelRepository());
+
   auto logger = ServiceResolver<ILogger>::resolve();
+  // reset local database
+  logger->logMessage("Reset the local configuration database", LogLevel::INFO);
+  channel_repository->removeAll();
   logger->logMessage("Fetch the node configuration", LogLevel::INFO);
   // load the fulll configuration
   node_configuration = node_configuration_service->getNodeConfiguration();
-
   if (node_configuration == nullptr) {
     logger->logMessage("Node configuration not found", LogLevel::ERROR);
     return;
   }
   // load the channel monitor
-  ChannelMonitorTypeConstVector channel_monitor_vector;
-  auto                          channel_repository = toShared(data_storage->getChannelRepository());
+  logger->logMessage("Load the channel monitor configuration", LogLevel::INFO);
   auto                          channel_monitor    = node_configuration->pv_monitor_info_map;
+  channel_repository->removeAll();
   for (auto const &desc : channel_monitor) {
     auto data_insert_res = channel_repository->insert(ChannelMonitorType{.pv_name             = desc.first,
                                                                          .event_serialization = static_cast<std::uint8_t>(desc.second->event_serialization),
@@ -79,8 +84,20 @@ NodeConfiguration::addChannelMonitor(const ChannelMonitorTypeConstVector &channe
 void
 NodeConfiguration::removeChannelMonitor(const ChannelMonitorTypeConstVector &channel_descriptions) {
   auto channel_repository = toShared(data_storage->getChannelRepository());
-  //TODO remove from persistent configuration
-  for (auto const &desc : channel_descriptions) { channel_repository->remove(desc); }
+
+  for (auto const &desc : channel_descriptions) {
+    // rmeove from configuration
+    channel_repository->remove(desc); 
+    // remove from configuration too
+    auto new_conf_for_pv = sc::MakePVMonitorInfoShrdPtr(sc::PVMonitorInfo{
+      .pv_destination_topic = desc.channel_destination, 
+      .event_serialization = static_cast<std::uint8_t>(desc.event_serialization)
+    });
+    node_configuration->removeFromKey(desc.pv_name, *new_conf_for_pv);
+  }
+
+  // store the configuration on the server
+  node_configuration_service->setNodeConfiguration(node_configuration);
 }
 
 size_t
