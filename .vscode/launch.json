@@ -133,7 +133,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=k2egateway.CommandSubmission*"],
+            "args": ["--gtest_filter=k2egateway.*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
