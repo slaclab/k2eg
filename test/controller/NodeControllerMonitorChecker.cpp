@@ -42,13 +42,15 @@ initChecker(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
     setenv("EPICS_k2eg_log-on-console", "false", 1);
   }
   setenv(("EPICS_k2eg_" + std::string(CONFIGURATION_SERVICE_HOST)).c_str(), "consul", 1);
+  if (clear_data) { 
+    setenv("EPICS_k2eg_configuration-reset-on-start", "true", 1);
+  }
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   opt->parse(argc, argv);
   ServiceResolver<sconf::INodeConfiguration>::registerService(std::make_shared<sconf::impl::consul::ConsuleNodeConfiguration>(opt->getConfigurationServiceConfiguration()));
   ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
   ServiceResolver<IPublisher>::registerService(pub);
   DataStorageShrdPtr storage = std::make_shared<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");
-  if (clear_data) { toShared(storage->getChannelRepository())->removeAll(); }
   auto node_configuration = std::make_shared<NodeConfiguration>(storage);
   // init configuration
   node_configuration->loadNodeConfiguration();
@@ -138,7 +140,7 @@ TEST(NodeControllerMonitorChecker, ScanForMonitorToStop) {
   // set high timeout for simulate that is not the time to delete
   checker->setPurgeTimeout(3600);
   checkerAutomaticManagementForStop(*checker);
-  // st timeout low for let chek ca trigger the delete of the queue
+  // set timeout low for let chek ca trigger the delete of the queue
   sleep(2);
   checker->setPurgeTimeout(1);
   checkerAutomaticManagementForStop(*checker);
