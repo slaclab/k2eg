@@ -49,8 +49,10 @@ initChecker(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   ServiceResolver<IPublisher>::registerService(pub);
   DataStorageShrdPtr storage = std::make_shared<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");
   if (clear_data) { toShared(storage->getChannelRepository())->removeAll(); }
-  auto node_configuraiton = std::make_shared<NodeConfiguration>(storage);
-  return MakeMonitorCheckerUPtr(opt->getNodeControllerConfiguration()->monitor_command_configuration.monitor_checker_configuration, node_configuraiton);
+  auto node_configuration = std::make_shared<NodeConfiguration>(storage);
+  // init configuration
+  node_configuration->loadNodeConfiguration();
+  return MakeMonitorCheckerUPtr(opt->getNodeControllerConfiguration()->monitor_command_configuration.monitor_checker_configuration, node_configuration);
 }
 
 void checkerAutomaticManagementForStop(MonitorChecker& checker) {
