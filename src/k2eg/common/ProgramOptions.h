@@ -12,6 +12,7 @@
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/scheduler/Scheduler.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/service/configuration/configuration.h>
 
 namespace po = boost::program_options;
 
@@ -56,6 +57,10 @@ static const char* const METRIC_HTTP_PORT = "metric-server-http-port";
 
 static const char* const EPICS_MONITOR_THREAD_COUNT = "epics-monitor-thread-count";
 
+static const char* const CONFIGURATION_SERVICE_HOST = "configuration-server-host";
+static const char* const CONFIGURATION_SERVICE_PORT = "configuration-server-port";
+static const char* const CONFIGURATION_SERVICE_RESET_ON_START = "configuration-reset-on-start";
+
 namespace k2eg
 {
     namespace common
@@ -82,6 +87,7 @@ namespace k2eg
             k2eg::service::metric::ConstMetricConfigurationUPtr getMetricConfiguration();
             k2eg::service::scheduler::ConstSchedulerConfigurationUPtr getSchedulerConfiguration();
             k2eg::service::epics_impl::ConstEpicsServiceManagerConfigUPtr getEpicsManagerConfiguration();
+            k2eg::service::configuration::ConstConfigurationServceiConfigUPtr getConfigurationServiceConfiguration();
             const std::string getStoragePath();
             bool optionConfigure(const std::string &name);
 

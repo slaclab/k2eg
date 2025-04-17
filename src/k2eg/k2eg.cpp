@@ -1,20 +1,24 @@
-#include <k2eg/common/utility.h>
 #include <k2eg/config.h>
 #include <k2eg/version.h>
 #include <k2eg/k2eg.h>
-#include <k2eg/service/ServiceResolver.h>
-#include <k2eg/service/scheduler/Scheduler.h>
-#include <k2eg/service/data/DataStorage.h>
-#include <k2eg/service/epics/EpicsServiceManager.h>
+
+#include <k2eg/common/utility.h>
+
 #include <k2eg/service/log/ILogger.h>
+#include <k2eg/service/pubsub/pubsub.h>
+#include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/data/DataStorage.h>
+#include <k2eg/service/pubsub/IPublisher.h>
+#include <k2eg/service/scheduler/Scheduler.h>
 #include <k2eg/service/log/impl/BoostLogger.h>
 #include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/service/configuration/configuration.h>
 #include <k2eg/service/metric/impl/DummyMetricService.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
-#include <k2eg/service/pubsub/pubsub.h>
+#include <k2eg/service/configuration/impl/consul/ConsulNodeConfiguration.h>
 
 #include <cstdlib>
-#include "k2eg/service/pubsub/IPublisher.h"
 
 using namespace k2eg;
 using namespace k2eg::service;
@@ -29,6 +33,8 @@ using namespace k2eg::service::data;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
 using namespace k2eg::service::scheduler;
+using namespace k2eg::service::configuration;
+using namespace k2eg::service::configuration::impl::consul;
 
 using namespace k2eg::controller::node;
 using namespace k2eg::controller::command;
@@ -53,6 +59,8 @@ K2EGateway::setup(int argc, const char* argv[]) {
     // setup services
     ServiceResolver<ILogger>::registerService(logger = std::make_shared<BoostLogger>(po->getloggerConfiguration()));
     logger->logMessage(getTextVersion(true));
+    logger->logMessage("Start configuration service");
+    ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsuleNodeConfiguration>(po->getConfigurationServiceConfiguration()));
     logger->logMessage("Start Metric Service");
     ServiceResolver<IMetricService>::registerService(instanceMetricService(po->getMetricConfiguration()));
     logger->logMessage("Start EPICS service");
@@ -87,6 +95,8 @@ K2EGateway::setup(int argc, const char* argv[]) {
     ServiceResolver<EpicsServiceManager>::resolve().reset();
     logger->logMessage("Stop Metric Service");
     ServiceResolver<IMetricService>::resolve().reset();
+    logger->logMessage("Stop configuration service");
+    ServiceResolver<INodeConfiguration>::resolve().reset();
     logger->logMessage("Shutdown completed");
     ServiceResolver<ILogger>::resolve().reset();
     terminated = true;

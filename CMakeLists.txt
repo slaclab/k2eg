@@ -1,18 +1,15 @@
 cmake_minimum_required(VERSION 3.5)
 project(k2eg)
 
+# ----------------------------------------------------
 # Set default install directory if not specified
+# ----------------------------------------------------
 IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   SET(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/local CACHE PATH "Default install directory" FORCE)
 ENDIF()
 
 include(ExternalProject)
-
-# EXECUTE_PROCESS (
-#     COMMAND bash -c "../tools/manage-version.sh ../src/k2eg/version.h"
-#     OUTPUT_VARIABLE outVar
-# )
-# message(STATUS "Update version ${outVar}")
+include(FetchContent)
 
 set(IS_DEBUG_BUILD CMAKE_BUILD_TYPE STREQUAL "Debug")
 
@@ -32,6 +29,7 @@ set(CURL_VERSION curl-7_88_1)
 set(ZLIB_VERSION v1.2.13)
 set(PROMETHEUS_VERSION v1.3.0)
 SET(CRONCPP_VERSION v2023.03.30)
+SET(OATPP_VERSION 1.3.0)
 set(GTEST_VERSION 1.8.0)
 
 set(CMAKE_BINARY_DIR ${CMAKE_INSTALL_PREFIX}/bin)
@@ -40,12 +38,19 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
 set(CMAKE_BINARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)
 set(SQLITE_INCLUDE ${CMAKE_INSTALL_PREFIX}/include)
 
+# ----------------------------------------------------
 # Suppress deprecated-declarations warnings (e.g. from Boost)
+# ----------------------------------------------------
 add_compile_options(-Wno-deprecated-declarations)
 
+# ----------------------------------------------------
 #manage code coverage
+# ----------------------------------------------------
 include(${CMAKE_CURRENT_SOURCE_DIR}/configuration/coverage.cmake)
+
+# ----------------------------------------------------
 #manage Address sanitizer
+# ----------------------------------------------------
 if(${ENABLE_ASAN})
   message(STATUS "Enable address sanitizer")
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=address -static-libasan")
@@ -98,6 +103,8 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/scheduler/Scheduler.cpp
   src/k2eg/service/scheduler/Task.cpp
 
+  src/k2eg/service/configuration/impl/consul/ConsulNodeConfiguration.cpp
+
   src/k2eg/controller/command/CMDController.cpp
   src/k2eg/controller/command/CMDCommand.cpp
 
@@ -135,7 +142,9 @@ TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC src)
 TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include)
 TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib)
 
-# -------------------------- Tests ---------------------
+# ----------------------------------------------------
+# Tests
+# ----------------------------------------------------
 set(TEST_SOURCE_FILES
   test/test.cpp
   test/k2eg.cpp
@@ -152,6 +161,7 @@ set(TEST_SOURCE_FILES
   test/metric/CMDMetric.cpp
   test/metric/NodeControllerMetric.cpp
   test/scheduler/Scheduler.cpp
+  test/configuration/ConsulConfigurationTest.cpp
   ${COMMON_SOURCE_FILES}
 )
 
@@ -172,7 +182,9 @@ TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC src)
 TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include)
 TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/lib)
 
+# ----------------------------------------------------
 # Configure Boost dependencies
+# ----------------------------------------------------
 MESSAGE(STATUS "Configure Boost version ${BOOST_VERSION}")
 
 if(WIN32)
@@ -206,7 +218,9 @@ SET(BUILD_LIBRARY ${BUILD_LIBRARY} boost_program_options boost_log boost_log_set
 ADD_DEPENDENCIES(${PROJECT_NAME} boost)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test boost)
 
+# ----------------------------------------------------
 # Configure EPICS dependencies
+# ----------------------------------------------------
 MESSAGE(STATUS "Configure EPICS version ${EPICS_VERSION}")
 MESSAGE(STATUS "Configure EPICS includes: ${CMAKE_INSTALL_PREFIX}/include/os/${CMAKE_SYSTEM_NAME}, ${CMAKE_INSTALL_PREFIX}/include/pv, ${CMAKE_INSTALL_PREFIX}/include/pva")
 
@@ -262,7 +276,9 @@ elseif(UNIX)
   endif()
 endif()
 
+# ----------------------------------------------------
 # Configure liblz4 dependencies
+# ----------------------------------------------------
 MESSAGE(STATUS "Configure liblz4 version ${LIBLZ4_VERSION}")
 ExternalProject_Add(
   liblz4
@@ -281,7 +297,9 @@ ExternalProject_Add(
   LOG_BUILD ON
 )
 
+# ----------------------------------------------------
 # Configure librdkafka dependencies
+# ----------------------------------------------------
 MESSAGE(STATUS "Configure librdkafka version ${LIBRDKAFKA_VERSION}")
 ExternalProject_Add(
   librdkafka
@@ -310,7 +328,9 @@ ADD_DEPENDENCIES(librdkafka liblz4)
 ADD_DEPENDENCIES(${PROJECT_NAME} librdkafka liblz4)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test librdkafka liblz4)
 
+# ----------------------------------------------------
 # Configure sqlite dependencies
+# ----------------------------------------------------
 MESSAGE(STATUS "Configure sqlite version ${SQLITE_VERSION}")
 ExternalProject_Add(
   sqlite_dist
@@ -322,7 +342,9 @@ ExternalProject_Add(
   INSTALL_COMMAND make install
 )
 
+# ----------------------------------------------------
 # Configure sqlite orm dependencies
+# ----------------------------------------------------
 MESSAGE(STATUS "Configure sqlite orm version ${SQLITEORM_VERSION}")
 ExternalProject_Add(
   sqlite_orm
@@ -349,7 +371,9 @@ SET(BUILD_LIBRARY ${BUILD_LIBRARY} sqlite3)
 ADD_DEPENDENCIES(${PROJECT_NAME} sqlite_orm sqlite_dist)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test sqlite_orm sqlite_dist)
 
+# ----------------------------------------------------
 # Configure msgpack dependencies
+# ----------------------------------------------------
 MESSAGE(STATUS "Configure msgpack version ${MSGPACK_VERSION}")
 ExternalProject_Add(
   msgpack
@@ -375,7 +399,9 @@ ADD_DEPENDENCIES(msgpack boost)
 ADD_DEPENDENCIES(${PROJECT_NAME} msgpack)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test msgpack)
 
+# ----------------------------------------------------
 # Configure zlib dependencies
+# ----------------------------------------------------
 MESSAGE(STATUS "Configure zlib version ${ZLIB_VERSION}")
 ExternalProject_Add(
   zlib
@@ -395,7 +421,9 @@ ExternalProject_Add(
 )
 SET(BUILD_LIBRARY ${BUILD_LIBRARY} z)
 
+# ----------------------------------------------------
 # Configure prometheus dependencies
+# ----------------------------------------------------
 MESSAGE(STATUS "Configure prometheus version ${PROMETHEUS_VERSION}")
 ExternalProject_Add(
   prometheus
@@ -422,7 +450,10 @@ SET(BUILD_LIBRARY ${BUILD_LIBRARY} prometheus-cpp-pull prometheus-cpp-core curl)
 ADD_DEPENDENCIES(${PROJECT_NAME} prometheus)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test prometheus)
 
+# ----------------------------------------------------
 # Configure cron scheduler dependencies
+# ----------------------------------------------------
+MESSAGE(STATUS "Configure croncpp version ${CRONCPP_VERSION}")
 ExternalProject_Add(
   croncpp
   GIT_REPOSITORY https://github.com/mariusbancila/croncpp.git
@@ -440,7 +471,98 @@ ExternalProject_Add(
 ADD_DEPENDENCIES(${PROJECT_NAME} croncpp)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test croncpp)
 
+# ----------------------------------------------------
+# External Project: oatpp
+# ----------------------------------------------------
+MESSAGE(STATUS "Configure oatpp-framework version ${OATPP_VERSION}")
+ExternalProject_Add(
+    oatpp-framework
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/oatpp-framework
+    GIT_REPOSITORY    https://github.com/oatpp/oatpp.git
+    GIT_TAG           ${OATPP_VERSION}
+    GIT_PROGRESS      1
+    LOG_DOWNLOAD      1
+    LOG_UPDATE        1
+    LOG_CONFIGURE     1
+    LOG_BUILD         1
+    LOG_INSTALL       1
+    CMAKE_ARGS
+        -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+        -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -DBUILD_SHARED_LIBS=ON
+)
+MESSAGE(STATUS "oatpp include: ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp")
+MESSAGE(STATUS "oatpp lib: ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION}/oatpp")
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp)
+
+# ----------------------------------------------------
+# External Project: oatpp-curl
+# ----------------------------------------------------
+MESSAGE(STATUS "Configure oatpp-curl version ${OATPP_VERSION}")
+ExternalProject_Add(
+  oatpp-curl-framework
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/oatpp-curl-framework
+    GIT_REPOSITORY    https://github.com/oatpp/oatpp-curl.git
+    GIT_TAG           ${OATPP_VERSION}
+    GIT_PROGRESS      1
+    LOG_DOWNLOAD      1
+    LOG_UPDATE        1
+    LOG_CONFIGURE     1
+    LOG_BUILD         1
+    LOG_INSTALL       1
+    CMAKE_ARGS
+        -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+        -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -DBUILD_SHARED_LIBS=ON
+)
+ADD_DEPENDENCIES(oatpp-curl-framework oatpp-framework)
+ADD_DEPENDENCIES(${PROJECT_NAME} oatpp-curl-framework)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test oatpp-curl-framework)
+MESSAGE(STATUS "oatpp-curl include: ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-curl")
+MESSAGE(STATUS "oatpp-curl lib: ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION}/oatpp-curl")
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-curl)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-curl)
+# ----------------------------------------------------
+# External Project: oatpp-consul
+# ----------------------------------------------------
+MESSAGE(STATUS "Configure oatpp-consul version ${OATPP_VERSION}")
+ExternalProject_Add(
+    oatpp-consul-framework
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/oatpp-consul-framework
+    GIT_REPOSITORY    https://github.com/oatpp/oatpp-consul.git
+    GIT_TAG           ${OATPP_VERSION}
+    GIT_PROGRESS      1
+    LOG_DOWNLOAD      1
+    LOG_UPDATE        1
+    LOG_CONFIGURE     1
+    LOG_BUILD         1
+    LOG_INSTALL       1
+    CMAKE_ARGS
+        -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+        -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -DBUILD_SHARED_LIBS=ON
+)
+ADD_DEPENDENCIES(oatpp-consul-framework oatpp-curl-framework)
+ADD_DEPENDENCIES(${PROJECT_NAME} oatpp-consul-framework)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test oatpp-consul-framework)
+MESSAGE(STATUS "oatpp-consul include: ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-consul")
+MESSAGE(STATUS "oatpp-consul lib: ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION}/oatpp-consul")
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-consul)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/oatpp-${OATPP_VERSION}/oatpp-consul)
+TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC  ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION})
+TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC  ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION})
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} oatpp-consul oatpp-curl oatpp)
+
+# ----------------------------------------------------
 # Configure Google Test dependencies
+# ----------------------------------------------------
 message(STATUS "Setup GTest version ${GTEST_VERSION}")
 ExternalProject_Add(
   googletest

@@ -53,6 +53,7 @@ TEST(k2egateway, Default)
     setenv(std::string("EPICS_k2eg_").append(SUB_SERVER_ADDRESS).c_str(), "kafka:9092", 1);
     setenv(std::string("EPICS_k2eg_").append(STORAGE_PATH).c_str(), storage_db_file.c_str(), 1);
     setenv(std::string("EPICS_k2eg_").append(METRIC_HTTP_PORT).c_str(), "8081", 1);
+    setenv(std::string("EPICS_k2eg_").append(CONFIGURATION_SERVICE_HOST).c_str(), "consul", 1);
     // remove possible old file
     std::filesystem::remove(log_file_path);
     auto k2eg = std::make_unique<K2EGateway>();
@@ -81,6 +82,9 @@ TEST(k2egateway, Default)
         ifs.close();
     }
     EXPECT_NE(full_str.find("Shutdown completed"), std::string::npos);
+    if(full_str.find("Shutdown completed") == std::string::npos) {
+        std::cerr << "Log file content: " << full_str << std::endl;
+    }
 }
 
 TEST(k2egateway, CommandSubmission)
@@ -102,6 +106,7 @@ TEST(k2egateway, CommandSubmission)
     setenv(std::string("EPICS_k2eg_").append(SUB_SERVER_ADDRESS).c_str(), "kafka:9092", 1);
     setenv(std::string("EPICS_k2eg_").append(STORAGE_PATH).c_str(), storage_db_file.c_str(), 1);
     setenv(std::string("EPICS_k2eg_").append(METRIC_HTTP_PORT).c_str(), "8081", 1);
+    setenv(std::string("EPICS_k2eg_").append(CONFIGURATION_SERVICE_HOST).c_str(), "consul", 1);
     // remove possible old file
     std::filesystem::remove(log_file_path);
     auto k2eg = std::make_unique<K2EGateway>();
@@ -154,9 +159,11 @@ TEST(k2egateway, CommandSubmission)
     // wait untli
     iotaFuture.wait();
     // now wait for execution of the command
-    while (messages.size() == 0) {
+    int retry = 0;
+    while (messages.size() == 0 && retry < 10) {
         ASSERT_EQ(consumer->getMsg(messages, 1, 1000), 0);
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        retry++;
     }
     ASSERT_NE(messages.size(), 0);
     // decode get json message

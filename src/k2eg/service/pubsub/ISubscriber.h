@@ -5,10 +5,8 @@
 
 #include <k2eg/common/types.h>
 #include <functional>
-#include <map>
 #include <memory>
 #include <string>
-#include <vector>
 
 namespace k2eg::service::pubsub {
 

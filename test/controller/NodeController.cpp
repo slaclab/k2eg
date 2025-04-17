@@ -6,6 +6,7 @@
 #include <k2eg/controller/command/cmd/PutCommand.h>
 #include <k2eg/controller/node/NodeController.h>
 #include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/configuration/configuration.h>
 #include <k2eg/service/data/DataStorage.h>
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
@@ -19,6 +20,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <latch>
@@ -55,6 +57,8 @@ using namespace k2eg::service::pubsub;
 using namespace k2eg::service::data;
 using namespace k2eg::service::scheduler;
 using namespace k2eg::service::epics_impl;
+using namespace k2eg::service::configuration;
+using namespace k2eg::service::configuration::impl::consul;
 
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
@@ -176,7 +180,7 @@ wait_forPublished_message_size(DummyPublisherNoSignal& publisher, unsigned int r
 #ifdef __linux__
 
 std::unique_ptr<NodeController>
-initBackend(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log = false) {
+initBackend(IPublisherShrdPtr pub, bool enable_debug_log = false, bool reset_conf = false) {
   int         argc    = 1;
   const char* argv[1] = {"epics-k2eg-test"};
   clearenv();
@@ -186,13 +190,19 @@ initBackend(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   } else {
     setenv("EPICS_k2eg_log-on-console", "false", 1);
   }
+
+  if(reset_conf){
+    setenv("EPICS_k2eg_configuration-reset-on-start", "true", 1);
+  }
+
   setenv("EPICS_k2eg_metric-server-http-port", std::to_string(++tcp_port).c_str(), 1);
   setenv(("EPICS_k2eg_" + std::string(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS)).c_str(), "1", 1);
   // set monitor expiration time out at minimum
   setenv(("EPICS_k2eg_" + std::string(NC_MONITOR_EXPIRATION_TIMEOUT)).c_str(), "1", 1);
-
+  setenv(("EPICS_k2eg_" + std::string(CONFIGURATION_SERVICE_HOST)).c_str(), "consul", 1);
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   opt->parse(argc, argv);
+  ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsuleNodeConfiguration>(opt->getConfigurationServiceConfiguration()));
   ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(opt->getSchedulerConfiguration()));
   ServiceResolver<Scheduler>::resolve()->start();
   ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
@@ -200,7 +210,9 @@ initBackend(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>());
   ServiceResolver<IPublisher>::registerService(pub);
   DataStorageUPtr storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");
-  if (clear_data) { toShared(storage->getChannelRepository())->removeAll(); }
+  // data should be alwasys erased becasue now the local databas eis only used at runtime the persistent
+  // data is stored on the central configuration management server
+  toShared(storage->getChannelRepository())->removeAll();
   return std::make_unique<NodeController>(opt->getNodeControllerConfiguration(), std::move(storage));
 }
 
@@ -213,6 +225,7 @@ deinitBackend(std::unique_ptr<NodeController> node_controller) {
   EXPECT_NO_THROW(ServiceResolver<ILogger>::resolve().reset(););
   EXPECT_NO_THROW(ServiceResolver<Scheduler>::resolve()->stop(););
   EXPECT_NO_THROW(ServiceResolver<Scheduler>::resolve().reset(););
+  EXPECT_NO_THROW(ServiceResolver<INodeConfiguration>::resolve().reset(););
 }
 
 boost::json::object
@@ -481,7 +494,7 @@ TEST(NodeController, MonitorCommandAfterReboot) {
   std::latch work_done{2};
   std::latch work_done_2{5};
   auto       publisher       = std::make_shared<DummyPublisher>(work_done);
-  auto       node_controller = initBackend(publisher, true);
+  auto       node_controller = initBackend(publisher, false, true);
 
   while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)) { sleep(1); }
 
@@ -498,7 +511,7 @@ TEST(NodeController, MonitorCommandAfterReboot) {
   deinitBackend(std::move(node_controller));
 
   // reboot without delete database
-  node_controller = initBackend(std::make_shared<DummyPublisher>(work_done_2), false, true);
+  node_controller = initBackend(std::make_shared<DummyPublisher>(work_done_2), true);
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   // we have to wait for monitor event
   work_done_2.wait();
@@ -559,7 +572,7 @@ TEST(NodeController, MonitorCommandMultiPVStress) {
   boost::json::object             reply_msg;
   std::unique_ptr<NodeController> node_controller;
   auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-  node_controller                           = initBackend(publisher, true, true);
+  node_controller                           = initBackend(publisher, true);
 
   // add the number of reader from topic
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);

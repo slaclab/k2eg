@@ -3,12 +3,12 @@
 #include <k2eg/controller/node/configuration/NodeConfiguration.h>
 #include <k2eg/controller/node/worker/monitor/MonitorChecker.h>
 #include <k2eg/service/data/DataStorage.h>
+#include <k2eg/service/configuration/configuration.h>
 
 #include <atomic>
 #include <filesystem>
 #include <memory>
 #include <string>
-#include <vector>
 #include <latch>
 
 #include "NodeControllerCommon.h"
@@ -29,7 +29,7 @@ using namespace k2eg::controller::node::worker::monitor;
 using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
 namespace fs = std::filesystem;
-
+namespace sconf = k2eg::service::configuration;
 MonitorCheckerUPtr
 initChecker(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log = false) {
   int         argc    = 1;
@@ -41,14 +41,20 @@ initChecker(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   } else {
     setenv("EPICS_k2eg_log-on-console", "false", 1);
   }
+  setenv(("EPICS_k2eg_" + std::string(CONFIGURATION_SERVICE_HOST)).c_str(), "consul", 1);
+  if (clear_data) { 
+    setenv("EPICS_k2eg_configuration-reset-on-start", "true", 1);
+  }
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   opt->parse(argc, argv);
+  ServiceResolver<sconf::INodeConfiguration>::registerService(std::make_shared<sconf::impl::consul::ConsuleNodeConfiguration>(opt->getConfigurationServiceConfiguration()));
   ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
   ServiceResolver<IPublisher>::registerService(pub);
   DataStorageShrdPtr storage = std::make_shared<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");
-  if (clear_data) { toShared(storage->getChannelRepository())->removeAll(); }
-  auto node_configuraiton = std::make_shared<NodeConfiguration>(storage);
-  return MakeMonitorCheckerUPtr(opt->getNodeControllerConfiguration()->monitor_command_configuration.monitor_checker_configuration, node_configuraiton);
+  auto node_configuration = std::make_shared<NodeConfiguration>(storage);
+  // init configuration
+  node_configuration->loadNodeConfiguration();
+  return MakeMonitorCheckerUPtr(opt->getNodeControllerConfiguration()->monitor_command_configuration.monitor_checker_configuration, node_configuration);
 }
 
 void checkerAutomaticManagementForStop(MonitorChecker& checker) {
@@ -134,7 +140,7 @@ TEST(NodeControllerMonitorChecker, ScanForMonitorToStop) {
   // set high timeout for simulate that is not the time to delete
   checker->setPurgeTimeout(3600);
   checkerAutomaticManagementForStop(*checker);
-  // st timeout low for let chek ca trigger the delete of the queue
+  // set timeout low for let chek ca trigger the delete of the queue
   sleep(2);
   checker->setPurgeTimeout(1);
   checkerAutomaticManagementForStop(*checker);

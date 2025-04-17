@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <memory>
 #include <msgpack.hpp>
 #include <boost/json.hpp>
 
@@ -45,6 +44,12 @@ inline x##ShrdPtr Make##x##ShrdPtr(_Args&&... __args) \
     typedef std::map<t1, t2> n;                                \
     typedef std::map<t1, t2>::iterator n##Iterator;            \
     typedef std::map<t1, t2>::const_iterator n##ConstIterator; \
+    typedef std::pair<t1, t2> n##Pair;
+
+#define DEFINE_MMAP_FOR_TYPE(t1, t2, n)                         \
+    typedef std::multimap<t1, t2> n;                                \
+    typedef std::multimap<t1, t2>::iterator n##Iterator;            \
+    typedef std::multimap<t1, t2>::const_iterator n##ConstIterator; \
     typedef std::pair<t1, t2> n##Pair;
 
     DEFINE_VECTOR_FOR_TYPE(std::string, StringVector);
