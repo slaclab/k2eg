@@ -26,7 +26,7 @@ COPY --from=builder /opt/app/build/local/lib /opt/app/lib
 # COPY --from=builder /opt/app/build/k2eg-test /opt/app
 # COPY --from=builder /opt/app/build/k2eg /opt/app
 ENV PATH="${PATH}:/opt/app:/opt/app/bin:/opt/app/bin/linux-x86_64"
-ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/app/lib:/opt/app/lib/linux-x86_64:/app/local/lib/oatpp-1.3.0"
+ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/app/lib:/opt/app/lib/linux-x86_64:/opt/app/lib/oatpp-1.3.0"
 RUN  apt update \
     &&  apt install -y openssl curl libcurl4-openssl-dev
 # Add docker-compose-wait tool -------------------
