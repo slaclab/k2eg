@@ -27,6 +27,7 @@ The current implementation receives and interprets commands and uses only JSON s
 - [X] MSGPack Binary serialization
 - [X] MSGPack compact serialization
 - [X] Multithreading EPICS Monitor
+- [x] Shapshot
 - [ ] Cluster implementation
 ```
 For the serialization and message format see documentation [here](doc/message-format.md)

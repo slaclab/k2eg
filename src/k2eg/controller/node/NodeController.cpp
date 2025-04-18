@@ -79,7 +79,7 @@ NodeController::submitCommand(ConstCommandShrdPtrVec commands) {
     // submit command to appropiate worker
     if (auto worker = worker_resolver.resolve(c->type); worker != nullptr) {
       logger->logMessage(STRING_FORMAT("Forward command => %1% to worker %2%", to_json_string(c) % std::string(command_type_to_string(c->type))));
-      processing_pool->push_task(&CommandWorker::processCommand, worker.get(), c);
+      processing_pool->push_task(&CommandWorker::processCommand, worker.get(), processing_pool, c);
     } else {
       logger->logMessage(STRING_FORMAT("No worker found for command type '%1%'", std::string(command_type_to_string(c->type))), LogLevel::ERROR);
     }

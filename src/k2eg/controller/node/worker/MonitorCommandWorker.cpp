@@ -236,7 +236,7 @@ MonitorCommandWorker::handleMonitorCheckEvents(MonitorHandlerData checker_event_
 }
 
 void
-MonitorCommandWorker::processCommand(ConstCommandShrdPtr command) {
+MonitorCommandWorker::processCommand(std::shared_ptr<BS::thread_pool> thread_pool, ConstCommandShrdPtr command) {
   if (starting_up) {
     logger->logMessage("[ Starting up ] Comamnd cannot be executed", LogLevel::ERROR);
     manageReply(-2, "Command cannot be executed, k2eg monitor worker is starting", command);

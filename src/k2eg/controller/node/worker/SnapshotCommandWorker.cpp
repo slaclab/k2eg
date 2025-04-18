@@ -18,8 +18,7 @@ using namespace k2eg::service::pubsub;
 using namespace k2eg::service::epics_impl;
 
 SnapshotCommandWorker::SnapshotCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager)
-    : processing_pool(std::make_shared<BS::thread_pool>(1)),
-      logger(ServiceResolver<ILogger>::resolve()),
+    : logger(ServiceResolver<ILogger>::resolve()),
       publisher(ServiceResolver<IPublisher>::resolve()),
       metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric()),
       epics_service_manager(epics_service_manager) {
@@ -27,7 +26,7 @@ SnapshotCommandWorker::SnapshotCommandWorker(EpicsServiceManagerShrdPtr epics_se
                                    std::bind(&SnapshotCommandWorker::publishEvtCB, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 }
 
-SnapshotCommandWorker::~SnapshotCommandWorker() { processing_pool->wait_for_tasks(); }
+SnapshotCommandWorker::~SnapshotCommandWorker() {}
 
 void
 SnapshotCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* const msg, const std::string& error_message) {
@@ -42,7 +41,7 @@ SnapshotCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* cons
 }
 
 void
-SnapshotCommandWorker::processCommand(ConstCommandShrdPtr command) {
+SnapshotCommandWorker::processCommand(std::shared_ptr<BS::thread_pool> command_pool, ConstCommandShrdPtr command) {
   if (command->type != CommandType::snapshot) { return; }
 
   ConstSnapshotCommandShrdPtr s_ptr = static_pointer_cast<const SnapshotCommand>(command);
@@ -63,7 +62,7 @@ SnapshotCommandWorker::processCommand(ConstCommandShrdPtr command) {
     }
   }
   // submit snapshot to processing pool
-  processing_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops)));
+  command_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, command_pool, std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops)));
 }
 
 void
@@ -82,7 +81,7 @@ SnapshotCommandWorker::manageFaultyReply(const std::int8_t error_code, const std
   }
 }
 
-void SnapshotCommandWorker::checkGetCompletion(SnapshotOpInfoShrdPtr snapshot_info) {
+void SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::thread_pool> command_pool, SnapshotOpInfoShrdPtr snapshot_info) {
   if (!snapshot_info->isTimeout()) {
       // Process monitors before timeout using processed_index to annotate completed ones.
       for (std::size_t i = 0; i < snapshot_info->v_mon_ops.size(); ++i) {
@@ -106,7 +105,7 @@ void SnapshotCommandWorker::checkGetCompletion(SnapshotOpInfoShrdPtr snapshot_in
       // check if we have done all the PVs
       if (!snapshot_info->processed_index.all()) {
           // there still are PVs that have not been received, so resubmit the task
-          processing_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, snapshot_info);
+          command_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, command_pool, snapshot_info);
       } else {
           // in this case we have comepleted the snapshot so we can send the completion message to the client before the snapshot
           publishEndSnapshotReply(snapshot_info->cmd);
