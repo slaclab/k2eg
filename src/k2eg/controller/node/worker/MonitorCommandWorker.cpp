@@ -263,7 +263,6 @@ MonitorCommandWorker::manage_single_monitor(k2eg::controller::command::cmd::Cons
     manageReply(-1, "Empty destination topic", cmd_ptr);
     return;
   }
-  // manageStartMonitorCommand(cmd_ptr);
   monitor_checker_shrd_ptr->storeMonitorData({ChannelMonitorType{.pv_name             = cmd_ptr->pv_name,
                                                                  .event_serialization = static_cast<std::uint8_t>(cmd_ptr->serialization),
                                                                  //  .channel_protocol    = cmd_ptr->protocol,
