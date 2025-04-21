@@ -67,11 +67,12 @@ SnapshotCommandWorker::processCommand(std::shared_ptr<BS::priority_thread_pool> 
         }
     }
     // submit snapshot to processing pool
-    // command_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, command_pool, std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops)));
+    // command_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, command_pool, );
+    auto s_op_ptr = std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops));
     command_pool->detach_task(
-        [this, command_pool, s_ptr, &v_mon_ops]()
+        [this, command_pool, s_op_ptr]()
         {
-            this->checkGetCompletion(command_pool, std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops)));
+            this->checkGetCompletion(command_pool, s_op_ptr);
         });
 }
 
