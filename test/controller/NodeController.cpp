@@ -1,5 +1,6 @@
 
 #include <gtest/gtest.h>
+#include <iostream>
 #include <k2eg/common/ProgramOptions.h>
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/command/cmd/Command.h>
@@ -180,7 +181,7 @@ wait_forPublished_message_size(DummyPublisherNoSignal& publisher, unsigned int r
 #ifdef __linux__
 
 std::unique_ptr<NodeController>
-initBackend(IPublisherShrdPtr pub, bool enable_debug_log = false, bool reset_conf = false) {
+initBackend(IPublisherShrdPtr pub, bool enable_debug_log = false, bool reset_conf = true) {
   int         argc    = 1;
   const char* argv[1] = {"epics-k2eg-test"};
   clearenv();
@@ -494,7 +495,7 @@ TEST(NodeController, MonitorCommandAfterReboot) {
   std::latch work_done{2};
   std::latch work_done_2{5};
   auto       publisher       = std::make_shared<DummyPublisher>(work_done);
-  auto       node_controller = initBackend(publisher, false, true);
+  auto       node_controller = initBackend(publisher);
 
   while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)) { sleep(1); }
 
@@ -510,8 +511,8 @@ TEST(NodeController, MonitorCommandAfterReboot) {
   // stop the node controller
   deinitBackend(std::move(node_controller));
 
-  // reboot without delete database
-  node_controller = initBackend(std::make_shared<DummyPublisher>(work_done_2), true);
+  // reboot without delete database (by defauilt the initBackend reset alwasy the configuration)
+  node_controller = initBackend(std::make_shared<DummyPublisher>(work_done_2), true, false);
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   // we have to wait for monitor event
   work_done_2.wait();
