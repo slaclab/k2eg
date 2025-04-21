@@ -30,7 +30,7 @@ DEFINE_PTR_TYPES(NodeControllerConfiguration)
  */
 class NodeController {
   ConstNodeControllerConfigurationUPtr node_controller_configuration;
-  std::shared_ptr<BS::thread_pool>                                                                      processing_pool;
+  std::shared_ptr<BS::priority_thread_pool>                                                                      processing_pool;
   k2eg::common::ObjectByTypeFactory<k2eg::controller::command::cmd::CommandType, worker::CommandWorker> worker_resolver;
   configuration::NodeConfigurationShrdPtr                                                                node_configuration;
 

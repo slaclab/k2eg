@@ -57,7 +57,7 @@ GetCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* const msg
 
 
 void
-GetCommandWorker::processCommand(std::shared_ptr<BS::thread_pool>  command_pool, ConstCommandShrdPtr command) {
+GetCommandWorker::processCommand(std::shared_ptr<BS::priority_thread_pool>  command_pool, ConstCommandShrdPtr command) {
   if (command->type != CommandType::get) { return; }
 
   ConstGetCommandShrdPtr g_ptr = static_pointer_cast<const GetCommand>(command);
@@ -68,10 +68,14 @@ GetCommandWorker::processCommand(std::shared_ptr<BS::thread_pool>  command_pool,
   if (!get_op) {
     manageFaultyReply(-1, "PV name malformed", g_ptr);
   } else {
-    command_pool->push_task(&GetCommandWorker::checkGetCompletion,
-                               this,
-                               command_pool,
-                               std::make_shared<GetOpInfo>(g_ptr, std::move(get_op)));
+    // command_pool->push_task(&GetCommandWorker::checkGetCompletion,
+    //                            this,
+    //                            command_pool,
+    //                            std::make_shared<GetOpInfo>(g_ptr, std::move(get_op)));
+    command_pool->detach_task(
+      [this, command_pool, g_ptr, &get_op]() {
+        this->checkGetCompletion(command_pool, std::make_shared<GetOpInfo>(g_ptr, std::move(get_op)));
+      });
   }
 }
 
@@ -92,7 +96,7 @@ GetCommandWorker::manageFaultyReply(const std::int8_t error_code, const std::str
 }
 
 void
-GetCommandWorker::checkGetCompletion(std::shared_ptr<BS::thread_pool>  command_pool, GetOpInfoShrdPtr get_info) {
+GetCommandWorker::checkGetCompletion(std::shared_ptr<BS::priority_thread_pool>  command_pool, GetOpInfoShrdPtr get_info) {
   // check for timeout
   if (get_info->isTimeout()) {
     manageFaultyReply(-3, "Timeout operation", get_info->cmd);
@@ -103,7 +107,11 @@ GetCommandWorker::checkGetCompletion(std::shared_ptr<BS::thread_pool>  command_p
 
   if (!get_info->op->isDone()) {
     // re-enque the op class
-    command_pool->push_task(&GetCommandWorker::checkGetCompletion, this, command_pool, get_info);
+    // command_pool->push_task(&GetCommandWorker::checkGetCompletion, this, command_pool, get_info);
+    command_pool->detach_task(
+      [this, command_pool, get_info]() {
+        this->checkGetCompletion(command_pool, get_info);
+      });
   } else {
     switch (get_info->op->getState().event) {
       case pvac::GetEvent::Fail: {

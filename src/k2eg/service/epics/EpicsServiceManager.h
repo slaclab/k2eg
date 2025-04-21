@@ -3,21 +3,19 @@
 
 #include <k2eg/common/types.h>
 #include <k2eg/common/broadcaster.h>
+#include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/Serialization.h>
-#include <atomic>
+#include <k2eg/service/epics/EpicsMonitorOperation.h>
+
 #include <cstdint>
-#include <k2eg/common/BS_thread_pool.hpp>
 
 #include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
-#include <thread>
-#include <vector>
-#include <queue>
-#include "k2eg/service/epics/EpicsMonitorOperation.h"
+
 
 
 namespace k2eg::service::epics_impl {
@@ -63,7 +61,7 @@ class EpicsServiceManager {
     std::unique_ptr<pvac::ClientProvider> pva_provider;
     std::unique_ptr<pvac::ClientProvider> ca_provider;
     bool end_processing;
-    BS::thread_pool processing_pool;
+    std::shared_ptr<BS::priority_thread_pool> processing_pool;
     
     void task(ConstMonitorOperationShrdPtr monitor_op);
 public:

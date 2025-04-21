@@ -32,7 +32,7 @@ PutCommandWorker::PutCommandWorker(EpicsServiceManagerShrdPtr epics_service_mana
 PutCommandWorker::~PutCommandWorker() {}
 
 void
-PutCommandWorker::processCommand(std::shared_ptr<BS::thread_pool> command_pool, ConstCommandShrdPtr command) {
+PutCommandWorker::processCommand(std::shared_ptr<BS::priority_thread_pool> command_pool, ConstCommandShrdPtr command) {
   if (command->type != CommandType::put) return;
   ConstPutCommandShrdPtr p_ptr = static_pointer_cast<const PutCommand>(command);
   logger->logMessage(STRING_FORMAT("Perform put command for %1%", p_ptr->pv_name), LogLevel::DEBUG);
@@ -41,11 +41,15 @@ PutCommandWorker::processCommand(std::shared_ptr<BS::thread_pool> command_pool, 
     // fire error
     manageReply(-1, "PV name malformed", p_ptr);
   } else {
-    command_pool->push_task(
-        &PutCommandWorker::checkPutCompletion,
-        this,
-        command_pool,
-        std::make_shared<PutOpInfo>(p_ptr, std::move(put_op)));
+    // command_pool->push_task(
+    //     &PutCommandWorker::checkPutCompletion,
+    //     this,
+    //     command_pool,
+    //     std::make_shared<PutOpInfo>(p_ptr, std::move(put_op)));
+    command_pool->detach_task(
+      [this, command_pool, p_ptr, &put_op]() {
+        this->checkPutCompletion(command_pool, std::make_shared<PutOpInfo>(p_ptr, std::move(put_op)));
+      });
   }
 }
 
@@ -66,7 +70,7 @@ PutCommandWorker::manageReply(const std::int8_t error_code, const std::string& e
 }
 
 void
-PutCommandWorker::checkPutCompletion(std::shared_ptr<BS::thread_pool> command_pool, PutOpInfoShrdPtr put_info) {
+PutCommandWorker::checkPutCompletion(std::shared_ptr<BS::priority_thread_pool> command_pool, PutOpInfoShrdPtr put_info) {
   // check for timeout
   if (put_info->isTimeout()) {
     manageReply(-3, "Timeout operation", put_info->cmd);
@@ -76,7 +80,11 @@ PutCommandWorker::checkPutCompletion(std::shared_ptr<BS::thread_pool> command_po
   std::this_thread::sleep_for(std::chrono::milliseconds(20));
   if (!put_info->op->isDone()) {
     // re-enque the op class
-    command_pool->push_task(&PutCommandWorker::checkPutCompletion, this, command_pool, put_info);
+    // command_pool->push_task(&PutCommandWorker::checkPutCompletion, this, command_pool, put_info);
+    command_pool->detach_task(
+      [this, command_pool, put_info]() {
+        this->checkPutCompletion(command_pool, put_info);
+      });
   } else {
     switch (put_info->op->getState().event) {
       case pvac::PutEvent::Fail: {

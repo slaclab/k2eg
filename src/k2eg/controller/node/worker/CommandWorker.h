@@ -134,7 +134,7 @@ class CommandWorker {
   CommandWorker(const CommandWorker&)                                                      = delete;
   CommandWorker& operator=(const CommandWorker&)                                           = delete;
   ~CommandWorker()                                                                         = default;
-  virtual void processCommand(std::shared_ptr<BS::thread_pool>  command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command) = 0;
+  virtual void processCommand(std::shared_ptr<BS::priority_thread_pool>  command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command) = 0;
   virtual bool isReady();
 };
 DEFINE_PTR_TYPES(CommandWorker)

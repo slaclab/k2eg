@@ -95,12 +95,12 @@ class GetCommandWorker : public CommandWorker {
   k2eg::service::metric::IEpicsMetric&                  metric;
   k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
   void                                                  publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
-  void                                                  checkGetCompletion(std::shared_ptr<BS::thread_pool>  command_pool, GetOpInfoShrdPtr put_info);
+  void                                                  checkGetCompletion(std::shared_ptr<BS::priority_thread_pool>  command_pool, GetOpInfoShrdPtr put_info);
   void                                                  manageFaultyReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstGetCommandShrdPtr cmd);
  public:
   GetCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
   virtual ~GetCommandWorker();
-  void processCommand(std::shared_ptr<BS::thread_pool>  command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
+  void processCommand(std::shared_ptr<BS::priority_thread_pool>  command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 };
 
 }  // namespace k2eg::controller::node::worker

@@ -4,7 +4,6 @@
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
 #include <k2eg/service/epics/EpicsPutOperation.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
-#include <ranges>
 
 #include <chrono>
 #include <cstddef>
@@ -18,14 +17,14 @@ using namespace k2eg::service::epics_impl;
 #define SELECT_PROVIDER(p) (p.find("pva") == 0 ? *pva_provider : *ca_provider)
 
 EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config)
-    : config(std::move(config)), end_processing(false), processing_pool(this->config->thread_count) {
+    : config(std::move(config)), end_processing(false), processing_pool(std::make_shared<BS::priority_thread_pool>(this->config->thread_count)) {
   pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
   ca_provider  = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
 }
 EpicsServiceManager::~EpicsServiceManager() {
   // Stop processing monitor tasks and wait for scheduled tasks to finish.
   end_processing = true;
-  processing_pool.wait_for_tasks();
+  processing_pool->wait();
   // Clear all registered channels and reset providers.
   channel_map.clear();
   pva_provider->reset();
@@ -52,7 +51,12 @@ EpicsServiceManager::addChannel(const std::string& pv_name_uri) {
       // Lock the channel map for reading and enqueue the monitor task.
       ReadLockCM read_lock(channel_map_mutex);
       ConstMonitorOperationShrdPtr monitor_operation = channel_map[sanitized_pv->name].channel->monitor();
-      processing_pool.push_task(&EpicsServiceManager::task, this, monitor_operation);
+      processing_pool->detach_task(
+        [this, monitor_operation]
+        {
+          this->task(monitor_operation);
+        }
+      );
     }
   } catch (std::exception& ex) {
     // In case of an error, remove the faulty channel and rethrow.
@@ -67,14 +71,14 @@ EpicsServiceManager::addChannel(const std::string& pv_name_uri) {
 StringVector
 EpicsServiceManager::getMonitoredChannels() {
   std::unique_lock guard(channel_map_mutex);
-#if defined(__clang__)
+// #if defined(__clang__)
   StringVector result;
   for (auto& p : channel_map) { result.push_back(p.first); }
   return result;
-#elif __GNUC_PREREQ(11, 0)
-  auto kv = std::views::keys(channel_map);
-  return k2eg::common::StringVector(kv.begin(), kv.end());
-#endif
+// #elif __GNUC_PREREQ(11, 0)
+//   auto kv = std::views::keys(channel_map);
+//   return k2eg::common::StringVector(kv.begin(), kv.end());
+// #endif
 }
 
 void
@@ -233,5 +237,11 @@ EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op) {
   }
   // Pause briefly then resubmit the monitor task.
   std::this_thread::sleep_for(std::chrono::microseconds(100));
-  processing_pool.push_task(&EpicsServiceManager::task, this, monitor_op);
+  // processing_pool->push_task(&EpicsServiceManager::task, this, monitor_op);
+  processing_pool->detach_task(
+    [this, monitor_op]
+    {
+        this->task(monitor_op);
+    }
+  );
 }

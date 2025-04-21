@@ -41,7 +41,7 @@ SnapshotCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* cons
 }
 
 void
-SnapshotCommandWorker::processCommand(std::shared_ptr<BS::thread_pool> command_pool, ConstCommandShrdPtr command) {
+SnapshotCommandWorker::processCommand(std::shared_ptr<BS::priority_thread_pool> command_pool, ConstCommandShrdPtr command) {
   if (command->type != CommandType::snapshot) { return; }
 
   ConstSnapshotCommandShrdPtr s_ptr = static_pointer_cast<const SnapshotCommand>(command);
@@ -62,7 +62,11 @@ SnapshotCommandWorker::processCommand(std::shared_ptr<BS::thread_pool> command_p
     }
   }
   // submit snapshot to processing pool
-  command_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, command_pool, std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops)));
+  // command_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, command_pool, std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops)));
+  command_pool->detach_task(
+    [this, command_pool, s_ptr, &v_mon_ops]() {
+      this->checkGetCompletion(command_pool, std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops)));
+    });
 }
 
 void
@@ -81,7 +85,7 @@ SnapshotCommandWorker::manageFaultyReply(const std::int8_t error_code, const std
   }
 }
 
-void SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::thread_pool> command_pool, SnapshotOpInfoShrdPtr snapshot_info) {
+void SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::priority_thread_pool> command_pool, SnapshotOpInfoShrdPtr snapshot_info) {
   if (!snapshot_info->isTimeout()) {
       // Process monitors before timeout using processed_index to annotate completed ones.
       for (std::size_t i = 0; i < snapshot_info->v_mon_ops.size(); ++i) {
@@ -105,7 +109,11 @@ void SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::thread_pool> 
       // check if we have done all the PVs
       if (!snapshot_info->processed_index.all()) {
           // there still are PVs that have not been received, so resubmit the task
-          command_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, command_pool, snapshot_info);
+          // command_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, command_pool, snapshot_info);
+          command_pool->detach_task(
+            [this, command_pool, snapshot_info]() {
+              this->checkGetCompletion(command_pool, snapshot_info);
+            });
       } else {
           // in this case we have comepleted the snapshot so we can send the completion message to the client before the snapshot
           publishEndSnapshotReply(snapshot_info->cmd);
