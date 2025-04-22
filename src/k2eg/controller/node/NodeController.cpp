@@ -1,3 +1,4 @@
+#include "k2eg/common/BS_thread_pool.hpp"
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/NodeController.h>
 #include <k2eg/controller/node/worker/GetCommandWorker.h>
@@ -28,7 +29,7 @@ using namespace k2eg::service::metric;
 NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_controller_configuration, DataStorageShrdPtr data_storage)
     : node_controller_configuration(std::move(node_controller_configuration)),
       node_configuration(std::make_shared<NodeConfiguration>(data_storage)),
-      processing_pool(std::make_shared<BS::priority_thread_pool>()),
+      processing_pool(std::make_shared<BS::light_thread_pool>()),
       metric(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric()) {
   // set logger
   logger = ServiceResolver<ILogger>::resolve();

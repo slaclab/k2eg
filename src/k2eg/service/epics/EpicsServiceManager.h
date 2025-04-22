@@ -64,7 +64,7 @@ class EpicsServiceManager
     std::unique_ptr<pvac::ClientProvider>                             pva_provider;
     std::unique_ptr<pvac::ClientProvider>                             ca_provider;
     bool                                                              end_processing;
-    std::shared_ptr<BS::priority_thread_pool>                         processing_pool;
+    std::shared_ptr<BS::light_thread_pool>                            processing_pool;
 
     void task(ConstMonitorOperationShrdPtr monitor_op);
 

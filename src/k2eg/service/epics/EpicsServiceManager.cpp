@@ -1,3 +1,4 @@
+#include "k2eg/common/BS_thread_pool.hpp"
 #include <k2eg/common/utility.h>
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
@@ -20,7 +21,7 @@ using namespace k2eg::service::epics_impl;
 EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config)
     : config(std::move(config))
     , end_processing(false)
-    , processing_pool(std::make_shared<BS::priority_thread_pool>(this->config->thread_count))
+    , processing_pool(std::make_shared<BS::light_thread_pool>(this->config->thread_count))
 {
     pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
     ca_provider = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
@@ -215,8 +216,8 @@ size_t EpicsServiceManager::getHandlerSize()
 }
 
 // regex for IOC name
-std::regex pv_name_regex("^(pva?|ca)://"
-                         "([a-zA-Z0-9-_]+(?::[a-zA-Z0-9-_]+)*)(\\.([a-zA-Z0-9-_]+(?:\\.[a-zA-Z0-9_]+)*))?$");
+std::regex pv_name_regex("^(pva?|ca)://" "([a-zA-Z0-9-_]+(?::[a-zA-Z0-9-_]+)*)(\\.([a-zA-Z0-9-_]+(?:\\.[a-zA-Z0-9_]+)*)"
+                                         ")?$");
 
 PVUPtr EpicsServiceManager::sanitizePVName(const std::string& pv_name)
 {
@@ -254,7 +255,6 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
 {
     if (end_processing)
         return;
-    std::cout << "Processing monitor task for: " << monitor_op->getPVName() << std::endl;
     bool to_delete = false;
     {
         // Lock channel_map for reading to check if the current monitor should be deleted or updated.
@@ -286,7 +286,7 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
         return; // Exit without resubmitting task.
     }
     // Pause briefly then resubmit the monitor task.
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::microseconds(100));
     // processing_pool->push_task(&EpicsServiceManager::task, this, monitor_op);
     processing_pool->detach_task(
         [this, monitor_op]
