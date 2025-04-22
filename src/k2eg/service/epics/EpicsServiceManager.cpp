@@ -254,6 +254,7 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
 {
     if (end_processing)
         return;
+    std::cout << "Processing monitor task for: " << monitor_op->getPVName() << std::endl;
     bool to_delete = false;
     {
         // Lock channel_map for reading to check if the current monitor should be deleted or updated.
@@ -285,7 +286,7 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
         return; // Exit without resubmitting task.
     }
     // Pause briefly then resubmit the monitor task.
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     // processing_pool->push_task(&EpicsServiceManager::task, this, monitor_op);
     processing_pool->detach_task(
         [this, monitor_op]

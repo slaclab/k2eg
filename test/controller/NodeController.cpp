@@ -248,9 +248,10 @@ getMsgPackObject(PublishMessage& published_message) {
 boost::json::object
 exstractJsonObjectThatContainsKey(std::vector<PublishMessageSharedPtr>& messages, const std::string& key_to_find, const std::string& published_on_topic) {
   for (int idx = 0; idx < messages.size(); idx++) {
+    std::cout<<"queue:"<< messages[idx]->getQueue()<< std::endl;
     if (messages[idx]->getQueue().compare(published_on_topic) != 0) continue;
     auto json_obj = getJsonObject(*messages[idx]);
-    // std::cout<<json_obj<< std::endl;
+    std::cout<<json_obj<< std::endl;
     if (json_obj.contains(key_to_find)) { return json_obj; }
   }
   return boost::json::object();
@@ -569,12 +570,12 @@ TEST(NodeController, MonitorCommandMultiPV) {
 }
 
 TEST(NodeController, MonitorCommandMultiPVStress) {
-  std::latch                      work_done{21};
   boost::json::object             reply_msg;
   std::unique_ptr<NodeController> node_controller;
-  auto                            publisher = std::make_shared<DummyPublisher>(work_done);
+  std::vector<std::string>         topics = {"channel_ramp_ramp", "channel_ramp_ramp_1"};
+  auto                            publisher = std::make_shared<TopicTargetPublisher>(topics);
   node_controller                           = initBackend(publisher, true);
-
+  publisher->enable_log = true;
   // add the number of reader from topic
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
   while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor)) { sleep(1); }
@@ -593,22 +594,22 @@ TEST(NodeController, MonitorCommandMultiPVStress) {
        "pva://channel:ramp:ramp_35", "pva://channel:ramp:ramp_36", "pva://channel:ramp:ramp_37", "pva://channel:ramp:ramp_38", "pva://channel:ramp:ramp_39"},
   })}););
 
-  work_done.wait();
+  publisher->getLatch().wait();
   // reduce the number of consumer
   dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(0);
   // force call add purge timestamp to the monitor
   node_controller->performManagementTask();
-  sleep(5);
+  sleep(2);
   // this close the emonitor
   node_controller->performManagementTask();
   // we need to have publish some message
   size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
   EXPECT_NE(published, 0);
-  // check if we have received an event for 'variable:a' pv on 'variable_a' topic
+  // check if we have received an event for ramp
   EXPECT_NO_THROW(reply_msg = exstractJsonObjectThatContainsKey(publisher->sent_messages, "channel:ramp:ramp", "channel_ramp_ramp"));
   EXPECT_EQ(reply_msg.contains("channel:ramp:ramp"), true);
 
-  // check if we have received an event for 'variable:b' pv on 'variable_b' topic
+  // check if we have received an event for ramp_1
   EXPECT_NO_THROW(reply_msg = exstractJsonObjectThatContainsKey(publisher->sent_messages, "channel:ramp:ramp_1", "channel_ramp_ramp_1"));
   EXPECT_EQ(reply_msg.contains("channel:ramp:ramp_1"), true);
   // dispose all
