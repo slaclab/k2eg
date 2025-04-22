@@ -246,25 +246,24 @@ getMsgPackObject(PublishMessage& published_message) {
 }
 
 boost::json::object
-exstractJsonObjectThatContainsKey(std::vector<PublishMessageSharedPtr>& messages, const std::string& key_to_find, const std::string& published_on_topic) {
+exstractJsonObjectThatContainsKey(std::vector<PublishMessageSharedPtr>& messages, const std::string& key_to_find, const std::string& published_on_topic, bool log = false) {
   for (int idx = 0; idx < messages.size(); idx++) {
     std::cout<<"queue:"<< messages[idx]->getQueue()<< std::endl;
     if (messages[idx]->getQueue().compare(published_on_topic) != 0) continue;
     auto json_obj = getJsonObject(*messages[idx]);
-    std::cout<<json_obj<< std::endl;
+    if(log){std::cout<<json_obj<< std::endl;}
     if (json_obj.contains(key_to_find)) { return json_obj; }
   }
   return boost::json::object();
 }
 
 msgpack::unpacked
-exstractMsgpackObjectThatContainsKey(std::vector<PublishMessageSharedPtr>& messages, const std::string& key_to_find, const std::string& published_on_topic) {
+exstractMsgpackObjectThatContainsKey(std::vector<PublishMessageSharedPtr>& messages, const std::string& key_to_find, const std::string& published_on_topic, bool log = false) {
   typedef std::map<std::string, msgpack::object> Map;
   typedef std::vector<msgpack::object>           Vec;
   for (int idx = 0; idx < messages.size(); idx++) {
     if (messages[idx]->getQueue().compare(published_on_topic) != 0) continue;
     auto msgpack_obj = getMsgPackObject(*messages[idx]);
-    // std::cout << msgpack_obj.get() << std::endl;
     switch (msgpack_obj->type) {
       case msgpack::type::MAP: {
         auto map_reply = msgpack_obj->as<Map>();

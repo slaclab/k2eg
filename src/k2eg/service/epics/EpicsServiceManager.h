@@ -53,6 +53,13 @@ typedef std::unique_lock<std::shared_mutex> ReadLockCM;
 
 DEFINE_PTR_TYPES(EpicsServiceManagerConfig)
 
+struct ThreadThrottling
+{
+    std::int32_t idle_counter{0};
+    std::int32_t idle_threshold{100};
+    std::int32_t throttle_ms{100};
+};
+
 class EpicsServiceManager
 {
     ConstEpicsServiceManagerConfigUPtr                                config;
@@ -65,7 +72,14 @@ class EpicsServiceManager
     std::unique_ptr<pvac::ClientProvider>                             ca_provider;
     bool                                                              end_processing;
     std::shared_ptr<BS::light_thread_pool>                            processing_pool;
+    std::vector<ThreadThrottling>                                     thread_throttling_vector;
 
+    /*
+    @brief task is the main function for the thread pool
+
+    @param monitor_op the monitor operation to execute
+    @details this function is called by the thread pool
+    */
     void task(ConstMonitorOperationShrdPtr monitor_op);
 
 public:

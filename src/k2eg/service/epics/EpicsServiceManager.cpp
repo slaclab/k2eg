@@ -24,10 +24,10 @@ void set_thread_name(const std::size_t idx)
     const bool result = BS::this_thread::set_os_thread_name(name);
 }
 
-
 EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config)
     : config(std::move(config))
     , end_processing(false)
+    , thread_throttling_vector(this->config->thread_count) 
     , processing_pool(std::make_shared<BS::light_thread_pool>(this->config->thread_count, set_thread_name))
 {
     pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
@@ -260,6 +260,8 @@ PVUPtr EpicsServiceManager::sanitizePVName(const std::string& pv_name)
 
 void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
 {
+    bool had_events = false;
+    const std::optional<std::size_t> thread_index = BS::this_thread::get_index();
     if (end_processing)
         return;
     bool to_delete = false;
@@ -281,6 +283,7 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
             if (monitor_op->hasEvents() && !handler_broadcaster.targets.empty())
             {
                 handler_broadcaster.broadcast(monitor_op->getEventData());
+                had_events = true;
             }
         }
     }
@@ -292,8 +295,18 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
         channel_map.erase(monitor_op->getPVName());
         return; // Exit without resubmitting task.
     }
-    // Pause briefly then resubmit the monitor task.
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
+
+    // manage throtling on situation where to much pv returtn nothing to reduce pressure
+    if (!had_events) {
+        int idle = ++thread_throttling_vector[thread_index.value()].idle_counter;
+        if (idle > thread_throttling_vector[thread_index.value()].idle_threshold) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(thread_throttling_vector[thread_index.value()].throttle_ms));
+            thread_throttling_vector[thread_index.value()].idle_counter = 0;
+        }
+    } else {
+        thread_throttling_vector[thread_index.value()].idle_counter = 0;
+    }
+    
     // processing_pool->push_task(&EpicsServiceManager::task, this, monitor_op);
     processing_pool->detach_task(
         [this, monitor_op]
