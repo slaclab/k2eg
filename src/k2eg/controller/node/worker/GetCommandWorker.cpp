@@ -51,7 +51,7 @@ void GetCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* cons
     }
 }
 
-void GetCommandWorker::processCommand(std::shared_ptr<BS::priority_thread_pool> command_pool, ConstCommandShrdPtr command)
+void GetCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> command_pool, ConstCommandShrdPtr command)
 {
     if (command->type != CommandType::get)
     {
@@ -99,7 +99,7 @@ void GetCommandWorker::manageFaultyReply(const std::int8_t error_code, const std
     }
 }
 
-void GetCommandWorker::checkGetCompletion(std::shared_ptr<BS::priority_thread_pool> command_pool, GetOpInfoShrdPtr get_info)
+void GetCommandWorker::checkGetCompletion(std::shared_ptr<BS::light_thread_pool> command_pool, GetOpInfoShrdPtr get_info)
 {
     // check for timeout
     if (get_info->isTimeout())

@@ -18,10 +18,17 @@ using namespace k2eg::service::epics_impl;
 
 #define SELECT_PROVIDER(p) (p.find("pva") == 0 ? *pva_provider : *ca_provider)
 
+void set_thread_name(const std::size_t idx)
+{
+    const std::string name = "EPICS Monitor " + std::to_string(idx);
+    const bool result = BS::this_thread::set_os_thread_name(name);
+}
+
+
 EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config)
     : config(std::move(config))
     , end_processing(false)
-    , processing_pool(std::make_shared<BS::light_thread_pool>(this->config->thread_count))
+    , processing_pool(std::make_shared<BS::light_thread_pool>(this->config->thread_count, set_thread_name))
 {
     pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
     ca_provider = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());

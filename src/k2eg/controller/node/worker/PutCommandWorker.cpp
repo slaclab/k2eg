@@ -34,7 +34,7 @@ PutCommandWorker::PutCommandWorker(EpicsServiceManagerShrdPtr epics_service_mana
 
 PutCommandWorker::~PutCommandWorker() {}
 
-void PutCommandWorker::processCommand(std::shared_ptr<BS::priority_thread_pool> command_pool, ConstCommandShrdPtr command)
+void PutCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> command_pool, ConstCommandShrdPtr command)
 {
     if (command->type != CommandType::put)
     {
@@ -80,7 +80,7 @@ void PutCommandWorker::manageReply(const std::int8_t error_code, const std::stri
     }
 }
 
-void PutCommandWorker::checkPutCompletion(std::shared_ptr<BS::priority_thread_pool> command_pool, PutOpInfoShrdPtr put_info)
+void PutCommandWorker::checkPutCompletion(std::shared_ptr<BS::light_thread_pool> command_pool, PutOpInfoShrdPtr put_info)
 {
     // check for timeout
     if (put_info->isTimeout())

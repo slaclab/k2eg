@@ -76,14 +76,14 @@ class PutCommandWorker : public CommandWorker {
   k2eg::service::pubsub::IPublisherShrdPtr              publisher;
   k2eg::service::metric::IEpicsMetric&                  metric;
   k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
-  void                                                  checkPutCompletion(std::shared_ptr<BS::priority_thread_pool> command_pool, PutOpInfoShrdPtr put_info);
+  void                                                  checkPutCompletion(std::shared_ptr<BS::light_thread_pool> command_pool, PutOpInfoShrdPtr put_info);
   k2eg::common::ConstSerializedMessageShrdPtr           getReply(PutOpInfoShrdPtr put_info);
   void                                                  manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstPutCommandShrdPtr cmd);
 
  public:
   PutCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
   virtual ~PutCommandWorker();
-  void processCommand(std::shared_ptr<BS::priority_thread_pool> command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
+  void processCommand(std::shared_ptr<BS::light_thread_pool> command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 };
 }  // namespace k2eg::controller::node::worker
 

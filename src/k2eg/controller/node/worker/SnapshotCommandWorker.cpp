@@ -40,7 +40,7 @@ SnapshotCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* cons
 }
 
 void
-SnapshotCommandWorker::processCommand(std::shared_ptr<BS::priority_thread_pool> command_pool, ConstCommandShrdPtr command)
+SnapshotCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> command_pool, ConstCommandShrdPtr command)
 {
     if (command->type != CommandType::snapshot)
     {
@@ -99,7 +99,7 @@ SnapshotCommandWorker::manageFaultyReply(const std::int8_t error_code, const std
 }
 
 void
-SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::priority_thread_pool> command_pool, SnapshotOpInfoShrdPtr snapshot_info)
+SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::light_thread_pool> command_pool, SnapshotOpInfoShrdPtr snapshot_info)
 {
     if (!snapshot_info->isTimeout())
     {
