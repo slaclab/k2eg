@@ -55,9 +55,10 @@ DEFINE_PTR_TYPES(EpicsServiceManagerConfig)
 
 struct ThreadThrottling
 {
-    std::int32_t idle_counter{0};
-    std::int32_t throttle_ms{100};
-    std::chrono::steady_clock::time_point last_activity_time = std::chrono::steady_clock::now();
+    std::int32_t  idle_counter{0};
+    std::int32_t  throttle_ms{100};
+    std::uint64_t total_events_processed = 0;
+    std::uint64_t total_idle_cycles = 0;
 };
 
 class EpicsServiceManager
@@ -73,7 +74,7 @@ class EpicsServiceManager
     bool                                                              end_processing;
     std::shared_ptr<BS::light_thread_pool>                            processing_pool;
     std::vector<ThreadThrottling>                                     thread_throttling_vector;
-
+    mutable std::mutex                                                thread_throttle_mutex;
     /*
     @brief task is the main function for the thread pool
 
@@ -110,9 +111,10 @@ public:
      * the handler receives the events. The internal broadcaster dispose all handler
      * which token is invalid
      */
-    k2eg::common::BroadcastToken addHandler(EpicsServiceManagerHandler new_handler);
-    size_t                       getHandlerSize();
-    k2eg::common::StringVector   getMonitoredChannels();
+    k2eg::common::BroadcastToken  addHandler(EpicsServiceManagerHandler new_handler);
+    size_t                        getHandlerSize();
+    k2eg::common::StringVector    getMonitoredChannels();
+    std::vector<ThreadThrottling> getThreadThrottlingInfo() const;
 };
 
 DEFINE_PTR_TYPES(EpicsServiceManager)

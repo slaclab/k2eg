@@ -257,6 +257,10 @@ PVUPtr EpicsServiceManager::sanitizePVName(const std::string& pv_name)
     return std::make_unique<PV>(PV{protocol, base_pv_name, field_name});
 }
 
+std::vector<ThreadThrottling> EpicsServiceManager::getThreadThrottlingInfo() const {
+    return thread_throttling_vector;
+}
+
 void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
 {
     if (end_processing)
@@ -268,6 +272,7 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
     bool        had_events = false;
     bool        to_delete = false;
     const auto& pv_name = monitor_op->getPVName();
+    auto&         throttling = thread_throttling_vector[thread_index.value()];
     {
         // Lock channel_map for reading to check if the current monitor should be deleted or updated.
         ReadLockCM read_lock(channel_map_mutex);
@@ -284,9 +289,7 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
                 monitor_op->forceUpdate();
                 info.to_force = false;
             }
-
             monitor_op->poll();
-
             if (monitor_op->hasEvents() && !handler_broadcaster.targets.empty())
             {
                 handler_broadcaster.broadcast(monitor_op->getEventData());
@@ -307,11 +310,11 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
     constexpr int min_throttle_ms = 1;
     constexpr int max_throttle_ms = 100;
     constexpr int idle_threshold = 10; // how many idle cycles before backoff increases
-    auto&         throttling = thread_throttling_vector[thread_index.value()];
+
     if (!had_events)
     {
         throttling.idle_counter++;
-
+        throttling.total_idle_cycles++;
         if (throttling.idle_counter >= idle_threshold)
         {
             // Exponential backoff with max cap
@@ -324,8 +327,8 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
     {
         // Work detected: reduce throttle or reset
         throttling.idle_counter = 0;
+        throttling.total_events_processed++;
         throttling.throttle_ms = std::max(throttling.throttle_ms / 2, min_throttle_ms);
-        throttling.last_activity_time = std::chrono::steady_clock::now();
     }
 
     processing_pool->detach_task(
