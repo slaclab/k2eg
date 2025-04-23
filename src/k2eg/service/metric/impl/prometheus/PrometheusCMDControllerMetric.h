@@ -27,7 +27,7 @@ class PrometheusCMDControllerMetric : public ICMDControllerMetric {
 
  public:
   virtual ~PrometheusCMDControllerMetric() = default;
-  void incrementCounter(ICMDControllerMetricCounterType type, double inc_value = 1.0) override final;
+  void incrementCounter(ICMDControllerMetricCounterType type, const double inc_value = 1.0, const std::map<std::string, std::string>& label = {}) override final;
 };
 }  // namespace k2eg::service::metric::impl::prometheus_impl
 

@@ -23,7 +23,7 @@ class PrometheusNodeControllerMetric : public INodeControllerMetric {
 
  public:
   virtual ~PrometheusNodeControllerMetric() = default;
-  void incrementCounter(INodeControllerMetricCounterType type, double inc_value = 1.0) override final;
+  void incrementCounter(INodeControllerMetricCounterType type, const double inc_value = 1.0, const std::map<std::string, std::string>& label = {}) override final;
 };
 }  // namespace k2eg::service::metric::impl::prometheus_impl
 

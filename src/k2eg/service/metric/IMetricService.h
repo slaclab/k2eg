@@ -7,10 +7,6 @@
 #include <k2eg/service/metric/ICMDControllerMetric.h>
 #include <k2eg/service/metric/INodeControllerMetric.h>
 
-#include <cstddef>
-#include <memory>
-#include <mutex>
-
 namespace k2eg::service::metric {
 struct MetricConfiguration {
   bool enable;

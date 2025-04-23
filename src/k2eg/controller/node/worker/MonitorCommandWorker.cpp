@@ -423,6 +423,18 @@ void MonitorCommandWorker::calcPVCount()
 
             metric.incrementCounter(IEpicsMetricCounterType::ActiveMonitor, active_pv);
             metric.incrementCounter(IEpicsMetricCounterType::TotalMonitor, channel_topics_map.size());
+
+            // update throttle metric
+            auto thread_throttling_vector = epics_service_manager->getThreadThrottlingInfo();
+            for (std::size_t i = 0; i < thread_throttling_vector.size(); ++i) {
+                const auto& throttling = thread_throttling_vector[i];
+                std::string thread_id = std::to_string(i);
+
+                metric.incrementCounter(IEpicsMetricCounterType::ThrottlingIdleCounter, throttling.idle_counter, {{"thread_id", thread_id}});
+                metric.incrementCounter(IEpicsMetricCounterType::ThrottlingEventCounter, throttling.total_events_processed, {{"thread_id", thread_id}});
+                metric.incrementCounter(IEpicsMetricCounterType::ThrottlingDurationCounter, throttling.total_idle_cycles, {{"thread_id", thread_id}});
+                metric.incrementCounter(IEpicsMetricCounterType::ThrottleGauge, throttling.throttle_ms, {{"thread_id", thread_id}});
+            }
         }
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }

@@ -25,7 +25,7 @@ class DummyMetricService;
    public:                                                                        \
     virtual ~Dummy##type() = default;                                             \
     void                                                                          \
-    incrementCounter(counter_type type, double inc_value = 1.0) override final {} \
+    incrementCounter(counter_type type, const double inc_value = 1.0, const std::map<std::string, std::string>& label = {}) override final {} \
   };
 
 #define CONSTRUCT_METRIC(type, counter_type)                                      \
@@ -36,7 +36,7 @@ class DummyMetricService;
    public:                                                                        \
     virtual ~Dummy##type() = default;                                             \
     void                                                                          \
-    incrementCounter(counter_type type, double inc_value = 1.0) override final {} \
+    incrementCounter(counter_type type, const double inc_value = 1.0, const std::map<std::string, std::string>& label = {}) override final {} \
   };
 
 DEFINE_METRIC(IEpicsMetric, IEpicsMetricCounterType)

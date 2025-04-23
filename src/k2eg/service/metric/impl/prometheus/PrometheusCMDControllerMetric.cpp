@@ -14,7 +14,7 @@ PrometheusCMDControllerMetric::PrometheusCMDControllerMetric()
       fault_processed(command_received_counters.Add({{"op", "fault_processed"}})) {}
 
 void
-PrometheusCMDControllerMetric::incrementCounter(ICMDControllerMetricCounterType type, double inc_value) {
+PrometheusCMDControllerMetric::incrementCounter(ICMDControllerMetricCounterType type, const double inc_value, const std::map<std::string, std::string>& label) {
   switch (type) {
     case ICMDControllerMetricCounterType::ReceivedCommand: received.Increment(inc_value); break;
     case ICMDControllerMetricCounterType::BadCommand: bad_parsed.Increment(inc_value); break;
