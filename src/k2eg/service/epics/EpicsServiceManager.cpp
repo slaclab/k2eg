@@ -21,13 +21,13 @@ using namespace k2eg::service::epics_impl;
 void set_thread_name(const std::size_t idx)
 {
     const std::string name = "EPICS Monitor " + std::to_string(idx);
-    const bool result = BS::this_thread::set_os_thread_name(name);
+    const bool        result = BS::this_thread::set_os_thread_name(name);
 }
 
 EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config)
     : config(std::move(config))
     , end_processing(false)
-    , thread_throttling_vector(this->config->thread_count) 
+    , thread_throttling_vector(this->config->thread_count)
     , processing_pool(std::make_shared<BS::light_thread_pool>(this->config->thread_count, set_thread_name))
 {
     pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
@@ -223,8 +223,7 @@ size_t EpicsServiceManager::getHandlerSize()
 }
 
 // regex for IOC name
-std::regex pv_name_regex("^(pva?|ca)://" "([a-zA-Z0-9-_]+(?::[a-zA-Z0-9-_]+)*)(\\.([a-zA-Z0-9-_]+(?:\\.[a-zA-Z0-9_]+)*)"
-                                         ")?$");
+std::regex pv_name_regex("^(pva?|ca)://" "([a-zA-Z0-9-_]+(?::[a-zA-Z0-9-_]+)*)(\\.([a-zA-Z0-9-_]+(?:\\.[a-zA-Z0-9_]+)*)" ")?$");
 
 PVUPtr EpicsServiceManager::sanitizePVName(const std::string& pv_name)
 {
@@ -260,26 +259,34 @@ PVUPtr EpicsServiceManager::sanitizePVName(const std::string& pv_name)
 
 void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
 {
-    bool had_events = false;
-    const std::optional<std::size_t> thread_index = BS::this_thread::get_index();
     if (end_processing)
         return;
-    bool to_delete = false;
+    const auto thread_index = BS::this_thread::get_index();
+    if (!thread_index.has_value())
+        return;
+
+    bool        had_events = false;
+    bool        to_delete = false;
+    const auto& pv_name = monitor_op->getPVName();
     {
         // Lock channel_map for reading to check if the current monitor should be deleted or updated.
         ReadLockCM read_lock(channel_map_mutex);
-        if ((to_delete = channel_map[monitor_op->getPVName()].to_erase) == false)
+        auto       it = channel_map.find(pv_name);
+        if (it == channel_map.end())
+            return;
+
+        auto& info = it->second;
+        to_delete = info.to_erase;
+        if (!to_delete)
         {
-            // Process monitor update if not marked for deletion.
-            if (channel_map[monitor_op->getPVName()].to_force)
+            if (info.to_force)
             {
-                // Force update on the monitor before processing.
                 monitor_op->forceUpdate();
-                channel_map[monitor_op->getPVName()].to_force = false;
+                info.to_force = false;
             }
-            // Poll for new monitor events.
+
             monitor_op->poll();
-            // If events exist and listeners are registered, broadcast the event data.
+
             if (monitor_op->hasEvents() && !handler_broadcaster.targets.empty())
             {
                 handler_broadcaster.broadcast(monitor_op->getEventData());
@@ -297,17 +304,30 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
     }
 
     // manage throtling on situation where to much pv returtn nothing to reduce pressure
-    if (!had_events) {
-        int idle = ++thread_throttling_vector[thread_index.value()].idle_counter;
-        if (idle > thread_throttling_vector[thread_index.value()].idle_threshold) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(thread_throttling_vector[thread_index.value()].throttle_ms));
-            thread_throttling_vector[thread_index.value()].idle_counter = 0;
+    constexpr int min_throttle_ms = 1;
+    constexpr int max_throttle_ms = 100;
+    constexpr int idle_threshold = 10; // how many idle cycles before backoff increases
+    auto&         throttling = thread_throttling_vector[thread_index.value()];
+    if (!had_events)
+    {
+        throttling.idle_counter++;
+
+        if (throttling.idle_counter >= idle_threshold)
+        {
+            // Exponential backoff with max cap
+            throttling.throttle_ms = std::min(throttling.throttle_ms * 2, max_throttle_ms);
+            std::this_thread::sleep_for(std::chrono::milliseconds(throttling.throttle_ms));
+            throttling.idle_counter = 0;
         }
-    } else {
-        thread_throttling_vector[thread_index.value()].idle_counter = 0;
     }
-    
-    // processing_pool->push_task(&EpicsServiceManager::task, this, monitor_op);
+    else
+    {
+        // Work detected: reduce throttle or reset
+        throttling.idle_counter = 0;
+        throttling.throttle_ms = std::max(throttling.throttle_ms / 2, min_throttle_ms);
+        throttling.last_activity_time = std::chrono::steady_clock::now();
+    }
+
     processing_pool->detach_task(
         [this, monitor_op]
         {

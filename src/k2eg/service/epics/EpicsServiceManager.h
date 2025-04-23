@@ -56,8 +56,8 @@ DEFINE_PTR_TYPES(EpicsServiceManagerConfig)
 struct ThreadThrottling
 {
     std::int32_t idle_counter{0};
-    std::int32_t idle_threshold{100};
     std::int32_t throttle_ms{100};
+    std::chrono::steady_clock::time_point last_activity_time = std::chrono::steady_clock::now();
 };
 
 class EpicsServiceManager
