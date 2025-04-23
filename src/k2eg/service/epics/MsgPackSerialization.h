@@ -1,19 +1,21 @@
 #ifndef K2EG_SERVICE_EPICS_MSGPACKSERIALIZATION_H_
 #define K2EG_SERVICE_EPICS_MSGPACKSERIALIZATION_H_
 
+#include "pvData.h"
 #include <k2eg/service/epics/Serialization.h>
 #include <msgpack.hpp>
-#include "pvData.h"
 
 namespace k2eg::service::epics_impl {
 // JSON serializer
-class MsgPackSerializer : public Serializer {
+class MsgPackSerializer : public Serializer
+{
     void processScalar(const epics::pvData::PVScalar* scalar, msgpack::packer<msgpack::sbuffer>& packer);
     void processScalarArray(const epics::pvData::PVScalarArray* scalarArray, msgpack::packer<msgpack::sbuffer>& packer);
     void processStructure(const epics::pvData::PVStructure* scalarArray, msgpack::packer<msgpack::sbuffer>& packer);
     void processStructureArray(epics::pvData::PVStructureArray::const_svector structure_array, msgpack::packer<msgpack::sbuffer>& packer);
     void processUnion(const epics::pvData::PVUnion* union_, msgpack::packer<msgpack::sbuffer>& packer);
     void processUnionArray(const epics::pvData::PVUnionArray::const_svector union_array, msgpack::packer<msgpack::sbuffer>& packer);
+
 public:
     MsgPackSerializer() = default;
     virtual ~MsgPackSerializer() = default;

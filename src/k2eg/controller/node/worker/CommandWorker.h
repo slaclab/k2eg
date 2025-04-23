@@ -2,18 +2,21 @@
 #define k2eg_CONTROLLER_NODE_WORKER_COMMANDWORKER_H_
 #include <k2eg/common/serialization.h>
 #include <k2eg/common/types.h>
+#include <k2eg/common/BS_thread_pool.hpp>
+
 #include <k2eg/controller/command/CMDCommand.h>
 #include <k2eg/service/pubsub/IPublisher.h>
+#include <k2eg/common/JsonSerialization.h>
+#include <k2eg/common/MsgpackSerialization.h>
+#include <k2eg/controller/command/cmd/Command.h>
 
 #include <chrono>
 #include <cstdint>
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <memory>
 
-#include "k2eg/common/JsonSerialization.h"
-#include "k2eg/common/MsgpackSerialization.h"
-#include "k2eg/controller/command/cmd/Command.h"
-#include "msgpack/v3/pack_decl.hpp"
+
+#include <msgpack/v3/pack_decl.hpp>
 
 namespace k2eg::controller::node::worker {
 
@@ -131,7 +134,7 @@ class CommandWorker {
   CommandWorker(const CommandWorker&)                                                      = delete;
   CommandWorker& operator=(const CommandWorker&)                                           = delete;
   ~CommandWorker()                                                                         = default;
-  virtual void processCommand(k2eg::controller::command::cmd::ConstCommandShrdPtr command) = 0;
+  virtual void processCommand(std::shared_ptr<BS::light_thread_pool>  command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command) = 0;
   virtual bool isReady();
 };
 DEFINE_PTR_TYPES(CommandWorker)

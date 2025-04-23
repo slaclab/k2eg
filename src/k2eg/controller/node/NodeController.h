@@ -19,38 +19,40 @@
 
 namespace k2eg::controller::node {
 
-struct NodeControllerConfiguration {
-  //monitor configuration
-  worker::monitor::MonitorCommandConfiguration monitor_command_configuration;
-
+struct NodeControllerConfiguration
+{
+    // monitor configuration
+    worker::monitor::MonitorCommandConfiguration monitor_command_configuration;
 };
 DEFINE_PTR_TYPES(NodeControllerConfiguration)
+
 /**
  * Main controller class for the node operation
  */
-class NodeController {
-  ConstNodeControllerConfigurationUPtr node_controller_configuration;
-  std::shared_ptr<BS::thread_pool>                                                                      processing_pool;
-  k2eg::common::ObjectByTypeFactory<k2eg::controller::command::cmd::CommandType, worker::CommandWorker> worker_resolver;
-  configuration::NodeConfigurationShrdPtr                                                                node_configuration;
+class NodeController
+{
+    ConstNodeControllerConfigurationUPtr   node_controller_configuration;
+    std::shared_ptr<BS::light_thread_pool> processing_pool;
+    k2eg::common::ObjectByTypeFactory<k2eg::controller::command::cmd::CommandType, worker::CommandWorker> worker_resolver;
+    configuration::NodeConfigurationShrdPtr node_configuration;
 
-  k2eg::service::log::ILoggerShrdPtr             logger;
-  k2eg::service::epics_impl::EpicsServiceManager epics_service_manager;
-  k2eg::service::metric::INodeControllerMetric&  metric;
+    k2eg::service::log::ILoggerShrdPtr             logger;
+    k2eg::service::epics_impl::EpicsServiceManager epics_service_manager;
+    k2eg::service::metric::INodeControllerMetric&  metric;
 
- public:
-  NodeController(ConstNodeControllerConfigurationUPtr node_controller_configuration, k2eg::service::data::DataStorageShrdPtr data_storage);
-  NodeController()                                 = delete;
-  NodeController(const NodeController&)            = delete;
-  NodeController& operator=(const NodeController&) = delete;
-  ~NodeController();
-  void performManagementTask();
-  void waitForTaskCompletion();
-  bool isWorkerReady(k2eg::controller::command::cmd::CommandType cmd_type);
-  // Process an array of command
-  void submitCommand(k2eg::controller::command::cmd::ConstCommandShrdPtrVec commands);
+public:
+    NodeController(ConstNodeControllerConfigurationUPtr node_controller_configuration, k2eg::service::data::DataStorageShrdPtr data_storage);
+    NodeController() = delete;
+    NodeController(const NodeController&) = delete;
+    NodeController& operator=(const NodeController&) = delete;
+    ~NodeController();
+    void performManagementTask();
+    void waitForTaskCompletion();
+    bool isWorkerReady(k2eg::controller::command::cmd::CommandType cmd_type);
+    // Process an array of command
+    void submitCommand(k2eg::controller::command::cmd::ConstCommandShrdPtrVec commands);
 };
 DEFINE_PTR_TYPES(NodeController)
-}  // namespace k2eg::controller::node
+} // namespace k2eg::controller::node
 
-#endif  // k2eg_CONTROLLER_NODE_NODECONTROLLER_H_
+#endif // k2eg_CONTROLLER_NODE_NODECONTROLLER_H_

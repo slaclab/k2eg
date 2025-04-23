@@ -1,3 +1,4 @@
+#include "k2eg/common/BS_thread_pool.hpp"
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/NodeController.h>
 #include <k2eg/controller/node/worker/GetCommandWorker.h>
@@ -28,7 +29,7 @@ using namespace k2eg::service::metric;
 NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_controller_configuration, DataStorageShrdPtr data_storage)
     : node_controller_configuration(std::move(node_controller_configuration)),
       node_configuration(std::make_shared<NodeConfiguration>(data_storage)),
-      processing_pool(std::make_shared<BS::thread_pool>()),
+      processing_pool(std::make_shared<BS::light_thread_pool>()),
       metric(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric()) {
   // set logger
   logger = ServiceResolver<ILogger>::resolve();
@@ -47,7 +48,7 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
   worker_resolver.registerObjectInstance(CommandType::snapshot, std::make_shared<SnapshotCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
 }
 
-NodeController::~NodeController() { processing_pool->wait_for_tasks(); }
+NodeController::~NodeController() { processing_pool->wait(); }
 
 void 
 NodeController::performManagementTask() {
@@ -57,7 +58,7 @@ NodeController::performManagementTask() {
 
 void
 NodeController::waitForTaskCompletion() {
-  processing_pool->wait_for_tasks();
+  processing_pool->wait();
 }
 
 bool 
@@ -74,14 +75,19 @@ NodeController::submitCommand(ConstCommandShrdPtrVec commands) {
   // submitted command metric
   if (commands.size()) { metric.incrementCounter(INodeControllerMetricCounterType::SubmittedCommand, commands.size()); }
   // apply all submitted commands
-  for (auto& c : commands) {
-    logger->logMessage(STRING_FORMAT("Process command => %1%", to_json_string(c)));
+  for (auto& cmd : commands) {
+    logger->logMessage(STRING_FORMAT("Process command => %1%", to_json_string(cmd)));
     // submit command to appropiate worker
-    if (auto worker = worker_resolver.resolve(c->type); worker != nullptr) {
-      logger->logMessage(STRING_FORMAT("Forward command => %1% to worker %2%", to_json_string(c) % std::string(command_type_to_string(c->type))));
-      processing_pool->push_task(&CommandWorker::processCommand, worker.get(), c);
+    if (auto worker = worker_resolver.resolve(cmd->type); worker != nullptr) {
+      logger->logMessage(STRING_FORMAT("Forward command => %1% to worker %2%", to_json_string(cmd) % std::string(command_type_to_string(cmd->type))));
+      processing_pool->detach_task(
+        [this, worker, cmd]
+        {
+            worker->processCommand(this->processing_pool, cmd);
+        }
+      );
     } else {
-      logger->logMessage(STRING_FORMAT("No worker found for command type '%1%'", std::string(command_type_to_string(c->type))), LogLevel::ERROR);
+      logger->logMessage(STRING_FORMAT("No worker found for command type '%1%'", std::string(command_type_to_string(cmd->type))), LogLevel::ERROR);
     }
   }
 }

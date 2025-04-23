@@ -108,7 +108,7 @@ class MonitorCommandWorker : public CommandWorker {
                        k2eg::controller::node::configuration::NodeConfigurationShrdPtr node_configuration_db);
   virtual ~MonitorCommandWorker();
   void executePeriodicTask();
-  void processCommand(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
+  void processCommand(std::shared_ptr<BS::light_thread_pool> thread_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
   bool isReady();
 };
 

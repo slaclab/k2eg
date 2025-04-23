@@ -108,7 +108,6 @@ DEFINE_PTR_TYPES(SnapshotOpInfo)
  * including data collection and response publication.
  */
 class SnapshotCommandWorker : public CommandWorker {
-  std::shared_ptr<BS::thread_pool>                      processing_pool;
   k2eg::service::log::ILoggerShrdPtr                    logger;
   k2eg::service::pubsub::IPublisherShrdPtr              publisher;
   k2eg::service::metric::IEpicsMetric&                  metric;
@@ -116,7 +115,7 @@ class SnapshotCommandWorker : public CommandWorker {
   // Receive event from publisher
   void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
   // manage the snapshot command execution in a separate thread
-  void checkGetCompletion(SnapshotOpInfoShrdPtr snapshot_info);
+  void checkGetCompletion(std::shared_ptr<BS::light_thread_pool> thread_pool, SnapshotOpInfoShrdPtr snapshot_info);
   // send a faulty reply to the client
   void manageFaultyReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd);
   // send the snapshot reply to the client for a pv index
@@ -137,7 +136,7 @@ class SnapshotCommandWorker : public CommandWorker {
   SnapshotCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
   virtual ~SnapshotCommandWorker();
   // process the command
-  void processCommand(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
+  void processCommand(std::shared_ptr<BS::light_thread_pool> thread_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 };
 
 }  // namespace k2eg::controller::node::worker

@@ -2,17 +2,18 @@
 #define K2EG_SERVICE_METRIC_IMPL_PROMETHEUS_PROMETHEUSEPICSMETRIC_H_
 
 #include <k2eg/service/metric/IEpicsMetric.h>
+
+#include <prometheus/gauge.h>
+#include <prometheus/labels.h>
 #include <prometheus/counter.h>
 #include <prometheus/exposer.h>
-#include <prometheus/labels.h>
 #include <prometheus/registry.h>
 
 #include <atomic>
-#include <cstdint>
 #include <memory>
 #include <thread>
 
-#include "prometheus/gauge.h"
+
 
 namespace k2eg::service::metric::impl::prometheus_impl {
 
@@ -25,6 +26,10 @@ class PrometheusEpicsMetric : public IEpicsMetric {
   prometheus::Family<prometheus::Counter>& ioc_read_write;
   prometheus::Family<prometheus::Gauge>&   ioc_read_write_rate;
   prometheus::Family<prometheus::Gauge>&   ioc_pv_count;
+  prometheus::Family<prometheus::Counter>& idle_counter_family;
+  prometheus::Family<prometheus::Counter>& event_counter_family;
+  prometheus::Family<prometheus::Counter>& duration_counter_family;
+  prometheus::Family<prometheus::Gauge>&   throttle_gauge_family;
   prometheus::Counter&                     get_ok_counter;
   prometheus::Counter&                     put_ok_counter;
   prometheus::Counter&                     monitor_event_data;
@@ -34,6 +39,7 @@ class PrometheusEpicsMetric : public IEpicsMetric {
   prometheus::Counter&                     monitor_event_disconnected;
   prometheus::Gauge&                       total_monitor_pv;
   prometheus::Gauge&                       active_monitor_pv;
+
   PrometheusEpicsMetric();
 
   bool                                  run_rate_thread;
@@ -44,7 +50,7 @@ class PrometheusEpicsMetric : public IEpicsMetric {
 
  public:
   virtual ~PrometheusEpicsMetric();
-  void incrementCounter(IEpicsMetricCounterType type, double inc_value = 1.0) override final;
+  void incrementCounter(IEpicsMetricCounterType type, const double inc_value = 1.0, const std::map<std::string, std::string>& label = {}) override final;
 };
 }  // namespace k2eg::service::metric::impl::prometheus_impl
 
