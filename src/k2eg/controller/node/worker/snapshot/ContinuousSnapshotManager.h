@@ -60,12 +60,12 @@ class ContinuousSnapshotManager
     std::shared_ptr<BS::light_thread_pool>                thread_pool;
     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
     void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
-    void manageSnapshot(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
+    void processSnapshot(RepeatingSnapshotOpInfoShrdPtr snapstho_command_info);
 
 public:
     ContinuousSnapshotManager(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     ~ContinuousSnapshotManager() = default;
-    virtual void processCommand(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr command);
+    void submitSnapshot(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr snapsthot_command);
 };
 
 DEFINE_PTR_TYPES(ContinuousSnapshotManager)

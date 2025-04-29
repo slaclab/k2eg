@@ -16,10 +16,16 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(k2eg::service::epics_impl::
     global_cache_.clear();
 }
 
-void ContinuousSnapshotManager::processCommand()
+void ContinuousSnapshotManager::submitSnapshot(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr snapsthot_command)
 {
     // TODO: implement processCommand
     //  This function should be implemented to process the command
+    auto s_op_ptr = MakeRepeatingSnapshotOpInfoShrdPtr(snapsthot_command);
+    thread_pool->detach_task(
+        [this, s_op_ptr]()
+        {
+            this->processSnapshot(s_op_ptr);
+        });
 }
 
 void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType event_received)
@@ -38,6 +44,7 @@ void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerPara
     }
 }
 
-void ContinuousSnapshotManager::manageSnapshot(std::shared_ptr<BS::light_thread_pool> command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command)
+void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr snapstho_command_info)
 {
+
 }
