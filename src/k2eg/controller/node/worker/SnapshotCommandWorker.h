@@ -2,11 +2,15 @@
 #define K2EG_CONTROLLER_NODE_WORKER_SNAPSHOTCOMMANDWORKER_H_
 
 #include <k2eg/controller/command/cmd/SnapshotCommand.h>
+
 #include <k2eg/controller/node/worker/CommandWorker.h>
-#include <k2eg/service/epics/EpicsMonitorOperation.h>
-#include <k2eg/service/epics/EpicsServiceManager.h>
-#include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.h>
+
 #include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/service/epics/EpicsMonitorOperation.h>
+
+#include <k2eg/service/metric/IMetricService.h>
 
 #include <vector>
 #include <stdint.h>
@@ -93,7 +97,7 @@ class SnapshotOpInfo : public WorkerAsyncOperation {
   k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd;
   // take track for all the monitor operation that have been processed
   boost::dynamic_bitset<> processed_index;
-  // cotnains the monitor async opration for all the PVs
+  // contains the monitor async opration for all the PVs
   std::vector<service::epics_impl::ConstMonitorOperationShrdPtr> v_mon_ops;
   SnapshotOpInfo(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr    cmd,
                  std::vector<service::epics_impl::ConstMonitorOperationShrdPtr> v_mon_ops,

@@ -1,9 +1,10 @@
 
 #include <k2eg/common/utility.h>
-#include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
+
 #include <k2eg/service/ServiceResolver.h>
 
-#include "k2eg/controller/command/cmd/SnapshotCommand.h"
+#include <k2eg/controller/command/cmd/SnapshotCommand.h>
+#include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 
 using namespace k2eg::common;
 
@@ -17,15 +18,18 @@ using namespace k2eg::service::metric;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::epics_impl;
 
-SnapshotCommandWorker::SnapshotCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager) : logger(ServiceResolver<ILogger>::resolve()), publisher(ServiceResolver<IPublisher>::resolve()), metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric()), epics_service_manager(epics_service_manager)
+SnapshotCommandWorker::SnapshotCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager)
+    : logger(ServiceResolver<ILogger>::resolve())
+    , publisher(ServiceResolver<IPublisher>::resolve())
+    , metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric())
+    , epics_service_manager(epics_service_manager)
 {
     publisher->setCallBackForReqType("get-reply-message", std::bind(&SnapshotCommandWorker::publishEvtCB, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 }
 
 SnapshotCommandWorker::~SnapshotCommandWorker() {}
 
-void
-SnapshotCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* const msg, const std::string& error_message)
+void SnapshotCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* const msg, const std::string& error_message)
 {
     switch (type)
     {
@@ -39,8 +43,7 @@ SnapshotCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* cons
     }
 }
 
-void
-SnapshotCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> command_pool, ConstCommandShrdPtr command)
+void SnapshotCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> command_pool, ConstCommandShrdPtr command)
 {
     if (command->type != CommandType::snapshot)
     {
@@ -53,7 +56,9 @@ SnapshotCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> com
     std::vector<service::epics_impl::ConstMonitorOperationShrdPtr> v_mon_ops;
     for (const auto& pv_uri : s_ptr->pv_name_list)
     {
-        logger->logMessage(STRING_FORMAT("Perepare snapshot ops for '%1%' on topic %2% with sertype: %3%", pv_uri % s_ptr->reply_topic % serialization_to_string(s_ptr->serialization)), LogLevel::DEBUG);
+        logger->logMessage(STRING_FORMAT("Perepare snapshot ops for '%1%' on topic %2% with sertype: %3%",
+                                         pv_uri % s_ptr->reply_topic % serialization_to_string(s_ptr->serialization)),
+                           LogLevel::DEBUG);
 
         auto mon_op = epics_service_manager->getMonitorOp(pv_uri);
         if (!mon_op)
@@ -76,8 +81,7 @@ SnapshotCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> com
         });
 }
 
-void
-SnapshotCommandWorker::manageFaultyReply(const std::int8_t error_code, const std::string& error_message, ConstSnapshotCommandShrdPtr cmd)
+void SnapshotCommandWorker::manageFaultyReply(const std::int8_t error_code, const std::string& error_message, ConstSnapshotCommandShrdPtr cmd)
 {
     logger->logMessage(STRING_FORMAT("Snapshot error%1%", error_message), LogLevel::ERROR);
     if (cmd->reply_topic.empty())
@@ -98,8 +102,7 @@ SnapshotCommandWorker::manageFaultyReply(const std::int8_t error_code, const std
     }
 }
 
-void
-SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::light_thread_pool> command_pool, SnapshotOpInfoShrdPtr snapshot_info)
+void SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::light_thread_pool> command_pool, SnapshotOpInfoShrdPtr snapshot_info)
 {
     if (!snapshot_info->isTimeout())
     {
@@ -138,7 +141,8 @@ SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::light_thread_pool>
         }
         else
         {
-            // in this case we have comepleted the snapshot so we can send the completion message to the client before the snapshot
+            // in this case we have comepleted the snapshot so we can send the completion message to the client before
+            // the snapshot
             publishEndSnapshotReply(snapshot_info->cmd);
         }
     }
@@ -166,8 +170,7 @@ SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::light_thread_pool>
     }
 }
 
-void
-SnapshotCommandWorker::publishSnapshotReply(ConstSnapshotCommandShrdPtr cmd, std::uint32_t pv_index, service::epics_impl::ConstChannelDataUPtr pv_data)
+void SnapshotCommandWorker::publishSnapshotReply(ConstSnapshotCommandShrdPtr cmd, std::uint32_t pv_index, service::epics_impl::ConstChannelDataUPtr pv_data)
 {
     // Pass the correct member (e.g., pv) from evt_shrd_ptr->channel_data
     auto serialized_message = serialize(SnapshotCommandReply{0, cmd->reply_id, static_cast<std::int32_t>(pv_index), std::move(pv_data)}, cmd->serialization);
@@ -181,8 +184,7 @@ SnapshotCommandWorker::publishSnapshotReply(ConstSnapshotCommandShrdPtr cmd, std
     }
 }
 
-void
-SnapshotCommandWorker::publishEndSnapshotReply(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd)
+void SnapshotCommandWorker::publishEndSnapshotReply(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd)
 {
     auto serialized_message = serialize(CommandReply{1, cmd->reply_id}, cmd->serialization);
     if (!serialized_message)
