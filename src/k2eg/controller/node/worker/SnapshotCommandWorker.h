@@ -12,10 +12,11 @@
 
 #include <k2eg/service/metric/IMetricService.h>
 
+#include <boost/dynamic_bitset.hpp>
+
 #include <vector>
 #include <stdint.h>
 
-#include <boost/dynamic_bitset.hpp>
 
 
 
