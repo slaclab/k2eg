@@ -1,16 +1,16 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 
-#include <k2eg/common/types.h>
 #include <k2eg/common/BS_thread_pool.hpp>
+#include <k2eg/common/types.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 
 #include <atomic>
 #include <memory>
-#include <string>
 #include <shared_mutex>
+#include <string>
 #include <unordered_map>
 
 namespace k2eg::controller::node::worker::snapshot {
@@ -50,12 +50,14 @@ Data is published se sequentially on publisher identifyed by name and iteration 
 */
 class ContinuousSnapshotManager
 {
+    k2eg::service::log::ILoggerShrdPtr logger;
+
     // atomic EPICS event data shared ptr
-    using MonitorEventAtomicShrdPtr = std::atomic<k2eg::service::epics_impl::MonitorEventShrdPtr>;
+    using AtomicMonitorEventShrdPtr = std::atomic<k2eg::service::epics_impl::MonitorEventShrdPtr>;
 
     // local cache for continuous snapshot
     mutable std::shared_mutex                                  global_cache_mutex_;
-    std::unordered_map<std::string, MonitorEventAtomicShrdPtr> global_cache_;
+    std::unordered_map<std::string, AtomicMonitorEventShrdPtr> global_cache_;
 
     std::shared_ptr<BS::light_thread_pool>                thread_pool;
     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
