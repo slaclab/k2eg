@@ -14,6 +14,9 @@
 #include <unordered_map>
 
 namespace k2eg::controller::node::worker::snapshot {
+// atomic EPICS event data shared ptr
+using AtomicMonitorEventShrdPtr = std::atomic<k2eg::service::epics_impl::MonitorEventShrdPtr>;
+using ShdAtomicMonitorEventShrdPtr = std::shared_ptr<AtomicMonitorEventShrdPtr>;
 
 /*
 @brief RepeatingSnapshotOpInfo is a class that holds information about a repeating snapshot operation.
@@ -30,7 +33,7 @@ public:
     // keep track of the comamnd specification
     k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd;
     // per-snapshot views hold pointers into global_cache_
-    std::unordered_map<std::string, std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr>> snapshot_views_;
+    std::unordered_map<std::string, ShdAtomicMonitorEventShrdPtr> snapshot_views_;
 
     RepeatingSnapshotOpInfo(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd) : cmd(cmd) {}
 };
@@ -52,12 +55,8 @@ class ContinuousSnapshotManager
 {
     k2eg::service::log::ILoggerShrdPtr logger;
 
-    // atomic EPICS event data shared ptr
-    using AtomicMonitorEventShrdPtr = std::atomic<k2eg::service::epics_impl::MonitorEventShrdPtr>;
-    using ShdAtomicMonitorEventShrdPtr = std::shared_ptr<AtomicMonitorEventShrdPtr>;
-
     // local cache for continuous snapshot
-    mutable std::shared_mutex                                  global_cache_mutex_;
+    mutable std::shared_mutex                                     global_cache_mutex_;
     std::unordered_map<std::string, ShdAtomicMonitorEventShrdPtr> global_cache_;
 
     std::shared_ptr<BS::light_thread_pool>                thread_pool;

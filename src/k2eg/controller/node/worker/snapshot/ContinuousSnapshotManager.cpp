@@ -19,9 +19,7 @@ void set_snapshot_thread_name(const std::size_t idx)
 }
 
 ContinuousSnapshotManager::ContinuousSnapshotManager(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager)
-    : logger(ServiceResolver<ILogger>::resolve())
-    , epics_service_manager(epics_service_manager)
-    , thread_pool(std::make_shared<BS::light_thread_pool>(std::thread::hardware_concurrency(), set_snapshot_thread_name))
+    : logger(ServiceResolver<ILogger>::resolve()), epics_service_manager(epics_service_manager), thread_pool(std::make_shared<BS::light_thread_pool>(std::thread::hardware_concurrency(), set_snapshot_thread_name))
 {
     // initialize the local cache
     global_cache_.clear();
@@ -31,9 +29,10 @@ void ContinuousSnapshotManager::submitSnapshot(k2eg::controller::command::cmd::C
 {
     // TODO: implement processCommand
     logger->logMessage(STRING_FORMAT("Perepare continuous snapshot ops for '%1%' on topic %2% with sertype: %3%",
-                                 snapsthot_command->snapshot_name % snapsthot_command->reply_topic % serialization_to_string(snapsthot_command->serialization)),
-                     LogLevel::DEBUG);
-    //  This function should be implemented to process the command
+                                     snapsthot_command->snapshot_name % snapsthot_command->reply_topic %
+                                         serialization_to_string(snapsthot_command->serialization)),
+                       LogLevel::DEBUG);
+    // This function should be implemented to process the command
     auto s_op_ptr = MakeRepeatingSnapshotOpInfoShrdPtr(snapsthot_command);
 
     // prepare global cache with all the needed key
@@ -44,25 +43,31 @@ void ContinuousSnapshotManager::submitSnapshot(k2eg::controller::command::cmd::C
     {
         auto it = global_cache_.find(pv_uri);
 
-        //auto mon_op = epics_service_manager->getMonitorOp(pv_uri);
-        if (it == global_cache_.end()) {
+        // auto mon_op = epics_service_manager->getMonitorOp(pv_uri);
+        if (it == global_cache_.end())
+        {
             read_lock.unlock();
             {
                 std::unique_lock write(global_cache_mutex_); // take exclusive
                 // double-check in case of race
-                auto inserted = global_cache_.emplace(pv_uri);
-                if(!inserted.second){
-                    logger->logMessage(STRING_FORMAT("Failing to add PV %1% to the global cache fro snapshot", pv_uri % s_op_ptr->cmd->snapshot_name), LogLevel::ERROR);
+                auto inserted = global_cache_.emplace(pv_uri, std::make_shared<AtomicMonitorEventShrdPtr>(std::make_shared<MonitorEvent>()));
+                if (!inserted.second)
+                {
+                    logger->logMessage(
+                        STRING_FORMAT("Failing to add PV %1% to the global cache fro snapshot", pv_uri % s_op_ptr->cmd->snapshot_name), LogLevel::ERROR);
                     continue;
                 }
                 it = inserted.first;
-            } 
-            // add to snapshot view cache
-            if(s_op_ptr->snapshot_views_.emplace(it).second){
-                logger->logMessage(STRING_FORMAT("Failing to add PV %1% to the view cache for snapshot " , pv_uri % s_op_ptr->cmd->snapshot_name), LogLevel::ERROR);
             }
             read_lock.lock();
-        } 
+        }
+
+        // ait now is valid
+        if (s_op_ptr->snapshot_views_.emplace(pv_uri, it->second).second)
+        {
+            logger->logMessage(
+                STRING_FORMAT("Failing to add PV %1% to the view cache for snapshot ", pv_uri % s_op_ptr->cmd->snapshot_name), LogLevel::ERROR);
+        }
     }
 
     // now the snapshot can be submited and processed
@@ -92,7 +97,4 @@ void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerPara
     }
 }
 
-void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr snapstho_command_info)
-{
-
-}
+void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr snapstho_command_info) {}
