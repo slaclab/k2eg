@@ -44,21 +44,36 @@ void ContinuousSnapshotManager::submitSnapshot(k2eg::controller::command::cmd::C
     {
         auto it = global_cache_.find(pv_uri);
 
-        auto mon_op = epics_service_manager->getMonitorOp(pv_uri);
+        //auto mon_op = epics_service_manager->getMonitorOp(pv_uri);
         if (it == global_cache_.end()) {
-            read_lock.unlock();                        // drop shared
-            std::unique_lock write(global_cache_mutex_); // take exclusive
-            // double-check in case of race
-            it = global_cache_.try_emplace(pv_uri).first;
-            // (optionally) rebuild your snapshot_views_ under this lock
+            read_lock.unlock();
+            {
+                std::unique_lock write(global_cache_mutex_); // take exclusive
+                // double-check in case of race
+                auto inserted = global_cache_.emplace(pv_uri);
+                if(!inserted.second){
+                    logger->logMessage(STRING_FORMAT("Failing to add PV %1% to the global cache fro snapshot", pv_uri % s_op_ptr->cmd->snapshot_name), LogLevel::ERROR);
+                    continue;
+                }
+                it = inserted.first;
+            } 
+            // add to snapshot view cache
+            if(s_op_ptr->snapshot_views_.emplace(it).second){
+                logger->logMessage(STRING_FORMAT("Failing to add PV %1% to the view cache for snapshot " , pv_uri % s_op_ptr->cmd->snapshot_name), LogLevel::ERROR);
+            }
+            read_lock.lock();
         } 
     }
 
+    // now the snapshot can be submited and processed
     thread_pool->detach_task(
         [this, s_op_ptr]()
         {
+            logger->logMessage(STRING_FORMAT("Start snapshot  %1%", s_op_ptr->cmd->snapshot_name), LogLevel::ERROR);
             this->processSnapshot(s_op_ptr);
         });
+
+    // TODO return reply to app for submitted command
 }
 
 void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType event_received)
