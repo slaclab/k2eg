@@ -73,7 +73,6 @@ void SnapshotCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool
         }
     }
     // submit snapshot to processing pool
-    // command_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, command_pool, );
     auto s_op_ptr = std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops));
     command_pool->detach_task(
         [this, command_pool, s_op_ptr]()

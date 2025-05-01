@@ -45,7 +45,7 @@ EpicsServiceManager::~EpicsServiceManager()
     ca_provider->reset();
 }
 
-void EpicsServiceManager::addChannel(const std::string& pv_name_uri)
+void EpicsServiceManager::addChannel(const std::string& pv_name_uri, bool sticky)
 {
     auto sanitized_pv = sanitizePVName(pv_name_uri);
     if (!sanitized_pv)
@@ -64,6 +64,7 @@ void EpicsServiceManager::addChannel(const std::string& pv_name_uri)
                 .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
                 .to_force = false,
                 .to_erase = false,
+                .sticky = sticky,
             };
         }
         {
@@ -111,6 +112,18 @@ void EpicsServiceManager::removeChannel(const std::string& pv_name_uri)
     if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
     {
         search->second.to_erase = true;
+    }
+}
+
+void EpicsServiceManager::setChannelSticky(const std::string& pv_name_uri, bool sticky)
+{
+    auto sanitized_pv = sanitizePVName(pv_name_uri);
+    if (!sanitized_pv)
+        return;
+    ReadLockCM read_lock(channel_map_mutex);
+    if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
+    {
+        search->second.sticky = sticky;
     }
 }
 
@@ -281,7 +294,7 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
             return;
 
         auto& info = it->second;
-        to_delete = info.to_erase;
+        to_delete = info.to_erase && !info.sticky;
         if (!to_delete)
         {
             if (info.to_force)

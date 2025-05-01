@@ -43,9 +43,14 @@ struct EpicsServiceManagerConfig
 // describe a channel ellement in map per each PV
 struct ChannelMapElement
 {
+    // this is the channel object
     std::shared_ptr<EpicsChannel> channel;
-    bool                          to_force;
-    bool                          to_erase;
+    // this is used to mark the channel as to be forced
+    bool to_force;
+    // this is used to mark the channel as to be removed
+    bool to_erase;
+    // this is used to mark the channel as sticky
+    bool sticky;
 };
 DEFINE_PTR_TYPES(ChannelMapElement)
 typedef std::unique_lock<std::shared_mutex> WriteLockCM;
@@ -86,9 +91,10 @@ class EpicsServiceManager
 public:
     explicit EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config = std::make_unique<EpicsServiceManagerConfig>());
     ~EpicsServiceManager();
-    void                         addChannel(const std::string& pv_name_uri);
+    void                         addChannel(const std::string& pv_name_uri, bool sticky = false);
     void                         removeChannel(const std::string& pv_name_uri);
     void                         monitorChannel(const std::string& pv_identification, bool activate);
+    void                         setChannelSticky(const std::string& pv_name_uri, bool sticky);
     void                         forceMonitorChannelUpdate(const std::string& pv_name_uri);
     ConstMonitorOperationShrdPtr getMonitorOp(const std::string& pv_name_uri);
     ConstGetOperationUPtr        getChannelData(const std::string& pv_name_uri);

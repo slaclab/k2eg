@@ -66,47 +66,64 @@ void ContinuousSnapshotManager::publishEvtCB(pubsub::EventType type, PublishMess
 void ContinuousSnapshotManager::submitSnapshot(ConstSnapshotCommandShrdPtr snapsthot_command)
 {
     bool faulty = false;
+
     logger->logMessage(STRING_FORMAT("Perepare continuous snapshot ops for '%1%' on topic %2% with sertype: %3%",
                                      snapsthot_command->snapshot_name % snapsthot_command->reply_topic %
                                          serialization_to_string(snapsthot_command->serialization)),
                        LogLevel::DEBUG);
-    // This function should be implemented to process the command
+    // create the commmand operation info structure
     auto s_op_ptr = MakeRepeatingSnapshotOpInfoShrdPtr(GET_QUEUE_FROM_SNAPSHOT_NAME(snapsthot_command->snapshot_name), snapsthot_command);
+    
+    // check if all the command infromation are filled
 
-    // prepare global cache with all the needed key
+    // create read lock toa ccess the globa cache to add pv not yet in the cache
     std::shared_lock read_lock(global_cache_mutex_);
 
-    // get the pv to add to the cache
+    // prepare global cache with all the needed pv
     for (const auto& pv_uri : s_op_ptr->cmd->pv_name_list)
     {
-        auto it = global_cache_.find(pv_uri);
+        // get pv name saniutization
+        auto sanitized_pv_name = epics_service_manager->sanitizePVName(pv_uri);
 
-        // auto mon_op = epics_service_manager->getMonitorOp(pv_uri);
+        // try to get cache lement on pv name
+        auto it = global_cache_.find(sanitized_pv_name->name);
+
         if (it == global_cache_.end())
         {
+            
+            if(!sanitized_pv_name){
+                manageReply(
+                    -1,
+                    STRING_FORMAT("PV '%1%'name malformed", pv_uri), snapsthot_command);
+                faulty = true;
+                break;
+            }
             read_lock.unlock();
             {
                 std::unique_lock write(global_cache_mutex_); // take exclusive
-                // double-check in case of race
-                auto inserted = global_cache_.emplace(pv_uri, std::make_shared<AtomicMonitorEventShrdPtr>(std::make_shared<MonitorEvent>()));
+                // create entry in cache using the pv_name without the protocol
+                auto inserted = global_cache_.emplace(sanitized_pv_name->name, std::make_shared<AtomicMonitorEventShrdPtr>(std::make_shared<MonitorEvent>()));
                 if (!inserted.second)
                 {
                     manageReply(
-                        -1,
+                        -2,
                         STRING_FORMAT("Failing to add PV %1% to the global cache fro snapshot", pv_uri % s_op_ptr->cmd->snapshot_name), snapsthot_command);
                     faulty = true;
                     break;
                 }
                 it = inserted.first;
+
+                // no we can start the monitor for the new registered pv and make it sticky (to not to be removed during monitor cleanup)
+                epics_service_manager->monitorChannel(pv_uri, true);
             }
             read_lock.lock();
         }
 
-        // ait now is valid
-        if (s_op_ptr->snapshot_views_.emplace(pv_uri, it->second).second)
+        // it now is valid
+        if (s_op_ptr->snapshot_views_.emplace(it->first, it->second).second)
         {
             manageReply(
-                -2, STRING_FORMAT("Failing to add PV %1% to the view cache for snapshot ", pv_uri % s_op_ptr->cmd->snapshot_name), snapsthot_command);
+                -3, STRING_FORMAT("Failing to add PV %1% to the view cache for snapshot ", pv_uri % s_op_ptr->cmd->snapshot_name), snapsthot_command);
             faulty = true;
             break;
         }
@@ -164,9 +181,8 @@ void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerPara
 
     for (auto& event : *event_received->event_fail)
     {
-        const std::string pv_name = event->channel_data.pv_name;
         // set the channel as not active
-        auto it = global_cache_.find(pv_name);
+        auto it = global_cache_.find(event->channel_data.pv_name);
         if (it != global_cache_.end())
         {
             it->second->store(nullptr, std::memory_order_release);
