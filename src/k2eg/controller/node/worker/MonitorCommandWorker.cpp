@@ -6,12 +6,12 @@
 #include <k2eg/controller/node/worker/MonitorCommandWorker.h>
 #include <k2eg/controller/node/worker/monitor/MonitorChecker.h>
 
-#include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/log/ILogger.h>
-#include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/scheduler/Task.h>
+#include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/scheduler/Scheduler.h>
-#include <k2eg/service/scheduler/Task.h>
+#include <k2eg/service/metric/IMetricService.h>
 
 #include <execution>
 #include <functional>

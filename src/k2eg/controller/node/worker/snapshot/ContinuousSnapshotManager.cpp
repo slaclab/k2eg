@@ -1,16 +1,24 @@
 
+#include "k2eg/service/epics/EpicsData.h"
 #include <k2eg/common/utility.h>
 
 #include <k2eg/service/ServiceResolver.h>
 
+#include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 #include <k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.h>
-#include <memory>
 
+#include <memory>
+#include <regex>
+using namespace k2eg::controller::command::cmd;
+using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::node::worker::snapshot;
 
 using namespace k2eg::service;
 using namespace k2eg::service::log;
+using namespace k2eg::service::pubsub;
 using namespace k2eg::service::epics_impl;
+
+#define GET_QUEUE_FROM_SNAPSHOT_NAME(snapshto_name) std::regex_replace(snapshto_name, std::regex(":"), "_")
 
 void set_snapshot_thread_name(const std::size_t idx)
 {
@@ -19,21 +27,51 @@ void set_snapshot_thread_name(const std::size_t idx)
 }
 
 ContinuousSnapshotManager::ContinuousSnapshotManager(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager)
-    : logger(ServiceResolver<ILogger>::resolve()), epics_service_manager(epics_service_manager), thread_pool(std::make_shared<BS::light_thread_pool>(std::thread::hardware_concurrency(), set_snapshot_thread_name))
+    : logger(ServiceResolver<ILogger>::resolve()), publisher(ServiceResolver<IPublisher>::resolve()), epics_service_manager(epics_service_manager), thread_pool(std::make_shared<BS::light_thread_pool>(std::thread::hardware_concurrency(), set_snapshot_thread_name))
 {
     // initialize the local cache
     global_cache_.clear();
+    // add epics manager monitor handler
+    epics_handler_token = epics_service_manager->addHandler(std::bind(&ContinuousSnapshotManager::epicsMonitorEvent, this, std::placeholders::_1));
+    // set the run flag to true
+    run_flag = true;
 }
 
-void ContinuousSnapshotManager::submitSnapshot(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr snapsthot_command)
+ContinuousSnapshotManager::~ContinuousSnapshotManager()
 {
-    // TODO: implement processCommand
+    // set the run flag to false
+    run_flag = false;
+    // remove epics monitor handler
+    epics_handler_token.reset();
+    // stop all the thread
+    thread_pool->wait();
+    // clear the global cache
+    global_cache_.clear();
+}
+
+void ContinuousSnapshotManager::publishEvtCB(pubsub::EventType type, PublishMessage* const msg, const std::string& error_message)
+{
+    switch (type)
+    {
+    case OnDelivery: break;
+    case OnSent: break;
+    case OnError:
+        {
+            logger->logMessage(STRING_FORMAT("[ContinuousSnapshotManager::publishEvtCB] %1%", error_message), LogLevel::ERROR);
+            break;
+        }
+    }
+}
+
+void ContinuousSnapshotManager::submitSnapshot(ConstSnapshotCommandShrdPtr snapsthot_command)
+{
+    bool faulty = false;
     logger->logMessage(STRING_FORMAT("Perepare continuous snapshot ops for '%1%' on topic %2% with sertype: %3%",
                                      snapsthot_command->snapshot_name % snapsthot_command->reply_topic %
                                          serialization_to_string(snapsthot_command->serialization)),
                        LogLevel::DEBUG);
     // This function should be implemented to process the command
-    auto s_op_ptr = MakeRepeatingSnapshotOpInfoShrdPtr(snapsthot_command);
+    auto s_op_ptr = MakeRepeatingSnapshotOpInfoShrdPtr(GET_QUEUE_FROM_SNAPSHOT_NAME(snapsthot_command->snapshot_name), snapsthot_command);
 
     // prepare global cache with all the needed key
     std::shared_lock read_lock(global_cache_mutex_);
@@ -53,9 +91,11 @@ void ContinuousSnapshotManager::submitSnapshot(k2eg::controller::command::cmd::C
                 auto inserted = global_cache_.emplace(pv_uri, std::make_shared<AtomicMonitorEventShrdPtr>(std::make_shared<MonitorEvent>()));
                 if (!inserted.second)
                 {
-                    logger->logMessage(
-                        STRING_FORMAT("Failing to add PV %1% to the global cache fro snapshot", pv_uri % s_op_ptr->cmd->snapshot_name), LogLevel::ERROR);
-                    continue;
+                    manageReply(
+                        -1,
+                        STRING_FORMAT("Failing to add PV %1% to the global cache fro snapshot", pv_uri % s_op_ptr->cmd->snapshot_name), snapsthot_command);
+                    faulty = true;
+                    break;
                 }
                 it = inserted.first;
             }
@@ -65,36 +105,128 @@ void ContinuousSnapshotManager::submitSnapshot(k2eg::controller::command::cmd::C
         // ait now is valid
         if (s_op_ptr->snapshot_views_.emplace(pv_uri, it->second).second)
         {
-            logger->logMessage(
-                STRING_FORMAT("Failing to add PV %1% to the view cache for snapshot ", pv_uri % s_op_ptr->cmd->snapshot_name), LogLevel::ERROR);
+            manageReply(
+                -2, STRING_FORMAT("Failing to add PV %1% to the view cache for snapshot ", pv_uri % s_op_ptr->cmd->snapshot_name), snapsthot_command);
+            faulty = true;
+            break;
         }
     }
-
-    // now the snapshot can be submited and processed
-    thread_pool->detach_task(
-        [this, s_op_ptr]()
-        {
-            logger->logMessage(STRING_FORMAT("Start snapshot  %1%", s_op_ptr->cmd->snapshot_name), LogLevel::ERROR);
-            this->processSnapshot(s_op_ptr);
+    if (!faulty)
+    {
+        // create topic where publish the snapshot
+        publisher->createQueue(QueueDescription{
+            .name = s_op_ptr->queue_name,
+            .paritions = 3,
+            .replicas = 1, // put default to 1 need to be calculated with more compelx logic for higher values
+            .retention_time = 1000 * 60 * 60,
+            .retention_size = 1024 * 1024 * 50,
         });
+        // we got no faulty during the cache preparation
+        // so we can start the snapshot
+        thread_pool->detach_task(
+            [this, s_op_ptr]()
+            {
+                logger->logMessage(STRING_FORMAT("Start snapshot %1%", s_op_ptr->cmd->snapshot_name), LogLevel::ERROR);
+                this->processSnapshot(s_op_ptr);
+            });
 
-    // TODO return reply to app for submitted command
+        // return reply to app for submitted command
+        manageReply(0, STRING_FORMAT("Start snapshot %1% has been started", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+    }
+}
+
+void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstSnapshotCommandShrdPtr cmd)
+{
+    logger->logMessage(error_message);
+    if (cmd->reply_topic.empty() || cmd->reply_id.empty())
+    {
+        logger->logMessage(STRING_FORMAT("No topic or reply id for rep[ly to snapshot %1% submition command]", cmd->snapshot_name), LogLevel::ERROR);
+        return;
+    }
+    else
+    {
+        auto serialized_message = serialize(ContinuousSnapshotCommandReply{error_code, cmd->reply_id, error_message}, cmd->serialization);
+        if (!serialized_message)
+        {
+            logger->logMessage("Invalid serialized message", LogLevel::FATAL);
+        }
+        else
+        {
+            publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "monitor-operation", "monitor-error-key", serialized_message), {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
+        }
+    }
 }
 
 void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType event_received)
 {
-    // TODO fill the global cache
-    //  manage the disconnections
+    // prepare reading lock
+    std::shared_lock read_lock(global_cache_mutex_);
+
     for (auto& event : *event_received->event_fail)
     {
-        // channel_topics_map[event->channel_data.pv_name].active = false;
-        // logger->logMessage(STRING_FORMAT("PV %1% is not connected", event->channel_data.pv_name), LogLevel::DEBUG);
+        const std::string pv_name = event->channel_data.pv_name;
+        // set the channel as not active
+        auto it = global_cache_.find(pv_name);
+        if (it != global_cache_.end())
+        {
+            it->second->store(nullptr, std::memory_order_release);
+        }
     }
 
     // manage the received data
     for (auto& event : *event_received->event_data)
     {
+        const std::string pv_name = event->channel_data.pv_name;
+        // store event on the global cache using the atomic pointer
+        auto it = global_cache_.find(pv_name);
+        if (it != global_cache_.end())
+        {
+            it->second->store(event, std::memory_order_release);
+        }
+        else
+        {
+            logger->logMessage(STRING_FORMAT("Fail to find PV %1% in the global cache", pv_name), LogLevel::ERROR);
+        }
     }
 }
 
-void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr snapstho_command_info) {}
+void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr snapshot_command_info)
+{
+    // check the run flag
+    if (!run_flag){return;}
+    // check if the time window is expired
+    if (snapshot_command_info->isTimeout())
+    {
+        // take the data from the global cache
+        int elementsIndex = 0;
+        for (auto& it : snapshot_command_info->snapshot_views_)
+        {
+            auto event = it.second->load(std::memory_order_acquire);
+            if (event)
+            {
+                auto serialized_message = serialize(
+                    SnapshotCommandReply{0, "", static_cast<std::int32_t>(elementsIndex), MakeChannelDataShrdPtr(event->channel_data)}, 
+                    snapshot_command_info->cmd->serialization);
+                if (serialized_message)
+                {
+                   // publish the data
+                    publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "snapshot-reply-message", "snapshot-dist-key", serialized_message), {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
+                }
+                else
+                {
+                   logger->logMessage(STRING_FORMAT("Send snapshot %1% for PV %2%", snapshot_command_info->cmd->snapshot_name % event->channel_data.pv_name), LogLevel::DEBUG);
+                }
+            }
+        }
+        // increment the iteration index
+        snapshot_command_info->snapshot_iteration_index++;
+    } else {
+        // we are not in the time window
+        // resubmit the snapshot command
+        thread_pool->detach_task(
+            [this, snapshot_command_info]()
+            {
+                this->processSnapshot(snapshot_command_info);
+            });
+    }
+}

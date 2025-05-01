@@ -114,15 +114,12 @@ DEFINE_PTR_TYPES(ReplyPushableMessage)
  */
 class WorkerAsyncOperation {
   const std::chrono::milliseconds       timeout_ms;
-  std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-
+  const std::chrono::steady_clock::time_point begin;
  public:
-  WorkerAsyncOperation(std::chrono::milliseconds timeout_ms) : timeout_ms(timeout_ms) {}
+  WorkerAsyncOperation(std::chrono::milliseconds timeout_ms) : timeout_ms(timeout_ms),  begin(std::chrono::steady_clock::now()) {}
   bool
   isTimeout() {
-    std::chrono::steady_clock::time_point now     = std::chrono::steady_clock::now();
-    auto                                  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - begin);
-    return elapsed > timeout_ms;
+    return (std::chrono::steady_clock::now() - begin) > timeout_ms;
   }
 };
 

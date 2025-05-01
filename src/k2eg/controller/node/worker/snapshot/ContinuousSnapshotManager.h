@@ -25,7 +25,7 @@ The class contains a command specification, after the command is epxired(ready t
 all the pv data is collected using the snapshot view(this permnit to get all the lasted received data)
 then it is published
 */
-class RepeatingSnapshotOpInfo
+class RepeatingSnapshotOpInfo: public WorkerAsyncOperation
 {
 public:
     // keep track of the iterantion
@@ -34,8 +34,9 @@ public:
     k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd;
     // per-snapshot views hold pointers into global_cache_
     std::unordered_map<std::string, ShdAtomicMonitorEventShrdPtr> snapshot_views_;
-
-    RepeatingSnapshotOpInfo(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd) : cmd(cmd) {}
+    const std::string queue_name;
+    RepeatingSnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd) 
+    : WorkerAsyncOperation(std::chrono::milliseconds(cmd->time_window_msec)), queue_name(queue_name), cmd(cmd) {}
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotOpInfo)
 
@@ -52,21 +53,36 @@ for additional locking mechanisms. The class provides methods to add, remove, an
 Data is published se sequentially on publisher identifyed by name and iteration number
 */
 class ContinuousSnapshotManager
-{
-    k2eg::service::log::ILoggerShrdPtr logger;
-
+{   
+    // define the run flag
+    std::atomic<bool> run_flag = false;
+    // local logger shared instances
+    k2eg::service::log::ILoggerShrdPtr       logger;
+    // local publisher shared instance
+    k2eg::service::pubsub::IPublisherShrdPtr publisher;
     // local cache for continuous snapshot
     mutable std::shared_mutex                                     global_cache_mutex_;
     std::unordered_map<std::string, ShdAtomicMonitorEventShrdPtr> global_cache_;
-
+    // thread pool for snapshot processing
     std::shared_ptr<BS::light_thread_pool>                thread_pool;
+    // EPICS service manager
     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
-    void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
-    void processSnapshot(RepeatingSnapshotOpInfoShrdPtr snapstho_command_info);
 
+    // Handler's liveness token
+    k2eg::common::BroadcastToken epics_handler_token;
+
+    // Received event from EPICS IOCs that are monitored
+    void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
+    // rpocess each snapshot checking if the timewindopws is epxired tahing the data from the cache
+    // and publishing the data
+    void processSnapshot(RepeatingSnapshotOpInfoShrdPtr snapstho_command_info);
+    // Manager the reply to the client durin gthe snapshto submission
+    void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr snapsthot_command);
+    // is the callback for the publisher
+    void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
 public:
     ContinuousSnapshotManager(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
-    ~ContinuousSnapshotManager() = default;
+    ~ContinuousSnapshotManager();
     void submitSnapshot(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr snapsthot_command);
 };
 

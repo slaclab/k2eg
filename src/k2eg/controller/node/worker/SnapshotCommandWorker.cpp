@@ -1,4 +1,5 @@
 
+#include "k2eg/service/epics/EpicsData.h"
 #include <k2eg/common/utility.h>
 
 #include <k2eg/service/ServiceResolver.h>
@@ -37,7 +38,7 @@ void SnapshotCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage*
     case OnSent: break;
     case OnError:
         {
-            logger->logMessage(STRING_FORMAT("[GetCommandWorker::publishEvtCB] %1%", error_message), LogLevel::ERROR);
+            logger->logMessage(STRING_FORMAT("[SnapshotCommandWorker::publishEvtCB] %1%", error_message), LogLevel::ERROR);
             break;
         }
     }
@@ -161,7 +162,7 @@ void SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::light_thread_
             if (m_op->hasData())
             {
                 auto evt_shrd_ptr = m_op->getEventData()->event_data->back();
-                publishSnapshotReply(snapshot_info->cmd, static_cast<std::uint32_t>(i), MakeChannelDataUPtr(evt_shrd_ptr->channel_data));
+                publishSnapshotReply(snapshot_info->cmd, static_cast<std::uint32_t>(i), MakeChannelDataShrdPtr(evt_shrd_ptr->channel_data));
             }
             snapshot_info->processed_index.set(i, true);
         }
@@ -170,7 +171,7 @@ void SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::light_thread_
     }
 }
 
-void SnapshotCommandWorker::publishSnapshotReply(ConstSnapshotCommandShrdPtr cmd, std::uint32_t pv_index, service::epics_impl::ConstChannelDataUPtr pv_data)
+void SnapshotCommandWorker::publishSnapshotReply(ConstSnapshotCommandShrdPtr cmd, std::uint32_t pv_index, service::epics_impl::ConstChannelDataShrdPtr pv_data)
 {
     // Pass the correct member (e.g., pv) from evt_shrd_ptr->channel_data
     auto serialized_message = serialize(SnapshotCommandReply{0, cmd->reply_id, static_cast<std::int32_t>(pv_index), std::move(pv_data)}, cmd->serialization);
