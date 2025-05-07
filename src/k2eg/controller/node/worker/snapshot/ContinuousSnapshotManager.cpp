@@ -104,7 +104,8 @@ void ContinuousSnapshotManager::submitSnapshot(ConstSnapshotCommandShrdPtr snaps
         return;
     }
 
-    // normalize the snapshot name
+    // normalize the snapshot name remove all character with '_'
+    s_op_ptr->normallized_snapshot_name = std::regex_replace(s_op_ptr->cmd->snapshot_name, std::regex(":"), "_");
 
     // create read lock toa ccess the globa cache to add pv not yet in the cache
     std::shared_lock read_lock(global_cache_mutex_);
