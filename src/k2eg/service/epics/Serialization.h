@@ -1,7 +1,7 @@
 #ifndef K2EG_SERVICE_EPICS_SERIALIZATION_H_
 #define K2EG_SERVICE_EPICS_SERIALIZATION_H_
-#include "k2eg/common/BaseSerialization.h"
-#include "k2eg/common/JsonSerialization.h"
+#include <k2eg/common/BaseSerialization.h>
+#include <k2eg/common/JsonSerialization.h>
 #include <k2eg/common/serialization.h>
 #include <k2eg/common/types.h>
 #include <k2eg/service/epics/EpicsData.h>
