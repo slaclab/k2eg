@@ -1,11 +1,13 @@
 #ifndef k2eg_SERVICE_DATA_MODEL_CHANNEL_H_
 #define k2eg_SERVICE_DATA_MODEL_CHANNEL_H_
+
 #include <k2eg/controller/command/CMDCommand.h>
-#include <cstdint>
+
 #include <memory>
-#include <optional>
 #include <string>
 #include <vector>
+#include <cstdint>
+#include <optional>
 
 namespace k2eg::service::data {
 class DataStorage;

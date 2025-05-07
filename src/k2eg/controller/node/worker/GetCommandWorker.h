@@ -1,18 +1,20 @@
 #ifndef k2eg_CONTROLLER_NODE_WORKER_GETCOMMANDWORKER_H_
 #define k2eg_CONTROLLER_NODE_WORKER_GETCOMMANDWORKER_H_
 
-#include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/types.h>
-#include <k2eg/controller/command/cmd/Command.h>
-#include <k2eg/controller/node/worker/CommandWorker.h>
+#include <k2eg/common/BS_thread_pool.hpp>
+#include <k2eg/common/BaseSerialization.h>
+
+#include <k2eg/service/log/ILogger.h>
+#include <k2eg/service/pubsub/IPublisher.h>
+#include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
-#include <k2eg/service/log/ILogger.h>
-#include <k2eg/service/metric/IMetricService.h>
-#include <k2eg/service/pubsub/IPublisher.h>
+
+#include <k2eg/controller/command/cmd/Command.h>
+#include <k2eg/controller/node/worker/CommandWorker.h>
 
 #include <chrono>
-#include <k2eg/common/BS_thread_pool.hpp>
 #include <string>
 
 namespace k2eg::controller::node::worker {

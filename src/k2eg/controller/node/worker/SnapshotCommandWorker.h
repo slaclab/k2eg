@@ -1,16 +1,14 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_SNAPSHOTCOMMANDWORKER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_SNAPSHOTCOMMANDWORKER_H_
 
-#include <k2eg/controller/command/cmd/SnapshotCommand.h>
+#include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/service/epics/EpicsMonitorOperation.h>
 
 #include <k2eg/controller/node/worker/CommandWorker.h>
+#include <k2eg/controller/command/cmd/SnapshotCommand.h>
 #include <k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.h>
-
-#include <k2eg/service/epics/EpicsData.h>
-#include <k2eg/service/epics/EpicsMonitorOperation.h>
-#include <k2eg/service/epics/EpicsServiceManager.h>
-
-#include <k2eg/service/metric/IMetricService.h>
 
 #include <boost/dynamic_bitset.hpp>
 

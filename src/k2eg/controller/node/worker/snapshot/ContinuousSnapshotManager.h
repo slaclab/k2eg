@@ -1,17 +1,20 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 
-#include <cstdint>
-#include <k2eg/common/BS_thread_pool.hpp>
+
 #include <k2eg/common/types.h>
-#include <k2eg/controller/node/worker/CommandWorker.h>
-#include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
+#include <k2eg/common/BS_thread_pool.hpp>
+
 #include <k2eg/service/epics/EpicsServiceManager.h>
 
+#include <k2eg/controller/node/worker/CommandWorker.h>
+#include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
+
+#include <cstdint>
 #include <atomic>
 #include <memory>
-#include <shared_mutex>
 #include <string>
+#include <shared_mutex>
 #include <unordered_map>
 
 namespace k2eg::controller::node::worker::snapshot {

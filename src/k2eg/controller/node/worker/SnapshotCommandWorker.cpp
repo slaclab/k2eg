@@ -1,7 +1,7 @@
 
-#include "k2eg/service/epics/EpicsData.h"
 #include <k2eg/common/utility.h>
 
+#include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/ServiceResolver.h>
 
 #include <k2eg/controller/command/cmd/SnapshotCommand.h>

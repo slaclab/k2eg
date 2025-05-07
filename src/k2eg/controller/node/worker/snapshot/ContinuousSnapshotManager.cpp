@@ -1,15 +1,15 @@
-
-#include "k2eg/common/BaseSerialization.h"
-#include "k2eg/service/epics/EpicsData.h"
 #include <k2eg/common/utility.h>
+#include <k2eg/common/BaseSerialization.h>
 
+#include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/ServiceResolver.h>
 
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 #include <k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.h>
 
-#include <memory>
 #include <regex>
+#include <memory>
+
 using namespace k2eg::controller::command::cmd;
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::node::worker::snapshot;

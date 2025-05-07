@@ -2,13 +2,15 @@
 #ifndef k2eg_SERVICE_DATA_DATASTORAGE_H_
 #define k2eg_SERVICE_DATA_DATASTORAGE_H_
 
+#include <k2eg/common/types.h>
+
 #include <k2eg/service/data/repository/ChannelRepository.h>
+
 #include <sqlite_orm/sqlite_orm.h>
 
 #include <memory>
 #include <mutex>
 
-#include "k2eg/common/types.h"
 namespace k2eg::service::data {
 /**
  *

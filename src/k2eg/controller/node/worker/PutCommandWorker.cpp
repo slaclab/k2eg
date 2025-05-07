@@ -1,9 +1,11 @@
 #include <k2eg/common/utility.h>
+
+#include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/epics/EpicsPutOperation.h>
+
 #include <k2eg/controller/command/cmd/Command.h>
 #include <k2eg/controller/command/cmd/PutCommand.h>
 #include <k2eg/controller/node/worker/PutCommandWorker.h>
-#include <k2eg/service/ServiceResolver.h>
-#include <k2eg/service/epics/EpicsPutOperation.h>
 
 #include <boost/json.hpp>
 

@@ -4,6 +4,7 @@
 #include <k2eg/common/types.h>
 
 #include <boost/json.hpp>
+
 #include <cstdint>
 #include <memory>
 #include <stdint.h>

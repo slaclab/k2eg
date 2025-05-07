@@ -1,21 +1,22 @@
 #ifndef k2eg_CONTROLLER_NODE_NODECONTROLLER_H_
 #define k2eg_CONTROLLER_NODE_NODECONTROLLER_H_
 
-#include <k2eg/common/ObjectFactory.h>
 #include <k2eg/common/types.h>
+#include <k2eg/common/ObjectFactory.h>
+#include <k2eg/common/BS_thread_pool.hpp>
+
+#include <k2eg/service/log/ILogger.h>
+#include <k2eg/service/data/DataStorage.h>
+#include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/service/metric/INodeControllerMetric.h>
+
 #include <k2eg/controller/command/CMDCommand.h>
-#include <k2eg/controller/node/configuration/NodeConfiguration.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/controller/node/worker/MonitorCommandWorker.h>
-#include <k2eg/service/epics/EpicsServiceManager.h>
-#include <k2eg/service/log/ILogger.h>
-#include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/controller/node/configuration/NodeConfiguration.h>
 
-#include <k2eg/common/BS_thread_pool.hpp>
 #include <memory>
-
-#include "k2eg/service/data/DataStorage.h"
-#include "k2eg/service/metric/INodeControllerMetric.h"
 
 namespace k2eg::controller::node {
 
