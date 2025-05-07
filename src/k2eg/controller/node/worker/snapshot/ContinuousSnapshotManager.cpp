@@ -268,7 +268,7 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         auto snap_ts = std::chrono::system_clock::to_time_t(timestamp);
         {
             auto serialized_header_message = serialize(
-                RepeatingSnaptshotHeader{snap_ts, snapshot_command_info->cmd->snapshot_name}, snapshot_command_info->cmd->serialization);
+                RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, snapshot_command_info->snapshot_iteration_index}, snapshot_command_info->cmd->serialization);
             // send the header for the snapshot
             publisher->pushMessage(MakeReplyPushableMessageUPtr(
                                        snapshot_command_info->queue_name, "snapshot-events", snapshot_command_info->cmd->snapshot_name, serialized_header_message),
@@ -282,7 +282,7 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         for (auto& event : snapshot_events)
         {
             auto serialized_message = serialize(
-                RepeatingSnaptshotData{snap_ts, MakeChannelDataShrdPtr(event->channel_data)}, snapshot_command_info->cmd->serialization);
+                RepeatingSnaptshotData{1, snap_ts, snapshot_command_info->snapshot_iteration_index, MakeChannelDataShrdPtr(event->channel_data)}, snapshot_command_info->cmd->serialization);
             if (serialized_message)
             {
                 // publish the data
@@ -296,6 +296,10 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
                                    LogLevel::ERROR);
             }
         }
+
+        // send completion for this snapshot submission
+        auto serialized_completion_message = serialize(
+            RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, snap_ts, snapshot_command_info->snapshot_iteration_index}, snapshot_command_info->cmd->serialization);
         // increment the iteration index
         snapshot_command_info->snapshot_iteration_index++;
     }

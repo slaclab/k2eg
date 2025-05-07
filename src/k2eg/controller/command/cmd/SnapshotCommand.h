@@ -11,7 +11,7 @@ Perform a snapshot of the current state of specific PV with determianted paramet
     "snapshot_id", "<user generated custom id>",
     "pv_name_list", ["[pva|ca]<pv name>"", ...]
     "reply_topic", "reply_topic"
-    "reply_id", "reply_topic",
+    "reply_id", "reply_id",
     "serialization", "json|msgpack",
     "is_continuous", true|false,
     "repeat_delay_msec", 1000,
@@ -21,13 +21,13 @@ Perform a snapshot of the current state of specific PV with determianted paramet
 */
 struct SnapshotCommand : public Command {
   // the snapshot is repeating
-  bool is_continuous = false;
+  bool is_continuous;
   // the list of PV to be monitored
   std::vector<std::string> pv_name_list;
   // the repeat delay after the last snapshot
-  std::int32_t repeat_delay_msec = 0;
+  std::int32_t repeat_delay_msec;
   // the time window to collect data
-  std::int32_t time_window_msec = 0;
+  std::int32_t time_window_msec;
   // the name of the snapshot
   std::string snapshot_name;
 };

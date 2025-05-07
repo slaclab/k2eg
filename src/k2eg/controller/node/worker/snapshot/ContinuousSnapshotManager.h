@@ -1,6 +1,7 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 
+#include <cstdint>
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/types.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
@@ -27,10 +28,13 @@ using ShdAtomicMonitorEventShrdPtr = std::shared_ptr<AtomicMonitorEventShrdPtr>;
 */
 struct RepeatingSnaptshotHeader
 {
-    // this is the snapshot timestamp
-    const std::int64_t timestamp;
+    const std::int8_t message_type = 0;
     // this is the snapshot name
     const std::string snapshot_name;
+    // this is the snapshot timestamp
+    const std::int64_t timestamp;
+    // this is the snapshot iteration
+    const std::int64_t iteration_index;
 };
 DEFINE_PTR_TYPES(RepeatingSnaptshotHeader)
 
@@ -38,30 +42,67 @@ DEFINE_PTR_TYPES(RepeatingSnaptshotHeader)
 
 /*
     @brief Repeating snapshot data
-    @details This message is used to send the data for a specific snapshot instances
+    @details This message is used to send the data for a specific snapshot and pv
 */
 struct RepeatingSnaptshotData
 {
+    const std::int8_t message_type = 1;
     // this is the snapshot instance where the pv is related
     const std::int64_t timestamp;
+    // this is the snapshot iteration
+    const std::int64_t iteration_index;
     // this is the snapshot values for a specific pv
     k2eg::service::epics_impl::ConstChannelDataShrdPtr pv_data;
 };
 DEFINE_PTR_TYPES(RepeatingSnaptshotData)
 
 /*
+@brief Repeating snapshot completion
+@details This message is used to send the completion of a current submission
+*/
+struct RepeatingSnaptshotCompletion
+{
+    const std::int8_t message_type = 2;
+    // this is the snapshot error code
+    const std::int32_t error;
+    // this is the snapshot error message( in case there is one)
+    const std::string error_message;
+    // this is the snapshot name
+    const std::string snapshot_name;
+    // this is the snapshot instance where the pv is related
+    const std::int64_t timestamp;
+    // this is the snapshot iteration
+    const std::int64_t iteration_index;
+};
+DEFINE_PTR_TYPES(RepeatingSnaptshotCompletion)
+
+/*
 json serialization for the repeating snapshot header and data
 */
-inline void serializeJson(const RepeatingSnaptshotHeader& reply, common::JsonMessage& json_message)
+inline void serializeJson(const RepeatingSnaptshotHeader& event_header, common::JsonMessage& json_message)
 {
-    json_message.getJsonObject()["snapshot_name"] = reply.snapshot_name;
-    json_message.getJsonObject()["timestamp"] = reply.timestamp;
+    json_message.getJsonObject()["type"] = event_header.message_type;
+    json_message.getJsonObject()["iter_index"] = event_header.iteration_index;
+    json_message.getJsonObject()["snapshot_name"] = event_header.snapshot_name;
+    json_message.getJsonObject()["timestamp"] = event_header.timestamp;
 }
 
-inline void serializeJson(const RepeatingSnaptshotData& reply, common::JsonMessage& json_message)
+inline void serializeJson(const RepeatingSnaptshotData& event_data, common::JsonMessage& json_message)
 {
-    json_message.getJsonObject()["timestamp"] = reply.timestamp;
-    service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::JSON)->serialize(*reply.pv_data, json_message);
+    json_message.getJsonObject()["type"] = event_data.message_type;
+    json_message.getJsonObject()["iter_index"] = event_data.iteration_index;
+    json_message.getJsonObject()["timestamp"] = event_data.timestamp;
+    service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::JSON)->serialize(*event_data.pv_data, json_message);
+}
+
+inline void serializeJson(const RepeatingSnaptshotCompletion& event_completion, common::JsonMessage& json_message)
+{
+    json_message.getJsonObject()["type"] = event_completion.message_type;
+    json_message.getJsonObject()["error"] = event_completion.error;
+    json_message.getJsonObject()["error_message"] = event_completion.error_message;
+    json_message.getJsonObject()["iter_index"] = event_completion.iteration_index;
+    json_message.getJsonObject()["timestamp"] = event_completion.timestamp;
+    json_message.getJsonObject()["snapshot_name"] = event_completion.snapshot_name;
 }
 
 /*
@@ -70,20 +111,49 @@ msgpack serialization for the repeating snapshot header and data
 inline void serializeMsgpack(const RepeatingSnaptshotHeader& header_event, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
 {
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
-    packer.pack_map(2);
+    packer.pack_map(4);
+    packer.pack("type");
+    packer.pack(header_event.message_type);
     packer.pack("snapshot_name");
     packer.pack(header_event.snapshot_name);
     packer.pack("timestamp");
     packer.pack(header_event.timestamp);
+    packer.pack("iter_index");
+    packer.pack(header_event.iteration_index);
 }
 
 inline void serializeMsgpack(const RepeatingSnaptshotData& data_event, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
 {
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
-    packer.pack_map(2);
+    packer.pack_map(4);
+    packer.pack("type");
+    packer.pack(data_event.message_type);
     packer.pack("timestamp");
     packer.pack(data_event.timestamp);
+    packer.pack("iter_index");
+    packer.pack(data_event.iteration_index);
     service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::Msgpack)->serialize(*data_event.pv_data, msgpack_message);
+}
+
+inline void serializeMsgpack(const RepeatingSnaptshotCompletion& header_completion, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
+{
+    msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
+    packer.pack_map(header_completion.error_message.empty() ? 5 : 6);
+    packer.pack("type");
+    packer.pack(header_completion.message_type);
+    packer.pack("error");
+    packer.pack(header_completion.error);
+    if (header_completion.error_message.empty() == false)
+    {
+        packer.pack("error_message");
+        packer.pack(header_completion.error_message);
+    }
+    packer.pack("iter_index");
+    packer.pack(header_completion.iteration_index);
+    packer.pack("timestamp");
+    packer.pack(header_completion.timestamp);
+    packer.pack("snapshot_name");
+    packer.pack(header_completion.snapshot_name);
 }
 
 // global serialization function
@@ -108,6 +178,26 @@ inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshot
 }
 
 inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshotData& data, k2eg::common::SerializationType type)
+{
+    switch (type)
+    {
+    case k2eg::common::SerializationType::JSON:
+        {
+            auto json_message = std::make_shared<k2eg::common::JsonMessage>();
+            serializeJson(data, *json_message);
+            return json_message;
+        }
+    case k2eg::common::SerializationType::Msgpack:
+        {
+            auto msgpack_message = std::make_shared<k2eg::common::MsgpackMessage>();
+            serializeMsgpack(data, *msgpack_message);
+            return msgpack_message;
+        }
+    default: return nullptr;
+    }
+}
+
+inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshotCompletion& data, k2eg::common::SerializationType type)
 {
     switch (type)
     {

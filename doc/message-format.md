@@ -170,3 +170,87 @@ Put command is ismilar to caput or pvput epics command, it permit to applya a va
     "reply_id":"reply id",
 }
 ```
+
+### Snapshot Command
+
+The **snapshot** command performs a one-time or continuous data acquisition (DAQ) of multiple EPICS PVs. Its structure is as follows:
+
+```json
+{
+  "command": "snapshot",
+  "snapshot_id": "<custom user-defined ID>",
+  "pv_name_list": ["[pva|ca]://<pv name>", ...],
+  "reply_topic": "<Kafka reply topic>",
+  "reply_id": "<correlation ID>",
+  "serialization": "json|msgpack",
+  "is_continuous": true | false,
+  "repeat_delay_msec": 1000,
+  "time_window_msec": 1000,
+  "snapshot_name": "snapshot_name"
+}
+```
+
+**Behavior:**
+- A monitor is allocated for each PV in the `pv_name_list`.
+- The EPICS monitor captures at least one event per PV within the defined `time_window_msec`.
+- If any PV does not produce an event within the window, a fallback `get` operation retrieves its current value.
+- Each PV's data is sent asynchronously to the client as it arrives—no need to wait for the full time window.
+- A final **completion message** is sent after the time window elapses.
+
+**Reply Format:**
+- **One message per PV**:
+  ```json
+  {
+    "error": 0,
+    "reply_id": "<reply id>",
+    "<pv name>": { "value": 0, ... }
+  }
+  ```
+- **Completion message**:
+  ```json
+  {
+    "error": 1,
+    "reply_id": "<reply id>"
+  }
+  ```
+
+**Continuous Mode (`is_continuous: true`)**:
+- The snapshot is repeatedly triggered.
+- After each snapshot completes, it waits for `repeat_delay_msec` before starting a new one.
+- `snapshot_name` is used as a unique identifier and also defines the topic where data is published.
+
+**Field Descriptions**:
+- `repeat_delay_msec`: Delay between two snapshots (in milliseconds).
+- `time_window_msec`: Duration of the window to gather PV updates after a snapshot is triggered.
+- `snapshot_name`: Unique name used for identification and topic routing.
+
+**Reply Format(Continuous Mode):**
+- **Header message**:
+  ```json
+  {
+    "type": 0,  ==> identify the header
+    "iter_index": <number of current snapshot trigger starting from 0>
+    "timestamp": "<snapshot timestamp>",
+    "snapshot_name": "the name of the snapshot"
+  }
+  ```
+- **Data message** (one for each pv data):
+  ```json
+  {
+    "type": 1,  ==> identify the data event
+    "iter_index": <number of current snapshot trigger starting from 0>,
+    "timestamp": "<snapshot timestamp>",
+    "pv_name": {pv data object}
+  }
+  ```
+- **Completion message**:
+  ```json
+  {
+    "type": 2,  ==> identify the completion
+    "error": 0,
+    "error_message":"in case there has been some issuer during snapshot",
+    "iter_index": <number of current snapshot trigger starting from 0>,
+    "timestamp": "<snapshot timestamp>",
+    "snapshot_name": "the name of the snapshot"
+  }
+  ```
