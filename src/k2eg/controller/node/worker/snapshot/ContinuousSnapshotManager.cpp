@@ -1,4 +1,5 @@
 
+#include "k2eg/common/BaseSerialization.h"
 #include "k2eg/service/epics/EpicsData.h"
 #include <k2eg/common/utility.h>
 
@@ -77,6 +78,33 @@ void ContinuousSnapshotManager::submitSnapshot(ConstSnapshotCommandShrdPtr snaps
     auto s_op_ptr = MakeRepeatingSnapshotOpInfoShrdPtr(GET_QUEUE_FROM_SNAPSHOT_NAME(snapsthot_command->snapshot_name), snapsthot_command);
 
     // check if all the command infromation are filled
+    if (s_op_ptr->cmd->pv_name_list.empty())
+    {
+        manageReply(-1, STRING_FORMAT("PV name list is empty for snapshot %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        return;
+    }
+    if (s_op_ptr->cmd->is_continuous == false)
+    {
+        manageReply(-2, STRING_FORMAT("The received snashot is not continuos %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        return;
+    }
+    if (s_op_ptr->cmd->repeat_delay_msec <= 0)
+    {
+        manageReply(-3, STRING_FORMAT("The repeat delay is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        return;
+    }
+    if (s_op_ptr->cmd->time_window_msec <= 0)
+    {
+        manageReply(-4, STRING_FORMAT("The time window is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        return;
+    }
+    if (s_op_ptr->cmd->snapshot_name.empty())
+    {
+        manageReply(-5, STRING_FORMAT("The snapshot name is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        return;
+    }
+
+    // normalize the snapshot name
 
     // create read lock toa ccess the globa cache to add pv not yet in the cache
     std::shared_lock read_lock(global_cache_mutex_);

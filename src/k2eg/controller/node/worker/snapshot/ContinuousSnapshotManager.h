@@ -19,6 +19,7 @@ using AtomicMonitorEventShrdPtr = std::atomic<k2eg::service::epics_impl::Monitor
 using ShdAtomicMonitorEventShrdPtr = std::shared_ptr<AtomicMonitorEventShrdPtr>;
 
 #pragma region Types
+
 /*
     @brief Repeating snapshot message header
     @details This message is used to send the header of a repeating snapshot reply.
@@ -34,6 +35,7 @@ struct RepeatingSnaptshotHeader
 DEFINE_PTR_TYPES(RepeatingSnaptshotHeader)
 
 #pragma region Serialization
+
 /*
     @brief Repeating snapshot data
     @details This message is used to send the data for a specific snapshot instances
@@ -85,42 +87,48 @@ inline void serializeMsgpack(const RepeatingSnaptshotData& data_event, common::M
 }
 
 // global serialization function
-inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshotHeader& header, k2eg::common::SerializationType type) {
-    switch (type) {
-        case k2eg::common::SerializationType::JSON: {
+inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshotHeader& header, k2eg::common::SerializationType type)
+{
+    switch (type)
+    {
+    case k2eg::common::SerializationType::JSON:
+        {
             auto json_message = std::make_shared<k2eg::common::JsonMessage>();
             serializeJson(header, *json_message);
             return json_message;
         }
-        case k2eg::common::SerializationType::Msgpack: {
+    case k2eg::common::SerializationType::Msgpack:
+        {
             auto msgpack_message = std::make_shared<k2eg::common::MsgpackMessage>();
             serializeMsgpack(header, *msgpack_message);
             return msgpack_message;
         }
-        default:
-            return nullptr;
-    
+    default: return nullptr;
     }
 }
 
-inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshotData& data, k2eg::common::SerializationType type) {
-    switch (type) {
-        case k2eg::common::SerializationType::JSON: {
+inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshotData& data, k2eg::common::SerializationType type)
+{
+    switch (type)
+    {
+    case k2eg::common::SerializationType::JSON:
+        {
             auto json_message = std::make_shared<k2eg::common::JsonMessage>();
             serializeJson(data, *json_message);
             return json_message;
         }
-        case k2eg::common::SerializationType::Msgpack: {
+    case k2eg::common::SerializationType::Msgpack:
+        {
             auto msgpack_message = std::make_shared<k2eg::common::MsgpackMessage>();
             serializeMsgpack(data, *msgpack_message);
             return msgpack_message;
         }
-        default:
-            return nullptr;
+    default: return nullptr;
     }
 }
 
 #pragma region Defining Classes
+
 /*
 @brief RepeatingSnapshotOpInfo is a class that holds information about a repeating snapshot operation.
 @details
@@ -131,6 +139,8 @@ then it is published
 class RepeatingSnapshotOpInfo : public WorkerAsyncOperation
 {
 public:
+    // the name of the snapshot nromalized
+    std::string normallized_snapshot_name;
     // keep track of the iterantion
     std::int64_t snapshot_iteration_index = 0;
     // keep track of the comamnd specification

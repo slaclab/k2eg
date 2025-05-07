@@ -35,7 +35,10 @@ command_type_to_string(CommandType t) noexcept {
 #define KEY_MONITOR_DEST_TOPIC "monitor_dest_topic"
 #define KEY_VALUE              "value"
 #define KEY_REPLY_ID           "reply_id"
-
+#define KEY_SNAPSHOT_NAME     "snapshot_name"
+#define KEY_IS_CONTINUOUS      "is_continuous"
+#define KEY_REPEAT_DELAY_MSEC  "repeat_delay_msec"
+#define KEY_TIME_WINDOW_MSEC   "time_window_msec"
 /**
 Base command structure
 */

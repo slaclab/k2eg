@@ -20,10 +20,10 @@ Perform a snapshot of the current state of specific PV with determianted paramet
 }
 */
 struct SnapshotCommand : public Command {
-  // the list of PV to be monitored
-  std::vector<std::string> pv_name_list;
   // the snapshot is repeating
   bool is_continuous = false;
+  // the list of PV to be monitored
+  std::vector<std::string> pv_name_list;
   // the repeat delay after the last snapshot
   std::int32_t repeat_delay_msec = 0;
   // the time window to collect data
