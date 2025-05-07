@@ -2,6 +2,7 @@
 #define K2EG_SERVICE_EPICS_PUTOPERATION_H_
 
 #include <k2eg/common/types.h>
+
 #include <pva/client.h>
 
 namespace k2eg::service::epics_impl {

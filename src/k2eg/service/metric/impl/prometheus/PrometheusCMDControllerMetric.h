@@ -4,6 +4,7 @@
 #include <k2eg/common/types.h>
 #include <k2eg/service/metric/ICMDControllerMetric.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusEpicsMetric.h>
+
 #include <prometheus/counter.h>
 #include <prometheus/exposer.h>
 #include <prometheus/labels.h>

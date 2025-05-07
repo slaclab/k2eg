@@ -1,9 +1,9 @@
 #include <k2eg/common/utility.h>
+
+#include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/log/ILogger.h>
 
 #include <k2eg/controller/node/worker/monitor/MonitorChecker.h>
-
-#include <k2eg/service/ServiceResolver.h>
 
 #include <cstddef>
 #include <stdexcept>

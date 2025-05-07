@@ -1,9 +1,9 @@
 
 #include <k2eg/service/metric/IMetricService.h>
-#include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
-#include <k2eg/service/metric/impl/prometheus/PrometheusEpicsMetric.h>
-#include <k2eg/service/metric/impl/prometheus/PrometheusCMDControllerMetric.h>
 #include <k2eg/service/metric/INodeControllerMetric.h>
+#include <k2eg/service/metric/impl/prometheus/PrometheusEpicsMetric.h>
+#include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
+#include <k2eg/service/metric/impl/prometheus/PrometheusCMDControllerMetric.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusNodeControllerMetric.h>
 
 #include <algorithm>

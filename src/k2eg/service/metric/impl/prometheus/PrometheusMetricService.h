@@ -1,13 +1,14 @@
 #ifndef K2EG_SERVICE_METRIC_IMPL_PROMETHEUSMETRICSERVICE_H_
 #define K2EG_SERVICE_METRIC_IMPL_PROMETHEUSMETRICSERVICE_H_
 
+#include <k2eg/common/types.h>
+
+#include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/metric/IEpicsMetric.h>
 #include <k2eg/service/metric/ICMDControllerMetric.h>
 #include <k2eg/service/metric/INodeControllerMetric.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusCMDControllerMetric.h>
 
-#include <k2eg/common/types.h>
-#include <k2eg/service/metric/IMetricService.h>
 #include <prometheus/exposer.h>
 #include <prometheus/registry.h>
 

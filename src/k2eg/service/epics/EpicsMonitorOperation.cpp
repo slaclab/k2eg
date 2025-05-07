@@ -1,11 +1,12 @@
+#include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/epics/EpicsGetOperation.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
+
 #include <pv/createRequest.h>
 
 #include <memory>
 #include <mutex>
 
-#include "k2eg/service/epics/EpicsData.h"
-#include "k2eg/service/epics/EpicsGetOperation.h"
 
 using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;

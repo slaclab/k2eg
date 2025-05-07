@@ -1,10 +1,13 @@
 #include <client.h>
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
-#include <memory>
-#include <pv/createRequest.h>
+
 #include <pvData.h>
 #include <pvIntrospect.h>
+#include <pv/createRequest.h>
+
+
+#include <memory>
 
 using namespace k2eg::service::epics_impl;
 

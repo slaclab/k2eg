@@ -1,7 +1,6 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 
-
 #include <k2eg/common/types.h>
 #include <k2eg/common/BS_thread_pool.hpp>
 

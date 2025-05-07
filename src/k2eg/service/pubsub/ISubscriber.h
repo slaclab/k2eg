@@ -1,9 +1,8 @@
 #ifndef ISUBSCRIBER_H
 #define ISUBSCRIBER_H
 
-#pragma once
-
 #include <k2eg/common/types.h>
+
 #include <functional>
 #include <memory>
 #include <string>

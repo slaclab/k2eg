@@ -1,16 +1,18 @@
 #ifndef K2EG_SERVICE_EPICS_EPICSCHANNEL_H_
 #define K2EG_SERVICE_EPICS_EPICSCHANNEL_H_
 
-#include <cadef.h>
 #include <k2eg/common/types.h>
+
 #include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/epics/EpicsPutOperation.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
-#include <k2eg/service/epics/EpicsPutOperation.h>
-#include <pv/configuration.h>
-#include <pv/createRequest.h>
+
+#include <cadef.h>
 #include <pv/json.h>
 #include <pva/client.h>
+#include <pv/configuration.h>
+#include <pv/createRequest.h>
 
 #include <memory>
 #include <string>

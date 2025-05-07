@@ -1,8 +1,10 @@
 #ifndef K2EG_SERVICE_EPICS_MSGPACKSERIALIZATION_H_
 #define K2EG_SERVICE_EPICS_MSGPACKSERIALIZATION_H_
 
-#include "pvData.h"
 #include <k2eg/service/epics/Serialization.h>
+
+#include <pvData.h>
+
 #include <msgpack.hpp>
 
 namespace k2eg::service::epics_impl {

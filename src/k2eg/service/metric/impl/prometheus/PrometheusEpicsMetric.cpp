@@ -1,10 +1,11 @@
 #include <k2eg/service/metric/impl/prometheus/PrometheusEpicsMetric.h>
 
+#include <prometheus/gauge.h>
+
 #include <chrono>
 #include <cstdint>
 #include <thread>
 
-#include "prometheus/gauge.h"
 
 using namespace prometheus;
 

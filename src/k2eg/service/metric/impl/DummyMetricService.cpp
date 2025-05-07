@@ -1,13 +1,12 @@
-
 #include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/metric/INodeControllerMetric.h>
 #include <k2eg/service/metric/impl/DummyMetricService.h>
+
 #include <prometheus/counter.h>
 #include <prometheus/exposer.h>
 
-#include <algorithm>
 #include <memory>
 
-#include "k2eg/service/metric/INodeControllerMetric.h"
 
 using namespace prometheus;
 

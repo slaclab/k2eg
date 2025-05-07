@@ -1,10 +1,11 @@
 #include <k2eg/common/utility.h>
 #include <k2eg/common/BS_thread_pool.hpp>
+
 #include <k2eg/service/epics/EpicsChannel.h>
-#include <k2eg/service/epics/EpicsGetOperation.h>
-#include <k2eg/service/epics/EpicsMonitorOperation.h>
 #include <k2eg/service/epics/EpicsPutOperation.h>
+#include <k2eg/service/epics/EpicsGetOperation.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/service/epics/EpicsMonitorOperation.h>
 
 #include <chrono>
 #include <cstddef>

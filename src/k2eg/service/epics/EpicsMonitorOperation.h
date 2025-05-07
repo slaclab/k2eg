@@ -2,12 +2,14 @@
 #define K2EG_SERVICE_EPICS_EPICSMONITOROPERATION_H_
 
 #include <k2eg/common/types.h>
+
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
 #include <k2eg/service/epics/PVStructureMerger.h>
+
 #include <pvData.h>
-#include <pva/client.h>
 #include <sys/types.h>
+#include <pva/client.h>
 
 #include <atomic>
 #include <mutex>

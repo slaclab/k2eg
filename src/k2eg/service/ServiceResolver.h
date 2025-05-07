@@ -1,10 +1,8 @@
 #ifndef __SERVICERESOLVER_H__
 #define __SERVICERESOLVER_H__
 
-#include <map>
-#include <string>
 #include <memory>
-#include <typeinfo>
+
 namespace k2eg::service
 {
     template <typename T>

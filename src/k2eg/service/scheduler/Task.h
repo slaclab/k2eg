@@ -1,11 +1,11 @@
 #ifndef K2EG_SERVICE_SCHEDULER_TASK_H_
 #define K2EG_SERVICE_SCHEDULER_TASK_H_
 
+#include <k2eg/common/types.h>
+
 #include <ctime>
 #include <croncpp.h>
 #include <functional>
-
-#include <k2eg/common/types.h>
 
 namespace k2eg::service::scheduler {
 class Scheduler;
