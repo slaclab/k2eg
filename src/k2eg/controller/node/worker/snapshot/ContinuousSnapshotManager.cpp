@@ -36,7 +36,7 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(k2eg::service::epics_impl::
     // add epics manager monitor handler
     epics_handler_token = epics_service_manager->addHandler(std::bind(&ContinuousSnapshotManager::epicsMonitorEvent, this, std::placeholders::_1));
     // set the publisher callback
-    publisher->setCallBackForReqType("get-reply-message", std::bind(&ContinuousSnapshotManager::publishEvtCB, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    publisher->setCallBackForReqType("repeating-snapshot-events", std::bind(&ContinuousSnapshotManager::publishEvtCB, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     // set the run flag to true
     run_flag = true;
 }
@@ -89,13 +89,11 @@ void ContinuousSnapshotManager::submitSnapshot(ConstCommandShrdPtr command)
             logger->logMessage(STRING_FORMAT("Command type %1% not supported by this worker", command->type), LogLevel::ERROR);
             break;
         }
-    
     }
 }
 
-void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr snapsthot_stop_command){}
-
-void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapshotCommandShrdPtr snapsthot_command) {
+void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapshotCommandShrdPtr snapsthot_command)
+{
     bool faulty = false;
     logger->logMessage(STRING_FORMAT("Perepare continuous snapshot ops for '%1%' on topic %2% with sertype: %3%",
                                      snapsthot_command->snapshot_name % snapsthot_command->reply_topic %
@@ -125,9 +123,6 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         manageReply(-5, STRING_FORMAT("The snapshot name is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
-
-    // normalize the snapshot name remove all character with '_'
-    s_op_ptr->normallized_snapshot_name = std::regex_replace(s_op_ptr->cmd->snapshot_name, std::regex(":"), "_");
 
     // create read lock toa ccess the globa cache to add pv not yet in the cache
     std::shared_lock read_lock(global_cache_mutex_);
@@ -196,33 +191,47 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         thread_pool->detach_task(
             [this, s_op_ptr]()
             {
-                logger->logMessage(STRING_FORMAT("Start snapshot %1%", s_op_ptr->cmd->snapshot_name), LogLevel::ERROR);
+                logger->logMessage(STRING_FORMAT("Start snapshot %1%", s_op_ptr->cmd->snapshot_name), LogLevel::INFO);
                 this->processSnapshot(s_op_ptr);
             });
 
         // return reply to app for submitted command
         manageReply(0, STRING_FORMAT("Start snapshot %1% has been started", s_op_ptr->cmd->snapshot_name), snapsthot_command);
     }
+    // add the snapshot to the stopped snapshot list
+    {
+        std::unique_lock write_lock(snapshot_runinnig_mutex_);
+        snapshot_runinnig_.emplace(s_op_ptr->queue_name, RunningInfo{true});
+    }
 }
 
-void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstRepeatingSnapshotCommandShrdPtr cmd)
+void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr snapsthot_stop_command)
 {
-    logger->logMessage(error_message);
-    if (cmd->reply_topic.empty() || cmd->reply_id.empty())
+    // queue name, the nromalized version of the snapshot name is used has key to stop the snapshot
+    auto queue_name = GET_QUEUE_FROM_SNAPSHOT_NAME(snapsthot_stop_command->snapshot_name);
+
+    // we can set to stop
+    logger->logMessage(STRING_FORMAT("Try to set snapshot %1% top stop", snapsthot_stop_command->snapshot_name), LogLevel::INFO);
+    if (snapsthot_stop_command->snapshot_name.empty())
     {
-        logger->logMessage(STRING_FORMAT("No topic or reply id for rep[ly to snapshot %1% submition command]", cmd->snapshot_name), LogLevel::ERROR);
+        manageReply(-1, "", snapsthot_stop_command);
         return;
     }
-    else
     {
-        auto serialized_message = serialize(ContinuousSnapshotCommandReply{error_code, cmd->reply_id, error_message}, cmd->serialization);
-        if (!serialized_message)
+        // acquire the write lock to stop the snapshot
+        std::unique_lock write_lock(snapshot_runinnig_mutex_);
+        // check if the snapshot is already stopped
+        if (auto it = snapshot_runinnig_.find(queue_name); it != snapshot_runinnig_.end())
         {
-            logger->logMessage("Invalid serialized message", LogLevel::FATAL);
+            // set snaphsot as to stop
+            it->second.is_running = false;
+            // send reply to app for submitted command
+            manageReply(0, STRING_FORMAT("Snapshot %1% has been stopped", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
         }
         else
         {
-            publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "monitor-operation", "monitor-error-key", serialized_message), {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
+            manageReply(-1, STRING_FORMAT("Snapshot %1% is not running", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
+            return;
         }
     }
 }
@@ -266,9 +275,24 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
     {
         return;
     }
+
     // check if the time window is expired
     if (snapshot_command_info->isTimeout())
     {
+        // before triggering the snapshot we need to check if the snapshot is still running
+        {
+            std::shared_lock lock(snapshot_runinnig_mutex_);
+            if (auto it = snapshot_runinnig_.find(snapshot_command_info->queue_name);
+                it == snapshot_runinnig_.end() || !it->second.is_running)
+            {
+                logger->logMessage(
+                    STRING_FORMAT("Snapshot %1% is stopped and wuill be removed from queue", snapshot_command_info->queue_name), LogLevel::INFO);
+                // remove the snapshot from the running list
+                snapshot_runinnig_.erase(snapshot_command_info->queue_name);
+                return;
+            }
+        }
+
         std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr> snapshot_events;
         // Copy all events to ensure snapshot data remains unchanged during publishing
         {
@@ -293,8 +317,8 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
                 RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, snapshot_command_info->snapshot_iteration_index},
                 snapshot_command_info->cmd->serialization);
             // send the header for the snapshot
-            publisher->pushMessage(MakeReplyPushableMessageUPtr(
-                                       snapshot_command_info->queue_name, "snapshot-events", snapshot_command_info->cmd->snapshot_name, serialized_header_message),
+            publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
+                                                                snapshot_command_info->cmd->snapshot_name, serialized_header_message),
                                    {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
         }
 
@@ -310,7 +334,7 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
             if (serialized_message)
             {
                 // publish the data
-                publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "snapshot-events",
+                publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
                                                                     snapshot_command_info->cmd->snapshot_name, serialized_message),
                                        {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
             }
@@ -326,6 +350,10 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         auto serialized_completion_message = serialize(RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, snap_ts,
                                                                                     snapshot_command_info->snapshot_iteration_index},
                                                        snapshot_command_info->cmd->serialization);
+        // publish the data
+        publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
+                                                            snapshot_command_info->cmd->snapshot_name, serialized_completion_message),
+                               {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
         // increment the iteration index
         snapshot_command_info->snapshot_iteration_index++;
     }
@@ -338,5 +366,27 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
             {
                 this->processSnapshot(snapshot_command_info);
             });
+    }
+}
+
+void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstCommandShrdPtr cmd)
+{
+    logger->logMessage(error_message);
+    if (cmd->reply_topic.empty() || cmd->reply_id.empty())
+    {
+        logger->logMessage(error_message, LogLevel::ERROR);
+        return;
+    }
+    else
+    {
+        auto serialized_message = serialize(ContinuousSnapshotCommandReply{error_code, cmd->reply_id, error_message}, cmd->serialization);
+        if (!serialized_message)
+        {
+            logger->logMessage("Invalid serialized message", LogLevel::FATAL);
+        }
+        else
+        {
+            publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "repeating-snapshot-events", "repeating-snapshot-events", serialized_message), {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
+        }
     }
 }
