@@ -247,7 +247,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 if (pv_name_list.size())
                 {
                     // we can create the command
-                    result = std::make_shared<SnapshotCommand>(SnapshotCommand{CommandType::snapshot, ser_type, reply_topic, reply_id,pv_name_list, time_window_msec});
+                    result = std::make_shared<SnapshotCommand>(SnapshotCommand{CommandType::snapshot, ser_type, reply_topic, reply_id, pv_name_list, time_window_msec});
                 }
                 else
                 {
@@ -268,7 +268,6 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 std::vector<std::string> pv_name_list;
                 const std::string        reply_id = check_for_reply_id(obj, logger);
                 const std::string        reply_topic = check_reply_topic(obj, logger);
-                const bool is_continuous = check_json_field<bool>(obj, KEY_IS_CONTINUOUS, logger, "The continuous key should be a boolean", false);
                 const int repeat_delay_msec = check_json_field<int32_t>(obj, KEY_REPEAT_DELAY_MSEC, logger, "The repeat delay key should be a integer", 0);
                 const int time_window_msec = check_json_field<int32_t>(obj, KEY_TIME_WINDOW_MSEC, logger, "The time window key should be a integer", 1000);
                 const std::string snapshot_name = check_json_field<std::string>(obj, KEY_SNAPSHOT_NAME, logger, "The snapshot name key should be a string", "");
@@ -289,6 +288,24 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 {
                     logger->logMessage("The array should not be empty: " + serialize(obj), LogLevel::ERROR);
                 }
+            }
+            else
+            {
+                logger->logMessage("Missing key for the Snapshot: " + serialize(obj), LogLevel::ERROR);
+            }
+            break;
+        }
+    case CommandType::repeating_snapshot_stop:
+        {
+            const SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
+            if (auto fields = checkFields(obj, {{KEY_PV_NAME_LIST, kind::array}, {KEY_REPLY_TOPIC, kind::string}, {KEY_REPLY_ID, kind::string}}); fields != nullptr)
+            {
+                std::vector<std::string> pv_name_list;
+                const std::string        reply_id = check_for_reply_id(obj, logger);
+                const std::string        reply_topic = check_reply_topic(obj, logger);
+                const std::string snapshot_name = check_json_field<std::string>(obj, KEY_SNAPSHOT_NAME, logger, "The snapshot name key should be a string", "");
+                auto json_array = std::any_cast<boost::json::array>(fields->find(KEY_PV_NAME_LIST)->second);
+                result = std::make_shared<RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, ser_type, reply_topic, reply_id, snapshot_name});
             }
             else
             {

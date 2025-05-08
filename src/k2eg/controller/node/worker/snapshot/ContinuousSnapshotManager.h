@@ -1,6 +1,7 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 
+#include "k2eg/controller/command/cmd/Command.h"
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
 #include <k2eg/common/types.h>
 #include <k2eg/common/BS_thread_pool.hpp>
@@ -289,11 +290,12 @@ class ContinuousSnapshotManager
     void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr snapsthot_command);
     // is the callback for the publisher
     void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
-
+    void startSnapshot(command::cmd::ConstRepeatingSnapshotCommandShrdPtr command);
+    void stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr command);
 public:
     ContinuousSnapshotManager(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     ~ContinuousSnapshotManager();
-    void submitSnapshot(k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr snapsthot_command);
+    void submitSnapshot(k2eg::controller::command::cmd::ConstCommandShrdPtr snapsthot_command);
 };
 
 DEFINE_PTR_TYPES(ContinuousSnapshotManager)

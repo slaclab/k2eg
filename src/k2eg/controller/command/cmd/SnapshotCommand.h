@@ -6,17 +6,14 @@
 namespace k2eg::controller::command::cmd {
 
 /*
-Perform a snapshot of the current state of specific PV with determianted parameters
+@brief Perform a snapshot of the current state of specific PV with determianted parameters
 {
     "command", "snapshot",
     "pv_name_list", ["[pva|ca]<pv name>"", ...]
     "reply_topic", "reply_topic"
     "reply_id", "reply_id",
     "serialization", "json|msgpack",
-    "is_continuous", true|false,
-    "repeat_delay_msec", 1000,
-    "time_window_msec", 1000,
-    "snapshot_name", "snapshot_name"
+    "time_window_msec", 1000
 }
 */
 struct SnapshotCommand : public Command {
@@ -27,7 +24,7 @@ struct SnapshotCommand : public Command {
 };
 DEFINE_PTR_TYPES(SnapshotCommand)
 /*
-Perform a repeating napshot of the current state of specific PV with determianted parameters
+@brief Perform a repeating napshot of the current state of specific PV with determianted parameters
 {
     "command", "repeating_snapshot",
     "pv_name_list", ["[pva|ca]<pv name>"", ...]
@@ -51,6 +48,18 @@ struct RepeatingSnapshotCommand : public Command {
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotCommand)
 
+/*
+@brief RepeatingSnapshotStopCommand is a command to stop the repeating snapshot
+{
+    "command", "repeating_snapshot_stop",
+    "snapshot_name", "snapshot_name"
+}
+*/
+struct RepeatingSnapshotStopCommand : public Command {
+  // the name of the snapshot
+  std::string snapshot_name;
+};
+DEFINE_PTR_TYPES(RepeatingSnapshotStopCommand)
 
 static void
 tag_invoke(boost::json::value_from_tag, boost::json::value& jv, SnapshotCommand const& c) {

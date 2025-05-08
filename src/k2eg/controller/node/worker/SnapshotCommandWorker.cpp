@@ -47,14 +47,14 @@ void SnapshotCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage*
 
 void SnapshotCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> command_pool, ConstCommandShrdPtr command)
 {
-    if (command->type != CommandType::snapshot || command->type != CommandType::repeating_snapshot)
+    if (command->type != CommandType::snapshot || command->type != CommandType::repeating_snapshot || command->type != CommandType::repeating_snapshot_stop)
     {
         logger->logMessage(STRING_FORMAT("Command type %1% not supported by this worker", command->type), LogLevel::ERROR);
         return;
     } else if (command->type == CommandType::repeating_snapshot)
     {
         // forward the command to the continuous snapshot manager
-        continuous_snapshot_manager.submitSnapshot(static_pointer_cast<const RepeatingSnapshotCommand>(command));
+        continuous_snapshot_manager.submitSnapshot(command);
         return;
     }
 

@@ -1,15 +1,15 @@
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
-#include <k2eg/common/utility.h>
 #include <k2eg/common/BaseSerialization.h>
+#include <k2eg/common/utility.h>
 
-#include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/epics/EpicsData.h>
 
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 #include <k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.h>
 
-#include <regex>
 #include <memory>
+#include <regex>
 
 using namespace k2eg::controller::command::cmd;
 using namespace k2eg::controller::node::worker;
@@ -67,10 +67,36 @@ void ContinuousSnapshotManager::publishEvtCB(pubsub::EventType type, PublishMess
     }
 }
 
-void ContinuousSnapshotManager::submitSnapshot(ConstRepeatingSnapshotCommandShrdPtr snapsthot_command)
+void ContinuousSnapshotManager::submitSnapshot(ConstCommandShrdPtr command)
 {
-    bool faulty = false;
 
+    switch (command->type)
+    {
+    case CommandType::repeating_snapshot:
+        {
+            // forward the command to the continuous snapshot manager
+            startSnapshot(static_pointer_cast<const RepeatingSnapshotCommand>(command));
+            break;
+        }
+    case CommandType::repeating_snapshot_stop:
+        {
+            // forward the command to the continuous snapshot manager
+            stopSnapshot(static_pointer_cast<const RepeatingSnapshotStopCommand>(command));
+            break;
+        }
+    default:
+        {
+            logger->logMessage(STRING_FORMAT("Command type %1% not supported by this worker", command->type), LogLevel::ERROR);
+            break;
+        }
+    
+    }
+}
+
+void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr snapsthot_stop_command){}
+
+void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapshotCommandShrdPtr snapsthot_command) {
+    bool faulty = false;
     logger->logMessage(STRING_FORMAT("Perepare continuous snapshot ops for '%1%' on topic %2% with sertype: %3%",
                                      snapsthot_command->snapshot_name % snapsthot_command->reply_topic %
                                          serialization_to_string(snapsthot_command->serialization)),
@@ -264,7 +290,8 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         auto snap_ts = std::chrono::system_clock::to_time_t(timestamp);
         {
             auto serialized_header_message = serialize(
-                RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, snapshot_command_info->snapshot_iteration_index}, snapshot_command_info->cmd->serialization);
+                RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, snapshot_command_info->snapshot_iteration_index},
+                snapshot_command_info->cmd->serialization);
             // send the header for the snapshot
             publisher->pushMessage(MakeReplyPushableMessageUPtr(
                                        snapshot_command_info->queue_name, "snapshot-events", snapshot_command_info->cmd->snapshot_name, serialized_header_message),
@@ -277,12 +304,14 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         int elementsIndex = 0;
         for (auto& event : snapshot_events)
         {
-            auto serialized_message = serialize(
-                RepeatingSnaptshotData{1, snap_ts, snapshot_command_info->snapshot_iteration_index, MakeChannelDataShrdPtr(event->channel_data)}, snapshot_command_info->cmd->serialization);
+            auto serialized_message = serialize(RepeatingSnaptshotData{1, snap_ts, snapshot_command_info->snapshot_iteration_index,
+                                                                       MakeChannelDataShrdPtr(event->channel_data)},
+                                                snapshot_command_info->cmd->serialization);
             if (serialized_message)
             {
                 // publish the data
-                publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "snapshot-events", snapshot_command_info->cmd->snapshot_name, serialized_message),
+                publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "snapshot-events",
+                                                                    snapshot_command_info->cmd->snapshot_name, serialized_message),
                                        {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
             }
             else
@@ -294,8 +323,9 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         }
 
         // send completion for this snapshot submission
-        auto serialized_completion_message = serialize(
-            RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, snap_ts, snapshot_command_info->snapshot_iteration_index}, snapshot_command_info->cmd->serialization);
+        auto serialized_completion_message = serialize(RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, snap_ts,
+                                                                                    snapshot_command_info->snapshot_iteration_index},
+                                                       snapshot_command_info->cmd->serialization);
         // increment the iteration index
         snapshot_command_info->snapshot_iteration_index++;
     }
