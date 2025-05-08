@@ -2,12 +2,12 @@
 #define K2EG_CONTROLLER_NODE_WORKER_SNAPSHOTCOMMANDWORKER_H_
 
 #include <k2eg/service/epics/EpicsData.h>
-#include <k2eg/service/metric/IMetricService.h>
-#include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
+#include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/service/metric/IMetricService.h>
 
-#include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/controller/command/cmd/SnapshotCommand.h>
+#include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.h>
 
 #include <boost/dynamic_bitset.hpp>
@@ -164,6 +164,7 @@ class SnapshotCommandWorker : public CommandWorker
     k2eg::service::pubsub::IPublisherShrdPtr              publisher;
     k2eg::service::metric::IEpicsMetric&                  metric;
     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
+    snapshot::ContinuousSnapshotManager                   continuous_snapshot_manager;
     // Receive event from publisher
     void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
     // manage the snapshot command execution in a separate thread

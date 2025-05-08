@@ -1,3 +1,4 @@
+#include "k2eg/controller/command/cmd/SnapshotCommand.h"
 #include <k2eg/common/utility.h>
 #include <k2eg/common/BaseSerialization.h>
 
@@ -66,7 +67,7 @@ void ContinuousSnapshotManager::publishEvtCB(pubsub::EventType type, PublishMess
     }
 }
 
-void ContinuousSnapshotManager::submitSnapshot(ConstSnapshotCommandShrdPtr snapsthot_command)
+void ContinuousSnapshotManager::submitSnapshot(ConstRepeatingSnapshotCommandShrdPtr snapsthot_command)
 {
     bool faulty = false;
 
@@ -81,11 +82,6 @@ void ContinuousSnapshotManager::submitSnapshot(ConstSnapshotCommandShrdPtr snaps
     if (s_op_ptr->cmd->pv_name_list.empty())
     {
         manageReply(-1, STRING_FORMAT("PV name list is empty for snapshot %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
-        return;
-    }
-    if (s_op_ptr->cmd->is_continuous == false)
-    {
-        manageReply(-2, STRING_FORMAT("The received snashot is not continuos %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
     if (s_op_ptr->cmd->repeat_delay_msec <= 0)
@@ -183,7 +179,7 @@ void ContinuousSnapshotManager::submitSnapshot(ConstSnapshotCommandShrdPtr snaps
     }
 }
 
-void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstSnapshotCommandShrdPtr cmd)
+void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstRepeatingSnapshotCommandShrdPtr cmd)
 {
     logger->logMessage(error_message);
     if (cmd->reply_topic.empty() || cmd->reply_id.empty())

@@ -1,6 +1,7 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 
+#include "k2eg/controller/command/cmd/SnapshotCommand.h"
 #include <k2eg/common/types.h>
 #include <k2eg/common/BS_thread_pool.hpp>
 
@@ -236,12 +237,12 @@ public:
     // keep track of the iterantion
     std::int64_t snapshot_iteration_index = 0;
     // keep track of the comamnd specification
-    k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd;
+    k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd;
     // per-snapshot views hold pointers into global_cache_
     std::unordered_map<std::string, ShdAtomicMonitorEventShrdPtr> snapshot_views_;
     const std::string                                             queue_name;
 
-    RepeatingSnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd)
+    RepeatingSnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd)
         : WorkerAsyncOperation(std::chrono::milliseconds(cmd->time_window_msec)), queue_name(queue_name), cmd(cmd)
     {
     }
@@ -285,14 +286,14 @@ class ContinuousSnapshotManager
     // and publishing the data
     void processSnapshot(RepeatingSnapshotOpInfoShrdPtr snapstho_command_info);
     // Manager the reply to the client durin gthe snapshto submission
-    void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr snapsthot_command);
+    void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr snapsthot_command);
     // is the callback for the publisher
     void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
 
 public:
     ContinuousSnapshotManager(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     ~ContinuousSnapshotManager();
-    void submitSnapshot(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr snapsthot_command);
+    void submitSnapshot(k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr snapsthot_command);
 };
 
 DEFINE_PTR_TYPES(ContinuousSnapshotManager)

@@ -1,12 +1,12 @@
-#include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/pubsub/IPublisher.h>
 
 #include <k2eg/controller/command/CMDCommand.h>
 #include <k2eg/controller/command/cmd/Command.h>
-#include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/controller/command/cmd/MonitorCommand.h>
 #include <k2eg/controller/command/cmd/SnapshotCommand.h>
+#include <k2eg/controller/node/worker/CommandWorker.h>
 
 #include <boost/json/array.hpp>
 
@@ -44,6 +44,8 @@ CommandType MapToCommand::getCMDType(const object& obj)
             return CommandType::info;
         else if (cmd.compare("snapshot") == 0)
             return CommandType::snapshot;
+        else if (cmd.compare("repeating_snapshot") == 0)
+            return CommandType::repeating_snapshot;
     }
     return CommandType::unknown;
 }
@@ -233,6 +235,39 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 std::vector<std::string> pv_name_list;
                 const std::string        reply_id = check_for_reply_id(obj, logger);
                 const std::string        reply_topic = check_reply_topic(obj, logger);
+                const int time_window_msec = check_json_field<int32_t>(obj, KEY_TIME_WINDOW_MSEC, logger, "The time window key should be a integer", 1000);
+                auto json_array = std::any_cast<boost::json::array>(fields->find(KEY_PV_NAME_LIST)->second);
+                // find all stirng in the vector
+                for (auto& element : json_array)
+                {
+                    if (element.kind() != kind::string)
+                        continue;
+                    pv_name_list.push_back(value_to<std::string>(element));
+                }
+                if (pv_name_list.size())
+                {
+                    // we can create the command
+                    result = std::make_shared<SnapshotCommand>(SnapshotCommand{CommandType::snapshot, ser_type, reply_topic, reply_id,pv_name_list, time_window_msec});
+                }
+                else
+                {
+                    logger->logMessage("The array should not be empty: " + serialize(obj), LogLevel::ERROR);
+                }
+            }
+            else
+            {
+                logger->logMessage("Missing key for the Snapshot: " + serialize(obj), LogLevel::ERROR);
+            }
+            break;
+        }
+    case CommandType::repeating_snapshot:
+        {
+            const SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
+            if (auto fields = checkFields(obj, {{KEY_PV_NAME_LIST, kind::array}, {KEY_REPLY_TOPIC, kind::string}, {KEY_REPLY_ID, kind::string}}); fields != nullptr)
+            {
+                std::vector<std::string> pv_name_list;
+                const std::string        reply_id = check_for_reply_id(obj, logger);
+                const std::string        reply_topic = check_reply_topic(obj, logger);
                 const bool is_continuous = check_json_field<bool>(obj, KEY_IS_CONTINUOUS, logger, "The continuous key should be a boolean", false);
                 const int repeat_delay_msec = check_json_field<int32_t>(obj, KEY_REPEAT_DELAY_MSEC, logger, "The repeat delay key should be a integer", 0);
                 const int time_window_msec = check_json_field<int32_t>(obj, KEY_TIME_WINDOW_MSEC, logger, "The time window key should be a integer", 1000);
@@ -248,10 +283,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 if (pv_name_list.size())
                 {
                     // we can create the command
-                    result = std::make_shared<SnapshotCommand>(SnapshotCommand{
-                      CommandType::snapshot, ser_type, reply_topic, reply_id, 
-                      is_continuous, pv_name_list, repeat_delay_msec, time_window_msec, snapshot_name
-                    });
+                    result = std::make_shared<RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, ser_type, reply_topic, reply_id, snapshot_name, pv_name_list, repeat_delay_msec, time_window_msec});
                 }
                 else
                 {
@@ -264,7 +296,6 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
             }
             break;
         }
-
     case CommandType::unknown:
         {
             ServiceResolver<ILogger>::resolve()->logMessage("Command not found:" + serialize(obj), LogLevel::ERROR);

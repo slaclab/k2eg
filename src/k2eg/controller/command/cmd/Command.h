@@ -13,7 +13,8 @@
 namespace k2eg::controller::command::cmd {
 
 // are all the possible command
-enum class CommandType { monitor, multi_monitor, get, put, info, snapshot,unknown };
+enum class CommandType { monitor, multi_monitor, get, put, info, snapshot, repeating_snapshot, unknown };
+
 constexpr const char *
 command_type_to_string(CommandType t) noexcept {
   switch (t) {
@@ -23,9 +24,15 @@ command_type_to_string(CommandType t) noexcept {
     case CommandType::multi_monitor: return "multi-monitor";
     case CommandType::put: return "put";
     case CommandType::snapshot: return "snapshot";
+    case CommandType::repeating_snapshot: return "repeating_snapshot";
     case CommandType::unknown: return "unknown";
   }
   return "undefined";
+}
+
+// Add to a header file included in your .cpp
+inline std::ostream& operator<<(std::ostream& os, const k2eg::controller::command::cmd::CommandType& type) {
+  return os << command_type_to_string(type);
 }
 
 #define KEY_COMMAND            "command"

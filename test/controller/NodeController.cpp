@@ -1016,11 +1016,7 @@ TEST(NodeController, SnapshotCommandMsgPackSer)
         SerializationType::Msgpack,
         KAFKA_TOPIC_ACQUIRE_IN,
         "rep-id",
-        false,
-        {"pva://variable:a", "pva://variable:b"},
-        0,
-        0,
-        "snapshot"
+        {"pva://variable:a", "pva://variable:b"}
     })}););
 
     work_done.wait();
@@ -1092,12 +1088,7 @@ TEST(NodeController, SnapshotCommandWithMonitorMsgPackSer)
         CommandType::snapshot,
         SerializationType::Msgpack,
         KAFKA_TOPIC_ACQUIRE_IN,
-        "rep-id-snapshot",
-        false,
-        {"pva://variable:a", "pva://variable:b"},
-        0,
-        0,
-        "snapshot"
+        {"pva://variable:a", "pva://variable:b"}
     })}););
 
     work_done.wait();

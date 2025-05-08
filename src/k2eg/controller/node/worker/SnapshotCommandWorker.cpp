@@ -24,6 +24,7 @@ SnapshotCommandWorker::SnapshotCommandWorker(EpicsServiceManagerShrdPtr epics_se
     , publisher(ServiceResolver<IPublisher>::resolve())
     , metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric())
     , epics_service_manager(epics_service_manager)
+    , continuous_snapshot_manager(epics_service_manager)
 {
     publisher->setCallBackForReqType("get-reply-message", std::bind(&SnapshotCommandWorker::publishEvtCB, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 }
@@ -46,8 +47,14 @@ void SnapshotCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage*
 
 void SnapshotCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> command_pool, ConstCommandShrdPtr command)
 {
-    if (command->type != CommandType::snapshot)
+    if (command->type != CommandType::snapshot || command->type != CommandType::repeating_snapshot)
     {
+        logger->logMessage(STRING_FORMAT("Command type %1% not supported by this worker", command->type), LogLevel::ERROR);
+        return;
+    } else if (command->type == CommandType::repeating_snapshot)
+    {
+        // forward the command to the continuous snapshot manager
+        continuous_snapshot_manager.submitSnapshot(static_pointer_cast<const RepeatingSnapshotCommand>(command));
         return;
     }
 
