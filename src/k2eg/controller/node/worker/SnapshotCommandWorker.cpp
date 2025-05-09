@@ -1,8 +1,8 @@
 
 #include <k2eg/common/utility.h>
 
-#include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/epics/EpicsData.h>
 
 #include <k2eg/controller/command/cmd/SnapshotCommand.h>
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
@@ -47,16 +47,24 @@ void SnapshotCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage*
 
 void SnapshotCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> command_pool, ConstCommandShrdPtr command)
 {
-    if (command->type != CommandType::snapshot || command->type != CommandType::repeating_snapshot || command->type != CommandType::repeating_snapshot_stop)
+    switch (command->type)
     {
-        logger->logMessage(STRING_FORMAT("Command type %1% not supported by this worker", command->type), LogLevel::ERROR);
-        return;
-    } else if (command->type == CommandType::repeating_snapshot)
-    {
+    case CommandType::snapshot:
+        // forward to internal method
+        submitSingleSnapshot(command_pool, command);
+        break;
+    case CommandType::repeating_snapshot:
         // forward the command to the continuous snapshot manager
         continuous_snapshot_manager.submitSnapshot(command);
-        return;
+        break;
+    default:
+        logger->logMessage(STRING_FORMAT("Command type %1% not supported by this worker", command->type), LogLevel::ERROR);
+        break;
     }
+}
+
+void SnapshotCommandWorker::submitSingleSnapshot(std::shared_ptr<BS::light_thread_pool> command_pool, ConstCommandShrdPtr command)
+{
 
     ConstSnapshotCommandShrdPtr s_ptr = static_pointer_cast<const SnapshotCommand>(command);
 
@@ -80,7 +88,7 @@ void SnapshotCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool
         }
     }
     // submit snapshot to processing pool
-    auto s_op_ptr = std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops));
+    auto s_op_ptr = std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops), s_ptr->time_window_msec);
     command_pool->detach_task(
         [this, command_pool, s_op_ptr]()
         {
@@ -135,23 +143,12 @@ void SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::light_thread_
         }
         // give some time to relax
         std::this_thread::sleep_for(std::chrono::microseconds(10));
-        // check if we have done all the PVs
-        if (!snapshot_info->processed_index.all())
-        {
-            // there still are PVs that have not been received, so resubmit the task
-            // command_pool->push_task(&SnapshotCommandWorker::checkGetCompletion, this, command_pool, snapshot_info);
-            command_pool->detach_task(
-                [this, command_pool, snapshot_info]()
-                {
-                    this->checkGetCompletion(command_pool, snapshot_info);
-                });
-        }
-        else
-        {
-            // in this case we have comepleted the snapshot so we can send the completion message to the client before
-            // the snapshot
-            publishEndSnapshotReply(snapshot_info->cmd);
-        }
+        // resubmit the task to check for completion
+        command_pool->detach_task(
+            [this, command_pool, snapshot_info]()
+            {
+                this->checkGetCompletion(command_pool, snapshot_info);
+            });
     }
     else
     { // At timeout, process unhandled monitors.
@@ -168,7 +165,8 @@ void SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::light_thread_
             if (m_op->hasData())
             {
                 auto evt_shrd_ptr = m_op->getEventData()->event_data->back();
-                publishSnapshotReply(snapshot_info->cmd, static_cast<std::uint32_t>(i), MakeChannelDataShrdPtr(evt_shrd_ptr->channel_data));
+                publishSnapshotReply(
+                    snapshot_info->cmd, static_cast<std::uint32_t>(i), MakeChannelDataShrdPtr(evt_shrd_ptr->channel_data));
             }
             snapshot_info->processed_index.set(i, true);
         }

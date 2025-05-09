@@ -182,6 +182,10 @@ class SnapshotCommandWorker : public CommandWorker
     Is the final message that is sent to the client to notify that the snapshot has been completed
     */
     void publishEndSnapshotReply(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd);
+    /*
+        preparae and submit the single snapshot command to the thread pool
+    */
+    void submitSingleSnapshot(std::shared_ptr<BS::light_thread_pool> command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 
 public:
     SnapshotCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);

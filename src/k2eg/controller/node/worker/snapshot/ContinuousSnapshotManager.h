@@ -248,6 +248,11 @@ public:
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotOpInfo)
 
+/*
+@brief RunningInfo is a class that holds information about the running status of a snapshot.
+@details 
+The class contains a boolean flag that indicates whether the snapshot is currently running or not.
+*/
 struct RunningInfo
 {
     // the snapshot command

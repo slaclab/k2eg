@@ -48,6 +48,8 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
     worker_resolver.registerObjectInstance(CommandType::get, std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
     worker_resolver.registerObjectInstance(CommandType::put, std::make_shared<PutCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
     worker_resolver.registerObjectInstance(CommandType::snapshot, std::make_shared<SnapshotCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
+    worker_resolver.registerObjectInstance(CommandType::repeating_snapshot, std::make_shared<SnapshotCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
+    worker_resolver.registerObjectInstance(CommandType::repeating_snapshot_stop, std::make_shared<SnapshotCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
 }
 
 NodeController::~NodeController()
