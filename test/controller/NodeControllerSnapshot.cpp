@@ -42,7 +42,6 @@
 #include "k2eg/service/pubsub/IPublisher.h"
 #include "msgpack/v3/object_fwd_decl.hpp"
 
-
 using namespace k2eg::common;
 
 using namespace k2eg::controller::command;
@@ -69,6 +68,7 @@ using namespace k2eg::service::metric::impl::prometheus_impl;
 #define KAFKA_TOPIC_ACQUIRE_IN "acquire_commad_in"
 
 int ncs_tcp_port = 9000;
+
 TEST(NodeControllerSnapshot, SnapshotCommandMsgPackSer)
 {
 
@@ -86,14 +86,7 @@ TEST(NodeControllerSnapshot, SnapshotCommandMsgPackSer)
         sleep(1);
     }
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const SnapshotCommand>(SnapshotCommand{
-        CommandType::snapshot,
-        SerializationType::Msgpack,
-        KAFKA_TOPIC_ACQUIRE_IN,
-        "rep-id",
-        {"pva://variable:a", "pva://variable:b"},
-        1000
-    })}););
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const SnapshotCommand>(SnapshotCommand{CommandType::snapshot, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", {"pva://variable:a", "pva://variable:b"}, 1000})}););
 
     work_done.wait();
 
@@ -160,13 +153,47 @@ TEST(NodeControllerSnapshot, SnapshotCommandWithMonitorMsgPackSer)
 
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const SnapshotCommand>(SnapshotCommand{
-        CommandType::snapshot,
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const SnapshotCommand>(SnapshotCommand{CommandType::snapshot, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", {"pva://variable:a", "pva://variable:b"}, 1000})}););
+
+    work_done.wait();
+
+    // we need to have publish some message
+    size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+    EXPECT_EQ(published, 5); // two values and one completion message
+
+    // dispose all
+    deinitBackend(std::move(node_controller));
+}
+
+TEST(NodeControllerSnapshot, RepeatingSnapshotStart)
+{
+    typedef std::map<std::string, msgpack::object> Map;
+    // wait for two monitor message(event and ack replay) and three snashot (two data and one completion message)
+    std::latch                      work_done{8};
+    boost::json::object             reply_msg;
+    std::unique_ptr<NodeController> node_controller;
+    auto                            publisher = std::make_shared<DummyPublisher>(work_done);
+    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
+
+    // add the number of reader from topic
+    dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
+    while (!node_controller->isWorkerReady(CommandType::repeating_snapshot))
+    {
+        sleep(1);
+    }
+
+    // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
+    // givin a new event, only for that
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{
+        CommandType::repeating_snapshot,
         SerializationType::Msgpack,
         KAFKA_TOPIC_ACQUIRE_IN,
         "rep-id",
+        "Snapshot Name",
         {"pva://variable:a", "pva://variable:b"},
-        1000
+        0,
+        1000,
+
     })}););
 
     work_done.wait();

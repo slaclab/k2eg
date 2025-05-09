@@ -10,6 +10,7 @@
 
 #include <memory>
 #include <regex>
+#include <algorithm>
 
 using namespace k2eg::controller::command::cmd;
 using namespace k2eg::controller::node::worker;
@@ -20,7 +21,11 @@ using namespace k2eg::service::log;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::epics_impl;
 
-#define GET_QUEUE_FROM_SNAPSHOT_NAME(snapshto_name) std::regex_replace(snapshto_name, std::regex(":"), "_")
+#define GET_QUEUE_FROM_SNAPSHOT_NAME(snapshot_name) ([](const std::string& name) { \
+    std::string norm = std::regex_replace(name, std::regex(R"([^A-Za-z0-9\-])"), "_"); \
+    std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower); \
+    return norm; \
+})(snapshot_name)
 
 void set_snapshot_thread_name(const std::size_t idx)
 {
@@ -102,18 +107,28 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     // create the commmand operation info structure
     auto s_op_ptr = MakeRepeatingSnapshotOpInfoShrdPtr(GET_QUEUE_FROM_SNAPSHOT_NAME(snapsthot_command->snapshot_name), snapsthot_command);
 
+    // chekc if it is already spinned
+    {
+        std::unique_lock write_lock(snapshot_runinnig_mutex_);
+        if (snapshot_runinnig_.find(s_op_ptr->queue_name) != snapshot_runinnig_.end())
+        {
+            manageReply(-1, STRING_FORMAT("Snapshot %1% is already running", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+            return;
+        }
+    }
+
     // check if all the command infromation are filled
     if (s_op_ptr->cmd->pv_name_list.empty())
     {
-        manageReply(-1, STRING_FORMAT("PV name list is empty for snapshot %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        manageReply(-2, STRING_FORMAT("PV name list is empty for snapshot %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
-    if (s_op_ptr->cmd->repeat_delay_msec <= 0)
+    if (s_op_ptr->cmd->repeat_delay_msec < 0)
     {
         manageReply(-3, STRING_FORMAT("The repeat delay is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
-    if (s_op_ptr->cmd->time_window_msec <= 0)
+    if (s_op_ptr->cmd->time_window_msec < 0)
     {
         manageReply(-4, STRING_FORMAT("The time window is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
@@ -168,7 +183,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         }
 
         // it now is valid
-        if (s_op_ptr->snapshot_views_.emplace(it->first, it->second).second)
+        if (!s_op_ptr->snapshot_views_.emplace(it->first, it->second).second)
         {
             manageReply(
                 -3, STRING_FORMAT("Failing to add PV %1% to the view cache for snapshot ", pv_uri % s_op_ptr->cmd->snapshot_name), snapsthot_command);
@@ -357,16 +372,14 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         // increment the iteration index
         snapshot_command_info->snapshot_iteration_index++;
     }
-    else
-    {
-        // we are not in the time window
-        // resubmit the snapshot command
-        thread_pool->detach_task(
-            [this, snapshot_command_info]()
-            {
-                this->processSnapshot(snapshot_command_info);
-            });
-    }
+
+    // resubmit the snapshot command
+    thread_pool->detach_task(
+        [this, snapshot_command_info]()
+        {
+            this->processSnapshot(snapshot_command_info);
+        });
+    
 }
 
 void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstCommandShrdPtr cmd)

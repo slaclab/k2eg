@@ -16,13 +16,15 @@ namespace k2eg::controller::command::cmd {
     "time_window_msec", 1000
 }
 */
-struct SnapshotCommand : public Command {
-  // the list of PV to be monitored
-  std::vector<std::string> pv_name_list;
-  // the time window to collect data
-  std::int32_t time_window_msec;
+struct SnapshotCommand : public Command
+{
+    // the list of PV to be monitored
+    std::vector<std::string> pv_name_list;
+    // the time window to collect data
+    std::int32_t time_window_msec;
 };
 DEFINE_PTR_TYPES(SnapshotCommand)
+
 /*
 @brief Perform a repeating napshot of the current state of specific PV with determianted parameters
 {
@@ -36,15 +38,16 @@ DEFINE_PTR_TYPES(SnapshotCommand)
     "snapshot_name", "snapshot_name"
 }
 */
-struct RepeatingSnapshotCommand : public Command {
-  // the name of the snapshot
-  std::string snapshot_name;
-  // the list of PV to be monitored
-  std::vector<std::string> pv_name_list;
-  // the repeat delay after the last snapshot
-  std::int32_t repeat_delay_msec;
-  // the time window to collect data
-  std::int32_t time_window_msec;
+struct RepeatingSnapshotCommand : public Command
+{
+    // the name of the snapshot
+    std::string snapshot_name;
+    // the list of PV to be monitored
+    std::vector<std::string> pv_name_list;
+    // the repeat delay after the last snapshot
+    std::int32_t repeat_delay_msec;
+    // the time window to collect data
+    std::int32_t time_window_msec;
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotCommand)
 
@@ -55,22 +58,59 @@ DEFINE_PTR_TYPES(RepeatingSnapshotCommand)
     "snapshot_name", "snapshot_name"
 }
 */
-struct RepeatingSnapshotStopCommand : public Command {
-  // the name of the snapshot
-  std::string snapshot_name;
+struct RepeatingSnapshotStopCommand : public Command
+{
+    // the name of the snapshot
+    std::string snapshot_name;
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotStopCommand)
 
-static void
-tag_invoke(boost::json::value_from_tag, boost::json::value& jv, SnapshotCommand const& c) {
-  boost::json::array pv_array;
-  for (const auto& name : c.pv_name_list) { pv_array.emplace_back(name); }
+// clang-format off
+static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, SnapshotCommand const& c)
+{
+    boost::json::array pv_array;
+    for (const auto& name : c.pv_name_list)
+    {
+        pv_array.emplace_back(name);
+    }
 
-  jv = {{"serialization", serialization_to_string(c.serialization)},
-        {"pv_name_list", std::move(pv_array)},
+    jv = {
+        {"serialization", serialization_to_string(c.serialization)},
         {"reply_id", c.reply_id},
-        {"reply_topic", c.reply_topic}
+        {"reply_topic", c.reply_topic},
+        {"pv_name_list", std::move(pv_array)},
+        {"time_window_msec", c.time_window_msec},
     };
 }
-}  // namespace k2eg::controller::command::cmd
-#endif  // K2EG_CONTROLLER_COMMAND_CMD_SNAPSHOTCOMMAND_H_
+
+static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, RepeatingSnapshotCommand const& c)
+{
+    boost::json::array pv_array;
+    for (const auto& name : c.pv_name_list)
+    {
+        pv_array.emplace_back(name);
+    }
+    jv = {
+      {"serialization", serialization_to_string(c.serialization)}, 
+      {"reply_id", c.reply_id}, 
+      {"reply_topic", c.reply_topic}, 
+      {"snapshot_name", c.snapshot_name}, 
+      {"pv_name_list", std::move(pv_array)}, 
+      {"repeat_delay_msec", c.repeat_delay_msec}, 
+      {"time_window_msec", c.time_window_msec}
+    };
+}
+
+static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, RepeatingSnapshotStopCommand const& c)
+{
+    jv = {
+        {"serialization", serialization_to_string(c.serialization)},
+        {"reply_id", c.reply_id},
+        {"reply_topic", c.reply_topic},
+        {"snapshot_name", c.snapshot_name},
+    };
+}
+
+// clang-format on
+} // namespace k2eg::controller::command::cmd
+#endif // K2EG_CONTROLLER_COMMAND_CMD_SNAPSHOTCOMMAND_H_
