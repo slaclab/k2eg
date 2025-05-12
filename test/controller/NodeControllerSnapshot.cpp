@@ -165,14 +165,13 @@ TEST(NodeControllerSnapshot, SnapshotCommandWithMonitorMsgPackSer)
     deinitBackend(std::move(node_controller));
 }
 
-TEST(NodeControllerSnapshot, RepeatingSnapshotStart)
+TEST(NodeControllerSnapshot, RepeatingSnapshotStartStop)
 {
     typedef std::map<std::string, msgpack::object> Map;
-    // wait for two monitor message(event and ack replay) and three snashot (two data and one completion message)
-    std::latch                      work_done{8};
     boost::json::object             reply_msg;
     std::unique_ptr<NodeController> node_controller;
-    auto                            publisher = std::make_shared<DummyPublisher>(work_done);
+       
+    auto                            publisher = std::make_shared<TopicCountedTargetPublisher>();
     node_controller = initBackend(ncs_tcp_port, publisher, true, true);
 
     // add the number of reader from topic
@@ -187,7 +186,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStart)
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{
         CommandType::repeating_snapshot,
         SerializationType::Msgpack,
-        KAFKA_TOPIC_ACQUIRE_IN,
+        "app_reply_topic",
         "rep-id",
         "Snapshot Name",
         {"pva://variable:a", "pva://variable:b"},
@@ -196,11 +195,22 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStart)
 
     })}););
 
-    work_done.wait();
+    // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event + completaion) messages
+    publisher->wait_for({{"snapshot_name", 4}, {"app_reply_topic", 1}}, std::chrono::milliseconds(60000));
 
     // we need to have publish some message
     size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
-    EXPECT_EQ(published, 5); // two values and one completion message
+    EXPECT_GE(published, 5);
+
+    // stop the snapshot
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{
+        CommandType::repeating_snapshot_stop,
+        SerializationType::Msgpack,
+        "app_reply_topic",
+        "rep-id",
+        "snapshot_name"
+    })}););
+
 
     // dispose all
     deinitBackend(std::move(node_controller));

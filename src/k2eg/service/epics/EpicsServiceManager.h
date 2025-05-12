@@ -1,9 +1,9 @@
 #ifndef EpicsServiceManager_H
 #define EpicsServiceManager_H
 
-#include <k2eg/common/types.h>
-#include <k2eg/common/broadcaster.h>
 #include <k2eg/common/BS_thread_pool.hpp>
+#include <k2eg/common/broadcaster.h>
+#include <k2eg/common/types.h>
 
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
@@ -11,10 +11,10 @@
 
 #include <cstdint>
 
-#include <map>
-#include <mutex>
-#include <memory>
 #include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
 #include <shared_mutex>
 
 namespace k2eg::service::epics_impl {
@@ -67,11 +67,13 @@ struct ThreadThrottling
     std::uint64_t total_idle_cycles = 0;
 };
 
+DEFINE_MAP_FOR_TYPE(std::string, ChannelMapElement, ChannelMap)
+
 class EpicsServiceManager
 {
     ConstEpicsServiceManagerConfigUPtr                                config;
     std::shared_mutex                                                 channel_map_mutex;
-    std::map<std::string, ChannelMapElement>                          channel_map;
+    ChannelMap                                                        channel_map;
     std::set<std::string>                                             pv_to_remove;
     std::set<std::string>                                             pv_to_force;
     k2eg::common::broadcaster<EpicsServiceManagerHandlerParamterType> handler_broadcaster;

@@ -250,7 +250,7 @@ DEFINE_PTR_TYPES(RepeatingSnapshotOpInfo)
 
 /*
 @brief RunningInfo is a class that holds information about the running status of a snapshot.
-@details 
+@details
 The class contains a boolean flag that indicates whether the snapshot is currently running or not.
 */
 struct RunningInfo
@@ -259,6 +259,9 @@ struct RunningInfo
     bool is_running = true;
 };
 DEFINE_PTR_TYPES(RunningInfo)
+
+DEFINE_UOMAP_FOR_TYPE(std::string, ShdAtomicMonitorEventShrdPtr, GlobalPVCacheMap)
+DEFINE_UOMAP_FOR_TYPE(std::string, RunningInfo, RunninInfoMap)
 
 /*
 @brief ContinuousSnapshotManager is a class that manages the continuous snapshot of EPICS events.
@@ -284,8 +287,8 @@ class ContinuousSnapshotManager
     mutable std::shared_mutex global_cache_mutex_;
     mutable std::shared_mutex snapshot_runinnig_mutex_;
 
-    std::unordered_map<std::string, ShdAtomicMonitorEventShrdPtr> global_cache_;
-    std::unordered_map<std::string, RunningInfo>                  snapshot_runinnig_;
+    GlobalPVCacheMap global_cache_;
+    RunninInfoMap    snapshot_runinnig_;
 
     // thread pool for snapshot processing
     std::shared_ptr<BS::light_thread_pool> thread_pool;
@@ -301,7 +304,7 @@ class ContinuousSnapshotManager
     // and publishing the data
     void processSnapshot(RepeatingSnapshotOpInfoShrdPtr snapstho_command_info);
     // Manager the reply to the client durin gthe snapshto submission
-    void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
+    void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstCommandShrdPtr command, const std::string& publishing_topic = "");
     // is the callback for the publisher
     void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
     void startSnapshot(command::cmd::ConstRepeatingSnapshotCommandShrdPtr command);

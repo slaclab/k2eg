@@ -39,6 +39,7 @@ DEFINE_PTR_TYPES(SnapshotFaultyCommandReply)
 struct ContinuousSnapshotCommandReply : public k2eg::controller::node::worker::CommandReply
 {
     const std::string message;
+    const std::string publishing_topic;
 };
 DEFINE_PTR_TYPES(ContinuousSnapshotCommandReply)
 
@@ -67,6 +68,10 @@ inline void serializeJson(const ContinuousSnapshotCommandReply& reply, common::J
     {
         json_message.getJsonObject()["message"] = reply.message;
     }
+    if (!reply.publishing_topic.empty())
+    {
+        json_message.getJsonObject()["publishing_topic"] = reply.publishing_topic;
+    }
 }
 
 /**
@@ -91,12 +96,20 @@ inline void serializeMsgpack(const SnapshotFaultyCommandReply& reply, common::Ms
 
 inline void serializeMsgpack(const ContinuousSnapshotCommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
 {
-    serializeMsgpack(static_cast<CommandReply>(reply), msgpack_message, map_size + (reply.message.empty() ? 0 : 1));
+    // calculate the size of the map
+    // 1 for the message and 1 for the publishing topic
+    int field_size = (reply.message.empty() ? 0 : 1) + (reply.publishing_topic.empty() ? 0 : 1);
+    serializeMsgpack(static_cast<CommandReply>(reply), msgpack_message, map_size + field_size);
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
     if (!reply.message.empty())
     {
         packer.pack("message");
         packer.pack(reply.message);
+    }
+    if (!reply.publishing_topic.empty())
+    {
+        packer.pack("publishing_topic");
+        packer.pack(reply.publishing_topic);
     }
 }
 
@@ -122,12 +135,18 @@ inline void serializeMsgpackCompact(const SnapshotFaultyCommandReply& reply, com
 
 inline void serializeMsgpackCompact(const ContinuousSnapshotCommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
 {
+    int field_size = (reply.message.empty() ? 0 : 1) + (reply.publishing_topic.empty() ? 0 : 1);
     serializeMsgpackCompact(static_cast<CommandReply>(reply), msgpack_message, map_size + (reply.message.empty() ? 0 : 1));
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
     if (!reply.message.empty())
     {
         packer.pack("message");
         packer.pack(reply.message);
+    }
+    if (!reply.publishing_topic.empty())
+    {
+        packer.pack("publishing_topic");
+        packer.pack(reply.publishing_topic);
     }
 }
 

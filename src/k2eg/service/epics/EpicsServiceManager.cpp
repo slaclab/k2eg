@@ -1,11 +1,11 @@
-#include <k2eg/common/utility.h>
 #include <k2eg/common/BS_thread_pool.hpp>
+#include <k2eg/common/utility.h>
 
 #include <k2eg/service/epics/EpicsChannel.h>
-#include <k2eg/service/epics/EpicsPutOperation.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
-#include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
+#include <k2eg/service/epics/EpicsPutOperation.h>
+#include <k2eg/service/epics/EpicsServiceManager.h>
 
 #include <chrono>
 #include <cstddef>
@@ -52,43 +52,46 @@ void EpicsServiceManager::addChannel(const std::string& pv_name_uri, bool sticky
     if (!sanitized_pv)
         return;
 
+    bool inserted = false;
     try
     {
+        std::shared_ptr<EpicsChannel> channel_ptr;
         {
             WriteLockCM write_lock(channel_map_mutex);
-            if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
+            auto [it, success] = channel_map.emplace(
+                sanitized_pv->name,
+                ChannelMapElement{
+                    .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
+                    .to_force = false,
+                    .to_erase = false,
+                    .sticky = sticky,
+                });
+            if (!success)
             {
+                // Already exists, nothing to do
                 return;
             }
-            // Register a new channel for the sanitized PV name.
-            channel_map[sanitized_pv->name] = ChannelMapElement{
-                .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
-                .to_force = false,
-                .to_erase = false,
-                .sticky = sticky,
-            };
+            channel_ptr = it->second.channel;
+            inserted = true;
         }
-        {
-            // Lock the channel map for reading and enqueue the monitor task.
-            ReadLockCM                   read_lock(channel_map_mutex);
-            ConstMonitorOperationShrdPtr monitor_operation = channel_map[sanitized_pv->name].channel->monitor();
-            processing_pool->detach_task(
-                [this, monitor_operation]
-                {
-                    this->task(monitor_operation);
-                });
-        }
-    }
-    catch (std::exception& ex)
-    {
-        // In case of an error, remove the faulty channel and rethrow.
-        channel_map.erase(sanitized_pv->name);
-        throw ex;
+
+        // Only monitor if we actually inserted a new channel
+        ConstMonitorOperationShrdPtr monitor_operation = channel_ptr->monitor();
+        processing_pool->detach_task(
+            [this, monitor_operation]
+            {
+                this->task(monitor_operation);
+            });
     }
     catch (...)
     {
-        channel_map.erase(sanitized_pv->name);
-        throw std::runtime_error("Unknown error during channel registration");
+        // Only erase if we actually inserted
+        if (inserted)
+        {
+            WriteLockCM write_lock(channel_map_mutex);
+            channel_map.erase(sanitized_pv->name);
+        }
+        throw;
     }
 }
 
@@ -271,7 +274,8 @@ PVUPtr EpicsServiceManager::sanitizePVName(const std::string& pv_name)
     return std::make_unique<PV>(PV{protocol, base_pv_name, field_name});
 }
 
-std::vector<ThreadThrottling> EpicsServiceManager::getThreadThrottlingInfo() const {
+std::vector<ThreadThrottling> EpicsServiceManager::getThreadThrottlingInfo() const
+{
     return thread_throttling_vector;
 }
 
@@ -286,22 +290,29 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
     bool        had_events = false;
     bool        to_delete = false;
     const auto& pv_name = monitor_op->getPVName();
-    auto&         throttling = thread_throttling_vector[thread_index.value()];
+    auto&       throttling = thread_throttling_vector[thread_index.value()];
     {
         // Lock channel_map for reading to check if the current monitor should be deleted or updated.
-        ReadLockCM read_lock(channel_map_mutex);
-        auto       it = channel_map.find(pv_name);
-        if (it == channel_map.end())
-            return;
+        ChannelMapIterator it;
+        {
+            ReadLockCM read_lock(channel_map_mutex);
+            it = channel_map.find(pv_name);
+            if (it == channel_map.end())
+            {
+                return;
+            }
+        }
 
-        auto& info = it->second;
-        to_delete = info.to_erase && !info.sticky;
+        // Copy info pointer to avoid holding reference after lock
+        auto* info = &(it->second);
+
+        to_delete = info->to_erase && !info->sticky;
         if (!to_delete)
         {
-            if (info.to_force)
+            if (info->to_force)
             {
                 monitor_op->forceUpdate();
-                info.to_force = false;
+                info->to_force = false;
             }
             monitor_op->poll();
             if (monitor_op->hasEvents() && !handler_broadcaster.targets.empty())

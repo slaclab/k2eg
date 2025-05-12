@@ -8,9 +8,10 @@
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 #include <k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.h>
 
+#include <algorithm>
 #include <memory>
 #include <regex>
-#include <algorithm>
+#include <set>
 
 using namespace k2eg::controller::command::cmd;
 using namespace k2eg::controller::node::worker;
@@ -29,7 +30,7 @@ using namespace k2eg::service::epics_impl;
 
 void set_snapshot_thread_name(const std::size_t idx)
 {
-    const std::string name = "Snapshot " + std::to_string(idx);
+    const std::string name = "Repeating Snapshot " + std::to_string(idx);
     const bool        result = BS::this_thread::set_os_thread_name(name);
 }
 
@@ -74,7 +75,7 @@ void ContinuousSnapshotManager::publishEvtCB(pubsub::EventType type, PublishMess
 
 void ContinuousSnapshotManager::submitSnapshot(ConstCommandShrdPtr command)
 {
-
+    logger->logMessage("Continuous snapshot command received", LogLevel::DEBUG);
     switch (command->type)
     {
     case CommandType::repeating_snapshot:
@@ -95,11 +96,13 @@ void ContinuousSnapshotManager::submitSnapshot(ConstCommandShrdPtr command)
             break;
         }
     }
+    logger->logMessage("Continuous snapshot command processed", LogLevel::DEBUG);
 }
 
 void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapshotCommandShrdPtr snapsthot_command)
 {
-    bool faulty = false;
+    bool                  faulty = false;
+    std::set<std::string> pv_uri_to_monitor;
     logger->logMessage(STRING_FORMAT("Perepare continuous snapshot ops for '%1%' on topic %2% with sertype: %3%",
                                      snapsthot_command->snapshot_name % snapsthot_command->reply_topic %
                                          serialization_to_string(snapsthot_command->serialization)),
@@ -154,6 +157,8 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         if (it == global_cache_.end())
         {
 
+            logger->logMessage(STRING_FORMAT("PV '%1%' not found in the global cache", pv_uri), LogLevel::DEBUG);
+
             if (!sanitized_pv_name)
             {
                 manageReply(-1, STRING_FORMAT("PV '%1%'name malformed", pv_uri), snapsthot_command);
@@ -174,12 +179,14 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
                     break;
                 }
                 it = inserted.first;
-
-                // no we can start the monitor for the new registered pv and make it sticky (to not to be removed during
-                // monitor cleanup)
-                epics_service_manager->monitorChannel(pv_uri, true);
+                pv_uri_to_monitor.insert(pv_uri);
             }
             read_lock.lock();
+            logger->logMessage(STRING_FORMAT("PV '%1%' added to the global cache", pv_uri), LogLevel::DEBUG);
+        }
+        else
+        {
+            logger->logMessage(STRING_FORMAT("PV '%1%' already in the global cache", pv_uri), LogLevel::DEBUG);
         }
 
         // it now is valid
@@ -190,34 +197,49 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
             faulty = true;
             break;
         }
+        logger->logMessage(STRING_FORMAT("PV '%1%' added to the view cache for snapshot '%2%'", pv_uri % s_op_ptr->cmd->snapshot_name), LogLevel::DEBUG);
     }
-    if (!faulty)
+   
+    read_lock.unlock();
+   
+    if (faulty)
     {
-        // create topic where publish the snapshot
-        publisher->createQueue(QueueDescription{
-            .name = s_op_ptr->queue_name,
-            .paritions = 3,
-            .replicas = 1, // put default to 1 need to be calculated with more compelx logic for higher values
-            .retention_time = 1000 * 60 * 60,
-            .retention_size = 1024 * 1024 * 50,
-        });
-        // we got no faulty during the cache preparation
-        // so we can start the snapshot
-        thread_pool->detach_task(
-            [this, s_op_ptr]()
-            {
-                logger->logMessage(STRING_FORMAT("Start snapshot %1%", s_op_ptr->cmd->snapshot_name), LogLevel::INFO);
-                this->processSnapshot(s_op_ptr);
-            });
-
-        // return reply to app for submitted command
-        manageReply(0, STRING_FORMAT("Start snapshot %1% has been started", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        return;
     }
+
+    // create topic where publish the snapshot
+    publisher->createQueue(QueueDescription{
+        .name = s_op_ptr->queue_name,
+        .paritions = 3,
+        .replicas = 1, // put default to 1 need to be calculated with more compelx logic for higher values
+        .retention_time = 1000 * 60 * 60,
+        .retention_size = 1024 * 1024 * 50,
+    });
+    // we got no faulty during the cache preparation
+    // so we can start the snapshot
     // add the snapshot to the stopped snapshot list
     {
         std::unique_lock write_lock(snapshot_runinnig_mutex_);
-        snapshot_runinnig_.emplace(s_op_ptr->queue_name, RunningInfo{true});
+        snapshot_runinnig_.insert(RunninInfoMapPair(s_op_ptr->queue_name, RunningInfo{true}));
     }
+
+    // start monitor for all needed pv
+    for (auto& pv_uri : pv_uri_to_monitor)
+    {
+        logger->logMessage(STRING_FORMAT("PV '%1%' enabling monitor", pv_uri), LogLevel::DEBUG);
+        epics_service_manager->monitorChannel(pv_uri, true);
+    }
+
+    // submite snapshot to the thread pool
+    thread_pool->detach_task(
+        [this, s_op_ptr]()
+        {
+            logger->logMessage(STRING_FORMAT("Start snapshot %1%", s_op_ptr->cmd->snapshot_name), LogLevel::INFO);
+            this->processSnapshot(s_op_ptr);
+        });
+
+    // return reply to app for submitted command
+    manageReply(0, STRING_FORMAT("Start snapshot %1% has been started", s_op_ptr->cmd->snapshot_name), snapsthot_command);
 }
 
 void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr snapsthot_stop_command)
@@ -236,7 +258,8 @@ void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapsho
         // acquire the write lock to stop the snapshot
         std::unique_lock write_lock(snapshot_runinnig_mutex_);
         // check if the snapshot is already stopped
-        if (auto it = snapshot_runinnig_.find(queue_name); it != snapshot_runinnig_.end())
+        auto it = snapshot_runinnig_.find(queue_name);
+        if (it != snapshot_runinnig_.end())
         {
             // set snaphsot as to stop
             it->second.is_running = false;
@@ -245,7 +268,7 @@ void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapsho
         }
         else
         {
-            manageReply(-1, STRING_FORMAT("Snapshot %1% is not running", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
+            manageReply(0, STRING_FORMAT("Snapshot %1% is already stopped", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
             return;
         }
     }
@@ -297,14 +320,17 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         // before triggering the snapshot we need to check if the snapshot is still running
         {
             std::shared_lock lock(snapshot_runinnig_mutex_);
-            if (auto it = snapshot_runinnig_.find(snapshot_command_info->queue_name);
-                it == snapshot_runinnig_.end() || !it->second.is_running)
+            if (auto it = snapshot_runinnig_.find(snapshot_command_info->queue_name); it != snapshot_runinnig_.end())
             {
-                logger->logMessage(
-                    STRING_FORMAT("Snapshot %1% is stopped and wuill be removed from queue", snapshot_command_info->queue_name), LogLevel::INFO);
-                // remove the snapshot from the running list
-                snapshot_runinnig_.erase(snapshot_command_info->queue_name);
-                return;
+                // check if the snapshot is still need to run
+                if (!it->second.is_running)
+                {
+                    logger->logMessage(
+                        STRING_FORMAT("Snapshot %1% is stopped and wuill be removed from queue", snapshot_command_info->queue_name), LogLevel::INFO);
+                    // remove the snapshot from the running list
+                    snapshot_runinnig_.erase(snapshot_command_info->queue_name);
+                    return;
+                }
             }
         }
 
@@ -379,20 +405,13 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         {
             this->processSnapshot(snapshot_command_info);
         });
-    
 }
 
-void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstCommandShrdPtr cmd)
+void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstCommandShrdPtr cmd, const std::string& publishing_topic)
 {
-    logger->logMessage(error_message);
-    if (cmd->reply_topic.empty() || cmd->reply_id.empty())
+    logger->logMessage(error_message, error_code == 0 ? LogLevel::INFO : LogLevel::ERROR);
     {
-        logger->logMessage(error_message, LogLevel::ERROR);
-        return;
-    }
-    else
-    {
-        auto serialized_message = serialize(ContinuousSnapshotCommandReply{error_code, cmd->reply_id, error_message}, cmd->serialization);
+        auto serialized_message = serialize(ContinuousSnapshotCommandReply{error_code, cmd->reply_id, error_message, publishing_topic}, cmd->serialization);
         if (!serialized_message)
         {
             logger->logMessage("Invalid serialized message", LogLevel::FATAL);
