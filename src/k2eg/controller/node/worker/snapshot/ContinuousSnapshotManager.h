@@ -240,28 +240,21 @@ public:
     // per-snapshot views hold pointers into global_cache_
     std::unordered_map<std::string, ShdAtomicMonitorEventShrdPtr> snapshot_views_;
     const std::string                                             queue_name;
+    const bool                                                    is_triggered;
+    // keep track when to stop the snapshtot
+    bool is_running = true;
+    // keep track when a triggered snashot need to trigger
+    bool request_to_trigger = false;
 
-    RepeatingSnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd)
-        : WorkerAsyncOperation(std::chrono::milliseconds(cmd->time_window_msec)), queue_name(queue_name), cmd(cmd)
+    RepeatingSnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd, bool is_triggered = false)
+        : WorkerAsyncOperation(std::chrono::milliseconds(cmd->time_window_msec)), queue_name(queue_name), cmd(cmd), is_triggered(is_triggered)
     {
     }
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotOpInfo)
 
-/*
-@brief RunningInfo is a class that holds information about the running status of a snapshot.
-@details
-The class contains a boolean flag that indicates whether the snapshot is currently running or not.
-*/
-struct RunningInfo
-{
-    // the snapshot command
-    bool is_running = true;
-};
-DEFINE_PTR_TYPES(RunningInfo)
-
 DEFINE_UOMAP_FOR_TYPE(std::string, ShdAtomicMonitorEventShrdPtr, GlobalPVCacheMap)
-DEFINE_UOMAP_FOR_TYPE(std::string, RunningInfo, RunninInfoMap)
+DEFINE_UOMAP_FOR_TYPE(std::string, RepeatingSnapshotOpInfoShrdPtr, RunninSnapshotMap)
 
 /*
 @brief ContinuousSnapshotManager is a class that manages the continuous snapshot of EPICS events.
@@ -287,8 +280,8 @@ class ContinuousSnapshotManager
     mutable std::shared_mutex global_cache_mutex_;
     mutable std::shared_mutex snapshot_runinnig_mutex_;
 
-    GlobalPVCacheMap global_cache_;
-    RunninInfoMap    snapshot_runinnig_;
+    GlobalPVCacheMap  global_cache_;
+    RunninSnapshotMap snapshot_runinnig_;
 
     // thread pool for snapshot processing
     std::shared_ptr<BS::light_thread_pool> thread_pool;
@@ -308,6 +301,7 @@ class ContinuousSnapshotManager
     // is the callback for the publisher
     void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
     void startSnapshot(command::cmd::ConstRepeatingSnapshotCommandShrdPtr command);
+    void triggerSnapshot(command::cmd::ConstRepeatingSnapshotTriggerCommandShrdPtr command);
     void stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr command);
     void printGlobalCacheStata();
 

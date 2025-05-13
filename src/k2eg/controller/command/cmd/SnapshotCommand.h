@@ -48,6 +48,11 @@ struct RepeatingSnapshotCommand : public Command
     std::int32_t repeat_delay_msec;
     // the time window to collect data
     std::int32_t time_window_msec;
+    // identify a triggered snapshot
+    // if true the snapshot is triggered by the user
+    // if false the snapshot is triggered by the repeating snapshot
+    // the default is false
+    bool triggered;
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotCommand)
 
@@ -65,7 +70,31 @@ struct RepeatingSnapshotStopCommand : public Command
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotStopCommand)
 
+/*
+@brief RepeatingSnapshotTriggerCommand is a command to trigger the repeating snapshot
+{
+    "command", "repeating_snapshot_trigger",
+    "snapshot_name", "snapshot_name"
+}
+*/
+struct RepeatingSnapshotTriggerCommand : public Command
+{
+    // the name of the snapshot to trigger
+    std::string snapshot_name;
+    // the tag to associate to the trigger
+    std::map<std::string, std::string> tags;
+};
+DEFINE_PTR_TYPES(RepeatingSnapshotTriggerCommand)
+
 // clang-format off
+static boost::json::object map_to_json_object(const std::map<std::string, std::string>& m) {
+    boost::json::object obj;
+    for (const auto& [k, v] : m) {
+        obj[k] = v;
+    }
+    return obj;
+}
+
 static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, SnapshotCommand const& c)
 {
     boost::json::array pv_array;
@@ -97,7 +126,8 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Repe
       {"snapshot_name", c.snapshot_name}, 
       {"pv_name_list", std::move(pv_array)}, 
       {"repeat_delay_msec", c.repeat_delay_msec}, 
-      {"time_window_msec", c.time_window_msec}
+      {"time_window_msec", c.time_window_msec},
+      {"triggered", c.triggered}
     };
 }
 
@@ -108,6 +138,17 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Repe
         {"reply_id", c.reply_id},
         {"reply_topic", c.reply_topic},
         {"snapshot_name", c.snapshot_name},
+    };
+}
+
+static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, RepeatingSnapshotTriggerCommand const& c)
+{
+    jv = {
+        {"serialization", serialization_to_string(c.serialization)},
+        {"reply_id", c.reply_id},
+        {"reply_topic", c.reply_topic},
+        {"snapshot_name", c.snapshot_name},
+        {"tags", map_to_json_object(c.tags)},
     };
 }
 

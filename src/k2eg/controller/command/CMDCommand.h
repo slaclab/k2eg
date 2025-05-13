@@ -8,20 +8,20 @@
 #include <k2eg/service/pubsub/IPublisher.h>
 
 #include <k2eg/controller/command/cmd/Command.h>
-#include <k2eg/controller/command/cmd/PutCommand.h>
 #include <k2eg/controller/command/cmd/GetCommand.h>
 #include <k2eg/controller/command/cmd/InfoCommand.h>
 #include <k2eg/controller/command/cmd/MonitorCommand.h>
+#include <k2eg/controller/command/cmd/PutCommand.h>
 #include <k2eg/controller/command/cmd/SnapshotCommand.h>
 
 #include <boost/json.hpp>
-#include <boost/json/value.hpp>
 #include <boost/json/object.hpp>
+#include <boost/json/value.hpp>
 
 #include <any>
-#include <tuple>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace k2eg::controller::command {
@@ -68,6 +68,27 @@ inline T check_json_field(const boost::json::object& o, const std::string& key, 
         }
     }
     return result;
+}
+
+inline std::map<std::string, std::string> check_json_field_for_map(const boost::json::object& o, const std::string& key, k2eg::service::log::ILoggerShrdPtr l, const std::string& error_msg)
+{
+    std::map<std::string, std::string> trigger_tag;
+    if (auto v = o.if_contains(key); v && v->is_object())
+    {
+        const auto& tag_obj = v->as_object();
+        for (const auto& [k, val] : tag_obj)
+        {
+            if (val.is_string())
+            {
+                trigger_tag.emplace(k, val.as_string().c_str());
+            }
+        }
+    }
+    else
+    {
+        l->logMessage(error_msg, service::log::LogLevel::ERROR);
+    }
+    return std::move(trigger_tag);
 }
 
 // Get the value for the reply topic if found

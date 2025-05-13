@@ -99,6 +99,7 @@ FieldValuesMapUPtr MapToCommand::checkFields(const object& obj, const std::vecto
 }
 
 // parse a json object to get the command
+// clang-format off
 ConstCommandShrdPtr MapToCommand::parse(const object& obj)
 {
     auto logger = ServiceResolver<ILogger>::resolve();
@@ -127,10 +128,13 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
             {
                 if (auto fields = checkFields(obj, {{KEY_PV_NAME, kind::string}}); fields != nullptr)
                 {
-                    result = std::make_shared<MonitorCommand>(
-                        MonitorCommand{CommandType::monitor, ser_type, reply_topic, reply_id,
-                                       // std::any_cast<std::string>(fields->find(KEY_PROTOCOL)->second),
-                                       std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second), event_destination_topic});
+                    result = std::make_shared<MonitorCommand>(MonitorCommand{
+                        CommandType::monitor, 
+                        ser_type, 
+                        reply_topic, 
+                        reply_id,
+                        std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second), 
+                        event_destination_topic});
                 }
                 else
                 {
@@ -163,7 +167,13 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 if (pv_name_list.size())
                 {
                     // we can create the command
-                    result = std::make_shared<MultiMonitorCommand>(MultiMonitorCommand{CommandType::multi_monitor, ser_type, reply_topic, reply_id, pv_name_list});
+                    result = std::make_shared<MultiMonitorCommand>(MultiMonitorCommand{
+                        CommandType::multi_monitor, 
+                        ser_type, 
+                        reply_topic, 
+                        reply_id, 
+                        pv_name_list
+                    });
                 }
                 else
                 {
@@ -200,9 +210,13 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 std::string       reply_id = check_for_reply_id(obj, logger);
                 SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
                 const std::string reply_topic = check_reply_topic(obj, logger);
-                result = std::make_shared<PutCommand>(PutCommand{CommandType::put, ser_type, reply_topic, reply_id,
-                                                                 std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
-                                                                 std::any_cast<std::string>(fields->find(KEY_VALUE)->second)});
+                result = std::make_shared<PutCommand>(PutCommand{
+                    CommandType::put, 
+                    ser_type, 
+                    reply_topic, 
+                    reply_id,
+                    std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
+                    std::any_cast<std::string>(fields->find(KEY_VALUE)->second)});
             }
             else
             {
@@ -217,8 +231,13 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 std::string       reply_id = check_for_reply_id(obj, logger);
                 SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
                 const std::string reply_topic = check_reply_topic(obj, logger);
-                result = std::make_shared<InfoCommand>(InfoCommand{CommandType::info, ser_type, reply_topic, reply_id,
-                                                                   std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second)});
+                result = std::make_shared<InfoCommand>(InfoCommand{
+                    CommandType::info, 
+                    ser_type, 
+                    reply_topic, 
+                    reply_id,
+                    std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second)
+                });
             }
             else
             {
@@ -247,7 +266,13 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 if (pv_name_list.size())
                 {
                     // we can create the command
-                    result = std::make_shared<SnapshotCommand>(SnapshotCommand{CommandType::snapshot, ser_type, reply_topic, reply_id, pv_name_list, time_window_msec});
+                    result = std::make_shared<SnapshotCommand>(SnapshotCommand{
+                        CommandType::snapshot, 
+                        ser_type, 
+                        reply_topic, 
+                        reply_id, pv_name_list,
+                        time_window_msec
+                    });
                 }
                 else
                 {
@@ -271,6 +296,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 const int repeat_delay_msec = check_json_field<int32_t>(obj, KEY_REPEAT_DELAY_MSEC, logger, "The repeat delay key should be a integer", 0);
                 const int time_window_msec = check_json_field<int32_t>(obj, KEY_TIME_WINDOW_MSEC, logger, "The time window key should be a integer", 1000);
                 const std::string snapshot_name = check_json_field<std::string>(obj, KEY_SNAPSHOT_NAME, logger, "The snapshot name key should be a string", "");
+                const bool triggered = check_json_field<bool>(obj, KEY_TRIGGERED, logger, "The triggered key should be a boolean", false);
                 auto json_array = std::any_cast<boost::json::array>(fields->find(KEY_PV_NAME_LIST)->second);
                 // find all stirng in the vector
                 for (auto& element : json_array)
@@ -282,7 +308,16 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 if (pv_name_list.size())
                 {
                     // we can create the command
-                    result = std::make_shared<RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, ser_type, reply_topic, reply_id, snapshot_name, pv_name_list, repeat_delay_msec, time_window_msec});
+                    result = std::make_shared<RepeatingSnapshotCommand>(RepeatingSnapshotCommand{
+                        CommandType::repeating_snapshot, 
+                        ser_type, 
+                        reply_topic, 
+                        reply_id, 
+                        snapshot_name, 
+                        pv_name_list, 
+                        repeat_delay_msec, 
+                        time_window_msec, 
+                        triggered});
                 }
                 else
                 {
@@ -304,8 +339,38 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 const std::string        reply_id = check_for_reply_id(obj, logger);
                 const std::string        reply_topic = check_reply_topic(obj, logger);
                 const std::string snapshot_name = check_json_field<std::string>(obj, KEY_SNAPSHOT_NAME, logger, "The snapshot name key should be a string", "");
-                auto json_array = std::any_cast<boost::json::array>(fields->find(KEY_PV_NAME_LIST)->second);
-                result = std::make_shared<RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, ser_type, reply_topic, reply_id, snapshot_name});
+                result = std::make_shared<RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{
+                    CommandType::repeating_snapshot_stop, 
+                    ser_type, 
+                    reply_topic, 
+                    reply_id, 
+                    snapshot_name
+                });
+            }
+            else
+            {
+                logger->logMessage("Missing key for the Snapshot: " + serialize(obj), LogLevel::ERROR);
+            }
+            break;
+        }
+    case CommandType::repeating_snapshot_trigger:
+        {
+            const SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
+            if (auto fields = checkFields(obj, {{KEY_PV_NAME_LIST, kind::array}, {KEY_REPLY_TOPIC, kind::string}, {KEY_REPLY_ID, kind::string}}); fields != nullptr)
+            {
+                std::vector<std::string> pv_name_list;
+                const std::string        reply_id = check_for_reply_id(obj, logger);
+                const std::string        reply_topic = check_reply_topic(obj, logger);
+                const std::string snapshot_name = check_json_field<std::string>(obj, KEY_SNAPSHOT_NAME, logger, "The snapshot name key should be a string", "");
+                const std::map<std::string, std::string> trigger_tag = check_json_field_for_map(obj, KET_TAGS, logger, "The triggered key should be a map");
+                result = std::make_shared<RepeatingSnapshotStopCommand>(RepeatingSnapshotTriggerCommand{
+                    CommandType::repeating_snapshot_trigger, 
+                    ser_type, 
+                    reply_topic, 
+                    reply_id, 
+                    snapshot_name,
+                    trigger_tag
+                });
             }
             else
             {
@@ -321,6 +386,8 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
     }
     return result;
 }
+
+// clang-format on
 
 void MapToCommand::returnFailCommandParsing(k2eg::service::pubsub::IPublisher& publisher, const boost::json::object& obj)
 {

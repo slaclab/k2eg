@@ -24,7 +24,8 @@ namespace k2eg::controller::command::cmd {
 #define KEY_IS_CONTINUOUS      "is_continuous"
 #define KEY_REPEAT_DELAY_MSEC  "repeat_delay_msec"
 #define KEY_TIME_WINDOW_MSEC   "time_window_msec"
-
+#define KEY_TRIGGERED          "triggered"
+#define KET_TAGS               "tags"
 // are all the possible command
 enum class CommandType
 {
@@ -36,6 +37,7 @@ enum class CommandType
     snapshot,
     repeating_snapshot,
     repeating_snapshot_stop,
+    repeating_snapshot_trigger,
     unknown
 };
 
@@ -51,6 +53,7 @@ constexpr const char* command_type_to_string(CommandType t) noexcept
     case CommandType::snapshot: return "snapshot";
     case CommandType::repeating_snapshot: return "repeating_snapshot";
     case CommandType::repeating_snapshot_stop: return "repeating_snapshot_stop";
+    case CommandType::repeating_snapshot_trigger: return "repeating_snapshot_trigger";
     case CommandType::unknown: return "unknown";
     }
     return "undefined";

@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <mutex>
 #include <regex>
 #include <set>
 
@@ -92,6 +93,12 @@ void ContinuousSnapshotManager::submitSnapshot(ConstCommandShrdPtr command)
         {
             // forward the command to the continuous snapshot manager
             stopSnapshot(static_pointer_cast<const RepeatingSnapshotStopCommand>(command));
+            break;
+        }
+    case CommandType::repeating_snapshot_trigger:
+        {
+            // forward the command to the continuous snapshot manager
+            triggerSnapshot(static_pointer_cast<const RepeatingSnapshotTriggerCommand>(command));
             break;
         }
     default:
@@ -218,19 +225,20 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         .retention_time = 1000 * 60 * 60,
         .retention_size = 1024 * 1024 * 50,
     });
-    // we got no faulty during the cache preparation
-    // so we can start the snapshot
-    // add the snapshot to the stopped snapshot list
-    {
-        std::unique_lock write_lock(snapshot_runinnig_mutex_);
-        snapshot_runinnig_.insert(RunninInfoMapPair(s_op_ptr->queue_name, RunningInfo{true}));
-    }
 
     // start monitor for all needed pv
     for (auto& pv_uri : pv_uri_to_monitor)
     {
         logger->logMessage(STRING_FORMAT("PV '%1%' enabling monitor", pv_uri), LogLevel::DEBUG);
         epics_service_manager->monitorChannel(pv_uri, true);
+    }
+
+    // we got no faulty during the cache preparation
+    // so we can start the snapshot
+    // add the snapshot to the stopped snapshot list
+    {
+        std::unique_lock write_lock(snapshot_runinnig_mutex_);
+        snapshot_runinnig_.emplace(s_op_ptr->queue_name, s_op_ptr);
     }
 
     // submite snapshot to the thread pool
@@ -245,16 +253,16 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     manageReply(0, STRING_FORMAT("The snapshot '%1%' has been started", s_op_ptr->cmd->snapshot_name), snapsthot_command);
 }
 
-void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr snapsthot_stop_command)
+void ContinuousSnapshotManager::triggerSnapshot(command::cmd::ConstRepeatingSnapshotTriggerCommandShrdPtr snapshot_trigger_command)
 {
     // queue name, the nromalized version of the snapshot name is used has key to stop the snapshot
-    auto queue_name = GET_QUEUE_FROM_SNAPSHOT_NAME(snapsthot_stop_command->snapshot_name);
+    auto queue_name = GET_QUEUE_FROM_SNAPSHOT_NAME(snapshot_trigger_command->snapshot_name);
 
     // we can set to stop
-    logger->logMessage(STRING_FORMAT("Try to set snapshot '%1%' to stop", snapsthot_stop_command->snapshot_name), LogLevel::INFO);
-    if (snapsthot_stop_command->snapshot_name.empty())
+    logger->logMessage(STRING_FORMAT("Try to set snapshot '%1%' to stop", snapshot_trigger_command->snapshot_name), LogLevel::INFO);
+    if (snapshot_trigger_command->snapshot_name.empty())
     {
-        manageReply(-1, "", snapsthot_stop_command);
+        manageReply(-1, "The snapshot name is empty", snapshot_trigger_command);
         return;
     }
     {
@@ -265,7 +273,39 @@ void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapsho
         if (it != snapshot_runinnig_.end())
         {
             // set snaphsot as to stop
-            it->second.is_running = false;
+            it->second->request_to_trigger = true;
+            // send reply to app for submitted command
+            manageReply(0, STRING_FORMAT("Snapshot '%1%' has been stopped", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
+        }
+        else
+        {
+            manageReply(0, STRING_FORMAT("Snapshot '%1%' is already stopped", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
+            return;
+        }
+    }
+}
+
+void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr snapsthot_stop_command)
+{
+    // queue name, the nromalized version of the snapshot name is used has key to stop the snapshot
+    auto queue_name = GET_QUEUE_FROM_SNAPSHOT_NAME(snapsthot_stop_command->snapshot_name);
+
+    // we can set to stop
+    logger->logMessage(STRING_FORMAT("Try to set snapshot '%1%' to stop", snapsthot_stop_command->snapshot_name), LogLevel::INFO);
+    if (snapsthot_stop_command->snapshot_name.empty())
+    {
+        manageReply(-1, "The snapshot name is empty", snapsthot_stop_command);
+        return;
+    }
+    {
+        // acquire the write lock to stop the snapshot
+        std::unique_lock write_lock(snapshot_runinnig_mutex_);
+        // check if the snapshot is already stopped
+        auto it = snapshot_runinnig_.find(queue_name);
+        if (it != snapshot_runinnig_.end())
+        {
+            // set snaphsot as to stop
+            it->second->is_running = false;
             // send reply to app for submitted command
             manageReply(0, STRING_FORMAT("Snapshot '%1%' has been stopped", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
         }
@@ -331,20 +371,19 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
     if (snapshot_command_info->isTimeout())
     {
         // before triggering the snapshot we need to check if the snapshot is still running
+        if (!snapshot_command_info->is_running)
         {
-            std::shared_lock lock(snapshot_runinnig_mutex_);
+            // we need to stop this trigger
+            std::unique_lock lock(snapshot_runinnig_mutex_);
             if (auto it = snapshot_runinnig_.find(snapshot_command_info->queue_name); it != snapshot_runinnig_.end())
             {
-                // check if the snapshot is still need to run
-                if (!it->second.is_running)
-                {
-                    logger->logMessage(
-                        STRING_FORMAT("Snapshot %1% is stopped and will be removed from queue", snapshot_command_info->queue_name), LogLevel::INFO);
-                    // remove the snapshot from the running list
-                    snapshot_runinnig_.erase(snapshot_command_info->queue_name);
-                    return;
-                }
+
+                logger->logMessage(
+                    STRING_FORMAT("Snapshot %1% is stopped and will be removed from queue", snapshot_command_info->queue_name), LogLevel::INFO);
+                // remove the snapshot from the running list
+                snapshot_runinnig_.erase(snapshot_command_info->queue_name);
             }
+            return;
         }
 
         std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr> snapshot_events;

@@ -60,6 +60,7 @@ void SnapshotCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool
         break;
     case CommandType::repeating_snapshot:
     case CommandType::repeating_snapshot_stop:
+    case CommandType::repeating_snapshot_trigger:
         // forward the command to the continuous snapshot manager
         continuous_snapshot_manager.submitSnapshot(command);
         break;

@@ -319,6 +319,7 @@ class TopicCountedTargetPublisher : public ControllerConsumerDummyPublisher
     std::mutex                 mtx;
     std::condition_variable    cv;
     std::map<std::string, int> topic_counts;
+    std::map<std::string, int> received_counts; // Track received per topic
     int                        remaining_topics = 0;
 
 public:
@@ -326,11 +327,13 @@ public:
 
     TopicCountedTargetPublisher() = default;
 
-    void wait(const std::map<std::string, int>& expected)
+    // Wait until all expected topics are fulfilled, then return received_counts
+    std::map<std::string, int> wait(const std::map<std::string, int>& expected)
     {
         {
             std::unique_lock lock(mtx);
             topic_counts = expected;
+            received_counts.clear();
             remaining_topics = static_cast<int>(topic_counts.size());
         }
         std::unique_lock lock(mtx);
@@ -339,21 +342,25 @@ public:
                 {
                     return remaining_topics == 0;
                 });
+        return received_counts;
     }
 
-    bool wait_for(const std::map<std::string, int>& expected, std::chrono::milliseconds duration)
+    // Wait with timeout, return received_counts (may be incomplete if timeout)
+    std::map<std::string, int> wait_for(const std::map<std::string, int>& expected, std::chrono::milliseconds duration)
     {
         {
             std::unique_lock lock(mtx);
             topic_counts = expected;
+            received_counts.clear();
             remaining_topics = static_cast<int>(topic_counts.size());
         }
         std::unique_lock lock(mtx);
-        return cv.wait_for(lock, duration,
-                           [this]
-                           {
-                               return remaining_topics == 0;
-                           });
+        cv.wait_for(lock, duration,
+                    [this]
+                    {
+                        return remaining_topics == 0;
+                    });
+        return received_counts;
     }
 
     int pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& header = PublisherHeaders()) override
@@ -365,6 +372,7 @@ public:
             auto             it = topic_counts.find(queue);
             if (it != topic_counts.end())
             {
+                received_counts[queue]++;
                 if (--it->second == 0)
                 {
                     topic_counts.erase(it);
@@ -394,6 +402,7 @@ public:
                 auto        it = topic_counts.find(queue);
                 if (it != topic_counts.end())
                 {
+                    received_counts[queue]++;
                     if (--it->second == 0)
                     {
                         topic_counts.erase(it);

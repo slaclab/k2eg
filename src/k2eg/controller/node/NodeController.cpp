@@ -57,6 +57,7 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
     }
     worker_resolver.registerObjectInstance(CommandType::snapshot, snapshotCommandWorker);
     worker_resolver.registerObjectInstance(CommandType::repeating_snapshot, snapshotCommandWorker);
+    worker_resolver.registerObjectInstance(CommandType::repeating_snapshot_trigger, snapshotCommandWorker);
     worker_resolver.registerObjectInstance(CommandType::repeating_snapshot_stop, snapshotCommandWorker);
 }
 
