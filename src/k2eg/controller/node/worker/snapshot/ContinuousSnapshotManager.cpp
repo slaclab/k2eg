@@ -80,7 +80,6 @@ void ContinuousSnapshotManager::publishEvtCB(pubsub::EventType type, PublishMess
 
 void ContinuousSnapshotManager::submitSnapshot(ConstCommandShrdPtr command)
 {
-    logger->logMessage("Continuous snapshot command received", LogLevel::DEBUG);
     switch (command->type)
     {
     case CommandType::repeating_snapshot:
@@ -101,7 +100,6 @@ void ContinuousSnapshotManager::submitSnapshot(ConstCommandShrdPtr command)
             break;
         }
     }
-    logger->logMessage("Continuous snapshot command processed", LogLevel::DEBUG);
 }
 
 void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapshotCommandShrdPtr snapsthot_command)
@@ -244,7 +242,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         });
 
     // return reply to app for submitted command
-    manageReply(0, STRING_FORMAT("Start snapshot %1% has been started", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+    manageReply(0, STRING_FORMAT("The snapshot '%1%' has been started", s_op_ptr->cmd->snapshot_name), snapsthot_command);
 }
 
 void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr snapsthot_stop_command)
@@ -253,7 +251,7 @@ void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapsho
     auto queue_name = GET_QUEUE_FROM_SNAPSHOT_NAME(snapsthot_stop_command->snapshot_name);
 
     // we can set to stop
-    logger->logMessage(STRING_FORMAT("Try to set snapshot %1% top stop", snapsthot_stop_command->snapshot_name), LogLevel::INFO);
+    logger->logMessage(STRING_FORMAT("Try to set snapshot '%1%' to stop", snapsthot_stop_command->snapshot_name), LogLevel::INFO);
     if (snapsthot_stop_command->snapshot_name.empty())
     {
         manageReply(-1, "", snapsthot_stop_command);
@@ -269,11 +267,11 @@ void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapsho
             // set snaphsot as to stop
             it->second.is_running = false;
             // send reply to app for submitted command
-            manageReply(0, STRING_FORMAT("Snapshot %1% has been stopped", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
+            manageReply(0, STRING_FORMAT("Snapshot '%1%' has been stopped", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
         }
         else
         {
-            manageReply(0, STRING_FORMAT("Snapshot %1% is already stopped", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
+            manageReply(0, STRING_FORMAT("Snapshot '%1%' is already stopped", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
             return;
         }
     }
