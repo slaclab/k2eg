@@ -50,6 +50,7 @@ public:
     void performManagementTask();
     void waitForTaskCompletion();
     bool isWorkerReady(k2eg::controller::command::cmd::CommandType cmd_type);
+    std::size_t getTaskRunning(k2eg::controller::command::cmd::CommandType cmd_type);
     // Process an array of command
     void submitCommand(k2eg::controller::command::cmd::ConstCommandShrdPtrVec commands);
 };

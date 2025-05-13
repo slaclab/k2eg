@@ -59,6 +59,11 @@ ContinuousSnapshotManager::~ContinuousSnapshotManager()
     global_cache_.clear();
 }
 
+std::size_t ContinuousSnapshotManager::getRunningSnapshotCount() const
+{
+    return thread_pool->get_tasks_running() + thread_pool->get_tasks_queued();
+}
+
 void ContinuousSnapshotManager::publishEvtCB(pubsub::EventType type, PublishMessage* const msg, const std::string& error_message)
 {
     switch (type)
@@ -199,9 +204,9 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         }
         logger->logMessage(STRING_FORMAT("PV '%1%' added to the view cache for snapshot '%2%'", pv_uri % s_op_ptr->cmd->snapshot_name), LogLevel::DEBUG);
     }
-   
+
     read_lock.unlock();
-   
+
     if (faulty)
     {
         return;
@@ -274,6 +279,16 @@ void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapsho
     }
 }
 
+void ContinuousSnapshotManager::printGlobalCacheStata()
+{
+    // pirnt for debug the global cache entries
+    logger->logMessage(STRING_FORMAT("Global cache size %1% [this=%2%]", global_cache_.size() % (void*)this), LogLevel::DEBUG);
+    for (auto& it : global_cache_)
+    {
+        logger->logMessage(STRING_FORMAT("Global cache entry %1% -> %2%", it.first % (it.second->load(std::memory_order_acquire) ? "valid" : "invalid")), LogLevel::DEBUG);
+    }
+}
+
 void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType event_received)
 {
     // prepare reading lock
@@ -326,7 +341,7 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
                 if (!it->second.is_running)
                 {
                     logger->logMessage(
-                        STRING_FORMAT("Snapshot %1% is stopped and wuill be removed from queue", snapshot_command_info->queue_name), LogLevel::INFO);
+                        STRING_FORMAT("Snapshot %1% is stopped and will be removed from queue", snapshot_command_info->queue_name), LogLevel::INFO);
                     // remove the snapshot from the running list
                     snapshot_runinnig_.erase(snapshot_command_info->queue_name);
                     return;
@@ -343,7 +358,7 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
             for (auto& it : snapshot_command_info->snapshot_views_)
             {
                 auto event = it.second->load(std::memory_order_acquire);
-                if (event)
+                if (event && event->channel_data.data)
                 {
                     snapshot_events.push_back(event);
                 }

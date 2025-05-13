@@ -13,6 +13,9 @@ namespace k2eg::common {
     public:
         void registerObjectInstance(const T type, std::shared_ptr<C> object)
         {
+            if(!object){
+                throw std::runtime_error("registerObjectInstance Object is null");
+            }
             typed_instances.insert(std::pair<T, std::shared_ptr<C>>(type, object));
         }
         std::shared_ptr<C> resolve(const T type)

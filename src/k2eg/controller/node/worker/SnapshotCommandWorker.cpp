@@ -31,6 +31,11 @@ SnapshotCommandWorker::SnapshotCommandWorker(EpicsServiceManagerShrdPtr epics_se
 
 SnapshotCommandWorker::~SnapshotCommandWorker() {}
 
+std::size_t SnapshotCommandWorker::getTaskRunning() const
+{
+    return continuous_snapshot_manager.getRunningSnapshotCount();
+}
+
 void SnapshotCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* const msg, const std::string& error_message)
 {
     switch (type)
@@ -58,7 +63,7 @@ void SnapshotCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool
         // forward the command to the continuous snapshot manager
         continuous_snapshot_manager.submitSnapshot(command);
         break;
-    
+
     default:
         logger->logMessage(STRING_FORMAT("Command type %1% not supported by this worker", command->type), LogLevel::ERROR);
         break;

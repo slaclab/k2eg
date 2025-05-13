@@ -133,6 +133,7 @@ class CommandWorker {
   ~CommandWorker()                                                                         = default;
   virtual void processCommand(std::shared_ptr<BS::light_thread_pool>  command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command) = 0;
   virtual bool isReady();
+  virtual std::size_t getTaskRunning() const;
 };
 DEFINE_PTR_TYPES(CommandWorker)
 }  // namespace k2eg::controller::node::worker

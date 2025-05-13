@@ -211,6 +211,7 @@ public:
     virtual ~SnapshotCommandWorker();
     // process the command
     void processCommand(std::shared_ptr<BS::light_thread_pool> thread_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
+    std::size_t getTaskRunning() const;
 };
 
 } // namespace k2eg::controller::node::worker

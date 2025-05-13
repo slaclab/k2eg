@@ -25,20 +25,16 @@
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>
-#include <filesystem>
 #include <memory>
 #include <msgpack.hpp>
-#include <ostream>
-#include <random>
-#include <ratio>
 #include <string>
 #include <thread>
+#include <unistd.h>
 
 #include "NodeControllerCommon.h"
 
 #include "k2eg/controller/command/cmd/MonitorCommand.h"
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
-#include "k2eg/service/metric/IMetricService.h"
 #include "k2eg/service/pubsub/IPublisher.h"
 #include "msgpack/v3/object_fwd_decl.hpp"
 
@@ -211,6 +207,10 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStop)
         "snapshot_name"
     })}););
 
+     while (node_controller->getTaskRunning(CommandType::repeating_snapshot))
+    {
+        sleep(1);
+    }
 
     // dispose all
     deinitBackend(std::move(node_controller));

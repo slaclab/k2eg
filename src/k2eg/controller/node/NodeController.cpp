@@ -43,13 +43,21 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
     // register worker for command type
     logger->logMessage("Configure command executor", LogLevel::INFO);
     auto monitor_command_worker = std::make_shared<MonitorCommandWorker>(this->node_controller_configuration->monitor_command_configuration, ServiceResolver<EpicsServiceManager>::resolve(), node_configuration);
+    if (!monitor_command_worker) {
+        throw std::runtime_error("Failed to create SnapshotCommandWorker");
+    }
     worker_resolver.registerObjectInstance(CommandType::monitor, monitor_command_worker);
     worker_resolver.registerObjectInstance(CommandType::multi_monitor, monitor_command_worker);
     worker_resolver.registerObjectInstance(CommandType::get, std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
     worker_resolver.registerObjectInstance(CommandType::put, std::make_shared<PutCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
-    worker_resolver.registerObjectInstance(CommandType::snapshot, std::make_shared<SnapshotCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
-    worker_resolver.registerObjectInstance(CommandType::repeating_snapshot, std::make_shared<SnapshotCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
-    worker_resolver.registerObjectInstance(CommandType::repeating_snapshot_stop, std::make_shared<SnapshotCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
+
+    auto snapshotCommandWorker = std::make_shared<SnapshotCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve());
+    if (!snapshotCommandWorker) {
+        throw std::runtime_error("Failed to create SnapshotCommandWorker");
+    }
+    worker_resolver.registerObjectInstance(CommandType::snapshot, snapshotCommandWorker);
+    worker_resolver.registerObjectInstance(CommandType::repeating_snapshot, snapshotCommandWorker);
+    worker_resolver.registerObjectInstance(CommandType::repeating_snapshot_stop, snapshotCommandWorker);
 }
 
 NodeController::~NodeController()
@@ -77,6 +85,17 @@ bool NodeController::isWorkerReady(k2eg::controller::command::cmd::CommandType c
     else
     {
         return false;
+    }
+}
+
+std::size_t NodeController::getTaskRunning(k2eg::controller::command::cmd::CommandType cmd_type) {
+    if (auto worker = worker_resolver.resolve(cmd_type); worker != nullptr)
+    {
+        return worker->getTaskRunning();
+    }
+    else
+    {
+        return 0;
     }
 }
 

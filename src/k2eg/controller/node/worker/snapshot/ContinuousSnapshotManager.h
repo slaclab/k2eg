@@ -309,11 +309,13 @@ class ContinuousSnapshotManager
     void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
     void startSnapshot(command::cmd::ConstRepeatingSnapshotCommandShrdPtr command);
     void stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr command);
+    void printGlobalCacheStata();
 
 public:
     ContinuousSnapshotManager(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     ~ContinuousSnapshotManager();
-    void submitSnapshot(k2eg::controller::command::cmd::ConstCommandShrdPtr snapsthot_command);
+    void        submitSnapshot(k2eg::controller::command::cmd::ConstCommandShrdPtr snapsthot_command);
+    std::size_t getRunningSnapshotCount() const;
 };
 
 DEFINE_PTR_TYPES(ContinuousSnapshotManager)
