@@ -275,11 +275,11 @@ void ContinuousSnapshotManager::triggerSnapshot(command::cmd::ConstRepeatingSnap
             // set snaphsot as to stop
             it->second->request_to_trigger = true;
             // send reply to app for submitted command
-            manageReply(0, STRING_FORMAT("Snapshot '%1%' has been stopped", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
+            manageReply(0, STRING_FORMAT("Snapshot '%1%' has been armed", snapshot_trigger_command->snapshot_name), snapshot_trigger_command);
         }
         else
         {
-            manageReply(0, STRING_FORMAT("Snapshot '%1%' is already stopped", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
+            manageReply(-2, STRING_FORMAT("Snapshot '%1%' is has not been found", snapshot_trigger_command->snapshot_name), snapshot_trigger_command);
             return;
         }
     }
