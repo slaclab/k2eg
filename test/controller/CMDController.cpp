@@ -309,8 +309,65 @@ CMDControllerCommandHandler snapshot_test = [](ConstCommandShrdPtrVec received_c
   ASSERT_EQ(reinterpret_cast<const SnapshotCommand*>(received_command[0].get())->reply_topic.compare("topic-dest"), 0);
 };
 
+
 boost::json::value snapshot_json = {
-  {KEY_COMMAND, "snapshot"}, {KEY_PV_NAME_LIST, {"pva://channel::a", "pva://channel::b"}}, {KEY_REPLY_TOPIC, "topic-dest"}, {KEY_REPLY_ID, "rep-id"}};
+  {KEY_COMMAND, "snapshot"}, 
+  {KEY_PV_NAME_LIST, {"pva://channel::a", "pva://channel::b"}}, 
+  {KEY_REPLY_TOPIC, "topic-dest"}, 
+  {KEY_REPLY_ID, "rep-id"}
+};
+
+CMDControllerCommandHandler recurring_snapshot_test = [](ConstCommandShrdPtrVec received_command) {
+  ASSERT_EQ(received_command.size(), 1);
+  ASSERT_EQ(received_command[0]->type, CommandType::repeating_snapshot);
+  // ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
+  auto pv_name_list = reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->pv_name_list;
+  ASSERT_TRUE(std::find(pv_name_list.begin(), pv_name_list.end(), "pva://channel::a") != pv_name_list.end());
+  ASSERT_TRUE(std::find(pv_name_list.begin(), pv_name_list.end(), "pva://channel::b") != pv_name_list.end());
+  ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->reply_topic.compare("topic-dest"), 0);
+  ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->reply_id.compare("rep-id"), 0);
+  ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->snapshot_name.compare("snapshot-name"), 0);
+  ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->repeat_delay_msec, 1000);
+  ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->time_window_msec, 1000);
+  ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->triggered, false);
+};
+
+boost::json::value recurring_snapshot_json = {
+  {KEY_COMMAND, "repeating_snapshot"},
+  {KEY_REPLY_TOPIC, "topic-dest"},
+  {KEY_REPLY_ID, "rep-id"},
+  {KEY_SNAPSHOT_NAME, "snapshot-name"},
+  {KEY_PV_NAME_LIST,{"pva://channel::a", "pva://channel::b"}},
+  {KEY_TIME_WINDOW_MSEC, 1000},
+  {KEY_REPEAT_DELAY_MSEC, 1000},
+  {KEY_TRIGGERED, false}
+};
+
+CMDControllerCommandHandler recurring_snapshot_trigger_test = [](ConstCommandShrdPtrVec received_command) {
+  ASSERT_EQ(received_command.size(), 1);
+  ASSERT_EQ(received_command[0]->type, CommandType::repeating_snapshot_trigger);
+  ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotTriggerCommand*>(received_command[0].get())->snapshot_name.compare("snapshot-name"), 0);
+};
+
+boost::json::value recurring_snapshot_trigger_json = {
+  {KEY_COMMAND, "repeating_snapshot_trigger"},
+  {KEY_REPLY_TOPIC, "topic-dest"},
+  {KEY_REPLY_ID, "rep-id"},
+  {KEY_SNAPSHOT_NAME, "snapshot-name"},
+};
+
+CMDControllerCommandHandler recurring_snapshot_stop_test = [](ConstCommandShrdPtrVec received_command) {
+  ASSERT_EQ(received_command.size(), 1);
+  ASSERT_EQ(received_command[0]->type, CommandType::repeating_snapshot_stop);
+  ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotStopCommand*>(received_command[0].get())->snapshot_name.compare("snapshot-name"), 0);
+};
+
+boost::json::value recurring_snapshot_stop_json = {
+  {KEY_COMMAND, "repeating_snapshot_stop"},
+  {KEY_REPLY_TOPIC, "topic-dest"},
+  {KEY_REPLY_ID, "rep-id"},
+  {KEY_SNAPSHOT_NAME, "snapshot-name"}
+};
 
 boost::json::value bad_acquire_command = {{KEY_COMMAND, "monitor"}, {"destination", "topic-dest"}};
 
@@ -349,6 +406,9 @@ INSTANTIATE_TEST_CASE_P(CMDControllerCommandTest,
                                           std::make_tuple(put_test, serialize(put_json)),
                                           std::make_tuple(info_test, serialize(info_json)),
                                           std::make_tuple(snapshot_test, serialize(snapshot_json)),
+                                          std::make_tuple(recurring_snapshot_test, serialize(recurring_snapshot_json)),
+                                          std::make_tuple(recurring_snapshot_trigger_test, serialize(recurring_snapshot_trigger_json)),
+                                          std::make_tuple(recurring_snapshot_stop_test, serialize(recurring_snapshot_stop_json)),
                                           std::make_tuple(dummy_receiver, serialize(non_compliant_command_1)),
                                           std::make_tuple(dummy_receiver, serialize(non_compliant_command_2)),
                                           std::make_tuple(dummy_receiver, serialize(bad_acquire_command)),

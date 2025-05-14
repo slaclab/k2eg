@@ -46,6 +46,10 @@ CommandType MapToCommand::getCMDType(const object& obj)
             return CommandType::snapshot;
         else if (cmd.compare("repeating_snapshot") == 0)
             return CommandType::repeating_snapshot;
+        else if (cmd.compare("repeating_snapshot_stop") == 0)
+            return CommandType::repeating_snapshot_stop;
+        else if (cmd.compare("repeating_snapshot_trigger") == 0)
+            return CommandType::repeating_snapshot_trigger;
     }
     return CommandType::unknown;
 }
@@ -333,7 +337,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
     case CommandType::repeating_snapshot_stop:
         {
             const SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
-            if (auto fields = checkFields(obj, {{KEY_PV_NAME_LIST, kind::array}, {KEY_REPLY_TOPIC, kind::string}, {KEY_REPLY_ID, kind::string}}); fields != nullptr)
+            if (auto fields = checkFields(obj, {{KEY_REPLY_TOPIC, kind::string}, {KEY_REPLY_ID, kind::string}}); fields != nullptr)
             {
                 std::vector<std::string> pv_name_list;
                 const std::string        reply_id = check_for_reply_id(obj, logger);
@@ -356,14 +360,14 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
     case CommandType::repeating_snapshot_trigger:
         {
             const SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
-            if (auto fields = checkFields(obj, {{KEY_PV_NAME_LIST, kind::array}, {KEY_REPLY_TOPIC, kind::string}, {KEY_REPLY_ID, kind::string}}); fields != nullptr)
+            if (auto fields = checkFields(obj, {{KEY_REPLY_TOPIC, kind::string}, {KEY_REPLY_ID, kind::string}}); fields != nullptr)
             {
                 std::vector<std::string> pv_name_list;
                 const std::string        reply_id = check_for_reply_id(obj, logger);
                 const std::string        reply_topic = check_reply_topic(obj, logger);
                 const std::string snapshot_name = check_json_field<std::string>(obj, KEY_SNAPSHOT_NAME, logger, "The snapshot name key should be a string", "");
                 const std::map<std::string, std::string> trigger_tag = check_json_field_for_map(obj, KET_TAGS, logger, "The triggered key should be a map");
-                result = std::make_shared<RepeatingSnapshotStopCommand>(RepeatingSnapshotTriggerCommand{
+                result = std::make_shared<RepeatingSnapshotTriggerCommand>(RepeatingSnapshotTriggerCommand{
                     CommandType::repeating_snapshot_trigger, 
                     ser_type, 
                     reply_topic, 
