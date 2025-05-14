@@ -5,8 +5,8 @@
 #include <k2eg/common/types.h>
 
 #include <k2eg/service/data/DataStorage.h>
-
 #include <k2eg/service/configuration/INodeConfiguration.h>
+
 namespace k2eg::controller::node::configuration {
     typedef std::vector<k2eg::service::data::repository::ChannelMonitorType> ChannelMonitorTypeConstVector;
     typedef std::function<void(const k2eg::service::data::repository::ChannelMonitorType&, int&)> ChannelMonitorTypeHandler;

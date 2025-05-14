@@ -2,7 +2,11 @@
 #define K2EG_SERVICE_METRIC_IMPL_DUMMYMETRICSERVICE_H_
 
 #include <k2eg/common/types.h>
+
 #include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/metric/ICMDControllerMetric.h>
+#include <k2eg/service/metric/INodeControllerMetric.h>
+
 #include <prometheus/exposer.h>
 #include <prometheus/registry.h>
 
@@ -10,8 +14,6 @@
 #include <mutex>
 #include <string>
 
-#include "k2eg/service/metric/ICMDControllerMetric.h"
-#include "k2eg/service/metric/INodeControllerMetric.h"
 
 namespace k2eg::service::metric::impl {
 

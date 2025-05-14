@@ -1,10 +1,11 @@
 #include <k2eg/common/uuid.h>
+
+#include <k2eg/service/pubsub/ISubscriber.h>
 #include <k2eg/service/pubsub/impl/kafka/RDKafkaSubscriber.h>
 
 #include <chrono>
 #include <stdexcept>
 
-#include "k2eg/service/pubsub/ISubscriber.h"
 
 using namespace k2eg::common;
 using namespace k2eg::service::pubsub::impl::kafka;

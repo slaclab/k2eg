@@ -72,271 +72,8 @@ using namespace k2eg::service::metric::impl::prometheus_impl;
 
 int tcp_port = 9000;
 
-class DummyPublisherCounter : public IPublisher
-{
-    std::uint64_t counter;
-
-public:
-    std::latch l;
-    DummyPublisherCounter(unsigned int latch_counter)
-        : IPublisher(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "fake_"
-                                                                                                             "addres"
-                                                                                                             "s"}))
-        , l(latch_counter)
-        , counter(0) {};
-    ~DummyPublisherCounter() = default;
-
-    void setAutoPoll(bool autopoll) {}
-
-    int setCallBackForReqType(const std::string req_type, EventCallback eventCallback)
-    {
-        return 0;
-    }
-
-    int createQueue(const QueueDescription& queue)
-    {
-        return 0;
-    }
-
-    int deleteQueue(const std::string& queue_name)
-    {
-        return 0;
-    }
-
-    QueueMetadataUPtr getQueueMetadata(const std::string& queue_name)
-    {
-        return nullptr;
-    }
-
-    int flush(const int timeo)
-    {
-        return 0;
-    }
-
-    int pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& header = PublisherHeaders())
-    {
-        counter++;
-        l.count_down();
-        return 0;
-    }
-
-    int pushMessages(PublisherMessageVector& messages, const PublisherHeaders& header = PublisherHeaders())
-    {
-        counter += messages.size();
-        l.count_down(messages.size());
-        return 0;
-    }
-
-    size_t getQueueMessageSize()
-    {
-        return counter;
-    }
-};
-
-class DummyPublisherNoSignal : public IPublisher
-{
-public:
-    std::vector<PublishMessageSharedPtr> sent_messages;
-    DummyPublisherNoSignal()
-        : IPublisher(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "fake_"
-                                                                                                             "addres"
-                                                                                                             "s"})) {};
-    ~DummyPublisherNoSignal() = default;
-
-    void setAutoPoll(bool autopoll) {}
-
-    int setCallBackForReqType(const std::string req_type, EventCallback eventCallback)
-    {
-        return 0;
-    }
-
-    int createQueue(const QueueDescription& queue)
-    {
-        return 0;
-    }
-
-    int deleteQueue(const std::string& queue_name)
-    {
-        return 0;
-    }
-
-    QueueMetadataUPtr getQueueMetadata(const std::string& queue_name)
-    {
-        return nullptr;
-    }
-
-    int flush(const int timeo)
-    {
-        return 0;
-    }
-
-    int pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& header = PublisherHeaders())
-    {
-        sent_messages.push_back(std::move(message));
-        return 0;
-    }
-
-    int pushMessages(PublisherMessageVector& messages, const PublisherHeaders& header = PublisherHeaders())
-    {
-        messages.clear();
-        return 0;
-    }
-
-    size_t getQueueMessageSize()
-    {
-        return sent_messages.size();
-    }
-};
-
-inline void wait_forPublished_message_size(DummyPublisherNoSignal& publisher, unsigned int requested_size, unsigned int timeout_ms)
-{
-    auto start_time = std::chrono::steady_clock::now();
-    auto end_time = std::chrono::steady_clock::now();
-    std::chrono::duration<long, std::milli> tout = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    bool waiting = true;
-    while (waiting)
-    {
-        waiting = publisher.getQueueMessageSize() < requested_size;
-        waiting = waiting && (tout.count() < timeout_ms);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        end_time = std::chrono::steady_clock::now();
-        tout = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    }
-}
-
 #ifdef __linux__
 
-std::unique_ptr<NodeController> initBackend(IPublisherShrdPtr pub, bool enable_debug_log = false, bool reset_conf = true)
-{
-    int         argc = 1;
-    const char* argv[1] = {"epics-k2eg-test"};
-    clearenv();
-    if (enable_debug_log)
-    {
-        setenv("EPICS_k2eg_log-on-console", "true", 1);
-        setenv("EPICS_k2eg_log-level", "trace", 1);
-    }
-    else
-    {
-        setenv("EPICS_k2eg_log-on-console", "false", 1);
-    }
-
-    if (reset_conf)
-    {
-        setenv("EPICS_k2eg_configuration-reset-on-start", "true", 1);
-    }
-
-    setenv("EPICS_k2eg_metric-server-http-port", std::to_string(++tcp_port).c_str(), 1);
-    setenv(("EPICS_k2eg_" + std::string(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS)).c_str(), "1", 1);
-    // set monitor expiration time out at minimum
-    setenv(("EPICS_k2eg_" + std::string(NC_MONITOR_EXPIRATION_TIMEOUT)).c_str(), "1", 1);
-    setenv(("EPICS_k2eg_" + std::string(CONFIGURATION_SERVICE_HOST)).c_str(), "consul", 1);
-    std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
-    opt->parse(argc, argv);
-    ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsuleNodeConfiguration>(opt->getConfigurationServiceConfiguration()));
-    ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(opt->getSchedulerConfiguration()));
-    ServiceResolver<Scheduler>::resolve()->start();
-    ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
-    ServiceResolver<IMetricService>::registerService(std::make_shared<PrometheusMetricService>(opt->getMetricConfiguration()));
-    ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>());
-    ServiceResolver<IPublisher>::registerService(pub);
-    DataStorageUPtr storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");
-    // data should be alwasys erased becasue now the local databas eis only used at runtime the persistent
-    // data is stored on the central configuration management server
-    toShared(storage->getChannelRepository())->removeAll();
-    return std::make_unique<NodeController>(opt->getNodeControllerConfiguration(), std::move(storage));
-}
-
-void deinitBackend(std::unique_ptr<NodeController> node_controller)
-{
-    node_controller.reset();
-    EXPECT_NO_THROW(ServiceResolver<IPublisher>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<EpicsServiceManager>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<IMetricService>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<ILogger>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<Scheduler>::resolve()->stop(););
-    EXPECT_NO_THROW(ServiceResolver<Scheduler>::resolve().reset(););
-    EXPECT_NO_THROW(ServiceResolver<INodeConfiguration>::resolve().reset(););
-}
-
-boost::json::object getJsonObject(PublishMessage& published_message)
-{
-    bs::error_code  ec;
-    bj::string_view value_str = bj::string_view(published_message.getBufferPtr(), published_message.getBufferSize());
-    auto            result = bj::parse(value_str, ec).as_object();
-    if (ec)
-        throw std::runtime_error("invalid json");
-    return result;
-}
-
-msgpack::unpacked getMsgPackObject(PublishMessage& published_message)
-{
-    msgpack::unpacked msg_upacked;
-    msgpack::unpack(msg_upacked, published_message.getBufferPtr(), published_message.getBufferSize());
-    return msg_upacked;
-}
-
-boost::json::object exstractJsonObjectThatContainsKey(std::vector<PublishMessageSharedPtr>& messages, const std::string& key_to_find, const std::string& published_on_topic, bool log = false)
-{
-    for (int idx = 0; idx < messages.size(); idx++)
-    {
-        std::cout << "queue:" << messages[idx]->getQueue() << std::endl;
-        if (messages[idx]->getQueue().compare(published_on_topic) != 0)
-            continue;
-        auto json_obj = getJsonObject(*messages[idx]);
-        if (log)
-        {
-            std::cout << json_obj << std::endl;
-        }
-        if (json_obj.contains(key_to_find))
-        {
-            return json_obj;
-        }
-    }
-    return boost::json::object();
-}
-
-msgpack::unpacked exstractMsgpackObjectThatContainsKey(std::vector<PublishMessageSharedPtr>& messages, const std::string& key_to_find, const std::string& published_on_topic, bool log = false)
-{
-    typedef std::map<std::string, msgpack::object> Map;
-    typedef std::vector<msgpack::object>           Vec;
-    for (int idx = 0; idx < messages.size(); idx++)
-    {
-        if (messages[idx]->getQueue().compare(published_on_topic) != 0)
-            continue;
-        auto msgpack_obj = getMsgPackObject(*messages[idx]);
-        switch (msgpack_obj->type)
-        {
-        case msgpack::type::MAP:
-            {
-                auto map_reply = msgpack_obj->as<Map>();
-                if (map_reply.contains(key_to_find))
-                {
-                    return msgpack_obj;
-                }
-                break;
-            }
-
-        case msgpack::type::ARRAY:
-            {
-                return msgpack_obj;
-            }
-        }
-    }
-    return msgpack::unpacked();
-}
-
-std::size_t countMessageOnTopic(std::vector<PublishMessageSharedPtr>& messages, const std::string& published_on_topic)
-{
-    std::size_t counter = 0;
-    for (int idx = 0; idx < messages.size(); idx++)
-    {
-        if (messages[idx]->getQueue().compare(published_on_topic) != 0)
-            continue;
-        counter++;
-    }
-    return counter;
-}
 
 TEST(NodeController, MonitorCommandJsonSerByDefault)
 {
@@ -344,7 +81,7 @@ TEST(NodeController, MonitorCommandJsonSerByDefault)
     boost::json::object             reply_msg;
     std::unique_ptr<NodeController> node_controller;
     auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-    node_controller = initBackend(publisher);
+    node_controller = initBackend(tcp_port, publisher);
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -390,7 +127,7 @@ TEST(NodeController, MonitorCommandJsonSerStalePV)
     boost::json::object             reply_msg;
     std::unique_ptr<NodeController> node_controller;
     auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-    node_controller = initBackend(publisher);
+    node_controller = initBackend(tcp_port, publisher);
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -424,7 +161,7 @@ TEST(NodeController, MonitorCommandSpecifySpecificMonitorEventTopic)
     boost::json::object             reply_msg;
     std::unique_ptr<NodeController> node_controller;
     auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-    node_controller = initBackend(publisher);
+    node_controller = initBackend(tcp_port,publisher);
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
     while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor))
     {
@@ -470,7 +207,7 @@ TEST(NodeController, MonitorCommandMsgPackSer)
     msgpack::unpacked               reply_msg;
     std::unique_ptr<NodeController> node_controller;
     auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-    node_controller = initBackend(publisher);
+    node_controller = initBackend(tcp_port,publisher);
     while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor))
     {
         sleep(1);
@@ -515,7 +252,7 @@ TEST(NodeController, MonitorCommandMsgPackCompactSer)
     std::latch                      work_done{2};
     std::unique_ptr<NodeController> node_controller;
     auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-    node_controller = initBackend(publisher);
+    node_controller = initBackend(tcp_port,publisher);
     while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor))
     {
         sleep(1);
@@ -559,7 +296,7 @@ TEST(NodeController, MonitorCommandAfterReboot)
     std::latch work_done{2};
     std::latch work_done_2{5};
     auto       publisher = std::make_shared<DummyPublisher>(work_done);
-    auto       node_controller = initBackend(publisher);
+    auto       node_controller = initBackend(tcp_port,publisher);
 
     while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor))
     {
@@ -578,7 +315,7 @@ TEST(NodeController, MonitorCommandAfterReboot)
     deinitBackend(std::move(node_controller));
 
     // reboot without delete database (by defauilt the initBackend reset alwasy the configuration)
-    node_controller = initBackend(std::make_shared<DummyPublisher>(work_done_2), true, false);
+    node_controller = initBackend(tcp_port, std::make_shared<DummyPublisher>(work_done_2), true, false);
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
     // we have to wait for monitor event
     work_done_2.wait();
@@ -596,7 +333,7 @@ TEST(NodeController, MonitorCommandMultiPV)
     boost::json::object             reply_msg;
     std::unique_ptr<NodeController> node_controller;
     auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-    node_controller = initBackend(publisher);
+    node_controller = initBackend(tcp_port, publisher);
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -644,7 +381,7 @@ TEST(NodeController, MonitorCommandMultiPVStress)
     std::unique_ptr<NodeController> node_controller;
     std::vector<std::string>        topics = {"channel_ramp_ramp", "channel_ramp_ramp_1"};
     auto                            publisher = std::make_shared<TopicTargetPublisher>(topics);
-    node_controller = initBackend(publisher, true);
+    node_controller = initBackend(tcp_port, publisher, true);
     publisher->enable_log = true;
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -701,7 +438,7 @@ TEST(NodeController, GetCommandJson)
     std::latch                      work_done{1};
     std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port, publisher);
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://channel:ramp:ramp"})}););
 
@@ -724,7 +461,7 @@ TEST(NodeController, GetCommandJsonWithReplyID)
     std::latch                      work_done{1};
     std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port, publisher);
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "REP_ID_JSON", "pva://channel:ramp:ramp"})}););
 
@@ -748,7 +485,7 @@ TEST(NodeController, GetFaultyCommandJsonWithReplyID)
     std::latch                      work_done{1};
     std::shared_ptr<DummyPublisher> publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port, publisher);
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "REP_ID_JSON", "pva://bad:channel"})}););
 
@@ -773,7 +510,7 @@ TEST(NodeController, GetCommandMsgPack)
     std::latch                                     work_done{1};
     std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port,publisher);
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://channel:ramp:ramp"})}););
 
@@ -801,7 +538,7 @@ TEST(NodeController, GetFaultyCommandMsgPack)
     std::latch                                     work_done{1};
     std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port,publisher);
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://bad:pv:name"})}););
 
@@ -830,7 +567,7 @@ TEST(NodeController, GetCommandMsgPackReplyID)
     std::latch                                     work_done{1};
     std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port,publisher);
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "REPLY_ID_MSGPACK", "pva://channel:ramp:ramp"})}););
 
@@ -860,7 +597,7 @@ TEST(NodeController, GetCommandMsgPackCompack)
     std::latch                                     work_done{1};
     std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port,publisher);
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://channel:ramp:ramp"})}););
 
@@ -889,7 +626,7 @@ TEST(NodeController, GetFaultyCommandMsgPackCompack)
     std::latch                                     work_done{1};
     std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port,publisher);
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://bad:pv:name"})}););
 
@@ -919,7 +656,7 @@ TEST(NodeController, GetCommandMsgPackCompackWithReplyID)
     std::latch                                     work_done{1};
     std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port,publisher);
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "REPLY_ID_MSGPACK_COMPACT", "pva://channel:ramp:ramp"})}););
 
@@ -965,7 +702,7 @@ TEST(NodeController, GetCommandCAChannel)
 {
     auto publisher = std::make_shared<DummyPublisherCounter>(1);
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port,publisher);
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "id", "ca://variable:sum"})}););
     // give some time for the timeout
@@ -982,7 +719,7 @@ TEST(NodeController, GetCommandBadChannel)
 {
     std::latch work_done{1};
     // set environment variable for test
-    auto node_controller = initBackend(std::make_shared<DummyPublisher>(work_done));
+    auto node_controller = initBackend(tcp_port,std::make_shared<DummyPublisher>(work_done));
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://bad:channel:name"})}););
     // give some time for the timeout
@@ -995,118 +732,11 @@ TEST(NodeController, GetCommandBadChannel)
     deinitBackend(std::move(node_controller));
 }
 
-TEST(NodeController, SnapshotCommandMsgPackSer)
-{
-    typedef std::map<std::string, msgpack::object> Map;
-    std::latch                                     work_done{3};
-    boost::json::object                            reply_msg;
-    std::unique_ptr<NodeController>                node_controller;
-    auto                                           publisher = std::make_shared<DummyPublisher>(work_done);
-    node_controller = initBackend(publisher);
-
-    // add the number of reader from topic
-    dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
-    while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::snapshot))
-    {
-        sleep(1);
-    }
-
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const SnapshotCommand>(SnapshotCommand{
-        CommandType::snapshot,
-        SerializationType::Msgpack,
-        KAFKA_TOPIC_ACQUIRE_IN,
-        "rep-id",
-        {"pva://variable:a", "pva://variable:b"},
-    })}););
-
-    work_done.wait();
-
-    // we need to have publish some message
-    size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
-    EXPECT_EQ(published, 3); // two values and one completion message
-
-    msgpack::unpacked msgpack_unpacked;
-    msgpack::object   msgpack_object;
-
-    // get first value could be one for variable a or b
-    EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
-    msgpack_object = msgpack_unpacked.get();
-    EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
-    auto map_reply = msgpack_object.as<Map>();
-    EXPECT_EQ(map_reply.contains("error"), true);
-    EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
-    EXPECT_TRUE(map_reply.contains("variable:a") || map_reply.contains("variable:b"));
-
-    EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[1]););
-    msgpack_object = msgpack_unpacked.get();
-    EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
-    map_reply = msgpack_object.as<Map>();
-    EXPECT_EQ(map_reply.contains("error"), true);
-    EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
-    EXPECT_TRUE(map_reply.contains("variable:a") || map_reply.contains("variable:b"));
-
-    // check for completion message
-    EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[2]););
-    msgpack_object = msgpack_unpacked.get();
-    EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
-    map_reply = msgpack_object.as<Map>();
-    EXPECT_EQ(map_reply.contains("error"), true);
-    EXPECT_EQ(map_reply["error"].as<std::int32_t>(), 1);
-    EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
-
-    // dispose all
-    deinitBackend(std::move(node_controller));
-}
-
-TEST(NodeController, SnapshotCommandWithMonitorMsgPackSer)
-{
-    typedef std::map<std::string, msgpack::object> Map;
-    // wait for two monitor message(event and ack replay) and three snashot (two data and one completion message)
-    std::latch                      work_done{5};
-    boost::json::object             reply_msg;
-    std::unique_ptr<NodeController> node_controller;
-    auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-    node_controller = initBackend(publisher, true, true);
-
-    // add the number of reader from topic
-    dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
-    while (!node_controller->isWorkerReady(CommandType::snapshot) || !node_controller->isWorkerReady(CommandType::multi_monitor))
-    {
-        sleep(1);
-    }
-
-    // start monitor on pva://variable:a that is not going to fire event at specific time so monitor only receive one
-    // message
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id-monitor", "pva://variable:a", KAFKA_TOPIC_ACQUIRE_IN})}););
-
-    // wait some time
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-    // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
-    // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const SnapshotCommand>(SnapshotCommand{
-        CommandType::snapshot,
-        SerializationType::Msgpack,
-        KAFKA_TOPIC_ACQUIRE_IN,
-        "rep-id-snapshot",
-        {"pva://variable:a", "pva://variable:b"},
-    })}););
-
-    work_done.wait();
-
-    // we need to have publish some message
-    size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
-    EXPECT_EQ(published, 5); // two values and one completion message
-
-    // dispose all
-    deinitBackend(std::move(node_controller));
-}
-
 TEST(NodeController, PutCommandBadChannel)
 {
     std::latch work_done{1};
     // set environment variable for test
-    auto node_controller = initBackend(std::make_shared<DummyPublisher>(work_done));
+    auto node_controller = initBackend(tcp_port,std::make_shared<DummyPublisher>(work_done));
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::Unknown, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://bad:channel:name", "1"})}););
 
@@ -1128,7 +758,7 @@ TEST(NodeController, PutCommandScalar)
     msgpack::object                                msgpack_object;
     auto                                           publisher = std::make_shared<DummyPublisherNoSignal>();
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port, publisher);
     auto random_scalar = uniform_dist(e1);
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::Msgpack, "reply-topic", "PUT_REPLY_ID", "pva://variable:b", std::to_string(random_scalar)})}););
     // give some time for the timeout
@@ -1172,7 +802,7 @@ TEST(NodeController, PutCommandScalarArray)
     ConstChannelDataUPtr                           value_readout;
     auto                                           publisher = std::make_shared<DummyPublisherNoSignal>();
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port,publisher);
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID", "pva://channel:waveform", "8 0 0 0 0 0 0 0 0"})}););
     // give some time for the timeout
@@ -1213,7 +843,7 @@ TEST(NodeController, PutCommandOnWrongPVCheckReply)
     ConstChannelDataUPtr                           value_readout;
     auto                                           publisher = std::make_shared<DummyPublisherNoSignal>();
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port,publisher);
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID", "pva://channel:wrong_pv_name", "8 0 0 0 0 0 0 0 0"})}););
     // give some time for the timeout
@@ -1242,7 +872,7 @@ TEST(NodeController, PutCommandMultithreadCheck)
     ConstChannelDataUPtr                           value_readout;
     auto                                           publisher = std::make_shared<DummyPublisherNoSignal>();
     // set environment variable for test
-    auto node_controller = initBackend(publisher);
+    auto node_controller = initBackend(tcp_port,publisher);
 
     // this should wait the tiemout
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID_1", "pva://channel:wrong_pv_name", "8 0 0 0 0 0 0 0 0"})}););
@@ -1281,7 +911,7 @@ TEST(NodeController, RandomCommand)
     std::uniform_int_distribution<int> uniform_dist(0, 2);
     std::uniform_int_distribution<int> uniform_dist_sleep(500, 1000);
     // set environment variable for test
-    auto node_controller = initBackend(std::make_shared<DummyPublisherNoSignal>());
+    auto node_controller = initBackend(tcp_port,std::make_shared<DummyPublisherNoSignal>());
 
     // send 100 random commands equence iteration
     for (int idx = 0; idx < 100; idx++)

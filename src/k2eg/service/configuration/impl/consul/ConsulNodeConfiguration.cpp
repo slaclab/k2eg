@@ -1,11 +1,13 @@
 #include <k2eg/common/utility.h>
+
 #include <k2eg/service/configuration/INodeConfiguration.h>
 #include <k2eg/service/configuration/impl/consul/ConsulNodeConfiguration.h>
 
-#include <memory>
 #include <oatpp/core/base/Environment.hpp>
-#include <oatpp/network/tcp/client/ConnectionProvider.hpp>
 #include <oatpp/web/client/HttpRequestExecutor.hpp>
+#include <oatpp/network/tcp/client/ConnectionProvider.hpp>
+
+#include <memory>
 
 using namespace k2eg::service::configuration;
 using namespace k2eg::service::configuration::impl::consul;

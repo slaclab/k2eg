@@ -2,6 +2,7 @@
 #define K2EG_SERVICE_EPICS_MSGPACKCOMPACTSERIALIZER_H_
 
 #include <k2eg/service/epics/Serialization.h>
+
 #include <msgpack.hpp>
 
 namespace k2eg::service::epics_impl {

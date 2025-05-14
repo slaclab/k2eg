@@ -116,6 +116,7 @@ set(COMMON_SOURCE_FILES
   src/k2eg/controller/node/worker/GetCommandWorker.cpp
   src/k2eg/controller/node/worker/PutCommandWorker.cpp
   src/k2eg/controller/node/worker/SnapshotCommandWorker.cpp
+  src/k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.cpp
 )
 
 set(SOURCE_FILES
@@ -155,6 +156,7 @@ set(TEST_SOURCE_FILES
   test/common/ProgramOptions.cpp
   test/controller/CMDController.cpp
   test/controller/NodeController.cpp
+  test/controller/NodeControllerSnapshot.cpp
   test/controller/NodeControllerMonitorChecker.cpp
   test/controller/NodeControllerReplyMessages.cpp
   test/metric/EpicsMetric.cpp

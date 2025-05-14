@@ -1,10 +1,12 @@
 #include <k2eg/common/utility.h>
-#include <k2eg/controller/node/configuration/NodeConfiguration.h>
-#include <k2eg/service/ServiceResolver.h>
-#include <k2eg/service/configuration/INodeConfiguration.h>
-#include <k2eg/service/configuration/configuration.h>
-#include <k2eg/service/data/repository/ChannelRepository.h>
+
 #include <k2eg/service/log/ILogger.h>
+#include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/configuration/configuration.h>
+#include <k2eg/service/configuration/INodeConfiguration.h>
+#include <k2eg/service/data/repository/ChannelRepository.h>
+
+#include <k2eg/controller/node/configuration/NodeConfiguration.h>
 
 #include <cstddef>
 #include <optional>

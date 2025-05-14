@@ -2,8 +2,10 @@
 #define K2EG_SERVICE_EPICS_EPICSGETOPERATION_H_
 
 #include <k2eg/common/types.h>
+
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/PVStructureMerger.h>
+
 #include <pva/client.h>
 
 namespace k2eg::service::epics_impl {

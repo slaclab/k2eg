@@ -4,6 +4,7 @@
 #pragma once
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/pubsub/impl/kafka/RDKafkaBase.h>
+
 #include <librdkafka/rdkafka.h>
 #include <librdkafka/rdkafkacpp.h>
 

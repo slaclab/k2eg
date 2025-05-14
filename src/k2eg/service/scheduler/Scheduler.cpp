@@ -1,13 +1,10 @@
+#include <k2eg/service/scheduler/Task.h>
 #include <k2eg/service/scheduler/Scheduler.h>
 
-#include <algorithm>
-#include <chrono>
-#include <iostream>
-#include <iterator>
 #include <mutex>
-#include <ostream>
+#include <chrono>
+#include <algorithm>
 
-#include "k2eg/service/scheduler/Task.h"
 
 using namespace k2eg::service::scheduler;
 using namespace std::chrono;

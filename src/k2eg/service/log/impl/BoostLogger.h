@@ -1,23 +1,24 @@
 #ifndef SERVICE_LOG_IMPL_BOOSTLOGGER_H_
 #define SERVICE_LOG_IMPL_BOOSTLOGGER_H_
 
+#include <k2eg/service/log/ILogger.h>
+
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/sources/severity_logger.hpp>
-#include <boost/log/sources/severity_feature.hpp>
-#include <boost/log/sources/logger.hpp>
-#include <boost/log/utility/setup/common_attributes.hpp>
-#include <boost/log/utility/setup/console.hpp>
-#include <boost/log/utility/setup/file.hpp>
-#include <boost/log/sources/severity_logger.hpp>
-#include <boost/log/attributes/attribute_name.hpp>
-#include <boost/log/sinks/sync_frontend.hpp>
-#include <boost/log/sinks/syslog_backend.hpp>
 #include <boost/log/attributes.hpp>
 #include <boost/log/expressions.hpp>
+#include <boost/log/sources/logger.hpp>
+#include <boost/log/utility/setup/file.hpp>
+#include <boost/log/sinks/sync_frontend.hpp>
+#include <boost/log/sinks/syslog_backend.hpp>
+#include <boost/log/utility/setup/console.hpp>
+#include <boost/log/sources/severity_logger.hpp>
+#include <boost/log/sources/severity_logger.hpp>
+#include <boost/log/sources/severity_feature.hpp>
+#include <boost/log/attributes/attribute_name.hpp>
 #include <boost/log/utility/setup/formatter_parser.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
 
-#include <k2eg/service/log/ILogger.h>
 namespace k2eg
 {
     namespace service

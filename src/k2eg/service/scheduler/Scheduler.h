@@ -1,18 +1,16 @@
 #ifndef K2EG_SERVICE_SCHEDULER_SCHEDULER_H_
 #define K2EG_SERVICE_SCHEDULER_SCHEDULER_H_
 
-#include <croncpp.h>
 #include <k2eg/service/scheduler/Task.h>
-#include <sys/types.h>
 
-#include <array>
-#include <condition_variable>
-#include <cstdint>
+#include <croncpp.h>
+
 #include <deque>
 #include <mutex>
 #include <thread>
 #include <vector>
-
+#include <sys/types.h>
+#include <condition_variable>
 namespace k2eg::service::scheduler {
 typedef std::deque<TaskShrdPtr> TaskQueue;
 typedef std::vector<TaskShrdPtr> TaskVector;

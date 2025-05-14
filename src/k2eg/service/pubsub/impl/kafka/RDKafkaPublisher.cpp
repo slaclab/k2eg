@@ -1,14 +1,15 @@
+#include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/pubsub/impl/kafka/RDKafkaPublisher.h>
+
+#include <librdkafka/rdkafka.h>
 #include <librdkafka/rdkafkacpp.h>
 
+#include <memory>
+#include <string>
 #include <cstddef>
 #include <cstring>
 #include <iostream>
-#include <memory>
-#include <string>
 
-#include "k2eg/service/pubsub/IPublisher.h"
-#include "librdkafka/rdkafka.h"
 
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;

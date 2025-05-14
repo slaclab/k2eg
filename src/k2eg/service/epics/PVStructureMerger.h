@@ -1,10 +1,12 @@
 #ifndef K2EG_SERVICE_EPICS_PVSTRUCTUREMERGER_H_
 #define K2EG_SERVICE_EPICS_PVSTRUCTUREMERGER_H_
-#include "k2eg/common/types.h"
+
+#include <k2eg/common/types.h>
+
 #include <pvData.h>
 #include <pvIntrospect.h>
-#include <vector>
 
+#include <vector>
 namespace k2eg::service::epics_impl {
 
 // Manage the merge of a structure and permit to copy value from two structure

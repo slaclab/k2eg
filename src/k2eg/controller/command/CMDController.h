@@ -2,10 +2,12 @@
 #define k2eg_SERVICE_CONTROLLER_CMDCONTROLLER_H_
 
 #include <k2eg/common/types.h>
-#include <k2eg/controller/command/CMDCommand.h>
+
 #include <k2eg/service/log/ILogger.h>
-#include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/pubsub/ISubscriber.h>
+#include <k2eg/service/metric/IMetricService.h>
+
+#include <k2eg/controller/command/CMDCommand.h>
 
 #include <memory>
 #include <string>

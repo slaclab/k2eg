@@ -51,7 +51,7 @@ initChecker(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
   ServiceResolver<IPublisher>::registerService(pub);
   DataStorageShrdPtr storage = std::make_shared<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");
-  auto node_configuration = std::make_shared<NodeConfiguration>(storage);
+  auto node_configuration = std::make_shared<k2eg::controller::node::configuration::NodeConfiguration>(storage);
   // init configuration
   node_configuration->loadNodeConfiguration();
   return MakeMonitorCheckerUPtr(opt->getNodeControllerConfiguration()->monitor_command_configuration.monitor_checker_configuration, node_configuration);

@@ -7,6 +7,7 @@
 #include <prometheus/labels.h>
 #include <prometheus/exposer.h>
 #include <prometheus/registry.h>
+
 #include <memory>
 
 namespace k2eg::service::metric::impl::prometheus_impl {

@@ -2,6 +2,7 @@
 #define __ILOGGER_H__
 
 #include <k2eg/common/types.h>
+
 #include <memory>
 #include <string>
 

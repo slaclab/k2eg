@@ -3,11 +3,12 @@
 
 #pragma once
 
+#include <k2eg/common/types.h>
+
+#include <librdkafka/rdkafkacpp.h>
+
 #include <string>
 #include <memory>
-#include <stdexcept>
-#include <librdkafka/rdkafkacpp.h>
-#include <k2eg/common/types.h>
 
 // macro utility
 #define RDK_LOG_AND_THROW(msg) \

@@ -1,10 +1,10 @@
 #include <k2eg/service/epics/EpicsChannel.h>
+#include <k2eg/service/epics/EpicsMonitorOperation.h>
+
 #include <pv/caProvider.h>
 #include <pv/clientFactory.h>
 
 #include <memory>
-
-#include <k2eg/service/epics/EpicsMonitorOperation.h>
 
 using namespace k2eg::service::epics_impl;
 

@@ -4,6 +4,7 @@
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/broadcaster.h>
 #include <k2eg/common/types.h>
+
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
 #include <k2eg/service/epics/Serialization.h>
@@ -43,9 +44,14 @@ struct EpicsServiceManagerConfig
 // describe a channel ellement in map per each PV
 struct ChannelMapElement
 {
+    // this is the channel object
     std::shared_ptr<EpicsChannel> channel;
-    bool                          to_force;
-    bool                          to_erase;
+    // this is used to mark the channel as to be forced
+    bool to_force;
+    // this is used to mark the channel as to be removed
+    bool to_erase;
+    // this is used to mark the channel as sticky
+    bool sticky;
 };
 DEFINE_PTR_TYPES(ChannelMapElement)
 typedef std::unique_lock<std::shared_mutex> WriteLockCM;
@@ -61,11 +67,13 @@ struct ThreadThrottling
     std::uint64_t total_idle_cycles = 0;
 };
 
+DEFINE_MAP_FOR_TYPE(std::string, ChannelMapElement, ChannelMap)
+
 class EpicsServiceManager
 {
     ConstEpicsServiceManagerConfigUPtr                                config;
     std::shared_mutex                                                 channel_map_mutex;
-    std::map<std::string, ChannelMapElement>                          channel_map;
+    ChannelMap                                                        channel_map;
     std::set<std::string>                                             pv_to_remove;
     std::set<std::string>                                             pv_to_force;
     k2eg::common::broadcaster<EpicsServiceManagerHandlerParamterType> handler_broadcaster;
@@ -86,9 +94,10 @@ class EpicsServiceManager
 public:
     explicit EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config = std::make_unique<EpicsServiceManagerConfig>());
     ~EpicsServiceManager();
-    void                         addChannel(const std::string& pv_name_uri);
+    void                         addChannel(const std::string& pv_name_uri, bool sticky = false);
     void                         removeChannel(const std::string& pv_name_uri);
     void                         monitorChannel(const std::string& pv_identification, bool activate);
+    void                         setChannelSticky(const std::string& pv_name_uri, bool sticky);
     void                         forceMonitorChannelUpdate(const std::string& pv_name_uri);
     ConstMonitorOperationShrdPtr getMonitorOp(const std::string& pv_name_uri);
     ConstGetOperationUPtr        getChannelData(const std::string& pv_name_uri);

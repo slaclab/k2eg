@@ -1,13 +1,15 @@
 #include <k2eg/common/utility.h>
-#include <k2eg/controller/node/worker/GetCommandWorker.h>
+
 #include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/metric/IMetricService.h>
+
+#include <k2eg/controller/node/worker/CommandWorker.h>
+#include <k2eg/controller/node/worker/GetCommandWorker.h>
+
+#include <client.h>
 
 #include <chrono>
 #include <thread>
-
-#include "client.h"
-#include "k2eg/controller/node/worker/CommandWorker.h"
-#include "k2eg/service/metric/IMetricService.h"
 
 using namespace k2eg::common;
 

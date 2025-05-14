@@ -2,6 +2,7 @@
 #define K2EG_CONTROLLER_COMMAND_CMD_GETCOMMAND_H_
 
 #include <k2eg/controller/command/cmd/Command.h>
+
 namespace k2eg::controller::command::cmd {
 /**
  *     {
