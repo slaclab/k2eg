@@ -250,14 +250,12 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         });
 
     // return reply to app for submitted command
-    manageReply(0, STRING_FORMAT("The snapshot '%1%' has been started", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+    manageReply(0, STRING_FORMAT("The snapshot '%1%' has been started", s_op_ptr->cmd->snapshot_name), snapsthot_command,
+                s_op_ptr->queue_name);
 }
 
 void ContinuousSnapshotManager::triggerSnapshot(command::cmd::ConstRepeatingSnapshotTriggerCommandShrdPtr snapshot_trigger_command)
 {
-    // queue name, the nromalized version of the snapshot name is used has key to stop the snapshot
-    auto queue_name = GET_QUEUE_FROM_SNAPSHOT_NAME(snapshot_trigger_command->snapshot_name);
-
     // we can set to stop
     logger->logMessage(STRING_FORMAT("Try to set snapshot '%1%' to stop", snapshot_trigger_command->snapshot_name), LogLevel::INFO);
     if (snapshot_trigger_command->snapshot_name.empty())
@@ -266,6 +264,8 @@ void ContinuousSnapshotManager::triggerSnapshot(command::cmd::ConstRepeatingSnap
         return;
     }
     {
+        // queue name, the nromalized version of the snapshot name is used has key to stop the snapshot
+        auto queue_name = GET_QUEUE_FROM_SNAPSHOT_NAME(snapshot_trigger_command->snapshot_name);
         // acquire the write lock to stop the snapshot
         std::unique_lock write_lock(snapshot_runinnig_mutex_);
         // check if the snapshot is already stopped
@@ -401,7 +401,9 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
                 }
             }
         }
-
+        
+        // increment the iteration index
+        snapshot_command_info->snapshot_iteration_index++;
         // get timestamp for the snapshot in unix time and utc
         auto timestamp = std::chrono::system_clock::now();
         auto snap_ts = std::chrono::system_clock::to_time_t(timestamp);
@@ -447,8 +449,6 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
                                                             snapshot_command_info->cmd->snapshot_name, serialized_completion_message),
                                {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
-        // increment the iteration index
-        snapshot_command_info->snapshot_iteration_index++;
     }
 
     // resubmit the snapshot command

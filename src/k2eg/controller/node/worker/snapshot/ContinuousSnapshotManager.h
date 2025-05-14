@@ -85,7 +85,7 @@ json serialization for the repeating snapshot header and data
 */
 inline void serializeJson(const RepeatingSnaptshotHeader& event_header, common::JsonMessage& json_message)
 {
-    json_message.getJsonObject()["type"] = event_header.message_type;
+    json_message.getJsonObject()["message_type"] = event_header.message_type;
     json_message.getJsonObject()["iter_index"] = event_header.iteration_index;
     json_message.getJsonObject()["snapshot_name"] = event_header.snapshot_name;
     json_message.getJsonObject()["timestamp"] = event_header.timestamp;
@@ -93,7 +93,7 @@ inline void serializeJson(const RepeatingSnaptshotHeader& event_header, common::
 
 inline void serializeJson(const RepeatingSnaptshotData& event_data, common::JsonMessage& json_message)
 {
-    json_message.getJsonObject()["type"] = event_data.message_type;
+    json_message.getJsonObject()["message_type"] = event_data.message_type;
     json_message.getJsonObject()["iter_index"] = event_data.iteration_index;
     json_message.getJsonObject()["timestamp"] = event_data.timestamp;
     service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::JSON)->serialize(*event_data.pv_data, json_message);
@@ -101,7 +101,7 @@ inline void serializeJson(const RepeatingSnaptshotData& event_data, common::Json
 
 inline void serializeJson(const RepeatingSnaptshotCompletion& event_completion, common::JsonMessage& json_message)
 {
-    json_message.getJsonObject()["type"] = event_completion.message_type;
+    json_message.getJsonObject()["message_type"] = event_completion.message_type;
     json_message.getJsonObject()["error"] = event_completion.error;
     json_message.getJsonObject()["error_message"] = event_completion.error_message;
     json_message.getJsonObject()["iter_index"] = event_completion.iteration_index;
@@ -116,7 +116,7 @@ inline void serializeMsgpack(const RepeatingSnaptshotHeader& header_event, commo
 {
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
     packer.pack_map(4);
-    packer.pack("type");
+    packer.pack("message_type");
     packer.pack(header_event.message_type);
     packer.pack("snapshot_name");
     packer.pack(header_event.snapshot_name);
@@ -130,7 +130,7 @@ inline void serializeMsgpack(const RepeatingSnaptshotData& data_event, common::M
 {
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
     packer.pack_map(4);
-    packer.pack("type");
+    packer.pack("message_type");
     packer.pack(data_event.message_type);
     packer.pack("timestamp");
     packer.pack(data_event.timestamp);
@@ -143,7 +143,7 @@ inline void serializeMsgpack(const RepeatingSnaptshotCompletion& header_completi
 {
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
     packer.pack_map(header_completion.error_message.empty() ? 5 : 6);
-    packer.pack("type");
+    packer.pack("message_type");
     packer.pack(header_completion.message_type);
     packer.pack("error");
     packer.pack(header_completion.error);
@@ -246,9 +246,33 @@ public:
     // keep track when a triggered snashot need to trigger
     bool request_to_trigger = false;
 
-    RepeatingSnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd, bool is_triggered = false)
-        : WorkerAsyncOperation(std::chrono::milliseconds(cmd->time_window_msec)), queue_name(queue_name), cmd(cmd), is_triggered(is_triggered)
+    RepeatingSnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd)
+        : WorkerAsyncOperation(std::chrono::milliseconds(cmd->time_window_msec)), queue_name(queue_name), cmd(cmd), is_triggered(cmd->triggered)
     {
+    }
+
+    bool isTimeout()
+    {
+        // For triggered snapshots, timeout occurs if a trigger is requested or the snapshot is stopped.
+        if (is_triggered)
+        {
+            if (!is_running)
+            {
+                // If stopped, reset trigger request and expire immediately.
+                request_to_trigger = false;
+                return true;
+            }
+            if (request_to_trigger)
+            {
+                // If triggered, reset and expire.
+                request_to_trigger = false;
+                return true;
+            }
+            // Not triggered and not stopped: do not expire.
+            return false;
+        }
+        // For periodic snapshots, use base class timeout logic.
+        return WorkerAsyncOperation::isTimeout();
     }
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotOpInfo)

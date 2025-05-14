@@ -82,7 +82,7 @@ struct RepeatingSnapshotTriggerCommand : public Command
     // the name of the snapshot to trigger
     std::string snapshot_name;
     // the tag to associate to the trigger
-    std::map<std::string, std::string> tags;
+    std::map<std::string, std::string> tags = {};
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotTriggerCommand)
 

@@ -2,7 +2,6 @@
 #include "NodeControllerCommon.h"
 
 #include <gtest/gtest.h>
-#include <iostream>
 #include <k2eg/common/ProgramOptions.h>
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/command/cmd/Command.h>
@@ -179,17 +178,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStop)
 
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{
-        CommandType::repeating_snapshot,
-        SerializationType::Msgpack,
-        "app_reply_topic",
-        "rep-id",
-        "Snapshot Name",
-        {"pva://variable:a", "pva://variable:b"},
-        0,
-        1000,
-        false
-    })}););
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://variable:b"}, 0, 1000, false})}););
 
     // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
     // completaion) messages
@@ -200,14 +189,9 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStop)
     EXPECT_EQ(published, 5);
     EXPECT_EQ(topic_counts["snapshot_name"], 4);
     EXPECT_EQ(topic_counts["app_reply_topic"], 1);
+
     // stop the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{
-        CommandType::repeating_snapshot_stop, 
-        SerializationType::Msgpack, 
-        "app_reply_topic", 
-        "rep-id", 
-        "snapshot_name"
-    })}););
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
     // wait for the stop message succeed
     while (node_controller->getTaskRunning(CommandType::repeating_snapshot))
     {
@@ -221,8 +205,10 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStop)
 TEST(NodeControllerSnapshot, RepeatingTriggeredSnapshotStartTriggerStop)
 {
     typedef std::map<std::string, msgpack::object> Map;
-    boost::json::object                            reply_msg;
-    std::unique_ptr<NodeController>                node_controller;
+    msgpack::unpacked                              msgpack_unpacked;
+
+    boost::json::object             reply_msg;
+    std::unique_ptr<NodeController> node_controller;
 
     auto publisher = std::make_shared<TopicCountedTargetPublisher>();
     node_controller = initBackend(ncs_tcp_port, publisher, false, true);
@@ -237,32 +223,83 @@ TEST(NodeControllerSnapshot, RepeatingTriggeredSnapshotStartTriggerStop)
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{
-        CommandType::repeating_snapshot,
-        SerializationType::Msgpack,
-        "app_reply_topic",
-        "rep-id",
-        "Snapshot Name",
-        {"pva://variable:a", "pva://variable:b"},
-        0,
-        1000,
+        CommandType::repeating_snapshot, 
+        SerializationType::Msgpack, 
+        "app_reply_topic", 
+        "rep-id", 
+        "Snapshot Name", 
+        {"pva://variable:a", "pva://variable:b"}, 
+        0, 
+        1000, 
         true
     })}););
 
     // try to listen on snapshot_name but it will not redceive anything so the wait will exipres on the specific timeout
-    auto topic_counts = publisher->wait_for({{"snapshot_name", 4},{"app_reply_topic", 1}}, std::chrono::milliseconds(4000));
+    auto topic_counts = publisher->wait_for({{"snapshot_name", 4}, {"app_reply_topic", 1}}, std::chrono::milliseconds(4000));
 
     // we need to have received only the ack for the snapshto submission
     EXPECT_EQ(topic_counts["snapshot_name"], 0);
     EXPECT_EQ(topic_counts["app_reply_topic"], 1);
 
+    // check for data validation
+
+    EXPECT_NO_THROW(msgpack_unpacked = exstractMsgpackObjectAtIndex(publisher->sent_messages, "app_reply_topic", 0, true););
+    auto msgpack_object = msgpack_unpacked.get();
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "error").as<int>(), 0);
+    EXPECT_STREQ(getMSGPackObjectForKey(msgpack_object, KEY_REPLY_ID).as<std::string>().c_str(), "rep-id");
+    EXPECT_STREQ(getMSGPackObjectForKey(msgpack_object, "publishing_topic").as<std::string>().c_str(), "snapshot_name");
+
     // now perform the trigger to let receive the snapshto values
-        EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotTriggerCommand{
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotTriggerCommand>(RepeatingSnapshotTriggerCommand{
         CommandType::repeating_snapshot_trigger, 
         SerializationType::Msgpack, 
         "app_reply_topic", 
         "rep-id", 
         "snapshot_name"
     })}););
+
+    auto topic_counts_trigger = publisher->wait_for({{"snapshot_name", 4}, {"app_reply_topic", 1}}, std::chrono::milliseconds(60000));
+    EXPECT_EQ(topic_counts_trigger["snapshot_name"], 4);
+    EXPECT_EQ(topic_counts_trigger["app_reply_topic"], 1);
+
+    // fetch reply message
+    EXPECT_NO_THROW(msgpack_unpacked = exstractMsgpackObjectAtIndex(publisher->sent_messages, "app_reply_topic", 1, true););
+    msgpack_object = msgpack_unpacked.get();
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "error").as<int>(), 0);
+
+    // fetch data header
+    int64_t data_ts = 0;
+    int iter_index = 0;
+    EXPECT_NO_THROW(msgpack_unpacked = exstractMsgpackObjectAtIndex(publisher->sent_messages, "snapshot_name", 0, true););
+    msgpack_object = msgpack_unpacked.get();
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "message_type").as<int>(), 0);
+    EXPECT_STREQ(getMSGPackObjectForKey(msgpack_object, "snapshot_name").as<std::string>().c_str(), "Snapshot Name");
+    EXPECT_GT((data_ts = getMSGPackObjectForKey(msgpack_object, "timestamp").as<int>()), 0);
+    EXPECT_GT((iter_index = getMSGPackObjectForKey(msgpack_object, "iter_index").as<int>()), 0);
+
+    // fetch data event
+    EXPECT_NO_THROW(msgpack_unpacked = exstractMsgpackObjectAtIndex(publisher->sent_messages, "snapshot_name", 1, true););
+    msgpack_object = msgpack_unpacked.get();
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "message_type").as<int>(), 1);
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "timestamp").as<int>(), data_ts);
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "iter_index").as<int>(), iter_index);
+    EXPECT_TRUE(checkMSGPackObjectContains(msgpack_object, "variable:a") || checkMSGPackObjectContains(msgpack_object, "variable:b"));
+
+    EXPECT_NO_THROW(msgpack_unpacked = exstractMsgpackObjectAtIndex(publisher->sent_messages, "snapshot_name", 2, true););
+    msgpack_object = msgpack_unpacked.get();
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "message_type").as<int>(), 1);
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "timestamp").as<int>(), data_ts);
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "iter_index").as<int>(), iter_index);
+    EXPECT_TRUE(checkMSGPackObjectContains(msgpack_object, "variable:a") || checkMSGPackObjectContains(msgpack_object, "variable:b"));
+
+    // fetch data tail event
+    EXPECT_NO_THROW(msgpack_unpacked = exstractMsgpackObjectAtIndex(publisher->sent_messages, "snapshot_name", 3, true););
+    msgpack_object = msgpack_unpacked.get();
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "message_type").as<int>(), 2);
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "timestamp").as<int>(), data_ts);
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "iter_index").as<int>(), iter_index);
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "error").as<int>(), 0);
+    EXPECT_STREQ(getMSGPackObjectForKey(msgpack_object, "snapshot_name").as<std::string>().c_str(), "Snapshot Name");
 
     // stop the snapshot
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{

@@ -561,6 +561,56 @@ inline msgpack::unpacked exstractMsgpackObjectThatContainsKey(std::vector<Publis
     return msgpack::unpacked();
 }
 
+inline msgpack::unpacked exstractMsgpackObjectAtIndex(
+    std::vector<PublishMessageSharedPtr>& messages, 
+    const std::string& published_on_topic, 
+    const int message_idx,
+    bool log = false)
+{
+    int curerent_idx = 0;
+    typedef std::map<std::string, msgpack::object> Map;
+    typedef std::vector<msgpack::object>           Vec;
+    if(message_idx < 0 || message_idx >= messages.size())
+    {
+        throw std::out_of_range("message index out of range");
+    }
+     msgpack::unpacked result = msgpack::unpacked();
+    for (int idx = 0; idx < messages.size(); idx++)
+    {
+        if (messages[idx]->getQueue().compare(published_on_topic) != 0)
+            continue;
+        if (curerent_idx++ != message_idx)
+            continue;
+        result = getMsgPackObject(*messages[idx]);
+        if (log)
+        {
+            std::cout << result.get() << std::endl;
+        }
+    }
+    return result;
+}
+
+inline msgpack::object getMSGPackObjectForKey(const msgpack::object& o, const std::string& key){
+    if (o.type != msgpack::type::MAP) return msgpack::object();
+
+    auto map_reply = o.as<std::map<std::string, msgpack::object>>();
+    auto it = map_reply.find(key);
+    if (it != map_reply.end())
+    {
+        return it->second;
+    } else {
+        return msgpack::object();
+    }
+}
+
+inline bool checkMSGPackObjectContains(const msgpack::object& o, const std::string& key){
+    if (o.type != msgpack::type::MAP) return false;
+
+    auto map_reply = o.as<std::map<std::string, msgpack::object>>();
+    auto it = map_reply.find(key);
+    return it != map_reply.end();
+}
+
 inline std::size_t countMessageOnTopic(std::vector<PublishMessageSharedPtr>& messages, const std::string& published_on_topic)
 {
     std::size_t counter = 0;
