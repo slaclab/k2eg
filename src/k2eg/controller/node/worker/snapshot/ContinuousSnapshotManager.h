@@ -3,6 +3,7 @@
 
 #include "k2eg/controller/command/cmd/Command.h"
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
+#include <chrono>
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/types.h>
 
@@ -19,10 +20,6 @@
 #include <unordered_map>
 
 namespace k2eg::controller::node::worker::snapshot {
-// atomic EPICS event data shared ptr
-using AtomicMonitorEventShrdPtr = std::atomic<k2eg::service::epics_impl::MonitorEventShrdPtr>;
-using ShdAtomicMonitorEventShrdPtr = std::shared_ptr<AtomicMonitorEventShrdPtr>;
-
 #pragma region Types
 
 /*
@@ -223,6 +220,26 @@ inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshot
 
 #pragma region Defining Classes
 
+struct CacheElement
+{
+    // this is the pv name
+    std::chrono::system_clock::time_point cached_time = std::chrono::system_clock::now();
+    // this is the pv data
+    k2eg::service::epics_impl::MonitorEventShrdPtr event_data;
+    CacheElement(k2eg::service::epics_impl::MonitorEventShrdPtr event_data)
+        : event_data(event_data)
+    {
+    }
+    CacheElement() = default;
+};
+
+DEFINE_PTR_TYPES(CacheElement)
+
+// atomic EPICS event data shared ptr
+//using AtomicMonitorEventShrdPtr = std::atomic<k2eg::service::epics_impl::MonitorEventShrdPtr>;
+using AtomicCacheElementShrdPtr = std::atomic<CacheElementShrdPtr>;
+using ShdAtomicCacheElementShrdPtr = std::shared_ptr<AtomicCacheElementShrdPtr>;
+
 /*
 @brief RepeatingSnapshotOpInfo is a class that holds information about a repeating snapshot operation.
 @details
@@ -238,7 +255,7 @@ public:
     // keep track of the comamnd specification
     k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd;
     // per-snapshot views hold pointers into global_cache_
-    std::unordered_map<std::string, ShdAtomicMonitorEventShrdPtr> snapshot_views_;
+    std::unordered_map<std::string, ShdAtomicCacheElementShrdPtr> snapshot_views_;
     const std::string                                             queue_name;
     const bool                                                    is_triggered;
     // keep track when to stop the snapshtot
@@ -277,7 +294,7 @@ public:
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotOpInfo)
 
-DEFINE_UOMAP_FOR_TYPE(std::string, ShdAtomicMonitorEventShrdPtr, GlobalPVCacheMap)
+DEFINE_UOMAP_FOR_TYPE(std::string, ShdAtomicCacheElementShrdPtr, GlobalPVCacheMap)
 DEFINE_UOMAP_FOR_TYPE(std::string, RepeatingSnapshotOpInfoShrdPtr, RunninSnapshotMap)
 
 /*

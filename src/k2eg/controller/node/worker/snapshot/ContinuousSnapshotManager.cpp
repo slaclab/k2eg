@@ -186,7 +186,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
             {
                 std::unique_lock write(global_cache_mutex_); // take exclusive
                 // create entry in cache using the pv_name without the protocol
-                auto inserted = global_cache_.emplace(sanitized_pv_name->name, std::make_shared<AtomicMonitorEventShrdPtr>(std::make_shared<MonitorEvent>()));
+                auto inserted = global_cache_.emplace(sanitized_pv_name->name, std::make_shared<AtomicCacheElementShrdPtr>());
                 if (!inserted.second)
                 {
                     manageReply(
@@ -239,7 +239,6 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     {
         logger->logMessage(STRING_FORMAT("PV '%1%' enabling monitor", pv_uri), LogLevel::DEBUG);
         epics_service_manager->monitorChannel(pv_uri, true);
-        epics_service_manager->setChannelSticky(pv_uri, true);
     }
 
     // we got no faulty during the cache preparation
@@ -359,7 +358,7 @@ void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerPara
         auto it = global_cache_.find(pv_name);
         if (it != global_cache_.end())
         {
-            it->second->store(event, std::memory_order_release);
+            it->second->store(MakeCacheElementShrdPtr(event), std::memory_order_release);
         }
     }
 }
@@ -388,7 +387,7 @@ void ContinuousSnapshotManager::cleanUnusedChannelFromGlobalCache(RepeatingSnaps
         if (instances == 2)
         {
             // set the channel as sticky
-            epics_service_manager->setChannelSticky(pv_uri, false);
+            epics_service_manager->monitorChannel(pv_uri, false);
             // remove the pv from the global cache
             global_cache_.erase(it);
             logger->logMessage(STRING_FORMAT("[Purge Cache] PV '%1%' removed from the global cache", pv_uri), LogLevel::INFO);
@@ -431,7 +430,7 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
             return;
         }
 
-        std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr> snapshot_events;
+        std::vector<CacheElementShrdPtr> snapshot_events;
         // Copy all events to ensure snapshot data remains unchanged during publishing
         {
             // lock in read mode the global cache
@@ -440,8 +439,9 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
             for (auto& it : snapshot_command_info->snapshot_views_)
             {
                 auto event = it.second->load(std::memory_order_acquire);
-                if (event && event->channel_data.data)
+                if (event && event->event_data->channel_data.data)
                 {
+                    logger->logMessage(STRING_FORMAT("PV '%1%' updated on %2% ready to be submitted with snapshot %3%", event->event_data->channel_data.pv_name %event->cached_time% snapshot_command_info->cmd->snapshot_name), LogLevel::DEBUG);
                     snapshot_events.push_back(event);
                 }
             }
@@ -468,9 +468,9 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         int elementsIndex = 0;
         for (auto& event : snapshot_events)
         {
-            logger->logMessage(STRING_FORMAT("PV '%1%' ready to be submitted with snapshot %2%", event->channel_data.pv_name%snapshot_command_info->cmd->snapshot_name), LogLevel::DEBUG);
+            logger->logMessage(STRING_FORMAT("PV '%1%' ready to be submitted with snapshot %2%", event->event_data->channel_data.pv_name%snapshot_command_info->cmd->snapshot_name), LogLevel::DEBUG);
             auto serialized_message = serialize(RepeatingSnaptshotData{1, snap_ts, snapshot_command_info->snapshot_iteration_index,
-                                                                       MakeChannelDataShrdPtr(event->channel_data)},
+                                                                       MakeChannelDataShrdPtr(event->event_data->channel_data)},
                                                 snapshot_command_info->cmd->serialization);
             if (serialized_message)
             {
@@ -482,7 +482,7 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
             else
             {
                 logger->logMessage(STRING_FORMAT("Failing serializing snapshot %1% for PV %2%",
-                                                 snapshot_command_info->cmd->snapshot_name % event->channel_data.pv_name),
+                                                 snapshot_command_info->cmd->snapshot_name % event->event_data->channel_data.pv_name),
                                    LogLevel::ERROR);
             }
         }
