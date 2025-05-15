@@ -328,7 +328,7 @@ class ContinuousSnapshotManager
     void triggerSnapshot(command::cmd::ConstRepeatingSnapshotTriggerCommandShrdPtr command);
     void stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr command);
     void printGlobalCacheStata();
-
+    void cleanUnusedChannelFromGlobalCache(RepeatingSnapshotOpInfoShrdPtr snapshot_command_info);
 public:
     ContinuousSnapshotManager(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     ~ContinuousSnapshotManager();

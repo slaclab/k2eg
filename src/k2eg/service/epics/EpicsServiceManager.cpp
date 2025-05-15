@@ -113,8 +113,9 @@ void EpicsServiceManager::removeChannel(const std::string& pv_name_uri)
     if (!sanitized_pv)
         return;
     ReadLockCM read_lock(channel_map_mutex);
-    if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
+    if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end() && !search->second.sticky)
     {
+        // we can set it to be erased becasue it is not sticky
         search->second.to_erase = true;
     }
 }
@@ -127,6 +128,8 @@ void EpicsServiceManager::setChannelSticky(const std::string& pv_name_uri, bool 
     ReadLockCM read_lock(channel_map_mutex);
     if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
     {
+        // when set to sticky false we set to force the update
+        search->second.to_force = true;
         search->second.sticky = sticky;
     }
 }

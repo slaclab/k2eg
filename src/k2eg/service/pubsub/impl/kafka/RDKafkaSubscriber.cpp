@@ -26,6 +26,7 @@ RDKafkaSubscriber::init() {
   RDK_CONF_SET(conf, "enable.auto.commit", "false")
   RDK_CONF_SET(conf, "enable.auto.offset.store", "true")
   RDK_CONF_SET(conf, "auto.offset.reset", "latest")
+  RDK_CONF_SET(conf, "partition.assignment.strategy", "cooperative-sticky")
   RDK_CONF_SET(conf, "default_topic_conf", t_conf.get())
 
   if(configuration->custom_impl_parameter.size()>0) {

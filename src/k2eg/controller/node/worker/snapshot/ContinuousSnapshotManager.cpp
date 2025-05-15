@@ -114,7 +114,13 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
 {
     bool                  faulty = false;
     std::set<std::string> pv_uri_to_monitor;
-    logger->logMessage(STRING_FORMAT("Perepare continuous(triggered %4%) snapshot ops for '%1%' on topic %2% with sertype: %3%",
+    logger->logMessage(STRING_FORMAT("Perepare continuous(triggered %4%) snapshot ops for '%1%' on topic %2% with " "se"
+                                                                                                                    "rt"
+                                                                                                                    "yp"
+                                                                                                                    "e:"
+                                                                                                                    " %"
+                                                                                                                    "3"
+                                                                                                                    "%",
                                      snapsthot_command->snapshot_name % snapsthot_command->reply_topic %
                                          serialization_to_string(snapsthot_command->serialization) % snapsthot_command->triggered),
                        LogLevel::DEBUG);
@@ -201,6 +207,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         }
 
         // it now is valid
+        logger->logMessage(STRING_FORMAT("Fill snapshot cache view with PV '%1%'", it->first), LogLevel::DEBUG);
         if (!s_op_ptr->snapshot_views_.emplace(it->first, it->second).second)
         {
             manageReply(
@@ -232,6 +239,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     {
         logger->logMessage(STRING_FORMAT("PV '%1%' enabling monitor", pv_uri), LogLevel::DEBUG);
         epics_service_manager->monitorChannel(pv_uri, true);
+        epics_service_manager->setChannelSticky(pv_uri, true);
     }
 
     // we got no faulty during the cache preparation
@@ -353,9 +361,41 @@ void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerPara
         {
             it->second->store(event, std::memory_order_release);
         }
+    }
+}
+
+void ContinuousSnapshotManager::cleanUnusedChannelFromGlobalCache(RepeatingSnapshotOpInfoShrdPtr snapshot_command_info)
+{
+    // clear the snapshot views to release use conunt on global cache shared ptr
+    snapshot_command_info->snapshot_views_.clear();
+    // create write lock toa ccess the globa cache to add pv not yet in the cache
+    std::unique_lock read_lock(global_cache_mutex_);
+
+    // prepare global cache with all the needed pv
+    for (const auto& pv_uri : snapshot_command_info->cmd->pv_name_list)
+    {
+        // get pv name saniutization
+        auto sanitized_pv_name = epics_service_manager->sanitizePVName(pv_uri);
+        // try to get cache element on pv name
+        auto it = global_cache_.find(sanitized_pv_name->name);
+        if (it == global_cache_.end())
+        {
+            logger->logMessage(STRING_FORMAT("[Purge Cache] PV '%1%' not found in the global cache", pv_uri), LogLevel::INFO);
+            continue;
+        }
+        auto cached_element_ptr = it->second->load(std::memory_order_release);
+        auto instances = cached_element_ptr.use_count();
+        if (instances == 2)
+        {
+            // set the channel as sticky
+            epics_service_manager->setChannelSticky(pv_uri, false);
+            // remove the pv from the global cache
+            global_cache_.erase(it);
+            logger->logMessage(STRING_FORMAT("[Purge Cache] PV '%1%' removed from the global cache", pv_uri), LogLevel::INFO);
+        }
         else
         {
-            logger->logMessage(STRING_FORMAT("Fail to find PV %1% in the global cache", pv_name), LogLevel::ERROR);
+            logger->logMessage(STRING_FORMAT("[Purge Cache] PV '%1%' is still used from other views", pv_uri), LogLevel::INFO);
         }
     }
 }
@@ -384,6 +424,10 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
                 // remove the snapshot from the running list
                 snapshot_runinnig_.erase(snapshot_command_info->queue_name);
             }
+
+            // we should cleanup the no more needed channel settint those channel to sticki==false be automanaged by the
+            // shared command checker
+            cleanUnusedChannelFromGlobalCache(snapshot_command_info);
             return;
         }
 
@@ -424,6 +468,7 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         int elementsIndex = 0;
         for (auto& event : snapshot_events)
         {
+            logger->logMessage(STRING_FORMAT("PV '%1%' ready to be submitted with snapshot %2%", event->channel_data.pv_name%snapshot_command_info->cmd->snapshot_name), LogLevel::DEBUG);
             auto serialized_message = serialize(RepeatingSnaptshotData{1, snap_ts, snapshot_command_info->snapshot_iteration_index,
                                                                        MakeChannelDataShrdPtr(event->channel_data)},
                                                 snapshot_command_info->cmd->serialization);
@@ -450,8 +495,8 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
                                                             snapshot_command_info->cmd->snapshot_name, serialized_completion_message),
                                {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
-        logger->logMessage(STRING_FORMAT("Snapshot %1% iteration %2% fired",
-                                         snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index),
+        logger->logMessage(STRING_FORMAT("Snapshot %1% iteration %2% fired with data [%3%]",
+                                         snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index%snapshot_events.size()),
                            LogLevel::DEBUG);
     }
 
