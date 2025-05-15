@@ -1,4 +1,5 @@
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
+#include <chrono>
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
 
@@ -113,9 +114,9 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
 {
     bool                  faulty = false;
     std::set<std::string> pv_uri_to_monitor;
-    logger->logMessage(STRING_FORMAT("Perepare continuous snapshot ops for '%1%' on topic %2% with sertype: %3%",
+    logger->logMessage(STRING_FORMAT("Perepare continuous(triggered %4%) snapshot ops for '%1%' on topic %2% with sertype: %3%",
                                      snapsthot_command->snapshot_name % snapsthot_command->reply_topic %
-                                         serialization_to_string(snapsthot_command->serialization)),
+                                         serialization_to_string(snapsthot_command->serialization) % snapsthot_command->triggered),
                        LogLevel::DEBUG);
     // create the commmand operation info structure
     auto s_op_ptr = MakeRepeatingSnapshotOpInfoShrdPtr(GET_QUEUE_FROM_SNAPSHOT_NAME(snapsthot_command->snapshot_name), snapsthot_command);
@@ -279,7 +280,7 @@ void ContinuousSnapshotManager::triggerSnapshot(command::cmd::ConstRepeatingSnap
         }
         else
         {
-            manageReply(-2, STRING_FORMAT("Snapshot '%1%' is has not been found", snapshot_trigger_command->snapshot_name), snapshot_trigger_command);
+            manageReply(-2, STRING_FORMAT("Snapshot '%1%' has not been found", snapshot_trigger_command->snapshot_name), snapshot_trigger_command);
             return;
         }
     }
@@ -401,7 +402,7 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
                 }
             }
         }
-        
+
         // increment the iteration index
         snapshot_command_info->snapshot_iteration_index++;
         // get timestamp for the snapshot in unix time and utc
@@ -449,6 +450,9 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
                                                             snapshot_command_info->cmd->snapshot_name, serialized_completion_message),
                                {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
+        logger->logMessage(STRING_FORMAT("Snapshot %1% iteration %2% fired",
+                                         snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index),
+                           LogLevel::DEBUG);
     }
 
     // resubmit the snapshot command
@@ -457,6 +461,9 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         {
             this->processSnapshot(snapshot_command_info);
         });
+
+    // give some time to relax
+    std::this_thread::sleep_for(std::chrono::microseconds(100));
 }
 
 void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstCommandShrdPtr cmd, const std::string& publishing_topic)

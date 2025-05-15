@@ -121,7 +121,7 @@ DEFINE_PTR_TYPES(ReplyPushableMessage)
 class WorkerAsyncOperation
 {
     const std::chrono::milliseconds             timeout_ms;
-    const std::chrono::steady_clock::time_point begin;
+    std::chrono::steady_clock::time_point begin;
 
 public:
     WorkerAsyncOperation(std::chrono::milliseconds timeout_ms)
@@ -130,8 +130,13 @@ public:
     }
 
     virtual bool isTimeout()
-    {
-        return (std::chrono::steady_clock::now() - begin) > timeout_ms;
+    {   
+        auto now = std::chrono::steady_clock::now();
+        if ((now - begin) > timeout_ms) {
+            begin = now; // renew begin after timeout
+            return true;
+        }
+        return false;
     }
 };
 
