@@ -67,8 +67,9 @@ void EpicsServiceManager::addChannel(const std::string& pv_name_uri)
                 });
             if (!success)
             {
-                // Already exists, nothing to do
+                // Already exists, increment keep_alive and set to_force
                 it->second.keep_alive++;
+                it->second.to_force = true;
                 return;
             }
             channel_ptr = it->second.channel;
@@ -151,15 +152,19 @@ ConstMonitorOperationShrdPtr EpicsServiceManager::getMonitorOp(const std::string
 
     ConstMonitorOperationShrdPtr result;
     ReadLockCM                   read_lock(channel_map_mutex);
-    if (auto search = channel_map.find(sanitized_pv->name); search == channel_map.end())
+    if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
     {
-        channel_map[sanitized_pv->name] = ChannelMapElement{
+        result = channel_map[sanitized_pv->name].channel->monitor();
+    }
+    else
+    {
+        auto channel = ChannelMapElement{
             .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
             .to_force = false,
             .keep_alive = 0,
         };
+        result = channel.channel->monitor();
     }
-    result = channel_map[sanitized_pv->name].channel->monitor();
     return result;
 }
 
@@ -173,19 +178,20 @@ ConstGetOperationUPtr EpicsServiceManager::getChannelData(const std::string& pv_
     {
         return ConstGetOperationUPtr();
     }
-    if (auto search = channel_map.find(sanitized_pv->name); search == channel_map.end())
+    if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
     {
-        channel_map[sanitized_pv->name] = ChannelMapElement{
+        // allocate channel and return data
+        result = channel_map[sanitized_pv->name].channel->get();
+    }
+    else
+    {
+        auto channel = ChannelMapElement{
             .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
             .to_force = false,
             .keep_alive = 0,
         };
-    }else{
-        // if the channel is already present we set to force the update
-        search->second.keep_alive++;
+        result = channel.channel->get();
     }
-    // allocate channel and return data
-    result = channel_map[sanitized_pv->name].channel->get();
     return result;
 }
 
@@ -198,16 +204,18 @@ ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_
     {
         return ConstPutOperationUPtr();
     }
-    if (auto search = channel_map.find(sanitized_pv->name); search == channel_map.end())
+    if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
     {
-        channel_map[sanitized_pv->name] = ChannelMapElement{
+       // allocate channel and return data
+    result = channel_map[sanitized_pv->name].channel->put(sanitized_pv->field, value);
+    } else{
+         auto channel = ChannelMapElement{
             .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
             .to_force = false,
             .keep_alive = 0,
         };
+        result = channel.channel->put(sanitized_pv->field, value);
     }
-    // allocate channel and return data
-    result = channel_map[sanitized_pv->name].channel->put(sanitized_pv->field, value);
     return result;
 }
 
@@ -297,7 +305,7 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
         // Copy info pointer to avoid holding reference after lock
         auto* info = &(it->second);
 
-        to_delete = info->keep_alive==0;
+        to_delete = info->keep_alive == 0;
         if (!to_delete)
         {
             if (info->to_force)
