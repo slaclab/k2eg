@@ -202,6 +202,75 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStop)
     deinitBackend(std::move(node_controller));
 }
 
+TEST(NodeControllerSnapshot, RepeatingSnapshotStartStopTwice)
+{
+    typedef std::map<std::string, msgpack::object> Map;
+    boost::json::object                            reply_msg;
+    std::unique_ptr<NodeController>                node_controller;
+
+    auto publisher = std::make_shared<TopicCountedTargetPublisher>();
+    node_controller = initBackend(ncs_tcp_port, publisher, false, true);
+
+    // add the number of reader from topic
+    dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
+    while (!node_controller->isWorkerReady(CommandType::repeating_snapshot))
+    {
+        sleep(1);
+    }
+
+    // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
+    // givin a new event, only for that
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://variable:b"}, 0, 1000, false})}););
+
+    // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
+    // completaion) messages
+    auto topic_counts = publisher->wait_for({{"snapshot_name", 4}, {"app_reply_topic", 1}}, std::chrono::milliseconds(10000));
+
+    // we need to have publish some message
+    size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
+    EXPECT_EQ(published, 5);
+    EXPECT_EQ(topic_counts["snapshot_name"], 4);
+    EXPECT_EQ(topic_counts["app_reply_topic"], 1);
+
+    // stop the snapshot
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    
+    sleep(1);
+
+    //redo the test again
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(
+        RepeatingSnapshotCommand{
+            CommandType::repeating_snapshot, 
+            SerializationType::Msgpack, 
+            "app_reply_topic", "rep-id",
+            "Snapshot Name",
+            {"pva://variable:a", "pva://variable:b"},
+            0, 
+            1000, 
+            false})}););
+
+    // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
+    // completaion) messages
+    topic_counts = publisher->wait_for({{"snapshot_name", 4}, {"app_reply_topic", 1}}, std::chrono::milliseconds(10000));
+
+    // we need to have publish some message
+    EXPECT_EQ(topic_counts["snapshot_name"], 4);
+    EXPECT_EQ(topic_counts["app_reply_topic"], 1);
+
+    // stop the snapshot
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+
+    
+    // wait for the stop message succeed
+    while (node_controller->getTaskRunning(CommandType::repeating_snapshot))
+    {
+        sleep(1);
+    }
+
+    // dispose all
+    deinitBackend(std::move(node_controller));
+}
+
 TEST(NodeControllerSnapshot, RepeatingTriggeredSnapshotStartTriggerStop)
 {
     typedef std::map<std::string, msgpack::object> Map;

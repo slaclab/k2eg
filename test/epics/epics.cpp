@@ -251,6 +251,7 @@ TEST(Epics, ChannelCAMonitor) {
   EXPECT_NO_THROW(monitor_op.reset(););
 }
 
+
 struct HandlerClass {
   std::latch           work_done;
   EventReceivedShrdPtr event_received = std::make_shared<EventReceived>();
@@ -319,6 +320,24 @@ TEST(Epics, EpicsServiceManagerMonitorOk) {
   }
   EXPECT_EQ(handler.event_received->event_data->size() > 0, true);
   monitor.reset();
+}
+
+TEST(Epics, EpicsServiceManagerMonitorMultipleInstanceOk) {
+  HandlerClass                         handler(1);
+  k2eg::common::BroadcastToken         handler_tok;
+  std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
+  EXPECT_NO_THROW(handler_tok = manager->addHandler(std::bind(&HandlerClass::handler, &handler, std::placeholders::_1)););
+  EXPECT_NO_THROW(manager->addChannel("pva://channel:ramp:ramp"););
+  EXPECT_NO_THROW(manager->addChannel("pva://channel:ramp:ramp"););
+  EXPECT_NO_THROW(manager->removeChannel("pva://channel:ramp:ramp"););
+  while (handler.event_received->event_data->size() == 0) {
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
+  EXPECT_NO_THROW(manager->removeChannel("pva://channel:ramp:ramp"););
+  EXPECT_EQ(handler.event_received->event_data->size() > 0, true);
+  sleep(1);
+  EXPECT_EQ(manager->getChannelMonitoredSize() == 0, true);
+  manager.reset();
 }
 
 TEST(Epics, EpicsServiceManagerMonitorStalePVOk) {
