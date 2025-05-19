@@ -343,30 +343,30 @@ TEST(NodeControllerSnapshot, RepeatingTriggeredSnapshotStartTriggerStop)
     msgpack_object = msgpack_unpacked.get();
     EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "message_type").as<int>(), 0);
     EXPECT_STREQ(getMSGPackObjectForKey(msgpack_object, "snapshot_name").as<std::string>().c_str(), "Snapshot Name");
-    EXPECT_GT((data_ts = getMSGPackObjectForKey(msgpack_object, "timestamp").as<int>()), 0);
-    EXPECT_GT((iter_index = getMSGPackObjectForKey(msgpack_object, "iter_index").as<int>()), 0);
+    EXPECT_GT((data_ts = getMSGPackObjectForKey(msgpack_object, "timestamp").as<std::int64_t>()), 0);
+    EXPECT_GT((iter_index = getMSGPackObjectForKey(msgpack_object, "iter_index").as<int64_t>()), 0);
 
     // fetch data event
     EXPECT_NO_THROW(msgpack_unpacked = exstractMsgpackObjectAtIndex(publisher->sent_messages, "snapshot_name", 1, true););
     msgpack_object = msgpack_unpacked.get();
     EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "message_type").as<int>(), 1);
-    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "timestamp").as<int>(), data_ts);
-    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "iter_index").as<int>(), iter_index);
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "timestamp").as<int64_t>(), data_ts);
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "iter_index").as<int64_t>(), iter_index);
     EXPECT_TRUE(checkMSGPackObjectContains(msgpack_object, "variable:a") || checkMSGPackObjectContains(msgpack_object, "variable:b"));
 
     EXPECT_NO_THROW(msgpack_unpacked = exstractMsgpackObjectAtIndex(publisher->sent_messages, "snapshot_name", 2, true););
     msgpack_object = msgpack_unpacked.get();
     EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "message_type").as<int>(), 1);
-    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "timestamp").as<int>(), data_ts);
-    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "iter_index").as<int>(), iter_index);
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "timestamp").as<int64_t>(), data_ts);
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "iter_index").as<int64_t>(), iter_index);
     EXPECT_TRUE(checkMSGPackObjectContains(msgpack_object, "variable:a") || checkMSGPackObjectContains(msgpack_object, "variable:b"));
 
     // fetch data tail event
     EXPECT_NO_THROW(msgpack_unpacked = exstractMsgpackObjectAtIndex(publisher->sent_messages, "snapshot_name", 3, true););
     msgpack_object = msgpack_unpacked.get();
     EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "message_type").as<int>(), 2);
-    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "timestamp").as<int>(), data_ts);
-    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "iter_index").as<int>(), iter_index);
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "timestamp").as<int64_t>(), data_ts);
+    EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "iter_index").as<int64_t>(), iter_index);
     EXPECT_EQ(getMSGPackObjectForKey(msgpack_object, "error").as<int>(), 0);
     EXPECT_STREQ(getMSGPackObjectForKey(msgpack_object, "snapshot_name").as<std::string>().c_str(), "Snapshot Name");
 

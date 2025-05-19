@@ -1,19 +1,19 @@
 #ifndef EpicsServiceManager_H
 #define EpicsServiceManager_H
 
-#include <k2eg/common/BS_thread_pool.hpp>
-#include <k2eg/common/ThrottleManagement.h>
-#include <k2eg/common/broadcaster.h>
 #include <k2eg/common/types.h>
+#include <k2eg/common/broadcaster.h>
+#include <k2eg/common/BS_thread_pool.hpp>
+#include <k2eg/common/ThrottlingManager.h>
 
 #include <k2eg/service/epics/EpicsChannel.h>
-#include <k2eg/service/epics/EpicsMonitorOperation.h>
 #include <k2eg/service/epics/Serialization.h>
+#include <k2eg/service/epics/EpicsMonitorOperation.h>
 
+#include <mutex>
+#include <memory>
 #include <cstdint>
 #include <functional>
-#include <memory>
-#include <mutex>
 #include <shared_mutex>
 
 namespace k2eg::service::epics_impl {

@@ -1,6 +1,8 @@
 #ifndef K2EG_COMMON_THROTTLEMANAGEMENT_H_
 #define K2EG_COMMON_THROTTLEMANAGEMENT_H_
 
+#include <k2eg/common/types.h>
+
 #include <chrono>
 #include <thread>
 #include <algorithm>
@@ -65,6 +67,7 @@ private:
     int idle_threshold_ = idle_threshold;
 };
 
+DEFINE_PTR_TYPES(ThrottlingManager)
 } // namespace k2eg::common
 
 #endif // K2EG_COMMON_THROTTLEMANAGEMENT_H_

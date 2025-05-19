@@ -1,22 +1,23 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 
-#include "k2eg/controller/command/cmd/Command.h"
-#include "k2eg/controller/command/cmd/SnapshotCommand.h"
-#include <chrono>
-#include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/types.h>
+#include <k2eg/common/BS_thread_pool.hpp>
+#include <k2eg/common/ThrottlingManager.h>
 
 #include <k2eg/service/epics/EpicsServiceManager.h>
 
+#include <k2eg/controller/command/cmd/Command.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
+#include <k2eg/controller/command/cmd/SnapshotCommand.h>
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 
+#include <chrono>
+#include <memory>
+#include <string>
 #include <atomic>
 #include <cstdint>
-#include <memory>
 #include <shared_mutex>
-#include <string>
 #include <unordered_map>
 
 namespace k2eg::controller::node::worker::snapshot {
@@ -331,6 +332,10 @@ class ContinuousSnapshotManager
 
     // Handler's liveness token
     k2eg::common::BroadcastToken epics_handler_token;
+
+
+    // vector for the throttlig statistic for each thread
+    std::vector<k2eg::common::ThrottlingManagerUPtr> thread_throttling_vector;
 
     // Received event from EPICS IOCs that are monitored
     void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);

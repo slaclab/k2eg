@@ -1,19 +1,20 @@
-#include "k2eg/controller/command/cmd/SnapshotCommand.h"
-#include <chrono>
-#include <k2eg/common/BaseSerialization.h>
+
 #include <k2eg/common/utility.h>
+#include <k2eg/common/BaseSerialization.h>
 
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/epics/EpicsData.h>
 
+#include <k2eg/controller/command/cmd/SnapshotCommand.h>
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 #include <k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.h>
 
-#include <algorithm>
-#include <memory>
+#include <set>
 #include <mutex>
 #include <regex>
-#include <set>
+#include <memory>
+#include <chrono>
+#include <algorithm>
 
 using namespace k2eg::controller::command::cmd;
 using namespace k2eg::controller::node::worker;
@@ -37,7 +38,10 @@ void set_snapshot_thread_name(const std::size_t idx)
 }
 
 ContinuousSnapshotManager::ContinuousSnapshotManager(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager)
-    : logger(ServiceResolver<ILogger>::resolve()), publisher(ServiceResolver<IPublisher>::resolve()), epics_service_manager(epics_service_manager), thread_pool(std::make_shared<BS::light_thread_pool>(std::thread::hardware_concurrency(), set_snapshot_thread_name))
+    : logger(ServiceResolver<ILogger>::resolve())
+    , publisher(ServiceResolver<IPublisher>::resolve())
+    , epics_service_manager(epics_service_manager)
+    , thread_pool(std::make_shared<BS::light_thread_pool>(std::thread::hardware_concurrency(), set_snapshot_thread_name))
 {
     // initialize the local cache
     global_cache_.clear();
@@ -47,6 +51,12 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(k2eg::service::epics_impl::
     publisher->setCallBackForReqType("repeating-snapshot-events", std::bind(&ContinuousSnapshotManager::publishEvtCB, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     // set the run flag to true
     run_flag = true;
+    // set the throtling vector dimensions
+    thread_throttling_vector.clear();
+    size_t n = std::thread::hardware_concurrency() ? std::thread::hardware_concurrency() : 1;
+    for (size_t i = 0; i < n; ++i) {
+        thread_throttling_vector.emplace_back(std::make_unique<k2eg::common::ThrottlingManager>());
+    }
 }
 
 ContinuousSnapshotManager::~ContinuousSnapshotManager()
@@ -407,9 +417,14 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         return;
     }
 
+    const auto thread_index = BS::this_thread::get_index();
+    if (!thread_index.has_value())
+        return;
+    auto&  throttling = thread_throttling_vector[thread_index.value()];
     // check if the time window is expired
     if (snapshot_command_info->isTimeout())
     {
+        throttling->update(true);
         // before triggering the snapshot we need to check if the snapshot is still running
         if (!snapshot_command_info->is_running)
         {
@@ -498,6 +513,8 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
                                          snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index%snapshot_events.size()),
                            LogLevel::DEBUG);
     }
+
+    throttling->update(false);
 
     // resubmit the snapshot command
     thread_pool->detach_task(

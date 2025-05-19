@@ -1,4 +1,4 @@
-#include "k2eg/common/ThrottleManagement.h"
+#include <k2eg/common/ThrottlingManager.h>
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/utility.h>
 
@@ -10,7 +10,6 @@
 
 #include <mutex>
 #include <regex>
-#include <chrono>
 #include <ranges>
 #include <memory>
 #include <cstddef>
