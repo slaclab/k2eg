@@ -450,8 +450,7 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         // increment the iteration index
         snapshot_command_info->snapshot_iteration_index++;
         // get timestamp for the snapshot in unix time and utc
-        auto timestamp = std::chrono::system_clock::now();
-        auto snap_ts = std::chrono::system_clock::to_time_t(timestamp);
+        std::int64_t snap_ts = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         {
             auto serialized_header_message = serialize(
                 RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, snapshot_command_info->snapshot_iteration_index},

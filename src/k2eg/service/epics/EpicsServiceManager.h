@@ -2,6 +2,7 @@
 #define EpicsServiceManager_H
 
 #include <k2eg/common/BS_thread_pool.hpp>
+#include <k2eg/common/ThrottleManagement.h>
 #include <k2eg/common/broadcaster.h>
 #include <k2eg/common/types.h>
 
@@ -10,9 +11,7 @@
 #include <k2eg/service/epics/Serialization.h>
 
 #include <cstdint>
-
 #include <functional>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -57,14 +56,6 @@ typedef std::unique_lock<std::shared_mutex> ReadLockCM;
 
 DEFINE_PTR_TYPES(EpicsServiceManagerConfig)
 
-struct ThreadThrottling
-{
-    std::int32_t  idle_counter{0};
-    std::int32_t  throttle_ms{100};
-    std::uint64_t total_events_processed = 0;
-    std::uint64_t total_idle_cycles = 0;
-};
-
 DEFINE_MAP_FOR_TYPE(std::string, ChannelMapElement, ChannelMap)
 
 class EpicsServiceManager
@@ -79,7 +70,7 @@ class EpicsServiceManager
     std::unique_ptr<pvac::ClientProvider>                             ca_provider;
     bool                                                              end_processing;
     std::shared_ptr<BS::light_thread_pool>                            processing_pool;
-    std::vector<ThreadThrottling>                                     thread_throttling_vector;
+    std::vector<k2eg::common::ThrottlingManager>                      thread_throttling_vector;
     mutable std::mutex                                                thread_throttle_mutex;
     /*
     @brief task is the main function for the thread pool
@@ -117,10 +108,10 @@ public:
      * the handler receives the events. The internal broadcaster dispose all handler
      * which token is invalid
      */
-    k2eg::common::BroadcastToken  addHandler(EpicsServiceManagerHandler new_handler);
-    size_t                        getHandlerSize();
-    k2eg::common::StringVector    getMonitoredChannels();
-    std::vector<ThreadThrottling> getThreadThrottlingInfo() const;
+    k2eg::common::BroadcastToken                        addHandler(EpicsServiceManagerHandler new_handler);
+    size_t                                              getHandlerSize();
+    k2eg::common::StringVector                          getMonitoredChannels();
+    const std::vector<k2eg::common::ThrottlingManager>& getThreadThrottlingInfo() const;
 };
 
 DEFINE_PTR_TYPES(EpicsServiceManager)
