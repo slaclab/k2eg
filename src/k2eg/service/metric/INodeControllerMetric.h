@@ -7,7 +7,11 @@ namespace k2eg::service::metric {
 
 // epics counter types
 enum class INodeControllerMetricCounterType { 
-    SubmittedCommand 
+    SubmittedCommand,
+    ThrottlingIdleCounter, 
+    ThrottlingEventCounter, 
+    ThrottlingDurationCounter, 
+    ThrottleGauge
     };
 
 // Epics metric group
