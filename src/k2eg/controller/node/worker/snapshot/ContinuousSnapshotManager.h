@@ -1,24 +1,26 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 
-#include <k2eg/common/types.h>
+#include "k2eg/service/metric/INodeControllerMetric.h"
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/ThrottlingManager.h>
+#include <k2eg/common/types.h>
 
 #include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/scheduler/Scheduler.h>
 
 #include <k2eg/controller/command/cmd/Command.h>
-#include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/controller/command/cmd/SnapshotCommand.h>
+#include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 
-#include <chrono>
-#include <memory>
-#include <string>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <memory>
 #include <shared_mutex>
-#include <unordered_map>
+#include <string>
 
 namespace k2eg::controller::node::worker::snapshot {
 #pragma region Types
@@ -227,17 +229,16 @@ struct CacheElement
     std::chrono::system_clock::time_point cached_time = std::chrono::system_clock::now();
     // this is the pv data
     k2eg::service::epics_impl::MonitorEventShrdPtr event_data;
-    CacheElement(k2eg::service::epics_impl::MonitorEventShrdPtr event_data)
-        : event_data(event_data)
-    {
-    }
+
+    CacheElement(k2eg::service::epics_impl::MonitorEventShrdPtr event_data) : event_data(event_data) {}
+
     CacheElement() = default;
 };
 
 DEFINE_PTR_TYPES(CacheElement)
 
 // atomic EPICS event data shared ptr
-//using AtomicMonitorEventShrdPtr = std::atomic<k2eg::service::epics_impl::MonitorEventShrdPtr>;
+// using AtomicMonitorEventShrdPtr = std::atomic<k2eg::service::epics_impl::MonitorEventShrdPtr>;
 using AtomicCacheElementShrdPtr = std::atomic<CacheElementShrdPtr>;
 using ShdAtomicCacheElementShrdPtr = std::shared_ptr<AtomicCacheElementShrdPtr>;
 
@@ -333,7 +334,8 @@ class ContinuousSnapshotManager
     // Handler's liveness token
     k2eg::common::BroadcastToken epics_handler_token;
 
-
+    // metric statistic
+    k2eg::service::metric::INodeControllerMetric& metrics;
     // vector for the throttlig statistic for each thread
     std::vector<k2eg::common::ThrottlingManagerUPtr> thread_throttling_vector;
 
@@ -351,6 +353,8 @@ class ContinuousSnapshotManager
     void stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr command);
     void printGlobalCacheStata();
     void cleanUnusedChannelFromGlobalCache(RepeatingSnapshotOpInfoShrdPtr snapshot_command_info);
+    void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
+
 public:
     ContinuousSnapshotManager(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     ~ContinuousSnapshotManager();

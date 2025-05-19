@@ -1,6 +1,7 @@
 
-#include <k2eg/common/utility.h>
+#include "k2eg/service/metric/INodeControllerMetric.h"
 #include <k2eg/common/BaseSerialization.h>
+#include <k2eg/common/utility.h>
 
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/epics/EpicsData.h>
@@ -9,12 +10,12 @@
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 #include <k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.h>
 
-#include <set>
+#include <algorithm>
+#include <chrono>
+#include <memory>
 #include <mutex>
 #include <regex>
-#include <memory>
-#include <chrono>
-#include <algorithm>
+#include <set>
 
 using namespace k2eg::controller::command::cmd;
 using namespace k2eg::controller::node::worker;
@@ -23,7 +24,12 @@ using namespace k2eg::controller::node::worker::snapshot;
 using namespace k2eg::service;
 using namespace k2eg::service::log;
 using namespace k2eg::service::pubsub;
+using namespace k2eg::service::metric;
+using namespace k2eg::service::scheduler;
 using namespace k2eg::service::epics_impl;
+
+#define CSM_STAT_TASK_NAME "csm-stat-task"
+#define CSM_STAT_TASK_CRON "* * * * * *"
 
 #define GET_QUEUE_FROM_SNAPSHOT_NAME(snapshot_name) ([](const std::string& name) { \
     std::string norm = std::regex_replace(name, std::regex(R"([^A-Za-z0-9\-])"), "_"); \
@@ -42,6 +48,7 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(k2eg::service::epics_impl::
     , publisher(ServiceResolver<IPublisher>::resolve())
     , epics_service_manager(epics_service_manager)
     , thread_pool(std::make_shared<BS::light_thread_pool>(std::thread::hardware_concurrency(), set_snapshot_thread_name))
+    , metrics(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric())
 {
     // initialize the local cache
     global_cache_.clear();
@@ -54,13 +61,23 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(k2eg::service::epics_impl::
     // set the throtling vector dimensions
     thread_throttling_vector.clear();
     size_t n = std::thread::hardware_concurrency() ? std::thread::hardware_concurrency() : 1;
-    for (size_t i = 0; i < n; ++i) {
+    for (size_t i = 0; i < n; ++i)
+    {
         thread_throttling_vector.emplace_back(std::make_unique<k2eg::common::ThrottlingManager>());
     }
+
+    // add tak to manage the statistic
+    auto statistic_task = MakeTaskShrdPtr(CSM_STAT_TASK_NAME, // name of the task
+                                          CSM_STAT_TASK_CRON, // cron expression
+                                          std::bind(&ContinuousSnapshotManager::handleStatistic, this, std::placeholders::_1), // task handler
+                                          -1 // start at application boot time
+    );
+    ServiceResolver<Scheduler>::resolve()->addTask(statistic_task);
 }
 
 ContinuousSnapshotManager::~ContinuousSnapshotManager()
 {
+    logger->logMessage("[ContinuousSnapshotManager] Stopping continuous snapshot manager");
     // set the run flag to false
     run_flag = false;
     // remove epics monitor handler
@@ -69,6 +86,9 @@ ContinuousSnapshotManager::~ContinuousSnapshotManager()
     thread_pool->wait();
     // clear the global cache
     global_cache_.clear();
+    bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(CSM_STAT_TASK_NAME);
+    logger->logMessage(STRING_FORMAT("[ContinuousSnapshotManager] Remove statistic task : %1%", erased));
+    logger->logMessage("[ContinuousSnapshotManager] Continuous snapshot manager stopped");
 }
 
 std::size_t ContinuousSnapshotManager::getRunningSnapshotCount() const
@@ -124,13 +144,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
 {
     bool                  faulty = false;
     std::set<std::string> pv_uri_to_monitor;
-    logger->logMessage(STRING_FORMAT("Perepare continuous(triggered %4%) snapshot ops for '%1%' on topic %2% with " "se"
-                                                                                                                    "rt"
-                                                                                                                    "yp"
-                                                                                                                    "e:"
-                                                                                                                    " %"
-                                                                                                                    "3"
-                                                                                                                    "%",
+    logger->logMessage(STRING_FORMAT("Perepare continuous(triggered %4%) snapshot ops for '%1%' on topic %2% with " "se" "rt" "yp" "e:" " %" "3" "%",
                                      snapsthot_command->snapshot_name % snapsthot_command->reply_topic %
                                          serialization_to_string(snapsthot_command->serialization) % snapsthot_command->triggered),
                        LogLevel::DEBUG);
@@ -420,7 +434,7 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
     const auto thread_index = BS::this_thread::get_index();
     if (!thread_index.has_value())
         return;
-    auto&  throttling = thread_throttling_vector[thread_index.value()];
+    auto& throttling = thread_throttling_vector[thread_index.value()];
     // check if the time window is expired
     if (snapshot_command_info->isTimeout())
     {
@@ -456,7 +470,10 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
                 auto event = it.second->load(std::memory_order_acquire);
                 if (event && event->event_data->channel_data.data)
                 {
-                    logger->logMessage(STRING_FORMAT("PV '%1%' updated on %2% ready to be submitted with snapshot %3%", event->event_data->channel_data.pv_name %event->cached_time% snapshot_command_info->cmd->snapshot_name), LogLevel::DEBUG);
+                    logger->logMessage(STRING_FORMAT("PV '%1%' updated on %2% ready to be submitted with snapshot %3%",
+                                                     event->event_data->channel_data.pv_name % event->cached_time %
+                                                         snapshot_command_info->cmd->snapshot_name),
+                                       LogLevel::DEBUG);
                     snapshot_events.push_back(event);
                 }
             }
@@ -465,7 +482,8 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         // increment the iteration index
         snapshot_command_info->snapshot_iteration_index++;
         // get timestamp for the snapshot in unix time and utc
-        std::int64_t snap_ts = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        std::int64_t snap_ts =
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         {
             auto serialized_header_message = serialize(
                 RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, snapshot_command_info->snapshot_iteration_index},
@@ -482,7 +500,9 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         int elementsIndex = 0;
         for (auto& event : snapshot_events)
         {
-            logger->logMessage(STRING_FORMAT("PV '%1%' ready to be submitted with snapshot %2%", event->event_data->channel_data.pv_name%snapshot_command_info->cmd->snapshot_name), LogLevel::DEBUG);
+            logger->logMessage(STRING_FORMAT("PV '%1%' ready to be submitted with snapshot %2%",
+                                             event->event_data->channel_data.pv_name % snapshot_command_info->cmd->snapshot_name),
+                               LogLevel::DEBUG);
             auto serialized_message = serialize(RepeatingSnaptshotData{1, snap_ts, snapshot_command_info->snapshot_iteration_index,
                                                                        MakeChannelDataShrdPtr(event->event_data->channel_data)},
                                                 snapshot_command_info->cmd->serialization);
@@ -495,9 +515,10 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
             }
             else
             {
-                logger->logMessage(STRING_FORMAT("Failing serializing snapshot %1% for PV %2%",
-                                                 snapshot_command_info->cmd->snapshot_name % event->event_data->channel_data.pv_name),
-                                   LogLevel::ERROR);
+                logger->logMessage(
+                    STRING_FORMAT("Failing serializing snapshot %1% for PV %2%",
+                                  snapshot_command_info->cmd->snapshot_name % event->event_data->channel_data.pv_name),
+                    LogLevel::ERROR);
             }
         }
 
@@ -509,8 +530,9 @@ void ContinuousSnapshotManager::processSnapshot(RepeatingSnapshotOpInfoShrdPtr s
         publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
                                                             snapshot_command_info->cmd->snapshot_name, serialized_completion_message),
                                {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
-        logger->logMessage(STRING_FORMAT("Snapshot %1% iteration %2% fired with data [%3%]",
-                                         snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index%snapshot_events.size()),
+        logger->logMessage(STRING_FORMAT("Snapshot %1% iteration %2% fired with data [%3%]", snapshot_command_info->cmd->snapshot_name %
+                                                                                                 snapshot_command_info->snapshot_iteration_index %
+                                                                                                 snapshot_events.size()),
                            LogLevel::DEBUG);
     }
 
@@ -540,5 +562,21 @@ void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const 
         {
             publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "repeating-snapshot-events", "repeating-snapshot-events", serialized_message), {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
         }
+    }
+}
+
+void ContinuousSnapshotManager::handleStatistic(TaskProperties& task_properties)
+{
+    // update throttle metric
+    // Assuming you have a metric object, otherwise replace 'metric' with the correct instance or accessor
+    for (size_t i = 0; i < thread_throttling_vector.size(); ++i)
+    {
+        auto& throttling = thread_throttling_vector[i];
+        std::string thread_id = std::to_string(i);
+        auto t_stat = throttling->getStats();
+        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::ThrottlingIdleCounter, t_stat.idle_counter, {{"thread_id", thread_id}});
+        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::ThrottlingEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
+        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::ThrottlingDurationCounter, t_stat.total_idle_cycles, {{"thread_id", thread_id}});
+        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::ThrottleGauge, t_stat.throttle_ms, {{"thread_id", thread_id}});
     }
 }

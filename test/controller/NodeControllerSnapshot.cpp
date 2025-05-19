@@ -209,7 +209,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStopTwice)
     std::unique_ptr<NodeController>                node_controller;
 
     auto publisher = std::make_shared<TopicCountedTargetPublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, false, true);
+    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -234,8 +234,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStopTwice)
 
     // stop the snapshot
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
-    
-    sleep(1);
+    // wait for ack command
+    sleep(5);
 
     //redo the test again
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(
