@@ -1,3 +1,4 @@
+#include <k2eg/common/ThrottlingManager.h>
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/utility.h>
 
@@ -7,12 +8,11 @@
 #include <k2eg/service/epics/EpicsPutOperation.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 
-#include <chrono>
-#include <cstddef>
-#include <memory>
 #include <mutex>
-#include <ranges>
 #include <regex>
+#include <ranges>
+#include <memory>
+#include <cstddef>
 
 using namespace k2eg::common;
 using namespace k2eg::service::epics_impl;
@@ -273,7 +273,7 @@ PVUPtr EpicsServiceManager::sanitizePVName(const std::string& pv_name)
     return std::make_unique<PV>(PV{protocol, base_pv_name, field_name});
 }
 
-std::vector<ThreadThrottling> EpicsServiceManager::getThreadThrottlingInfo() const
+const std::vector<ThrottlingManager>& EpicsServiceManager::getThreadThrottlingInfo() const
 {
     return thread_throttling_vector;
 }
@@ -335,26 +335,10 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
     constexpr int max_throttle_ms = 100;
     constexpr int idle_threshold = 10; // how many idle cycles before backoff increases
 
-    if (!had_events)
-    {
-        throttling.idle_counter++;
-        throttling.total_idle_cycles++;
-        if (throttling.idle_counter >= idle_threshold)
-        {
-            // Exponential backoff with max cap
-            throttling.throttle_ms = std::min(throttling.throttle_ms * 2, max_throttle_ms);
-            std::this_thread::sleep_for(std::chrono::milliseconds(throttling.throttle_ms));
-            throttling.idle_counter = 0;
-        }
-    }
-    else
-    {
-        // Work detected: reduce throttle or reset
-        throttling.idle_counter = 0;
-        throttling.total_events_processed++;
-        throttling.throttle_ms = std::max(throttling.throttle_ms / 2, min_throttle_ms);
-    }
-
+    // manqage throtling
+    throttling.update(had_events);
+    
+    // resubmit the task to the thread pool
     processing_pool->detach_task(
         [this, monitor_op]
         {
