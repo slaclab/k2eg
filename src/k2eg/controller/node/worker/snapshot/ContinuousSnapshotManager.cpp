@@ -47,7 +47,8 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(k2eg::service::epics_impl::
     : logger(ServiceResolver<ILogger>::resolve())
     , publisher(ServiceResolver<IPublisher>::resolve())
     , epics_service_manager(epics_service_manager)
-    , thread_pool(std::make_shared<BS::light_thread_pool>(std::thread::hardware_concurrency(), set_snapshot_thread_name))
+    , thread_pool(std::make_shared<BS::light_thread_pool>(1, set_snapshot_thread_name))
+    , thread_throttling_vector(1)
     , metrics(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric())
 {
     // initialize the local cache
@@ -58,13 +59,6 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(k2eg::service::epics_impl::
     publisher->setCallBackForReqType("repeating-snapshot-events", std::bind(&ContinuousSnapshotManager::publishEvtCB, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     // set the run flag to true
     run_flag = true;
-    // set the throtling vector dimensions
-    thread_throttling_vector.clear();
-    size_t n = std::thread::hardware_concurrency() ? std::thread::hardware_concurrency() : 1;
-    for (size_t i = 0; i < n; ++i)
-    {
-        thread_throttling_vector.emplace_back(std::make_unique<k2eg::common::ThrottlingManager>());
-    }
 
     // add tak to manage the statistic
     auto statistic_task = MakeTaskShrdPtr(CSM_STAT_TASK_NAME, // name of the task

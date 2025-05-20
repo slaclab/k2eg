@@ -293,8 +293,30 @@ public:
         // For periodic snapshots, use base class timeout logic.
         return WorkerAsyncOperation::isTimeout();
     }
+
+    /**
+    @brief This method is called when the cache is being updated for the spiecfic pv name
+    @details It is a virtual method that can be overridden by derived classes to perform specific actions when the cache is updated.
+    */
+    virtual void cacheWillBeUpdatedFor(std::string& pv_name)
+    {
+
+    }
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotOpInfo)
+
+class BufferedRepeatingSnapshotOpInfo : public RepeatingSnapshotOpInfo {
+public:
+    // Buffer to store all received values during the time window
+    std::map<std::string, std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr>> value_buffer;
+
+    //this method should update the historical buffer for the specific pv name
+    // taking the actual vlaue from snapshot_views_ and store on the value_buffer array
+    void cacheWillBeUpdatedFor(std::string& pv_name)
+    {
+
+    }
+};
 
 DEFINE_UOMAP_FOR_TYPE(std::string, ShdAtomicCacheElementShrdPtr, GlobalPVCacheMap)
 DEFINE_UOMAP_FOR_TYPE(std::string, RepeatingSnapshotOpInfoShrdPtr, RunninSnapshotMap)
