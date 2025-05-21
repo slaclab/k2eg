@@ -49,7 +49,6 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(k2eg::service::epics_impl::
     , publisher(ServiceResolver<IPublisher>::resolve())
     , epics_service_manager(epics_service_manager)
     , thread_pool(std::make_shared<BS::light_thread_pool>(1, set_snapshot_thread_name))
-    , thread_throttling_vector(1)
     , metrics(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric())
 {
     // add epics manager monitor handler
@@ -58,6 +57,13 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(k2eg::service::epics_impl::
     publisher->setCallBackForReqType("repeating-snapshot-events", std::bind(&ContinuousSnapshotManager::publishEvtCB, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     // set the run flag to true
     run_flag = true;
+
+    // init thread_throttling_vector vector
+    auto thread_count = thread_pool->get_thread_count();
+    for (size_t i = 0; i < thread_count; ++i)
+    {
+        thread_throttling_vector.emplace_back(std::make_unique<k2eg::common::ThrottlingManager>());
+    }
 
     // add tak to manage the statistic
     auto statistic_task = MakeTaskShrdPtr(CSM_STAT_TASK_NAME, // name of the task
@@ -203,27 +209,27 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         .retention_size = 1024 * 1024 * 50,
     });
 
-    // start monitor for all needed pv
-    for (auto& pv_uri : s_op_ptr->cmd->pv_name_list)
-    {
-        logger->logMessage(STRING_FORMAT("PV '%1%' enabling monitor", pv_uri), LogLevel::DEBUG);
-        epics_service_manager->monitorChannel(pv_uri, true);
-    }
-
     // we got no faulty during the cache preparation
     // so we can start the snapshot
-    // add the snapshot to the stopped snapshot list
+    // add the snapshot to the stopped snapshot list and to the pv list
     {
         std::unique_lock write_lock(snapshot_runinnig_mutex_);
         // assocaite the topi to the snapshot in the running list
         snapshot_runinnig_.emplace(s_op_ptr->queue_name, s_op_ptr);
         for (auto& pv_uri : sanitized_pv_name_list)
         {
-            logger->logMessage(STRING_FORMAT("associate snapshot '%1%' to pv '%2%'", pv_uri), LogLevel::DEBUG);
+            logger->logMessage(STRING_FORMAT("associate snapshot '%1%' to pv '%2%'", s_op_ptr->cmd->snapshot_name%pv_uri), LogLevel::DEBUG);
             // associate snaphsot to each pv, so the epics handler can
             // find the snapshot to fiil with data
             pv_snapshot_map_.emplace(std::make_pair(pv_uri->name, s_op_ptr));
         }
+    }
+
+    // start monitor for all needed pv
+    for (auto& pv_uri : s_op_ptr->cmd->pv_name_list)
+    {
+        logger->logMessage(STRING_FORMAT("PV '%1%' enabling monitor", pv_uri), LogLevel::DEBUG);
+        epics_service_manager->monitorChannel(pv_uri, true);
     }
 
     // submite snapshot to the thread pool
@@ -362,7 +368,8 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
                 // remove the snapshot from the running list
                 snapshot_runinnig_.erase(snapshot_command_info->queue_name);
                 // erase the snapshot from the pv_snapshot_map_
-                logger->logMessage(STRING_FORMAT("Remove Snapshot %1% from all his pv snapshot map", snapshot_command_info->cmd->snapshot_name), LogLevel::INFO);
+                logger->logMessage(
+                    STRING_FORMAT("Remove Snapshot %1% from all his pv snapshot map", snapshot_command_info->cmd->snapshot_name), LogLevel::INFO);
                 for (auto& pv_uri : snapshot_command_info->cmd->pv_name_list)
                 {
                     auto s_pv = epics_service_manager->sanitizePVName(pv_uri);
@@ -371,13 +378,14 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
                     {
                         if (it->second == snapshot_command_info)
                         {
-                            logger->logMessage(STRING_FORMAT("Snapshot '%1%' is removed from PV mapa %2%", snapshot_command_info->cmd->snapshot_name%s_pv), LogLevel::INFO);
+                            logger->logMessage(
+                                STRING_FORMAT("Snapshot '%1%' is removed from PV mapa %2%", snapshot_command_info->cmd->snapshot_name % s_pv), LogLevel::INFO);
                             pv_snapshot_map_.erase(it);
                             break;
                         }
                     }
                 }
-                logger->logMessage(STRING_FORMAT("Snapshot %1% is cancelled", snapshot_command_info->queue_name), LogLevel::INFO); 
+                logger->logMessage(STRING_FORMAT("Snapshot %1% is cancelled", snapshot_command_info->queue_name), LogLevel::INFO);
             }
             return;
         }

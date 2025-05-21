@@ -24,36 +24,13 @@ public:
     bool                                                                 request_to_trigger = false;
     bool                                                                 is_running = true;
 
-    SnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd)
-        : WorkerAsyncOperation(std::chrono::milliseconds(cmd->time_window_msec)), queue_name(queue_name), cmd(cmd), is_triggered(cmd->triggered)
-    {
-    }
+    SnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd);
+    virtual ~SnapshotOpInfo();
 
-    virtual bool init(std::vector<service::epics_impl::PVShrdPtr>& sanitized_pv_name_list);
-    virtual void addData(k2eg::service::epics_impl::MonitorEventShrdPtr event_data);
-    virtual std::vector<service::epics_impl::MonitorEventShrdPtr> getData();
-    bool isTimeout()
-    {
-                // For triggered snapshots, timeout occurs if a trigger is requested or the snapshot is stopped.
-        if (is_triggered)
-        {
-            if (!is_running)
-            {
-                // If stopped, reset trigger request and expire immediately.
-                request_to_trigger = false;
-                return true;
-            }
-            if (request_to_trigger)
-            {
-                // If triggered, reset and expire.
-                request_to_trigger = false;
-                return true;
-            }
-            // Not triggered and not stopped: do not expire.
-            return false;
-        }
-        return WorkerAsyncOperation::isTimeout();
-    }
+    virtual bool init(std::vector<service::epics_impl::PVShrdPtr>& sanitized_pv_name_list) = 0;
+    virtual void addData(k2eg::service::epics_impl::MonitorEventShrdPtr event_data) = 0;
+    virtual std::vector<service::epics_impl::MonitorEventShrdPtr> getData() = 0;
+    virtual bool isTimeout();
 };
 DEFINE_PTR_TYPES(SnapshotOpInfo)
 } // namespace k2eg::controller::node::worker::snapshot

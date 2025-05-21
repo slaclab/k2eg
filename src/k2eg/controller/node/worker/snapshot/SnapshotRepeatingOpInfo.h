@@ -25,64 +25,19 @@ public:
     // define when the snapshot is acquiring data
     std::atomic<bool> taking_data;
 
-    SnapshotRepeatingOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd)
-        : SnapshotOpInfo(queue_name, cmd)
-        ,taking_data(true)
-    {
-    }
+    SnapshotRepeatingOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd);
 
-    bool init(std::vector<service::epics_impl::PVShrdPtr>& sanitized_pv_name_list)
-    {
-        // Initialize the element_data map with atomic pointers to MonitorEvent objects.
-        for (const auto& sanitized_pv_name : sanitized_pv_name_list)
-        {
-            element_data[sanitized_pv_name->name] = std::make_shared<AtomicMonitorEventShrdPtr>();
-        }
-        return true;
-    }
+    bool init(std::vector<service::epics_impl::PVShrdPtr>& sanitized_pv_name_list);
 
-    bool isTimeout()
-    {
-        // For periodic snapshots, use base class timeout logic.
-        auto timeout = SnapshotOpInfo::isTimeout();
-
-        return timeout;
-    }
+    bool isTimeout();
 
     /**
     @brief This method is called when the cache is being updated for the spiecfic pv name
     @details It is a virtual method that can be overridden by derived classes to perform specific actions when the cache
     is updated.
     */
-    virtual void addData(k2eg::service::epics_impl::MonitorEventShrdPtr event_data)
-    {
-        if (!taking_data.load(std::memory_order_acquire))
-        {
-            return;
-        }
-        auto it = element_data.find(event_data->channel_data.pv_name);
-        if (it != element_data.end())
-        {
-            it->second->store(event_data, std::memory_order_release);
-        }
-    }
-
-    virtual std::vector<service::epics_impl::MonitorEventShrdPtr> getData()
-    {
-        taking_data.store(false, std::memory_order_release);
-        std::vector<service::epics_impl::MonitorEventShrdPtr> result(element_data.size());
-        for (const auto& pair : element_data)
-        {
-            if (pair.second)
-            {
-                auto ptr = pair.second->load(std::memory_order_acquire);
-                if (ptr)
-                    result.push_back(ptr);
-            }
-        }
-        taking_data.store(true, std::memory_order_release);
-        return result;
-    }
+    void addData(k2eg::service::epics_impl::MonitorEventShrdPtr event_data);
+    std::vector<service::epics_impl::MonitorEventShrdPtr> getData();
 };
 DEFINE_PTR_TYPES(SnapshotRepeatingOpInfo)
 

@@ -117,6 +117,9 @@ set(COMMON_SOURCE_FILES
   src/k2eg/controller/node/worker/PutCommandWorker.cpp
   src/k2eg/controller/node/worker/SnapshotCommandWorker.cpp
   src/k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.cpp
+  src/k2eg/controller/node/worker/snapshot/SnapshotOpInfo.cpp
+  src/k2eg/controller/node/worker/snapshot/SnapshotRepeatingOpInfo.cpp
+  src/k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.cpp
 )
 
 set(SOURCE_FILES

@@ -281,9 +281,13 @@ class ContinuousSnapshotManager
     void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstCommandShrdPtr command, const std::string& publishing_topic = "");
     // is the callback for the publisher
     void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
+    // manage the start of the snapshot
     void startSnapshot(command::cmd::ConstRepeatingSnapshotCommandShrdPtr command);
+    // manage the trigger of the snapshot
     void triggerSnapshot(command::cmd::ConstRepeatingSnapshotTriggerCommandShrdPtr command);
+    // manage the stop of the snapshot
     void stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr command);
+    // manage the statistic collection of the snapshots engine
     void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
 
 public:
