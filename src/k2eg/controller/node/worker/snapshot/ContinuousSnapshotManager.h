@@ -314,7 +314,18 @@ public:
     // taking the actual vlaue from snapshot_views_ and store on the value_buffer array
     void cacheWillBeUpdatedFor(std::string& pv_name)
     {
-
+        // check if the pv name is in the snapshot views
+        auto it = snapshot_views_.find(pv_name);
+        if (it != snapshot_views_.end())
+        {
+            // get the pv data from the snapshot views
+            auto pv_data_shard_ptr = it->second->load(std::memory_order_acquire);
+            if (pv_data_shard_ptr)
+            {
+                // add the pv data to the buffer
+                value_buffer[pv_name].push_back(pv_data_shard_ptr->event_data);
+            }
+        }
     }
 };
 
