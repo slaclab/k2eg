@@ -1,5 +1,5 @@
-#ifndef K2EG_COMMON_RESIZABLEBUFFER_H_
-#define K2EG_COMMON_RESIZABLEBUFFER_H_
+#ifndef K2EG_COMMON_LOCKFREESNAPSHOTBUFFER_H_
+#define K2EG_COMMON_LOCKFREESNAPSHOTBUFFER_H_
 
 #include <atomic>
 #include <memory>
@@ -9,7 +9,7 @@
 namespace k2eg::common {
 
 template <typename T>
-class LockFreeSnapshotBuffer
+class LockFreeBuffer
 {
     std::vector<std::shared_ptr<T>> buffer;
     std::atomic<size_t>             write_idx{0};
@@ -19,7 +19,7 @@ class LockFreeSnapshotBuffer
     const size_t                    growth_factor; // e.g., 2 for doubling
 
 public:
-    explicit LockFreeSnapshotBuffer(size_t reserve = 1024, size_t growth = 2)
+    explicit LockFreeBuffer(size_t reserve = 1024, size_t growth = 2)
         : buffer(reserve), initial_capacity(reserve), growth_factor(growth)
     {
     }
@@ -30,29 +30,32 @@ public:
             return false;
         size_t idx = write_idx.fetch_add(1, std::memory_order_acq_rel);
 
-        // Lock only if resize is needed
         if (idx >= buffer.size())
         {
             std::lock_guard<std::mutex> lock(resize_mtx);
-            // Double-check, maybe another thread already resized
             if (idx >= buffer.size())
             {
                 size_t new_size = buffer.size() * growth_factor;
                 if (new_size <= idx)
                 {
-                    new_size = idx + initial_capacity; // or growth_factor*idx, as you like
+                    new_size = idx + initial_capacity;
                 }
                 buffer.resize(new_size);
             }
+            // Write to the slot while holding the lock to be sure
+            buffer[idx] = std::move(value);
         }
-
-        buffer[idx] = std::move(value);
+        else
+        {
+            // No resize, so it's safe (as long as the buffer isn't resized concurrently)
+            buffer[idx] = std::move(value);
+        }
         return true;
     }
 
-    void denyNewData()
+    void setDataTakingEnabled(bool enable)
     {
-        accepting_data.store(false, std::memory_order_release);
+        accepting_data.store(enable, std::memory_order_release);
     }
 
     void reset()
@@ -76,6 +79,7 @@ public:
         return out;
     }
 };
+
 } // namespace k2eg::common
 
-#endif // K2EG_COMMON_RESIZABLEBUFFER_H_
+#endif // K2EG_COMMON_LOCKFREESNAPSHOTBUFFER_H_

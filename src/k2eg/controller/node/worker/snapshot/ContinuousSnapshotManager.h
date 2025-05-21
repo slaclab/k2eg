@@ -1,10 +1,13 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 
+#include "k2eg/service/epics/EpicsData.h"
 #include "k2eg/service/metric/INodeControllerMetric.h"
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/ThrottlingManager.h>
 #include <k2eg/common/types.h>
+
+#include <k2eg/common/LockFreeBuffer.h>
 
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/metric/IMetricService.h>
@@ -14,6 +17,7 @@
 #include <k2eg/controller/command/cmd/SnapshotCommand.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
+#include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
 
 #include <atomic>
 #include <chrono>
@@ -21,6 +25,7 @@
 #include <memory>
 #include <shared_mutex>
 #include <string>
+#include <unordered_map>
 
 namespace k2eg::controller::node::worker::snapshot {
 #pragma region Types
@@ -222,116 +227,12 @@ inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshot
 }
 
 #pragma region Defining Classes
-
-struct CacheElement
-{
-    // this is the pv name
-    std::chrono::system_clock::time_point cached_time = std::chrono::system_clock::now();
-    // this is the pv data
-    k2eg::service::epics_impl::MonitorEventShrdPtr event_data;
-
-    CacheElement(k2eg::service::epics_impl::MonitorEventShrdPtr event_data) : event_data(event_data) {}
-
-    CacheElement() = default;
-};
-
-DEFINE_PTR_TYPES(CacheElement)
-
 // atomic EPICS event data shared ptr
-// using AtomicMonitorEventShrdPtr = std::atomic<k2eg::service::epics_impl::MonitorEventShrdPtr>;
-using AtomicCacheElementShrdPtr = std::atomic<CacheElementShrdPtr>;
-using ShdAtomicCacheElementShrdPtr = std::shared_ptr<AtomicCacheElementShrdPtr>;
+using AtomicMonitorEventShrdPtr = std::atomic<k2eg::service::epics_impl::MonitorEventShrdPtr>;
+using ShdAtomicCacheElementShrdPtr = std::shared_ptr<AtomicMonitorEventShrdPtr>;
 
-/*
-@brief RepeatingSnapshotOpInfo is a class that holds information about a repeating snapshot operation.
-@details
-The class contains a command specification, after the command is epxired(ready to be fired)
-all the pv data is collected using the snapshot view(this permnit to get all the lasted received data)
-then it is published
-*/
-class RepeatingSnapshotOpInfo : public WorkerAsyncOperation
-{
-public:
-    // keep track of the iterantion
-    std::int64_t snapshot_iteration_index = 0;
-    // keep track of the comamnd specification
-    k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd;
-    // per-snapshot views hold pointers into global_cache_
-    std::unordered_map<std::string, ShdAtomicCacheElementShrdPtr> snapshot_views_;
-    const std::string                                             queue_name;
-    const bool                                                    is_triggered;
-    // keep track when to stop the snapshtot
-    bool is_running = true;
-    // keep track when a triggered snashot need to trigger
-    bool request_to_trigger = false;
-
-    RepeatingSnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd)
-        : WorkerAsyncOperation(std::chrono::milliseconds(cmd->time_window_msec)), queue_name(queue_name), cmd(cmd), is_triggered(cmd->triggered)
-    {
-    }
-
-    bool isTimeout()
-    {
-        // For triggered snapshots, timeout occurs if a trigger is requested or the snapshot is stopped.
-        if (is_triggered)
-        {
-            if (!is_running)
-            {
-                // If stopped, reset trigger request and expire immediately.
-                request_to_trigger = false;
-                return true;
-            }
-            if (request_to_trigger)
-            {
-                // If triggered, reset and expire.
-                request_to_trigger = false;
-                return true;
-            }
-            // Not triggered and not stopped: do not expire.
-            return false;
-        }
-        // For periodic snapshots, use base class timeout logic.
-        return WorkerAsyncOperation::isTimeout();
-    }
-
-    /**
-    @brief This method is called when the cache is being updated for the spiecfic pv name
-    @details It is a virtual method that can be overridden by derived classes to perform specific actions when the cache is updated.
-    */
-    virtual void cacheWillBeUpdatedFor(std::string& pv_name)
-    {
-
-    }
-};
-DEFINE_PTR_TYPES(RepeatingSnapshotOpInfo)
-
-class BufferedRepeatingSnapshotOpInfo : public RepeatingSnapshotOpInfo {
-public:
-    // Buffer to store all received values during the time window
-    std::map<std::string, std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr>> value_buffer;
-
-    //this method should update the historical buffer for the specific pv name
-    // taking the actual vlaue from snapshot_views_ and store on the value_buffer array
-    void cacheWillBeUpdatedFor(std::string& pv_name)
-    {
-        // check if the pv name is in the snapshot views
-        auto it = snapshot_views_.find(pv_name);
-        if (it != snapshot_views_.end())
-        {
-            // get the pv data from the snapshot views
-            auto pv_data_shard_ptr = it->second->load(std::memory_order_acquire);
-            if (pv_data_shard_ptr)
-            {
-                // add the pv data to the buffer
-                value_buffer[pv_name].push_back(pv_data_shard_ptr->event_data);
-            }
-        }
-    }
-};
-
-DEFINE_UOMAP_FOR_TYPE(std::string, ShdAtomicCacheElementShrdPtr, GlobalPVCacheMap)
-DEFINE_UOMAP_FOR_TYPE(std::string, RepeatingSnapshotOpInfoShrdPtr, RunninSnapshotMap)
-
+DEFINE_UOMAP_FOR_TYPE(std::string, std::shared_ptr<SnapshotOpInfo>, RunninSnapshotMap)
+using PVSnapshotMap = std::unordered_multimap<std::string, std::shared_ptr<SnapshotOpInfo>>;
 /*
 @brief ContinuousSnapshotManager is a class that manages the continuous snapshot of EPICS events.
 It provides a local cache for continuous snapshots and ensures thread-safe access to the cache.
@@ -352,12 +253,11 @@ class ContinuousSnapshotManager
     k2eg::service::log::ILoggerShrdPtr logger;
     // local publisher shared instance
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
-    // mutext
-    mutable std::shared_mutex global_cache_mutex_;
+    
+    // keep track of running snapshots
     mutable std::shared_mutex snapshot_runinnig_mutex_;
-
-    GlobalPVCacheMap  global_cache_;
     RunninSnapshotMap snapshot_runinnig_;
+    PVSnapshotMap pv_snapshot_map_;
 
     // thread pool for snapshot processing
     std::shared_ptr<BS::light_thread_pool> thread_pool;
@@ -376,7 +276,7 @@ class ContinuousSnapshotManager
     void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
     // rpocess each snapshot checking if the timewindopws is epxired tahing the data from the cache
     // and publishing the data
-    void processSnapshot(RepeatingSnapshotOpInfoShrdPtr snapstho_command_info);
+    void processSnapshot(SnapshotOpInfoShrdPtr snapshot_command_info);
     // Manager the reply to the client durin gthe snapshto submission
     void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstCommandShrdPtr command, const std::string& publishing_topic = "");
     // is the callback for the publisher
@@ -384,8 +284,6 @@ class ContinuousSnapshotManager
     void startSnapshot(command::cmd::ConstRepeatingSnapshotCommandShrdPtr command);
     void triggerSnapshot(command::cmd::ConstRepeatingSnapshotTriggerCommandShrdPtr command);
     void stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr command);
-    void printGlobalCacheStata();
-    void cleanUnusedChannelFromGlobalCache(RepeatingSnapshotOpInfoShrdPtr snapshot_command_info);
     void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
 
 public:
