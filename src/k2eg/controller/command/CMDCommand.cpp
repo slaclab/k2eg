@@ -256,6 +256,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
             if (auto fields = checkFields(obj, {{KEY_PV_NAME_LIST, kind::array}, {KEY_REPLY_TOPIC, kind::string}, {KEY_REPLY_ID, kind::string}}); fields != nullptr)
             {
                 std::vector<std::string> pv_name_list;
+
                 const std::string        reply_id = check_for_reply_id(obj, logger);
                 const std::string        reply_topic = check_reply_topic(obj, logger);
                 const int time_window_msec = check_json_field<int32_t>(obj, KEY_TIME_WINDOW_MSEC, logger, "The time window key should be a integer", 1000);
@@ -267,6 +268,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                         continue;
                     pv_name_list.push_back(value_to<std::string>(element));
                 }
+
                 if (pv_name_list.size())
                 {
                     // we can create the command
@@ -294,7 +296,8 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
             const SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
             if (auto fields = checkFields(obj, {{KEY_PV_NAME_LIST, kind::array}, {KEY_REPLY_TOPIC, kind::string}, {KEY_REPLY_ID, kind::string}}); fields != nullptr)
             {
-                std::vector<std::string> pv_name_list;
+                std::vector<std::string>            pv_name_list;
+                std::unordered_set<std::string>     pv_field_filter_list;
                 const std::string        reply_id = check_for_reply_id(obj, logger);
                 const std::string        reply_topic = check_reply_topic(obj, logger);
                 const int repeat_delay_msec = check_json_field<int32_t>(obj, KEY_REPEAT_DELAY_MSEC, logger, "The repeat delay key should be a integer", 0);
@@ -303,12 +306,19 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 const bool triggered = check_json_field<bool>(obj, KEY_TRIGGERED, logger, "The triggered key should be a boolean", false);
                 const SnapshotType type = snapshot_type_from_string(check_json_field<std::string>(obj, "type", logger, "The snapshot type key should be a string", "normal").c_str());
                 auto json_array = std::any_cast<boost::json::array>(fields->find(KEY_PV_NAME_LIST)->second);
+                auto json_array_field_filter = std::any_cast<boost::json::array>(fields->find(KEY_PV_FIELD_FILTER_LIST)->second);
                 // find all stirng in the vector
                 for (auto& element : json_array)
                 {
                     if (element.kind() != kind::string)
                         continue;
                     pv_name_list.push_back(value_to<std::string>(element));
+                }
+                for (auto& element : json_array_field_filter)
+                {
+                    if (element.kind() != kind::string)
+                        continue;
+                    pv_field_filter_list.insert(value_to<std::string>(element));
                 }
                 if (pv_name_list.size())
                 {
@@ -323,7 +333,8 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                         repeat_delay_msec, 
                         time_window_msec, 
                         triggered,
-                        type});
+                        type,
+                        pv_field_filter_list});
                 }
                 else
                 {

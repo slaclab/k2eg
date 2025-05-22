@@ -16,6 +16,9 @@ specific snapshot operation info class
 */
 class SnapshotOpInfo : public WorkerAsyncOperation
 {
+protected:
+    const epics::pvData::PVStructure::const_shared_pointer filterPVField(const epics::pvData::PVStructure::const_shared_pointer& src, const std::unordered_set<std::string>& fields_to_include);
+
 public:
     k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd;
     std::int64_t                                                         snapshot_iteration_index = 0;
@@ -23,14 +26,14 @@ public:
     const bool                                                           is_triggered;
     bool                                                                 request_to_trigger = false;
     bool                                                                 is_running = true;
-
+    
     SnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd);
     virtual ~SnapshotOpInfo();
 
     virtual bool init(std::vector<service::epics_impl::PVShrdPtr>& sanitized_pv_name_list) = 0;
     virtual void addData(k2eg::service::epics_impl::MonitorEventShrdPtr event_data) = 0;
     virtual std::vector<service::epics_impl::MonitorEventShrdPtr> getData() = 0;
-    virtual bool isTimeout();
+    virtual bool                                                  isTimeout();
 };
 DEFINE_PTR_TYPES(SnapshotOpInfo)
 } // namespace k2eg::controller::node::worker::snapshot

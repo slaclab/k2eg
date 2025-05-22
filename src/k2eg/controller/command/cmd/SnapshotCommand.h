@@ -48,21 +48,28 @@ constexpr const char* snapshot_type_to_string(SnapshotType t) noexcept
 
 constexpr SnapshotType snapshot_type_from_string(const char* st) noexcept
 {
-    if (st == nullptr) return SnapshotType::unknown;
+    if (st == nullptr)
+        return SnapshotType::unknown;
 
     // Compare case-insensitively
-    auto iequals = [](const char* a, const char* b) {
-        while (*a && *b) {
+    auto iequals = [](const char* a, const char* b)
+    {
+        while (*a && *b)
+        {
             if (std::tolower(static_cast<unsigned char>(*a)) != std::tolower(static_cast<unsigned char>(*b)))
                 return false;
-            ++a; ++b;
+            ++a;
+            ++b;
         }
         return *a == *b;
     };
 
-    if (iequals(st, "normal")) return SnapshotType::NORMAL;
-    if (iequals(st, "timedbuffered")) return SnapshotType::TIMED_BUFFERED;
-    if (iequals(st, "unknown")) return SnapshotType::unknown;
+    if (iequals(st, "normal"))
+        return SnapshotType::NORMAL;
+    if (iequals(st, "timedbuffered"))
+        return SnapshotType::TIMED_BUFFERED;
+    if (iequals(st, "unknown"))
+        return SnapshotType::unknown;
     return SnapshotType::unknown;
 }
 
@@ -106,6 +113,8 @@ struct RepeatingSnapshotCommand : public Command
     bool triggered;
     // define the type of snapshot
     SnapshotType type = SnapshotType::NORMAL;
+    // the fields to include in the snapshot for each pv data
+    std::unordered_set<std::string> pv_field_filter_list = {};
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotCommand)
 

@@ -1,3 +1,4 @@
+#include "k2eg/service/epics/EpicsData.h"
 #include <k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.h>
 
 using namespace k2eg::controller::node::worker::snapshot;
@@ -6,11 +7,12 @@ using namespace k2eg::service::epics_impl;
 using namespace std::chrono;
 
 BackTimedBufferedSnapshotOpInfo::BackTimedBufferedSnapshotOpInfo(const std::string& queue_name, ConstRepeatingSnapshotCommandShrdPtr cmd)
-    : SnapshotOpInfo(queue_name, cmd), buffer(cmd->time_window_msec),taking_data(true)
+    : SnapshotOpInfo(queue_name, cmd), taking_data(true), buffer(cmd->time_window_msec)
 {
 }
 
-bool BackTimedBufferedSnapshotOpInfo::init(std::vector<PVShrdPtr>& sanitized_pv_name_list){
+bool BackTimedBufferedSnapshotOpInfo::init(std::vector<PVShrdPtr>& sanitized_pv_name_list)
+{
     // there is nothuing to do here
     return true;
 }
@@ -27,8 +29,23 @@ void BackTimedBufferedSnapshotOpInfo::addData(MonitorEventShrdPtr event_data)
 
 std::vector<MonitorEventShrdPtr> BackTimedBufferedSnapshotOpInfo::getData()
 {
+    std::vector<MonitorEventShrdPtr> result;
     taking_data.store(false, std::memory_order_release);
-    auto result = buffer.fetchWindow();
+    if (this->cmd->pv_field_filter_list.size() == 0)
+    {
+        result = buffer.fetchWindow();
+    }
+    else
+    {
+        // we need to filterout unneeded fileds
+        result = buffer.fetchWindow<MonitorEventShrdPtr>(
+            [this](auto ev) -> std::optional<MonitorEventShrdPtr>
+            {
+                return std::make_optional(MakeMonitorEventShrdPtr(
+                    ev->type, ev->message,
+                    ChannelData{ev->channel_data.pv_name, filterPVField(ev->channel_data.data, this->cmd->pv_field_filter_list)}));
+            });
+    }
     taking_data.store(true, std::memory_order_release);
     return result;
 }

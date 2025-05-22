@@ -70,6 +70,29 @@ public:
         return out;
     }
 
+    template <typename OutT, typename Func>
+    std::vector<OutT> fetchWindow(Func&& filter_map)
+    {
+        std::lock_guard<std::mutex> lock(buffer_mutex);
+        std::vector<OutT>           out;
+        for (size_t i = start_idx; i < buffer.size(); ++i)
+        {
+            auto maybe = filter_map(buffer[i].event);
+            if constexpr (std::is_same_v<OutT, decltype(maybe)>)
+            {
+                // No filtering, just mapping
+                out.push_back(maybe);
+            }
+            else
+            {
+                // Filtering: expect filter_map to return std::optional<OutT>
+                if (maybe)
+                    out.push_back(*maybe);
+            }
+        }
+        return out;
+    }
+
     void reset()
     {
         // Lock reset

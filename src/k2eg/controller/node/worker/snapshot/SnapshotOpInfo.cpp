@@ -31,3 +31,40 @@ bool SnapshotOpInfo::isTimeout()
     }
     return WorkerAsyncOperation::isTimeout();
 }
+
+const epics::pvData::PVStructure::const_shared_pointer SnapshotOpInfo::filterPVField(const epics::pvData::PVStructure::const_shared_pointer& src, 
+                                                                                     const std::unordered_set<std::string>& fields_to_include)
+{
+    using namespace epics::pvData;
+    if (!src)
+        return PVStructure::const_shared_pointer();
+
+    FieldCreatePtr  fieldCreate = getFieldCreate();
+    FieldBuilderPtr builder = fieldCreate->createFieldBuilder();
+
+    // Add only the requested fields
+    for (const auto& field : fields_to_include)
+    {
+        auto pvField = src->getSubFieldT<const PVField>(field);
+        if (pvField)
+        {
+            builder = builder->add(field, pvField->getField());
+        }
+    }
+
+    StructureConstPtr filteredStruct = builder->createStructure();
+    PVStructurePtr    filteredPV = getPVDataCreate()->createPVStructure(filteredStruct);
+
+    // Copy values
+    for (const auto& field : fields_to_include)
+    {
+        auto srcField = src->getSubFieldT<const PVField>(field);
+        auto dstField = filteredPV->getSubField(field);
+        if (srcField && dstField)
+        {
+            dstField->copy(*srcField);
+        }
+    }
+
+    return filteredPV;
+}

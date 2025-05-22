@@ -12,19 +12,20 @@
 
 namespace k2eg::controller::command::cmd {
 
-#define KEY_COMMAND            "command"
-#define KEY_SERIALIZATION      "serialization"
-#define KEY_PV_NAME            "pv_name"
-#define KEY_PV_NAME_LIST       "pv_name_list"
-#define KEY_REPLY_TOPIC        "reply_topic"
-#define KEY_MONITOR_DEST_TOPIC "monitor_dest_topic"
-#define KEY_VALUE              "value"
-#define KEY_REPLY_ID           "reply_id"
-#define KEY_SNAPSHOT_NAME      "snapshot_name"
-#define KEY_REPEAT_DELAY_MSEC  "repeat_delay_msec"
-#define KEY_TIME_WINDOW_MSEC   "time_window_msec"
-#define KEY_TRIGGERED          "triggered"
-#define KET_TAGS               "tags"
+#define KEY_COMMAND                 "command"
+#define KEY_SERIALIZATION           "serialization"
+#define KEY_PV_NAME                 "pv_name"
+#define KEY_PV_NAME_LIST            "pv_name_list"
+#define KEY_PV_FIELD_FILTER_LIST    "pv_field_filter_list"
+#define KEY_REPLY_TOPIC             "reply_topic"
+#define KEY_MONITOR_DEST_TOPIC      "monitor_dest_topic"
+#define KEY_VALUE                   "value"
+#define KEY_REPLY_ID                "reply_id"
+#define KEY_SNAPSHOT_NAME           "snapshot_name"
+#define KEY_REPEAT_DELAY_MSEC       "repeat_delay_msec"
+#define KEY_TIME_WINDOW_MSEC        "time_window_msec"
+#define KEY_TRIGGERED               "triggered"
+#define KET_TAGS                    "tags"
 // are all the possible command
 enum class CommandType
 {
