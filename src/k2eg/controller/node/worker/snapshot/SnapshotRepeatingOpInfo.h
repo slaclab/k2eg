@@ -27,17 +27,17 @@ public:
 
     SnapshotRepeatingOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd);
 
-    bool init(std::vector<service::epics_impl::PVShrdPtr>& sanitized_pv_name_list);
+    bool init(std::vector<service::epics_impl::PVShrdPtr>& sanitized_pv_name_list) override;
 
-    bool isTimeout();
+    bool isTimeout() override ;
 
     /**
     @brief This method is called when the cache is being updated for the spiecfic pv name
     @details It is a virtual method that can be overridden by derived classes to perform specific actions when the cache
     is updated.
     */
-    void addData(k2eg::service::epics_impl::MonitorEventShrdPtr event_data);
-    std::vector<service::epics_impl::MonitorEventShrdPtr> getData();
+    void addData(k2eg::service::epics_impl::MonitorEventShrdPtr event_data) override;
+    std::vector<service::epics_impl::MonitorEventShrdPtr> getData() override;
 };
 DEFINE_PTR_TYPES(SnapshotRepeatingOpInfo)
 

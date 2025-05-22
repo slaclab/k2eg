@@ -28,8 +28,8 @@ class TimeWindowEventBuffer
     size_t                    grow_factor; // Multiplicative growth
 
 public:
-    explicit TimeWindowEventBuffer(std::chrono::milliseconds window = std::chrono::milliseconds(1000), size_t reserve = 1024, size_t grow = 2)
-        : window_ms(window), max_size(reserve), grow_factor(grow)
+    explicit TimeWindowEventBuffer(size_t window = 1000, size_t reserve = 1024, size_t grow = 2)
+        : window_ms(std::chrono::milliseconds(window)), max_size(reserve), grow_factor(grow)
     {
         buffer.reserve(max_size);
     }

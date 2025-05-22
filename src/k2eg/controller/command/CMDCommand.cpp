@@ -301,6 +301,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 const int time_window_msec = check_json_field<int32_t>(obj, KEY_TIME_WINDOW_MSEC, logger, "The time window key should be a integer", 1000);
                 const std::string snapshot_name = check_json_field<std::string>(obj, KEY_SNAPSHOT_NAME, logger, "The snapshot name key should be a string", "");
                 const bool triggered = check_json_field<bool>(obj, KEY_TRIGGERED, logger, "The triggered key should be a boolean", false);
+                const SnapshotType type = snapshot_type_from_string(check_json_field<std::string>(obj, "type", logger, "The snapshot type key should be a string", "normal").c_str());
                 auto json_array = std::any_cast<boost::json::array>(fields->find(KEY_PV_NAME_LIST)->second);
                 // find all stirng in the vector
                 for (auto& element : json_array)
@@ -321,7 +322,8 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                         pv_name_list, 
                         repeat_delay_msec, 
                         time_window_msec, 
-                        triggered});
+                        triggered,
+                        type});
                 }
                 else
                 {

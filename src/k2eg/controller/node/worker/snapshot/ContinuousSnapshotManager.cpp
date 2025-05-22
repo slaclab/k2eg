@@ -1,6 +1,8 @@
 
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
+#include <k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.h>
+#include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
 #include <k2eg/service/metric/INodeControllerMetric.h>
 
 #include <k2eg/service/ServiceResolver.h>
@@ -16,7 +18,6 @@
 #include <memory>
 #include <mutex>
 #include <regex>
-#include <set>
 
 using namespace k2eg::controller::command::cmd;
 using namespace k2eg::controller::node::worker;
@@ -146,14 +147,36 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
                                          serialization_to_string(snapsthot_command->serialization) % snapsthot_command->triggered),
                        LogLevel::DEBUG);
     // create the commmand operation info structure
-    auto s_op_ptr = MakeSnapshotRepeatingOpInfoShrdPtr(GET_QUEUE_FROM_SNAPSHOT_NAME(snapsthot_command->snapshot_name), snapsthot_command);
+
+    SnapshotOpInfoShrdPtr s_op_ptr = nullptr;
+    switch (snapsthot_command->type)
+    {
+    case SnapshotType::unknown:
+        {
+            logger->logMessage(STRING_FORMAT("The snapshot type %1% is not supported", snapsthot_command->type), LogLevel::ERROR);
+            manageReply(-1, STRING_FORMAT("The snapshot type %1% is not supported", snapsthot_command->type), snapsthot_command);
+            return;
+        }
+    case SnapshotType::NORMAL:
+        {
+            logger->logMessage(STRING_FORMAT("Create normal snapshot %1%", snapsthot_command->snapshot_name), LogLevel::DEBUG);
+            s_op_ptr = MakeSnapshotRepeatingOpInfoShrdPtr(GET_QUEUE_FROM_SNAPSHOT_NAME(snapsthot_command->snapshot_name), snapsthot_command);
+            break;
+        }
+    case SnapshotType::TIMED_BUFFERED:
+        {
+            logger->logMessage(STRING_FORMAT("Create timed buffered snapshot %1%", snapsthot_command->snapshot_name), LogLevel::DEBUG);
+            s_op_ptr = MakeBackTimedBufferedSnapshotOpInfoShrdPtr(GET_QUEUE_FROM_SNAPSHOT_NAME(snapsthot_command->snapshot_name), snapsthot_command);
+            break;
+        }
+    }
 
     // chekc if it is already spinned
     {
         std::unique_lock write_lock(snapshot_runinnig_mutex_);
         if (snapshot_runinnig_.find(s_op_ptr->queue_name) != snapshot_runinnig_.end())
         {
-            manageReply(-1, STRING_FORMAT("Snapshot %1% is already running", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+            manageReply(-2, STRING_FORMAT("Snapshot %1% is already running", s_op_ptr->cmd->snapshot_name), snapsthot_command);
             return;
         }
     }
@@ -161,22 +184,22 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     // check if all the command infromation are filled
     if (s_op_ptr->cmd->pv_name_list.empty())
     {
-        manageReply(-2, STRING_FORMAT("PV name list is empty for snapshot %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        manageReply(-3, STRING_FORMAT("PV name list is empty for snapshot %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
     if (s_op_ptr->cmd->repeat_delay_msec < 0)
     {
-        manageReply(-3, STRING_FORMAT("The repeat delay is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        manageReply(-4, STRING_FORMAT("The repeat delay is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
     if (s_op_ptr->cmd->time_window_msec < 0)
     {
-        manageReply(-4, STRING_FORMAT("The time window is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        manageReply(-5, STRING_FORMAT("The time window is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
     if (s_op_ptr->cmd->snapshot_name.empty())
     {
-        manageReply(-5, STRING_FORMAT("The snapshot name is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        manageReply(-6, STRING_FORMAT("The snapshot name is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
 
@@ -186,7 +209,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         auto sanitized_pv_name = epics_service_manager->sanitizePVName(pv_uri);
         if (!sanitized_pv_name)
         {
-            manageReply(-6, STRING_FORMAT("The pv uri %1% is not parsable", pv_uri), snapsthot_command);
+            manageReply(-7, STRING_FORMAT("The pv uri %1% is not parsable", pv_uri), snapsthot_command);
             return;
         }
         // add the pv to the list of pv to monitor
@@ -196,7 +219,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     // init the snapshot operation info
     if (!s_op_ptr->init(sanitized_pv_name_list))
     {
-        manageReply(-7, STRING_FORMAT("The snapshot %1% is not valid", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        manageReply(-8, STRING_FORMAT("The snapshot %1% is not valid", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
 
@@ -218,7 +241,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         snapshot_runinnig_.emplace(s_op_ptr->queue_name, s_op_ptr);
         for (auto& pv_uri : sanitized_pv_name_list)
         {
-            logger->logMessage(STRING_FORMAT("associate snapshot '%1%' to pv '%2%'", s_op_ptr->cmd->snapshot_name%pv_uri), LogLevel::DEBUG);
+            logger->logMessage(STRING_FORMAT("associate snapshot '%1%' to pv '%2%'", s_op_ptr->cmd->snapshot_name % pv_uri), LogLevel::DEBUG);
             // associate snaphsot to each pv, so the epics handler can
             // find the snapshot to fiil with data
             pv_snapshot_map_.emplace(std::make_pair(pv_uri->name, s_op_ptr));
@@ -384,7 +407,12 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
                             break;
                         }
                     }
+
+                    // remove instance of epics channel
+                    logger->logMessage(STRING_FORMAT("PV '%1%' disabling monitor", pv_uri), LogLevel::DEBUG);
+                    epics_service_manager->monitorChannel(pv_uri, false);
                 }
+
                 logger->logMessage(STRING_FORMAT("Snapshot %1% is cancelled", snapshot_command_info->queue_name), LogLevel::INFO);
             }
             return;
