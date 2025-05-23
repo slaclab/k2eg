@@ -14,6 +14,7 @@ namespace k2eg::controller::command::cmd {
 
 #define KEY_COMMAND                 "command"
 #define KEY_SERIALIZATION           "serialization"
+#define KEY_TYPE                    "type"
 #define KEY_PV_NAME                 "pv_name"
 #define KEY_PV_NAME_LIST            "pv_name_list"
 #define KEY_PV_FIELD_FILTER_LIST    "pv_field_filter_list"
