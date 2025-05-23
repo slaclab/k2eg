@@ -20,8 +20,10 @@ publish the last 2 second of data
 class BackTimedBufferedSnapshotOpInfo : public SnapshotOpInfo
 {
     // define when the snapshot is acquiring data
+    std::mutex                                                                   buffer_mutex;
     std::atomic<bool>                                                            taking_data;
     k2eg::common::TimeWindowEventBuffer<k2eg::service::epics_impl::MonitorEvent> buffer;
+
 public:
     // Buffer to store all received values during the time window
     std::map<std::string, std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr>> value_buffer;

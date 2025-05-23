@@ -23,6 +23,7 @@ void BackTimedBufferedSnapshotOpInfo::addData(MonitorEventShrdPtr event_data)
     {
         return;
     }
+    std::lock_guard<std::mutex> lock(buffer_mutex);
     // add to the buffer
     buffer.push(event_data, steady_clock::now());
 }
@@ -31,6 +32,8 @@ std::vector<MonitorEventShrdPtr> BackTimedBufferedSnapshotOpInfo::getData()
 {
     std::vector<MonitorEventShrdPtr> result;
     taking_data.store(false, std::memory_order_release);
+    std::lock_guard<std::mutex> lock(buffer_mutex);
+    
     if (this->cmd->pv_field_filter_list.size() == 0)
     {
         result = buffer.fetchWindow();

@@ -5,6 +5,8 @@
 #include <chrono>
 #include <memory>
 #include <vector>
+#include <mutex>
+#include <type_traits>
 
 namespace k2eg::common {
 
@@ -19,25 +21,19 @@ class TimeWindowEventBuffer
         std::shared_ptr<T> event;
     };
 
-    std::vector<Entry>        buffer;
-    std::mutex                buffer_mutex; // <-- Add this
-    std::atomic<bool>         accepting_data{true};
+    std::vector<Entry> buffer;
+    size_t             head = 0; // points to the oldest element
+    size_t             tail = 0; // points to the next insertion point
+    size_t             count = 0;
+    std::mutex         buffer_mutex;
     std::chrono::milliseconds window_ms;
-    size_t                    start_idx = 0;
-    size_t                    max_size;    // Initial reserve and step if zero
-    size_t                    grow_factor; // Multiplicative growth
+    size_t            max_size;
+    size_t            grow_factor;
 
 public:
     explicit TimeWindowEventBuffer(size_t window = 1000, size_t reserve = 1024, size_t grow = 2)
-        : window_ms(std::chrono::milliseconds(window)), max_size(reserve), grow_factor(grow)
-    {
-        buffer.reserve(max_size);
-    }
-
-    void setDataTakingEnabled(bool enable)
-    {
-        accepting_data.store(enable, std::memory_order_release);
-    }
+        : buffer(reserve), window_ms(std::chrono::milliseconds(window)), max_size(reserve), grow_factor(grow)
+    {}
 
     void setTimeWindow(std::chrono::milliseconds window)
     {
@@ -46,26 +42,28 @@ public:
 
     bool push(std::shared_ptr<T> value, TimePoint timestamp)
     {
-        if (!accepting_data.load(std::memory_order_acquire))
-            return false;
-        std::lock_guard<std::mutex> lock(buffer_mutex); // <-- Lock here
         pruneOldIfNeeded(timestamp);
-        if (buffer.size() == buffer.capacity())
-        {
-            size_t new_cap = buffer.capacity() == 0 ? max_size : buffer.capacity() * grow_factor;
-            buffer.reserve(new_cap);
+
+        if (count == buffer.size()) {
+            expandBuffer();
         }
-        buffer.push_back(Entry{timestamp, std::move(value)});
+
+        buffer[tail] = Entry{timestamp, std::move(value)};
+        tail = (tail + 1) % buffer.size();
+        if (count < buffer.size()) {
+            ++count;
+        } else {
+            // Overwrite oldest
+            head = (head + 1) % buffer.size();
+        }
         return true;
     }
 
     std::vector<std::shared_ptr<T>> fetchWindow()
     {
-        std::lock_guard<std::mutex>     lock(buffer_mutex); // <-- Lock for read safety
         std::vector<std::shared_ptr<T>> out;
-        for (size_t i = start_idx; i < buffer.size(); ++i)
-        {
-            out.push_back(buffer[i].event);
+        for (size_t i = 0, idx = head; i < count; ++i, idx = (idx + 1) % buffer.size()) {
+            out.push_back(buffer[idx].event);
         }
         return out;
     }
@@ -73,19 +71,12 @@ public:
     template <typename OutT, typename Func>
     std::vector<OutT> fetchWindow(Func&& filter_map)
     {
-        std::lock_guard<std::mutex> lock(buffer_mutex);
-        std::vector<OutT>           out;
-        for (size_t i = start_idx; i < buffer.size(); ++i)
-        {
-            auto maybe = filter_map(buffer[i].event);
-            if constexpr (std::is_same_v<OutT, decltype(maybe)>)
-            {
-                // No filtering, just mapping
+        std::vector<OutT> out;
+        for (size_t i = 0, idx = head; i < count; ++i, idx = (idx + 1) % buffer.size()) {
+            auto maybe = filter_map(buffer[idx].event);
+            if constexpr (std::is_same_v<OutT, decltype(maybe)>) {
                 out.push_back(maybe);
-            }
-            else
-            {
-                // Filtering: expect filter_map to return std::optional<OutT>
+            } else {
                 if (maybe)
                     out.push_back(*maybe);
             }
@@ -95,26 +86,33 @@ public:
 
     void reset()
     {
-        // Lock reset
-        std::lock_guard<std::mutex> lock(buffer_mutex);
-        // don't shrink, keep allocation for speed
         buffer.clear();
-        start_idx = 0;
-        accepting_data.store(true, std::memory_order_release);
+        buffer.resize(max_size);
+        head = tail = count = 0;
     }
 
 private:
     void pruneOldIfNeeded(TimePoint now)
     {
-        // Assumes buffer_mutex is held!
-        while (start_idx < buffer.size() && now - buffer[start_idx].timestamp > window_ms)
-            ++start_idx;
-        // Compact only if a lot of unused space
-        if (start_idx > buffer.size() / 2)
-        {
-            buffer.erase(buffer.begin(), buffer.begin() + start_idx);
-            start_idx = 0;
+        // Remove old entries from the head
+        while (count > 0 && now - buffer[head].timestamp > window_ms) {
+            head = (head + 1) % buffer.size();
+            --count;
         }
+    }
+
+    void expandBuffer()
+    {
+        size_t new_size = buffer.size() == 0 ? max_size : buffer.size() * grow_factor;
+        std::vector<Entry> new_buffer(new_size);
+
+        // Copy elements in order
+        for (size_t i = 0; i < count; ++i) {
+            new_buffer[i] = buffer[(head + i) % buffer.size()];
+        }
+        buffer = std::move(new_buffer);
+        head = 0;
+        tail = count;
     }
 };
 
