@@ -330,6 +330,8 @@ CMDControllerCommandHandler recurring_snapshot_test = [](ConstCommandShrdPtrVec 
   ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->repeat_delay_msec, 1000);
   ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->time_window_msec, 1000);
   ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->triggered, false);
+  auto pv_field_filter_list = reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->pv_field_filter_list;
+  ASSERT_TRUE(std::find(pv_field_filter_list.begin(), pv_field_filter_list.end(), "value") != pv_field_filter_list.end());
 };
 
 boost::json::value recurring_snapshot_json = {
@@ -340,7 +342,8 @@ boost::json::value recurring_snapshot_json = {
   {KEY_PV_NAME_LIST,{"pva://channel::a", "pva://channel::b"}},
   {KEY_TIME_WINDOW_MSEC, 1000},
   {KEY_REPEAT_DELAY_MSEC, 1000},
-  {KEY_TRIGGERED, false}
+  {KEY_TRIGGERED, false},
+  {KEY_PV_FIELD_FILTER_LIST, {"value"}}
 };
 
 CMDControllerCommandHandler recurring_snapshot_trigger_test = [](ConstCommandShrdPtrVec received_command) {

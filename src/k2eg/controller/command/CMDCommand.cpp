@@ -306,7 +306,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 const bool triggered = check_json_field<bool>(obj, KEY_TRIGGERED, logger, "The triggered key should be a boolean", false);
                 const SnapshotType type = snapshot_type_from_string(check_json_field<std::string>(obj, "type", logger, "The snapshot type key should be a string", "normal").c_str());
                 auto json_array = std::any_cast<boost::json::array>(fields->find(KEY_PV_NAME_LIST)->second);
-                auto json_array_field_filter = std::any_cast<boost::json::array>(fields->find(KEY_PV_FIELD_FILTER_LIST)->second);
+                auto json_array_field_filter =  check_json_field<boost::json::array>(obj, KEY_PV_FIELD_FILTER_LIST, logger, "The field filter key should be an array", boost::json::array());
                 // find all stirng in the vector
                 for (auto& element : json_array)
                 {
