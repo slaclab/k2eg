@@ -1,7 +1,7 @@
 #ifndef K2EG_COMMON_TIMEWINDOWEVENTBUFFER_H_
 #define K2EG_COMMON_TIMEWINDOWEVENTBUFFER_H_
 
-#include <atomic>
+#include "k2eg/common/types.h"
 #include <chrono>
 #include <memory>
 #include <vector>
@@ -115,7 +115,6 @@ private:
         tail = count;
     }
 };
-
 } // namespace k2eg::common
 
 #endif // K2EG_COMMON_TIMEWINDOWEVENTBUFFER_H_
