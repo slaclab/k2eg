@@ -428,16 +428,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFields)
 
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({
-            std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{
-                CommandType::repeating_snapshot, 
-                SerializationType::Msgpack, 
-                "app_reply_topic", 
-                "rep-id", 
-                "Snapshot Name", 
-                {"pva://variable:a", "pva://channel:ramp:ramp"}, 
-                0, 4000, 
-                false, SnapshotType::TIMED_BUFFERED, {"value"}})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://channel:ramp:ramp"}, 0, 4000, false, SnapshotType::TIMED_BUFFERED, {"value"}})}););
 
     // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
     // completaion) messages
@@ -475,7 +466,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFields)
 
 TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsWithManualTrigger)
 {
-    std::vector<int> checked_values;
+    std::vector<int>                               checked_values;
     typedef std::map<std::string, msgpack::object> Map;
     boost::json::object                            reply_msg;
     std::unique_ptr<NodeController>                node_controller;
@@ -492,19 +483,10 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsWit
 
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({
-            std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{
-                CommandType::repeating_snapshot, 
-                SerializationType::Msgpack, 
-                "app_reply_topic", 
-                "rep-id", 
-                "Snapshot Name", 
-                {"pva://variable:a", "pva://channel:ramp:ramp"}, 
-                0, 4000, 
-                true, SnapshotType::TIMED_BUFFERED, {"value"}})}););
-    
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://channel:ramp:ramp"}, 0, 4000, true, SnapshotType::TIMED_BUFFERED, {"value"}})}););
+
     // wait only ack
-    auto topic_counts = publisher->wait_for({ {"app_reply_topic", 1}}, std::chrono::milliseconds(10000));
+    auto topic_counts = publisher->wait_for({{"app_reply_topic", 1}}, std::chrono::milliseconds(10000));
 
     // we need to have publish some message
     size_t published = ServiceResolver<IPublisher>::resolve()->getQueueMessageSize();
@@ -515,26 +497,36 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsWit
 
     // trigger the snapshot
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotTriggerCommand>(RepeatingSnapshotTriggerCommand{CommandType::repeating_snapshot_trigger, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
-    topic_counts = publisher->wait_for({ {"snapshot_name", 6}}, std::chrono::milliseconds(10000));
+    topic_counts = publisher->wait_for({{"snapshot_name", 6}}, std::chrono::milliseconds(10000));
 
     EXPECT_GE(topic_counts["snapshot_name"], 6);
     // check all messages
     for (int idx = 0; idx < publisher->sent_messages.size(); idx++)
     {
+        if (publisher->sent_messages[idx] == nullptr)
+        {
+            continue;
+        }
         typedef std::map<std::string, msgpack::object> Map;
         msgpack::unpacked                              msgpack_unpacked;
         EXPECT_NO_THROW(msgpack_unpacked = exstractMsgpackObjectAtIndex(publisher->sent_messages, "snapshot_name", idx, false););
         auto msgpack_object = msgpack_unpacked.get();
+        if (msgpack_object.type == msgpack::type::NIL)
+        {
+            continue;
+        }
         std::cout << msgpack_object << std::endl;
-        if (checkMSGPackObjectContains(msgpack_object, "channel:ramp:ramp")) {
+        if (checkMSGPackObjectContains(msgpack_object, "channel:ramp:ramp"))
+        {
             auto channel_obj = getMSGPackObjectForKey(msgpack_object, "channel:ramp:ramp");
-            int value = static_cast<int>(getMSGPackObjectForKey(channel_obj, "value").as<float>());
+            int  value = static_cast<int>(getMSGPackObjectForKey(channel_obj, "value").as<float>());
             checked_values.push_back(value);
         }
     }
     // check the sequence of the values
-    for (size_t i = 1; i < checked_values.size(); ++i) {
-        EXPECT_TRUE(checked_values[i] == checked_values[i-1] + 1 || (checked_values[i-1] == 10 && checked_values[i] == 0));
+    for (size_t i = 1; i < checked_values.size(); ++i)
+    {
+        EXPECT_TRUE(checked_values[i] == checked_values[i - 1] + 1 || (checked_values[i - 1] == 10 && checked_values[i] == 0));
     }
 
     // clear all messages
@@ -544,28 +536,38 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsWit
 
     // trigger the snapshot again
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotTriggerCommand>(RepeatingSnapshotTriggerCommand{CommandType::repeating_snapshot_trigger, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
-    topic_counts = publisher->wait_for({ {"snapshot_name", 6}}, std::chrono::milliseconds(10000));
+    topic_counts = publisher->wait_for({{"snapshot_name", 6}}, std::chrono::milliseconds(10000));
 
     EXPECT_GE(topic_counts["snapshot_name"], 6);
     // check all messages
     checked_values.clear();
     for (int idx = 0; idx < publisher->sent_messages.size(); idx++)
     {
+        if (publisher->sent_messages[idx] == nullptr)
+        {
+            continue;
+        }
         typedef std::map<std::string, msgpack::object> Map;
         msgpack::unpacked                              msgpack_unpacked;
         EXPECT_NO_THROW(msgpack_unpacked = exstractMsgpackObjectAtIndex(publisher->sent_messages, "snapshot_name", idx, false););
         auto msgpack_object = msgpack_unpacked.get();
+        if (msgpack_object.type == msgpack::type::NIL)
+        {
+            continue;
+        }
         std::cout << msgpack_object << std::endl;
-        if (checkMSGPackObjectContains(msgpack_object, "channel:ramp:ramp")) {
+        if (checkMSGPackObjectContains(msgpack_object, "channel:ramp:ramp"))
+        {
             auto channel_obj = getMSGPackObjectForKey(msgpack_object, "channel:ramp:ramp");
-            int value = static_cast<int>(getMSGPackObjectForKey(channel_obj, "value").as<float>());
+            int  value = static_cast<int>(getMSGPackObjectForKey(channel_obj, "value").as<float>());
             checked_values.push_back(value);
         }
     }
-    
+
     // check the sequence of the values
-    for (size_t i = 1; i < checked_values.size(); ++i) {
-        EXPECT_TRUE(checked_values[i] == checked_values[i-1] + 1 || (checked_values[i-1] == 10 && checked_values[i] == 0));
+    for (size_t i = 1; i < checked_values.size(); ++i)
+    {
+        EXPECT_TRUE(checked_values[i] == checked_values[i - 1] + 1 || (checked_values[i - 1] == 10 && checked_values[i] == 0));
     }
 
     // stop the snapshot
