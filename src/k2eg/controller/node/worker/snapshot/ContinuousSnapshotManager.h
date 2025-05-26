@@ -3,6 +3,7 @@
 
 #include "k2eg/service/epics/EpicsData.h"
 #include "k2eg/service/metric/INodeControllerMetric.h"
+#include <cstddef>
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/ThrottlingManager.h>
 #include <k2eg/common/types.h>
@@ -20,7 +21,6 @@
 #include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
 
 #include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <shared_mutex>
@@ -29,6 +29,13 @@
 
 namespace k2eg::controller::node::worker::snapshot {
 #pragma region Types
+
+struct RepeatingSnaptshotConfiguration
+{
+    // the cron stirng for schedule the monitor
+    size_t snapshot_processing_thread_count = 1;
+};
+DEFINE_PTR_TYPES(RepeatingSnaptshotConfiguration)
 
 /*
     @brief Repeating snapshot message header
@@ -247,6 +254,7 @@ Data is published se sequentially on publisher identifyed by name and iteration 
 */
 class ContinuousSnapshotManager
 {
+    const RepeatingSnaptshotConfiguration& repeating_snapshot_configuration;
     // define the run flag
     std::atomic<bool> run_flag = false;
     // local logger shared instances
@@ -291,7 +299,7 @@ class ContinuousSnapshotManager
     void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
 
 public:
-    ContinuousSnapshotManager(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
+    ContinuousSnapshotManager(const RepeatingSnaptshotConfiguration& repeating_snapshot_configuration, k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     ~ContinuousSnapshotManager();
     void        submitSnapshot(k2eg::controller::command::cmd::ConstCommandShrdPtr snapsthot_command);
     std::size_t getRunningSnapshotCount() const;

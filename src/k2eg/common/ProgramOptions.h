@@ -52,6 +52,9 @@ static const char* const MONITOR_WORKER_SCHEDULE_CRON_CONFIGURATION = "monitor-w
 static const char* const SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS = "scheduler-check-delay-seconds";
 static const char* const SCHEDULER_THREAD_NUMBER = "scheduler-thread-number";
 
+// snapshot command configuration
+static const char* const SNAPSHOT_REPEATING_SCHEDULER_THREAD = "snapshot-repeating-scheduler-thread";
+
 static const char* const METRIC_ENABLE = "metric-enable";
 static const char* const METRIC_HTTP_PORT = "metric-server-http-port";
 

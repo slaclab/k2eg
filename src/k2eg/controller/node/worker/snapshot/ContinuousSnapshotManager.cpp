@@ -45,11 +45,12 @@ void set_snapshot_thread_name(const std::size_t idx)
     const bool        result = BS::this_thread::set_os_thread_name(name);
 }
 
-ContinuousSnapshotManager::ContinuousSnapshotManager(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager)
-    : logger(ServiceResolver<ILogger>::resolve())
+ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnaptshotConfiguration& repeating_snapshot_configuration, k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager)
+    : repeating_snapshot_configuration(repeating_snapshot_configuration)
+    , logger(ServiceResolver<ILogger>::resolve())
     , publisher(ServiceResolver<IPublisher>::resolve())
     , epics_service_manager(epics_service_manager)
-    , thread_pool(std::make_shared<BS::light_thread_pool>(1, set_snapshot_thread_name))
+    , thread_pool(std::make_shared<BS::light_thread_pool>(repeating_snapshot_configuration.snapshot_processing_thread_count, set_snapshot_thread_name))
     , metrics(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric())
 {
     // add epics manager monitor handler

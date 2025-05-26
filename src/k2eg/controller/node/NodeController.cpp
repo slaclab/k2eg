@@ -51,7 +51,7 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
     worker_resolver.registerObjectInstance(CommandType::get, std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
     worker_resolver.registerObjectInstance(CommandType::put, std::make_shared<PutCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
 
-    auto snapshotCommandWorker = std::make_shared<SnapshotCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve());
+    auto snapshotCommandWorker = std::make_shared<SnapshotCommandWorker>(this->node_controller_configuration->snapshot_command_configuration,ServiceResolver<EpicsServiceManager>::resolve());
     if (!snapshotCommandWorker) {
         throw std::runtime_error("Failed to create SnapshotCommandWorker");
     }

@@ -14,6 +14,7 @@
 #include <k2eg/controller/command/CMDCommand.h>
 #include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/controller/node/worker/MonitorCommandWorker.h>
+#include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 #include <k2eg/controller/node/configuration/NodeConfiguration.h>
 
 #include <memory>
@@ -24,6 +25,7 @@ struct NodeControllerConfiguration
 {
     // monitor configuration
     worker::monitor::MonitorCommandConfiguration monitor_command_configuration;
+    worker::SnapshotCommandConfiguration snapshot_command_configuration;
 };
 DEFINE_PTR_TYPES(NodeControllerConfiguration)
 

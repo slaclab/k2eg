@@ -17,6 +17,13 @@
 
 namespace k2eg::controller::node::worker {
 
+struct SnapshotCommandConfiguration
+{
+    // the cron stirng for schedule the monitor
+    snapshot::RepeatingSnaptshotConfiguration continuous_snapshot_configuration;
+};
+DEFINE_PTR_TYPES(SnapshotCommandConfiguration)
+
 /*
 Snapshot reply message
 */
@@ -179,6 +186,7 @@ DEFINE_PTR_TYPES(SnapshotOpInfo)
  */
 class SnapshotCommandWorker : public CommandWorker
 {
+    const SnapshotCommandConfiguration&                   snapshot_command_configuration;
     k2eg::service::log::ILoggerShrdPtr                    logger;
     k2eg::service::pubsub::IPublisherShrdPtr              publisher;
     k2eg::service::metric::IEpicsMetric&                  metric;
@@ -207,7 +215,7 @@ class SnapshotCommandWorker : public CommandWorker
     void submitSingleSnapshot(std::shared_ptr<BS::light_thread_pool> command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 
 public:
-    SnapshotCommandWorker(k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
+    SnapshotCommandWorker(const SnapshotCommandConfiguration& snapshot_command_configuration, k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     virtual ~SnapshotCommandWorker();
     // process the command
     void processCommand(std::shared_ptr<BS::light_thread_pool> thread_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
