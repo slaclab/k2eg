@@ -1,6 +1,6 @@
+#include <k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.h>
 #include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
 #include <k2eg/service/epics/EpicsData.h>
-#include <k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.h>
 
 using namespace k2eg::controller::node::worker::snapshot;
 using namespace k2eg::controller::command::cmd;
@@ -25,16 +25,23 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout()
     {
         // swap thwe buffers so the getData can workw without
         // blocking the addData
+        swapping.store(true, std::memory_order_release);
         std::lock_guard<std::mutex> lock(buffer_mutex);
         std::swap(acquiring_buffer, processing_buffer);
+        swapping.store(false, std::memory_order_release);
     }
     return is_timeout;
 }
 
 void BackTimedBufferedSnapshotOpInfo::addData(MonitorEventShrdPtr event_data)
 {
-    std::lock_guard<std::mutex> lock(buffer_mutex);
-    // add to the bufer
+    // If a swap is in progress, wait for it to finish by locking the mutex
+    if (swapping.load(std::memory_order_acquire))
+    {
+        std::lock_guard<std::mutex> lock(buffer_mutex);
+        // After lock, swap is complete, proceed to push
+    }
+    // Add to the acquiring buffer
     acquiring_buffer->push(event_data, steady_clock::now());
 }
 

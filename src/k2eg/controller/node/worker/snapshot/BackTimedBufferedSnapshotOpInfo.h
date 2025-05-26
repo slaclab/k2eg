@@ -5,6 +5,8 @@
 #include <k2eg/common/types.h>
 #include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
 
+#include <atomic>
+
 namespace k2eg::controller::node::worker::snapshot {
 
 using MonitoEventBacktimeBuffer = k2eg::common::TimeWindowEventBuffer<k2eg::service::epics_impl::MonitorEvent>;
@@ -14,28 +16,35 @@ DEFINE_PTR_TYPES(MonitoEventBacktimeBuffer)
 @brief Double-buffered back-timed snapshot operation for EPICS PV monitoring.
 
 @details
-BackTimedBufferedSnapshotOpInfo implements a double-buffered, time-windowed event buffer for repeating snapshot operations in EPICS-based control systems.
+BackTimedBufferedSnapshotOpInfo implements a double-buffered, time-windowed event buffer for repeating snapshot
+operations in EPICS-based control systems.
 
 **Purpose:**
-This class enables efficient and lossless collection of Process Variable (PV) events over a configurable time window, supporting both periodic and triggered snapshot modes. 
-It is designed to ensure that data acquisition never stops, even while a snapshot is being processed and published.
+This class enables efficient and lossless collection of Process Variable (PV) events over a configurable time window,
+supporting both periodic and triggered snapshot modes. It is designed to ensure that data acquisition never stops, even
+while a snapshot is being processed and published.
 
 **How it works:**
 
-- **Double Buffering:**  
-  Two internal buffers are maintained: one for acquiring new events (`acquiring_buffer`) and one for processing/publishing (`processing_buffer`).  
+- **Double Buffering:**
+  Two internal buffers are maintained: one for acquiring new events (`acquiring_buffer`) and one for
+processing/publishing (`processing_buffer`).
   - All incoming PV events are pushed into the acquiring buffer.
-  - When a snapshot is triggered (either by timeout or manual trigger), the buffers are swapped under a mutex lock.  
-  - The processing buffer is then used to fetch and publish the snapshot data, while the acquiring buffer immediately resumes collecting new events.
+  - When a snapshot is triggered (either by timeout or manual trigger), the buffers are swapped under a mutex lock.
+  - The processing buffer is then used to fetch and publish the snapshot data, while the acquiring buffer immediately
+resumes collecting new events.
 
-- **Time Window:**  
-  Each buffer only retains events within a configurable time window (e.g., the last N milliseconds). This ensures that snapshots always contain recent data, and old data is automatically pruned.
+- **Time Window:**
+  Each buffer only retains events within a configurable time window (e.g., the last N milliseconds). This ensures that
+snapshots always contain recent data, and old data is automatically pruned.
 
-- **Thread Safety:**  
-  All buffer operations and swaps are protected by a mutex to ensure thread safety between data acquisition and snapshot processing.
+- **Thread Safety:**
+  All buffer operations and swaps are protected by a mutex to ensure thread safety between data acquisition and snapshot
+processing.
 
-- **Field Filtering:**  
-  When fetching data for a snapshot, the class can filter PV fields(using cmd->pv_field_filter_list), returning only the specified fields if requested.
+- **Field Filtering:**
+  When fetching data for a snapshot, the class can filter PV fields(using cmd->pv_field_filter_list), returning only the
+specified fields if requested.
 
 **Benefits:**
 - No data loss during snapshot processing.
@@ -46,6 +55,7 @@ It is designed to ensure that data acquisition never stops, even while a snapsho
 class BackTimedBufferedSnapshotOpInfo : public SnapshotOpInfo
 {
     // define when the snapshot is acquiring data
+    std::atomic<bool>             swapping;
     std::mutex                    buffer_mutex;
     MonitoEventBacktimeBufferUPtr acquiring_buffer;
     MonitoEventBacktimeBufferUPtr processing_buffer;
