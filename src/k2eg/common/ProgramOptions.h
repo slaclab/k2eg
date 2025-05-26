@@ -41,6 +41,8 @@ static const char* const NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT = "nc-purge-queue-on
 
 static const char* const PUB_SERVER_ADDRESS = "pub-server-address";
 static const char* const PUB_IMPL_KV = "pub-impl-kv";
+static const char* const PUB_GROUP_ID = "pub-group-id";
+static const char* const PUB_FLUSH_TIMEOUT_MS = "pub-flush-trimeout-ms";
 
 static const char* const SUB_SERVER_ADDRESS = "sub-server-address";
 static const char* const SUB_GROUP_ID = "sub-group-id";

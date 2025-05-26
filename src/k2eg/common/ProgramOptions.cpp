@@ -62,6 +62,7 @@ ProgramOptions::ProgramOptions() {
       (CONFIGURATION_SERVICE_RESET_ON_START, po::value<bool>(), "Reset the node at startup, as a new node")
       (PUB_SERVER_ADDRESS, po::value<std::string>(), "Publisher server address")
       (PUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for publisher implementation driver")
+      (PUB_FLUSH_TIMEOUT_MS, po::value<size_t>()->default_value(500), "Default flush timeout in milliseconds for publisher")
       (SUB_SERVER_ADDRESS, po::value<std::string>(), "Subscriber server address")
       (SUB_GROUP_ID, po::value<std::string>()->default_value("k2eg-default-group"), "Subscriber group id")
       (SUB_IMPL_KV, po::value<std::vector<std::string>>(), "The key:value list for subscriber implementation driver")
@@ -194,7 +195,10 @@ ConstNodeControllerConfigurationUPtr ProgramOptions::getNodeControllerConfigurat
 
 ConstPublisherConfigurationUPtr
 ProgramOptions::getPublisherConfiguration() {
-        return std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = GET_OPTION(PUB_SERVER_ADDRESS, std::string, ""), .custom_impl_parameter = parseKVCustomParam(GET_OPTION(PUB_IMPL_KV, std::vector<std::string>, std::vector<std::string>()))});
+        return std::make_unique<const PublisherConfiguration>(PublisherConfiguration{
+            .server_address = GET_OPTION(PUB_SERVER_ADDRESS, std::string, ""), 
+            .flush_timeout_ms = GET_OPTION(PUB_FLUSH_TIMEOUT_MS, size_t, 500),
+            .custom_impl_parameter = parseKVCustomParam(GET_OPTION(PUB_IMPL_KV, std::vector<std::string>, std::vector<std::string>()))});
 }
 
 ConstSubscriberConfigurationUPtr

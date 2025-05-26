@@ -17,6 +17,8 @@ namespace k2eg::service::pubsub {
 struct PublisherConfiguration {
     // publsher broker address
     std::string server_address;
+    // default flush timeout in milliseconds
+    size_t flush_timeout_ms = 500;
     // custom k/v string map for implementation paramter
     k2eg::common::MapStrKV custom_impl_parameter;
 };

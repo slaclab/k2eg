@@ -1,3 +1,6 @@
+#include <k2eg/common/utility.h>
+
+#include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/pubsub/impl/kafka/RDKafkaPublisher.h>
 
@@ -9,6 +12,8 @@
 #include <iostream>
 #include <memory>
 #include <string>
+
+using namespace k2eg::service::log;
 
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
@@ -42,6 +47,7 @@ void RDKafkaPublisher::dr_cb(RdKafka::Message& message)
     case RdKafka::Message::MSG_STATUS_NOT_PERSISTED:
         if (cb_handler)
             cb_handler(OnError, message_managed.get(), message.errstr());
+        logger->logMessage(STRING_FORMAT("Message not persisted: %1%", message.errstr()), LogLevel::ERROR);
         break;
     case RdKafka::Message::MSG_STATUS_POSSIBLY_PERSISTED:
         if (cb_handler)
@@ -57,12 +63,16 @@ void RDKafkaPublisher::dr_cb(RdKafka::Message& message)
 
 void RDKafkaPublisher::init()
 {
+    // fetch logger
+    logger = ServiceResolver<k2eg::service::log::ILogger>::resolve();
+    if (!logger)
+    {
+        throw std::runtime_error("Logger service is not initialized");
+    }
     std::string errstr;
-    // RDK_CONF_SET(conf, "debug", "cgrp,topic,fetch,protocol", RDK_PUB_ERR_)
+    logger->logMessage(STRING_FORMAT("Initializing RDKafkaPublisher with server address: %1% ",configuration->server_address), LogLevel::INFO);
     RDK_CONF_SET(conf, "bootstrap.servers", configuration->server_address.c_str())
     RDK_CONF_SET(conf, "compression.type", "snappy")
-    // RDK_CONF_SET(conf, "linger.ms", "5")
-    // RDK_CONF_SET(conf, "batch.size", "1048576")
 
     RDK_CONF_SET(conf, "dr_cb", this);
 
@@ -75,12 +85,13 @@ void RDKafkaPublisher::init()
     producer.reset(RdKafka::Producer::create(conf.get(), errstr));
     if (!producer)
     {
-        // RDK_PUB_ERR_ << "Failed to create producer: " << errstr << std::endl;
+        logger->logMessage(STRING_FORMAT("Error creating kafka producer: %1%", errstr), LogLevel::FATAL);
         throw std::runtime_error("Error creating kafka producer (" + errstr + ")");
     }
     // start polling thread
     if (_auto_poll)
     {
+        logger->logMessage("Starting auto poll thread for RDKafkaPublisher", LogLevel::INFO);
         auto_poll_thread = std::thread(&RDKafkaPublisher::autoPoll, this);
     }
 }
@@ -89,10 +100,11 @@ void RDKafkaPublisher::autoPoll()
 {
     while (!this->_stop_inner_thread)
     {
-        if (producer && producer->outq_len() > 0)
+        if (producer->outq_len() > 0)
         {
             // If there are messages, poll immediately (no sleep)
-            flush(0);
+            logger->logMessage(STRING_FORMAT("Auto polling RDKafkaPublisher queue size: %1%", producer->outq_len()), LogLevel::DEBUG);
+            flush(configuration->flush_timeout_ms);
         }
         else
         {
@@ -104,6 +116,7 @@ void RDKafkaPublisher::autoPoll()
 
 void RDKafkaPublisher::deinit()
 {
+    logger->logMessage("Deinitializing RDKafkaPublisher", LogLevel::INFO);
     int retry = 100;
     while (producer->outq_len() > 0 && retry > 0)
     {
@@ -115,15 +128,12 @@ void RDKafkaPublisher::deinit()
         _stop_inner_thread = true;
         auto_poll_thread.join();
     }
+    logger->logMessage("RDKafkaPublisher deinitialized", LogLevel::INFO);
 }
 
 int RDKafkaPublisher::flush(const int timeo)
 {
-    // int retry = 3;
-    //  RDK_PUB_DBG_ << "Flushing... ";
-    // while (producer->outq_len() > 0 && retry>0) { producer->poll(timeo); retry--;}
     producer->poll(timeo);
-    // RDK_PUB_DBG_ << "Flushing...done ";
     return 0;
 }
 
@@ -239,12 +249,12 @@ int RDKafkaPublisher::deleteQueue(const std::string& queue_name)
 
     if (err = rd_kafka_AdminOptions_set_request_timeout(admin_options.get(), tmout, errstr, sizeof(errstr)); err != RD_KAFKA_RESP_ERR_NO_ERROR)
     {
-        throw std::runtime_error("Error creating kafka option reqeust timeout (" + std::string(errstr) + ")");
+        throw std::runtime_error("Error creating kafka option request timeout (" + std::string(errstr) + ")");
     }
 
     if (err = rd_kafka_AdminOptions_set_operation_timeout(admin_options.get(), tmout - 5000, errstr, sizeof(errstr)); err != RD_KAFKA_RESP_ERR_NO_ERROR)
     {
-        throw std::runtime_error("Error creating kafka option reqeust timeout (" + std::string(errstr) + ")");
+        throw std::runtime_error("Error creating kafka option request timeout (" + std::string(errstr) + ")");
     }
 
     // allocate queue
@@ -420,7 +430,7 @@ int RDKafkaPublisher::pushMessage(PublishMessageUniquePtr message, const std::ma
                              msg_ptr);
     if (resp != RdKafka::ERR_NO_ERROR)
     {
-        std::cerr << RdKafka::err2str(resp) << std::endl;
+        logger->logMessage(STRING_FORMAT("Error producing message: %1% (%2%)", RdKafka::err2str(resp) % msg_ptr->getQueue()), LogLevel::ERROR);
         /* Headers are automatically deleted on produce() success. */
         delete kafka_headers;
         delete msg_ptr;

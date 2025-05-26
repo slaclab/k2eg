@@ -403,7 +403,7 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
                         if (it->second == snapshot_command_info)
                         {
                             logger->logMessage(
-                                STRING_FORMAT("Snapshot '%1%' is removed from PV mapa %2%", snapshot_command_info->cmd->snapshot_name % s_pv), LogLevel::INFO);
+                                STRING_FORMAT("Snapshot '%1%' is removed from PV map %2%", snapshot_command_info->cmd->snapshot_name % s_pv->name), LogLevel::INFO);
                             pv_snapshot_map_.erase(it);
                             break;
                         }
