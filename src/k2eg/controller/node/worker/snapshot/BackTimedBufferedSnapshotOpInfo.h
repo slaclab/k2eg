@@ -55,8 +55,7 @@ specified fields if requested.
 class BackTimedBufferedSnapshotOpInfo : public SnapshotOpInfo
 {
     // define when the snapshot is acquiring data
-    std::atomic<bool>             swapping;
-    std::mutex                    buffer_mutex;
+    mutable std::shared_mutex     buffer_mutex;
     MonitoEventBacktimeBufferUPtr acquiring_buffer;
     MonitoEventBacktimeBufferUPtr processing_buffer;
 

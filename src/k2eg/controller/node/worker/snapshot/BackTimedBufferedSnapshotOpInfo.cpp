@@ -24,40 +24,30 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout()
     if (is_timeout)
     {
         // swap thwe buffers so the getData can workw without
-        // blocking the addData
-        swapping.store(true, std::memory_order_release);
-        std::lock_guard<std::mutex> lock(buffer_mutex);
+        std::unique_lock<std::shared_mutex> lock(buffer_mutex);
         std::swap(acquiring_buffer, processing_buffer);
-        swapping.store(false, std::memory_order_release);
     }
     return is_timeout;
 }
 
 void BackTimedBufferedSnapshotOpInfo::addData(MonitorEventShrdPtr event_data)
 {
-    // If a swap is in progress, wait for it to finish by locking the mutex
-    if (swapping.load(std::memory_order_acquire))
-    {
-        std::lock_guard<std::mutex> lock(buffer_mutex);
-        // After lock, swap is complete, proceed to push
-    }
+    std::shared_lock<std::shared_mutex> lock(buffer_mutex);
     // Add to the acquiring buffer
     acquiring_buffer->push(event_data, steady_clock::now());
 }
 
 std::vector<MonitorEventShrdPtr> BackTimedBufferedSnapshotOpInfo::getData()
 {
-    std::vector<MonitorEventShrdPtr> result;
-    std::lock_guard<std::mutex>      lock(buffer_mutex);
-
+    std::shared_lock<std::shared_mutex> lock(buffer_mutex);
     if (this->cmd->pv_field_filter_list.size() == 0)
     {
-        result = processing_buffer->fetchWindow();
+        return processing_buffer->fetchWindow();
     }
     else
     {
         // we need to filterout unneeded fileds
-        result = processing_buffer->fetchWindow<MonitorEventShrdPtr>(
+        return  processing_buffer->fetchWindow<MonitorEventShrdPtr>(
             [this](auto ev) -> std::optional<MonitorEventShrdPtr>
             {
                 return std::make_optional(MakeMonitorEventShrdPtr(
@@ -65,5 +55,4 @@ std::vector<MonitorEventShrdPtr> BackTimedBufferedSnapshotOpInfo::getData()
                     ChannelData{ev->channel_data.pv_name, filterPVField(ev->channel_data.data, this->cmd->pv_field_filter_list)}));
             });
     }
-    return result;
 }
