@@ -19,12 +19,13 @@ using namespace k2eg::service::metric;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::epics_impl;
 
-SnapshotCommandWorker::SnapshotCommandWorker(EpicsServiceManagerShrdPtr epics_service_manager)
-    : logger(ServiceResolver<ILogger>::resolve())
+SnapshotCommandWorker::SnapshotCommandWorker(const SnapshotCommandConfiguration& snapshot_command_configuration, EpicsServiceManagerShrdPtr epics_service_manager)
+    : snapshot_command_configuration(std::move(snapshot_command_configuration))
+    , logger(ServiceResolver<ILogger>::resolve())
     , publisher(ServiceResolver<IPublisher>::resolve())
     , metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric())
     , epics_service_manager(epics_service_manager)
-    , continuous_snapshot_manager(epics_service_manager)
+    , continuous_snapshot_manager(this->snapshot_command_configuration.continuous_snapshot_configuration, epics_service_manager)
 {
     publisher->setCallBackForReqType("get-reply-message", std::bind(&SnapshotCommandWorker::publishEvtCB, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 }

@@ -25,6 +25,64 @@ struct SnapshotCommand : public Command
 };
 DEFINE_PTR_TYPES(SnapshotCommand)
 
+enum class SnapshotType
+{
+    unknown,
+    // is the default type, that represent a snapshot that when is triggered (automatically or manually)
+    // will be publish the last arrived data fropm all pvs
+    NORMAL,
+    // When triggered, publishes all values received from all PVs within the time window before the trigger.
+    TIMED_BUFFERED
+};
+
+constexpr const char* snapshot_type_to_string(SnapshotType t) noexcept
+{
+    switch (t)
+    {
+    case SnapshotType::NORMAL: return "Normal";
+    case SnapshotType::TIMED_BUFFERED: return "TimedBuffered";
+    case SnapshotType::unknown: return "Unknown";
+    }
+    return "Unknown";
+}
+
+constexpr SnapshotType snapshot_type_from_string(const char* st) noexcept
+{
+    if (st == nullptr)
+        return SnapshotType::unknown;
+
+    // Compare case-insensitively
+    auto iequals = [](const char* a, const char* b)
+    {
+        while (*a && *b)
+        {
+            if (std::tolower(static_cast<unsigned char>(*a)) != std::tolower(static_cast<unsigned char>(*b)))
+                return false;
+            ++a;
+            ++b;
+        }
+        return *a == *b;
+    };
+
+    if (iequals(st, "normal"))
+        return SnapshotType::NORMAL;
+    if (iequals(st, "timedbuffered"))
+        return SnapshotType::TIMED_BUFFERED;
+    if (iequals(st, "unknown"))
+        return SnapshotType::unknown;
+    return SnapshotType::unknown;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const SnapshotType& type)
+{
+    return os << snapshot_type_to_string(type);
+}
+
+static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, SnapshotType const& cfg)
+{
+    jv = {{"type", snapshot_type_to_string(cfg)}};
+}
+
 /*
 @brief Perform a repeating napshot of the current state of specific PV with determianted parameters
 {
@@ -53,6 +111,10 @@ struct RepeatingSnapshotCommand : public Command
     // if false the snapshot is triggered by the repeating snapshot
     // the default is false
     bool triggered;
+    // define the type of snapshot
+    SnapshotType type = SnapshotType::NORMAL;
+    // the fields to include in the snapshot for each pv data
+    std::unordered_set<std::string> pv_field_filter_list = {};
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotCommand)
 
@@ -127,7 +189,8 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Repe
       {"pv_name_list", std::move(pv_array)}, 
       {"repeat_delay_msec", c.repeat_delay_msec}, 
       {"time_window_msec", c.time_window_msec},
-      {"triggered", c.triggered}
+      {"triggered", c.triggered},
+      {"type", snapshot_type_to_string(c.type)},
     };
 }
 

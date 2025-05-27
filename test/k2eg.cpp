@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <k2eg/k2eg.h>
 #include <k2eg/common/ProgramOptions.h>
+#include <k2eg/common/uuid.h>
 #include <k2eg/service/pubsub/pubsub.h>
 
 #include <chrono>
@@ -8,6 +9,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <unistd.h>
 
 #include "pubsub/common.h"
 
@@ -104,6 +106,8 @@ TEST(k2egateway, CommandSubmission)
     setenv(std::string("EPICS_k2eg_").append(CMD_INPUT_TOPIC).c_str(), TEST_TOPIC_IN, 1);
     setenv(std::string("EPICS_k2eg_").append(PUB_SERVER_ADDRESS).c_str(), "kafka:9092", 1);
     setenv(std::string("EPICS_k2eg_").append(SUB_SERVER_ADDRESS).c_str(), "kafka:9092", 1);
+    // set random group
+    setenv(std::string("EPICS_k2eg_").append(SUB_GROUP_ID).c_str(), common::UUID::generateUUIDLite().c_str(), 1);
     setenv(std::string("EPICS_k2eg_").append(STORAGE_PATH).c_str(), storage_db_file.c_str(), 1);
     setenv(std::string("EPICS_k2eg_").append(METRIC_HTTP_PORT).c_str(), "8081", 1);
     setenv(std::string("EPICS_k2eg_").append(CONFIGURATION_SERVICE_HOST).c_str(), "consul", 1);
@@ -148,6 +152,7 @@ TEST(k2egateway, CommandSubmission)
           .retention_size = 1024*2
         }
       ), 0);
+      sleep(5);
       auto iotaFuture = std::async(
           std::launch::async,
           [&get_json_obj](std::unique_ptr<IPublisher> producer) {

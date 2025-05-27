@@ -41,6 +41,8 @@ static const char* const NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT = "nc-purge-queue-on
 
 static const char* const PUB_SERVER_ADDRESS = "pub-server-address";
 static const char* const PUB_IMPL_KV = "pub-impl-kv";
+static const char* const PUB_GROUP_ID = "pub-group-id";
+static const char* const PUB_FLUSH_TIMEOUT_MS = "pub-flush-trimeout-ms";
 
 static const char* const SUB_SERVER_ADDRESS = "sub-server-address";
 static const char* const SUB_GROUP_ID = "sub-group-id";
@@ -51,6 +53,9 @@ static const char* const STORAGE_PATH = "storage-path";
 static const char* const MONITOR_WORKER_SCHEDULE_CRON_CONFIGURATION = "monitor-worker-cron-schedule";
 static const char* const SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS = "scheduler-check-delay-seconds";
 static const char* const SCHEDULER_THREAD_NUMBER = "scheduler-thread-number";
+
+// snapshot command configuration
+static const char* const SNAPSHOT_REPEATING_SCHEDULER_THREAD = "snapshot-repeating-scheduler-thread";
 
 static const char* const METRIC_ENABLE = "metric-enable";
 static const char* const METRIC_HTTP_PORT = "metric-server-http-port";

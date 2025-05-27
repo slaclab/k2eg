@@ -577,6 +577,10 @@ inline msgpack::unpacked exstractMsgpackObjectAtIndex(
      msgpack::unpacked result = msgpack::unpacked();
     for (int idx = 0; idx < messages.size(); idx++)
     {
+        if(messages[idx] == nullptr)
+        {
+            continue;
+        }
         if (messages[idx]->getQueue().compare(published_on_topic) != 0)
             continue;
         if (curerent_idx++ != message_idx)

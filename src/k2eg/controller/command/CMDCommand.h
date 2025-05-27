@@ -44,6 +44,7 @@ static const std::string to_json_string(cmd::ConstCommandShrdPtr c)
     case cmd::CommandType::snapshot: return BOOST_JSON_TO_STRIN(cmd::SnapshotCommand, c);
     case cmd::CommandType::repeating_snapshot: return BOOST_JSON_TO_STRIN(cmd::RepeatingSnapshotCommand, c);
     case cmd::CommandType::repeating_snapshot_stop: return BOOST_JSON_TO_STRIN(cmd::RepeatingSnapshotStopCommand, c);
+    case cmd::CommandType::repeating_snapshot_trigger: return BOOST_JSON_TO_STRIN(cmd::RepeatingSnapshotTriggerCommand, c);
     case cmd::CommandType::unknown: return "Unknown";
     }
     return "Unknown";

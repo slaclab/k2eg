@@ -162,6 +162,7 @@ TEST(ProgramOptions, NodeControllerConfiguration) {
     EXPECT_EQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.purge_queue_on_monitor_timeout, false);
     EXPECT_EQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.filter_out_regex.size(), 1);
     EXPECT_STREQ(node_controller_configuration->monitor_command_configuration.monitor_checker_configuration.filter_out_regex[0].c_str(), "regex1");
+    EXPECT_EQ(node_controller_configuration->snapshot_command_configuration.continuous_snapshot_configuration.snapshot_processing_thread_count, 1);
 }
 
 TEST(ProgramOptions, EpicsManagerConfiguration) {
