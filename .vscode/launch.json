@@ -25,7 +25,9 @@
                 "--nc-purge-queue-on-exp-timeout=true",
                 // "--pub-impl-kv=debug:topic,msg,queue",
                 "--pub-impl-kv=linger.ms:1",
-                "--pub-impl-kv=batch.size:1048576"
+                // "--pub-impl-kv=queue.buffering.max.ms:1",
+                "--sub-impl-kv=session.timeout.ms:6000",
+                "--sub-impl-kv=max.poll.interval.ms:10000",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

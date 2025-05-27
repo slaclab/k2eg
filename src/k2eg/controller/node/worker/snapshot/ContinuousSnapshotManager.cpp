@@ -228,11 +228,14 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     publisher->createQueue(QueueDescription{
         .name = s_op_ptr->queue_name,
         .paritions = 3,
-        .replicas = 1, // put default to 1 need to be calculated with more compelx logic for higher values
+        .replicas = 1, // put default to 1 need to be calculated with more complex logic for higher values
         .retention_time = 1000 * 60 * 60,
         .retention_size = 1024 * 1024 * 50,
     });
 
+    // read metadata to fast the get of topic information
+    auto topic_info = publisher->getQueueMetadata(s_op_ptr->queue_name);
+    logger->logMessage(STRING_FORMAT("Topic '%1%' metadata => subscriber number:%2%", s_op_ptr->queue_name%topic_info->subscriber_groups.size()), LogLevel::DEBUG);
     // we got no faulty during the cache preparation
     // so we can start the snapshot
     // add the snapshot to the stopped snapshot list and to the pv list
@@ -419,6 +422,9 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
             return;
         }
 
+        logger->logMessage(STRING_FORMAT("Snapshot %1% is will be triggered", snapshot_command_info->queue_name), LogLevel::INFO);
+        // get data from snapshot command info
+        auto snapshot_events = snapshot_command_info->getData();
         // increment the iteration index
         snapshot_command_info->snapshot_iteration_index++;
         // get timestamp for the snapshot in unix time and utc
@@ -434,17 +440,8 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
                                    {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
         }
 
-        // snapshot event vector contains the data from all pv
-        // and the smart poiner are no more changed so we can push safetely
-        // and we have all non null pointer here
-        int elementsIndex = 0;
-        // get data from snapshot command info
-        auto snapshot_events = snapshot_command_info->getData();
         for (auto& event : snapshot_events)
         {
-            logger->logMessage(STRING_FORMAT("PV '%1%' ready to be submitted with snapshot %2%",
-                                             event->channel_data.pv_name % snapshot_command_info->cmd->snapshot_name),
-                               LogLevel::DEBUG);
             auto serialized_message = serialize(RepeatingSnaptshotData{1, snap_ts, snapshot_command_info->snapshot_iteration_index,
                                                                        MakeChannelDataShrdPtr(event->channel_data)},
                                                 snapshot_command_info->cmd->serialization);
