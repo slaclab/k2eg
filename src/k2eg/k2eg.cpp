@@ -94,7 +94,7 @@ int K2EGateway::setup(int argc, const char* argv[])
         logger->logMessage("Stop node controller");
         node_controller.reset();
         logger->logMessage("Stop subscriber service");
-        ServiceResolver<ISubscriber>::resolve().reset();
+        ServiceResolver<ISubscriber>::reset();
         logger->logMessage("Stop publihser service");
         ServiceResolver<IPublisher>::resolve().reset();
         logger->logMessage("Stop EPICS service");
