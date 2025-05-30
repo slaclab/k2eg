@@ -1,23 +1,30 @@
-#include <k2eg/common/ThrottlingManager.h>
 #include <k2eg/common/BS_thread_pool.hpp>
+#include <k2eg/common/ThrottlingManager.h>
 #include <k2eg/common/utility.h>
 
+#include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
 #include <k2eg/service/epics/EpicsPutOperation.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 
-#include <mutex>
-#include <regex>
-#include <ranges>
-#include <memory>
 #include <cstddef>
+#include <execution>
+#include <memory>
+#include <mutex>
+#include <ranges>
+#include <regex>
 
 using namespace k2eg::common;
+
+using namespace k2eg::service::scheduler;
 using namespace k2eg::service::epics_impl;
+using namespace k2eg::service::metric;
 
 #define SELECT_PROVIDER(p) (p.find("pva") == 0 ? *pva_provider : *ca_provider)
+#define EPICS_MANAGER_STAT_TASK_NAME "epics-manager-stat-task"
+#define EPICS_MANAGER_STAT_TASK_CRON "* * * * * *"
 
 void set_thread_name(const std::size_t idx)
 {
@@ -30,13 +37,22 @@ EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr conf
     , end_processing(false)
     , thread_throttling_vector(this->config->thread_count)
     , processing_pool(std::make_shared<BS::light_thread_pool>(this->config->thread_count, set_thread_name))
+    , metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric())
 {
     pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
     ca_provider = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
+    auto statistic_task = MakeTaskShrdPtr(EPICS_MANAGER_STAT_TASK_NAME, // name of the task
+                                          EPICS_MANAGER_STAT_TASK_CRON, // cron expression
+                                          std::bind(&EpicsServiceManager::handleStatistic, this, std::placeholders::_1), // task handler
+                                          -1 // start at application boot time
+    );
+    ServiceResolver<Scheduler>::resolve()->addTask(statistic_task);
 }
 
 EpicsServiceManager::~EpicsServiceManager()
 {
+    // stop the statistic
+    bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(EPICS_MANAGER_STAT_TASK_NAME);
     // Stop processing monitor tasks and wait for scheduled tasks to finish.
     end_processing = true;
     processing_pool->wait();
@@ -206,10 +222,12 @@ ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_
     }
     if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
     {
-       // allocate channel and return data
-    result = channel_map[sanitized_pv->name].channel->put(sanitized_pv->field, value);
-    } else{
-         auto channel = ChannelMapElement{
+        // allocate channel and return data
+        result = channel_map[sanitized_pv->name].channel->put(sanitized_pv->field, value);
+    }
+    else
+    {
+        auto channel = ChannelMapElement{
             .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
             .to_force = false,
             .keep_alive = 0,
@@ -316,8 +334,18 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
             monitor_op->poll();
             if (monitor_op->hasEvents() && !handler_broadcaster.targets.empty())
             {
-                handler_broadcaster.broadcast(monitor_op->getEventData());
+                auto received_event = monitor_op->getEventData();
                 had_events = true;
+                // check if the channel is active or not
+                info->active = received_event->event_data->empty() &&
+                               (!received_event->event_cancel->empty() || !received_event->event_disconnect->empty() ||
+                                !received_event->event_fail->empty());
+                metric.incrementCounter(IEpicsMetricCounterType::MonitorData, received_event->event_data->size());
+                metric.incrementCounter(IEpicsMetricCounterType::MonitorCancel, received_event->event_cancel->size());
+                metric.incrementCounter(IEpicsMetricCounterType::MonitorDisconnect, received_event->event_disconnect->size());
+                metric.incrementCounter(IEpicsMetricCounterType::MonitorFail, received_event->event_fail->size());
+                // broadcast to handlers
+                handler_broadcaster.broadcast(received_event);
             }
         }
     }
@@ -337,11 +365,36 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
 
     // manqage throtling
     throttling.update(had_events);
-    
+
     // resubmit the task to the thread pool
     processing_pool->detach_task(
         [this, monitor_op]
         {
             this->task(monitor_op);
         });
+}
+
+void EpicsServiceManager::handleStatistic(TaskProperties& task_properties)
+{
+    ReadLockCM read_lock(channel_map_mutex);
+    int        active_pv = std::count_if(std::execution::par, channel_map.begin(), channel_map.end(),
+                                         [](const auto& pair)
+                                         {
+                                      return pair.second.active == true;
+                                  });
+
+    metric.incrementCounter(IEpicsMetricCounterType::ActiveMonitor, active_pv);
+    metric.incrementCounter(IEpicsMetricCounterType::TotalMonitor, channel_map.size());
+
+    auto& thread_throttling_vector = getThreadThrottlingInfo();
+    for (std::size_t i = 0; i < thread_throttling_vector.size(); ++i)
+    {
+        const auto& throttling = thread_throttling_vector[i];
+        std::string thread_id = std::to_string(i);
+        auto        t_stat = throttling.getStats();
+        metric.incrementCounter(IEpicsMetricCounterType::ThrottlingIdleCounter, t_stat.idle_counter, {{"thread_id", thread_id}});
+        metric.incrementCounter(IEpicsMetricCounterType::ThrottlingEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
+        metric.incrementCounter(IEpicsMetricCounterType::ThrottlingDurationCounter, t_stat.total_idle_cycles, {{"thread_id", thread_id}});
+        metric.incrementCounter(IEpicsMetricCounterType::ThrottleGauge, t_stat.throttle_ms, {{"thread_id", thread_id}});
+    }
 }

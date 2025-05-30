@@ -3,7 +3,7 @@
 
 #include "k2eg/service/epics/EpicsData.h"
 #include "k2eg/service/metric/INodeControllerMetric.h"
-#include <cstddef>
+
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/ThrottlingManager.h>
 #include <k2eg/common/types.h>
@@ -25,6 +25,7 @@
 #include <memory>
 #include <shared_mutex>
 #include <string>
+#include <cstddef>
 #include <unordered_map>
 
 namespace k2eg::controller::node::worker::snapshot {
