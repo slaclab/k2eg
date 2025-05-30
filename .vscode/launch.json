@@ -187,11 +187,39 @@
                 }
             ]
         },{
+            "name": "Test EPICS Channel",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/k2eg-test",
+            "args": ["--gtest_filter=EpicsChannel.*"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "$LD_LIBRARY_PATH:${workspaceFolder}/build/local/lib:${workspaceFolder}/build/local/lib/linux_86_64"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },{
             "name": "Test EPICS",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=Epics.EpicsServiceManagerPVSanitizationfailWithNoProtocol*"],
+            "args": ["--gtest_filter=Epics.*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
