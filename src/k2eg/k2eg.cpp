@@ -96,11 +96,11 @@ int K2EGateway::setup(int argc, const char* argv[])
         logger->logMessage("Stop subscriber service");
         ServiceResolver<ISubscriber>::reset();
         logger->logMessage("Stop publihser service");
-        ServiceResolver<IPublisher>::resolve().reset();
+        ServiceResolver<IPublisher>::reset();
         logger->logMessage("Stop EPICS service");
-        ServiceResolver<EpicsServiceManager>::resolve().reset();
+        ServiceResolver<EpicsServiceManager>::reset();
         logger->logMessage("Stop Metric Service");
-        ServiceResolver<IMetricService>::resolve().reset();
+        ServiceResolver<IMetricService>::reset();
         logger->logMessage("Stop configuration service");
         ServiceResolver<INodeConfiguration>::resolve().reset();
         logger->logMessage("Stop scheduler service");
