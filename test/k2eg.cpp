@@ -182,6 +182,8 @@ TEST(k2egateway, CommandSubmission)
     ASSERT_TRUE(get_json_reply_obj.contains("reply_id"));
     // neeed to contains the pv name
     ASSERT_TRUE(get_json_reply_obj.contains("variable:a"));
+    producer.reset();
+    consumer.reset();
     k2eg->stop();
     t.join();
 }
