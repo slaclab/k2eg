@@ -2,7 +2,9 @@
 #include <k2eg/common/uuid.h>
 #include <k2eg/service/pubsub/pubsub.h>
 #include <k2eg/service/pubsub/IPublisher.h>
-
+#include <k2eg/service/log/ILogger.h>
+#include <k2eg/service/log/impl/BoostLogger.h>
+#include <k2eg/service/ServiceResolver.h>
 #include "common.h"
 
 #include <unistd.h>
@@ -16,15 +18,40 @@ using namespace k2eg::common;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
 
+// setup the test environment
+using namespace k2eg::service;
+using namespace k2eg::service::log;
+using namespace k2eg::service::log::impl;
+
+
+class Kafka : public ::testing::Test
+{
+protected:
+    Kafka() {}
+
+    virtual ~Kafka() {}
+
+    virtual void SetUp()
+    {
+        ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(MakeLogConfigurationUPtr(LogConfiguration{})));
+    }
+
+    virtual void TearDown()
+    {
+        ServiceResolver<ILogger>::reset();
+    }
+};
+
+
 #define TOPIC_TEST_NAME "queue-test"
 #define LOG(x) std::cout << x << std::endl << std::flush
 
-TEST(Kafka, KafkaFaultInitWithNoAddress) {
+TEST_F(Kafka, KafkaFaultInitWithNoAddress) {
   ASSERT_ANY_THROW(std::make_unique<RDKafkaPublisher>(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{})););
   ASSERT_ANY_THROW(std::make_unique<RDKafkaSubscriber>(std::make_unique<const SubscriberConfiguration>(SubscriberConfiguration{})););
 }
 
-TEST(Kafka, KafkaAuthenticationTest) {
+TEST_F(Kafka, KafkaAuthenticationTest) {
   auto pub_conf = PublisherConfiguration{
     .server_address = "kafka:9092",
     .custom_impl_parameter = k2eg::common::MapStrKV {
@@ -47,7 +74,7 @@ TEST(Kafka, KafkaAuthenticationTest) {
   ASSERT_NO_THROW(std::make_unique<RDKafkaSubscriber>(std::make_unique<const SubscriberConfiguration>(sub_conf)););
 }
 
-TEST(Kafka, CreateTopic) {
+TEST_F(Kafka, CreateTopic) {
   std::unique_ptr<RDKafkaPublisher> producer =
       std::make_unique<RDKafkaPublisher>(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "kafka:9092"}));
   ASSERT_EQ(producer->createQueue(
@@ -73,7 +100,7 @@ TEST(Kafka, CreateTopic) {
   ASSERT_EQ(producer->deleteQueue("new_queue"), 0);
 }
 
-TEST(Kafka, KafkaSimplePubSub) {
+TEST_F(Kafka, KafkaSimplePubSub) {
   SubscriberInterfaceElementVector  messages;
   std::unique_ptr<RDKafkaPublisher> producer =
       std::make_unique<RDKafkaPublisher>(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "kafka:9092"}));
@@ -119,7 +146,7 @@ TEST(Kafka, KafkaSimplePubSub) {
   ASSERT_STREQ(message_received.c_str(), message_sent.c_str());
 }
 
-TEST(Kafka, KafkaSimplePubSubMultiple) {
+TEST_F(Kafka, KafkaSimplePubSubMultiple) {
   SubscriberInterfaceElementVector  messages;
   std::unique_ptr<RDKafkaPublisher> producer =
       std::make_unique<RDKafkaPublisher>(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "kafka:9092"}));
@@ -168,7 +195,7 @@ TEST(Kafka, KafkaSimplePubSubMultiple) {
   ASSERT_STREQ(message_received.c_str(), message_sent.c_str());
 }
 
-TEST(Kafka, KafkaSimplePubSubHeaderCheck) {
+TEST_F(Kafka, KafkaSimplePubSubHeaderCheck) {
   SubscriberInterfaceElementVector  messages;
   std::unique_ptr<RDKafkaPublisher> producer =
       std::make_unique<RDKafkaPublisher>(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "kafka:9092"}));
@@ -213,7 +240,7 @@ TEST(Kafka, KafkaSimplePubSubHeaderCheck) {
   ASSERT_STREQ(message_received.c_str(), message_sent.c_str());
 }
 
-TEST(Kafka, KafkaPushMultipleMessage) {
+TEST_F(Kafka, KafkaPushMultipleMessage) {
   SubscriberInterfaceElementVector  tmp_received_messages;
   SubscriberInterfaceElementVector  received_messages;
   std::unique_ptr<RDKafkaPublisher> producer =

@@ -27,6 +27,11 @@ namespace k2eg::common {
             auto i = typed_instances.find(type);
             return i != std::end(typed_instances);
         }
+
+        void clear()
+        {
+            typed_instances.clear();
+        }
     };
 
 }

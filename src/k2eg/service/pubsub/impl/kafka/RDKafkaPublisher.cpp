@@ -116,7 +116,7 @@ void RDKafkaPublisher::autoPoll()
 
 void RDKafkaPublisher::deinit()
 {
-    logger->logMessage("Deinitializing RDKafkaPublisher", LogLevel::INFO);
+    //if(logger)logger->logMessage("Deinitializing RDKafkaPublisher", LogLevel::INFO);
     int retry = 100;
     while (producer->outq_len() > 0 && retry > 0)
     {
@@ -128,7 +128,7 @@ void RDKafkaPublisher::deinit()
         _stop_inner_thread = true;
         auto_poll_thread.join();
     }
-    logger->logMessage("RDKafkaPublisher deinitialized", LogLevel::INFO);
+    //if(logger)logger->logMessage("RDKafkaPublisher deinitialized", LogLevel::INFO);
 }
 
 int RDKafkaPublisher::flush(const int timeo)

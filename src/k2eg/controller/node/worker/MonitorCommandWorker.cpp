@@ -14,7 +14,6 @@
 #include <k2eg/controller/node/worker/monitor/MonitorChecker.h>
 
 #include <mutex>
-#include <execution>
 #include <functional>
 #include <shared_mutex>
 
@@ -30,7 +29,6 @@ using namespace k2eg::service;
 using namespace k2eg::service::log;
 using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::pubsub;
-using namespace k2eg::service::metric;
 using namespace k2eg::service::scheduler;
 using namespace k2eg::service::data;
 using namespace k2eg::service::data::repository;
@@ -45,11 +43,9 @@ MonitorCommandWorker::MonitorCommandWorker(const MonitorCommandConfiguration& mo
     , node_configuration_db(node_configuration_db)
     , logger(ServiceResolver<ILogger>::resolve())
     , publisher(ServiceResolver<IPublisher>::resolve())
-    , metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric())
     , epics_service_manager(epics_service_manager)
     , monitor_checker_shrd_ptr(MakeMonitorCheckerShrdPtr(monitor_command_configuration.monitor_checker_configuration, node_configuration_db))
     , starting_up(true)
-    , run_rate_thread(false)
 {
     // reset all processed element present in the monitor database
     monitor_checker_shrd_ptr->resetMonitorToProcess();
@@ -79,12 +75,6 @@ MonitorCommandWorker::~MonitorCommandWorker()
     logger->logMessage(STRING_FORMAT("Remove periodic maintanance : %1%", erased));
     erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(STARTUP_MONITOR_TASK_NAME);
     logger->logMessage(STRING_FORMAT("Remove startup task: %1%", erased));
-
-    // stop metric monitor
-    run_rate_thread = false;
-    if (rate_thread.joinable())
-        rate_thread.join();
-
     // dipose all still live monitor
     logger->logMessage("[ Dispose Worker ] stop all still live monitor");
     for (auto& mon_vec_for_pv : channel_topics_map)
@@ -111,12 +101,6 @@ void MonitorCommandWorker::handleRestartMonitorTask(TaskProperties& task_propert
         // start checker timing
         auto task_periodic_maintanance = MakeTaskShrdPtr(MAINTANACE_TASK_NAME, monitor_command_configuration.cron_scheduler_monitor_check, std::bind(&MonitorCommandWorker::handlePeriodicTask, this, std::placeholders::_1));
         ServiceResolver<Scheduler>::resolve()->addTask(task_periodic_maintanance);
-
-        // activate thread for metric
-        logger->logMessage("[ Startup Task ] Startup thread for udpate pv metrics");
-        run_rate_thread = true;
-        start_sample_ts = std::chrono::steady_clock::now();
-        rate_thread = std::thread(&MonitorCommandWorker::calcPVCount, this);
     }
 }
 
@@ -353,12 +337,6 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
                                          event_received->event_disconnect->size() % event_received->event_fail->size()),
                        LogLevel::TRACE);
 #endif
-    //----------update metric--------
-    metric.incrementCounter(IEpicsMetricCounterType::MonitorData, event_received->event_data->size());
-    metric.incrementCounter(IEpicsMetricCounterType::MonitorCancel, event_received->event_cancel->size());
-    metric.incrementCounter(IEpicsMetricCounterType::MonitorDisconnect, event_received->event_disconnect->size());
-    metric.incrementCounter(IEpicsMetricCounterType::MonitorFail, event_received->event_fail->size());
-
     // check fail to connect pv
     {
         std::shared_lock slock(channel_map_mtx);
@@ -402,42 +380,6 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
         }
     }
     publisher->flush(100);
-}
-
-void MonitorCommandWorker::calcPVCount()
-{
-    while (run_rate_thread)
-    {
-        double rate_per_sec = 0;
-        auto   end_time = std::chrono::steady_clock::now();
-        auto   elapsed = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_sample_ts);
-        if (elapsed.count() >= 5)
-        {
-            start_sample_ts = end_time;
-            std::shared_lock slock(channel_map_mtx);
-            int active_pv = std::count_if(std::execution::par, channel_topics_map.begin(), channel_topics_map.end(),
-                                          [](const auto& pair)
-                                          {
-                                              return pair.second.active == true;
-                                          });
-
-            metric.incrementCounter(IEpicsMetricCounterType::ActiveMonitor, active_pv);
-            metric.incrementCounter(IEpicsMetricCounterType::TotalMonitor, channel_topics_map.size());
-
-            // update throttle metric
-            auto & thread_throttling_vector = epics_service_manager->getThreadThrottlingInfo();
-            for (std::size_t i = 0; i < thread_throttling_vector.size(); ++i) {
-                const auto& throttling = thread_throttling_vector[i];
-                std::string thread_id = std::to_string(i);
-                auto t_stat = throttling.getStats();
-                metric.incrementCounter(IEpicsMetricCounterType::ThrottlingIdleCounter, t_stat.idle_counter, {{"thread_id", thread_id}});
-                metric.incrementCounter(IEpicsMetricCounterType::ThrottlingEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
-                metric.incrementCounter(IEpicsMetricCounterType::ThrottlingDurationCounter, t_stat.total_idle_cycles, {{"thread_id", thread_id}});
-                metric.incrementCounter(IEpicsMetricCounterType::ThrottleGauge, t_stat.throttle_ms, {{"thread_id", thread_id}});
-            }
-        }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
 }
 
 #pragma endregion MonitorMessage

@@ -5,7 +5,6 @@
 
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/pubsub/IPublisher.h>
-#include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/controller/command/cmd/MonitorCommand.h>
 #include <k2eg/service/data/repository/ChannelRepository.h>
@@ -92,17 +91,12 @@ class MonitorCommandWorker : public CommandWorker
     k2eg::controller::node::configuration::NodeConfigurationShrdPtr node_configuration_db;
     k2eg::service::log::ILoggerShrdPtr                              logger;
     k2eg::service::pubsub::IPublisherShrdPtr                        publisher;
-    k2eg::service::metric::IEpicsMetric&                            metric;
     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr           epics_service_manager;
     MonitorCheckerShrdPtr                                           monitor_checker_shrd_ptr;
     // Handler's liveness token
     k2eg::common::BroadcastToken epics_handler_token;
     k2eg::common::BroadcastToken monitor_checker_token;
     std::atomic_bool             starting_up;
-    // thread for manage the update of the pv counting metrics
-    bool                                  run_rate_thread;
-    std::chrono::steady_clock::time_point start_sample_ts;
-    std::thread                           rate_thread;
 
     const std::string get_queue_for_pv(const std::string& pv_name);
     void              manage_single_monitor(k2eg::controller::command::cmd::ConstCommandShrdPtr command);
@@ -112,7 +106,6 @@ class MonitorCommandWorker : public CommandWorker
     void handleMonitorCheckEvents(MonitorHandlerData checker_event_data);
     void handleRestartMonitorTask(k2eg::service::scheduler::TaskProperties& task_properties);
     void handlePeriodicTask(k2eg::service::scheduler::TaskProperties& task_properties);
-    void calcPVCount();
     void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
 
 public:

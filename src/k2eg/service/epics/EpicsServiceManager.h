@@ -1,19 +1,21 @@
 #ifndef EpicsServiceManager_H
 #define EpicsServiceManager_H
 
-#include <k2eg/common/types.h>
-#include <k2eg/common/broadcaster.h>
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/ThrottlingManager.h>
+#include <k2eg/common/broadcaster.h>
+#include <k2eg/common/types.h>
 
 #include <k2eg/service/epics/EpicsChannel.h>
-#include <k2eg/service/epics/Serialization.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
+#include <k2eg/service/epics/Serialization.h>
+#include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/scheduler/Scheduler.h>
 
-#include <mutex>
-#include <memory>
 #include <cstdint>
 #include <functional>
+#include <memory>
+#include <mutex>
 #include <shared_mutex>
 
 namespace k2eg::service::epics_impl {
@@ -49,6 +51,8 @@ struct ChannelMapElement
     bool to_force;
     // this is used to mark the channel as to be removed when keep alive is 0
     int keep_alive;
+    // Indicates if the channel is currently active
+    bool active = false;
 };
 DEFINE_PTR_TYPES(ChannelMapElement)
 typedef std::unique_lock<std::shared_mutex> WriteLockCM;
@@ -70,6 +74,7 @@ class EpicsServiceManager
     std::unique_ptr<pvac::ClientProvider>                             ca_provider;
     bool                                                              end_processing;
     std::shared_ptr<BS::light_thread_pool>                            processing_pool;
+    k2eg::service::metric::IEpicsMetric&                              metric;
     std::vector<k2eg::common::ThrottlingManager>                      thread_throttling_vector;
     mutable std::mutex                                                thread_throttle_mutex;
     /*
@@ -79,6 +84,7 @@ class EpicsServiceManager
     @details this function is called by the thread pool
     */
     void task(ConstMonitorOperationShrdPtr monitor_op);
+    void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
 
 public:
     explicit EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config = std::make_unique<EpicsServiceManagerConfig>());

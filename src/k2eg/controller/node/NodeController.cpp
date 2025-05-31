@@ -64,6 +64,7 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
 NodeController::~NodeController()
 {
     processing_pool->wait();
+    worker_resolver.clear();
 }
 
 void NodeController::performManagementTask()

@@ -19,6 +19,10 @@ namespace k2eg::service
         {
             return registered_instance;
         }
+        static void reset()
+        {
+            registered_instance.reset();
+        }
     };
 
     template <typename T>
