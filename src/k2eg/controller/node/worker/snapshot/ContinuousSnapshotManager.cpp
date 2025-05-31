@@ -529,10 +529,8 @@ void ContinuousSnapshotManager::handleStatistic(TaskProperties& task_properties)
         auto&       throttling = thread_throttling_vector[i];
         std::string thread_id = std::to_string(i);
         auto        t_stat = throttling->getStats();
-        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::ThrottlingIdleCounter, t_stat.idle_counter, {{"thread_id", thread_id}});
-        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::ThrottlingEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
-        metrics.incrementCounter(
-            k2eg::service::metric::INodeControllerMetricCounterType::ThrottlingDurationCounter, t_stat.total_idle_cycles, {{"thread_id", thread_id}});
-        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::ThrottleGauge, t_stat.throttle_ms, {{"thread_id", thread_id}});
+        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
+        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotThrottleGauge, t_stat.throttle_ms, {{"thread_id", thread_id}});
+        throttling->resetEventCounter();
     }
 }

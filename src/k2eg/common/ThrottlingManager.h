@@ -12,8 +12,30 @@ namespace k2eg::common {
 struct ThrottlingStats {
     int idle_counter;
     int total_idle_cycles;
-    int total_events_processed;
+    std::atomic<int> total_events_processed;
     int throttle_ms;
+    ThrottlingStats(int idle = 0, int idle_cycles = 0, int events = 0, int throttle = 1)
+        : idle_counter(idle), total_idle_cycles(idle_cycles), total_events_processed(events), throttle_ms(throttle) {}
+
+    // Custom copy constructor
+    ThrottlingStats(const ThrottlingStats& other)
+        : idle_counter(other.idle_counter),
+          total_idle_cycles(other.total_idle_cycles),
+          total_events_processed(other.total_events_processed.load(std::memory_order_relaxed)),
+          throttle_ms(other.throttle_ms) {}
+
+    //reset operator
+    ThrottlingStats& operator=(const ThrottlingStats& other)
+    {
+        if (this != &other)
+        {
+            idle_counter = other.idle_counter;
+            total_idle_cycles = other.total_idle_cycles;
+            total_events_processed.store(other.total_events_processed.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            throttle_ms = other.throttle_ms;
+        }
+        return *this;
+    }
 };
 
 class ThrottlingManager
@@ -50,11 +72,19 @@ public:
         }
     }
 
-    ThrottlingStats getStats() const noexcept { return stats; }
+    ThrottlingStats getStats() const noexcept { 
+        // this work cause of the copy contructur
+        return stats;
+     }
 
     void reset() noexcept
     {
         stats = {0, 0, 0, min_throttle_ms_};
+    }
+
+    void resetEventCounter() noexcept
+    {
+        stats.total_events_processed = 0;
     }
 
     ThrottlingManager(const ThrottlingManager&) = delete;
