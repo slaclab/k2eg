@@ -9,7 +9,6 @@
 #include <k2eg/service/configuration/impl/consul/ConsulNodeConfiguration.h>
 #include <k2eg/service/data/DataStorage.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
-#include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/log/impl/BoostLogger.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/metric/impl/DummyMetricService.h>
@@ -39,13 +38,20 @@ using namespace k2eg::service::configuration::impl::consul;
 using namespace k2eg::controller::node;
 using namespace k2eg::controller::command;
 
-K2EGateway::K2EGateway() : po(std::make_unique<k2eg::common::ProgramOptions>()), quit(false), terminated(false) {}
+K2EGateway::K2EGateway()
+    : po(std::make_unique<k2eg::common::ProgramOptions>()), quit(false), terminated(false), running(false)
+{
+}
+
+K2EGateway::~K2EGateway()
+{
+    ServiceResolver<ILogger>::reset();
+}
 
 int K2EGateway::setup(int argc, const char* argv[])
 {
-    int                      err = 0;
-    std::shared_ptr<ILogger> logger;
-    std::unique_lock         lk(m);
+    int              err = 0;
+    std::unique_lock lk(m);
     try
     {
         po->parse(argc, argv);
@@ -59,12 +65,12 @@ int K2EGateway::setup(int argc, const char* argv[])
             std::cout << getTextVersion(false) << std::endl;
             return err;
         }
-        // setup services
-
         ServiceResolver<ILogger>::registerService(logger = std::make_shared<BoostLogger>(po->getloggerConfiguration()));
+        // setup services
         logger->logMessage(getTextVersion(true));
         logger->logMessage("Start Scheduler Service");
         ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(po->getSchedulerConfiguration()));
+        ServiceResolver<Scheduler>::resolve()->start();
         logger->logMessage("Start configuration service");
         ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsuleNodeConfiguration>(po->getConfigurationServiceConfiguration()));
         logger->logMessage("Start Metric Service");
@@ -79,8 +85,7 @@ int K2EGateway::setup(int argc, const char* argv[])
         node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
         logger->logMessage("Start command controller");
         cmd_controller = std::make_unique<CMDController>(po->getCMDControllerConfiguration(), std::bind(&NodeController::submitCommand, &(*node_controller), std::placeholders::_1));
-        logger->logMessage("Start Scheduler Service");
-        ServiceResolver<Scheduler>::resolve()->start();
+        running = true;
         // wait for termination request
         cv.wait(lk,
                 [this]
@@ -107,7 +112,7 @@ int K2EGateway::setup(int argc, const char* argv[])
         ServiceResolver<Scheduler>::resolve()->stop();
         ServiceResolver<Scheduler>::reset();
         logger->logMessage("Shutdown completed");
-        ServiceResolver<ILogger>::resolve().reset();
+        running = false;
         terminated = true;
     }
     catch (std::runtime_error re)
@@ -152,16 +157,6 @@ void K2EGateway::stop()
     std::lock_guard lk(m);
     quit = true;
     cv.notify_one();
-}
-
-const bool K2EGateway::isStopRequested()
-{
-    return quit;
-}
-
-const bool K2EGateway::isTerminated()
-{
-    return terminated;
 }
 
 const std::string K2EGateway::getTextVersion(bool long_version)

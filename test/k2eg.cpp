@@ -120,7 +120,9 @@ TEST(k2egateway, CommandSubmission)
          EXPECT_EQ(k2eg->isTerminated(), true);
          EXPECT_EQ(exit_code, EXIT_SUCCESS);
     });
-    
+    while(!k2eg->isRunning()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
     // create consumer and producer to send comamnd adn wait for reply to/from kafka
     std::unique_ptr<RDKafkaPublisher> producer = std::make_unique<RDKafkaPublisher>(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "kafka:9092"}));
     std::unique_ptr<RDKafkaSubscriber> consumer = std::make_unique<RDKafkaSubscriber>(std::make_unique<const SubscriberConfiguration>(SubscriberConfiguration{.server_address = "kafka:9092"}));
@@ -171,6 +173,12 @@ TEST(k2egateway, CommandSubmission)
         retry++;
     }
     ASSERT_NE(messages.size(), 0);
+
+    producer.reset();
+    consumer.reset();
+    k2eg->stop();
+    t.join();
+
     // decode get json message
     boost::json::object get_json_reply_obj;
     boost::json::string_view value_str = boost::json::string_view(messages[0]->data.get(), messages[0]->data_len);
@@ -182,10 +190,7 @@ TEST(k2egateway, CommandSubmission)
     ASSERT_TRUE(get_json_reply_obj.contains("reply_id"));
     // neeed to contains the pv name
     ASSERT_TRUE(get_json_reply_obj.contains("variable:a"));
-    producer.reset();
-    consumer.reset();
-    k2eg->stop();
-    t.join();
+
 }
 
 #endif //__linux__

@@ -483,6 +483,7 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
                            LogLevel::DEBUG);
     }
 
+    // manage the throttling
     throttling->update(false);
 
     // resubmit the snapshot command
@@ -499,9 +500,6 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
                 logger->logMessage("Snapshot operation info is no longer valid", LogLevel::ERROR);
             }
         });
-
-    // give some time to relax
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
 }
 
 void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstCommandShrdPtr cmd, const std::string& publishing_topic)
