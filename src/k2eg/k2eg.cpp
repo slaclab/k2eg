@@ -102,11 +102,12 @@ int K2EGateway::setup(int argc, const char* argv[])
         logger->logMessage("Stop Metric Service");
         ServiceResolver<IMetricService>::reset();
         logger->logMessage("Stop configuration service");
-        ServiceResolver<INodeConfiguration>::resolve().reset();
+        ServiceResolver<INodeConfiguration>::reset();
         logger->logMessage("Stop scheduler service");
         ServiceResolver<Scheduler>::resolve()->stop();
+        ServiceResolver<Scheduler>::reset();
         logger->logMessage("Shutdown completed");
-        ServiceResolver<ILogger>::resolve().reset();
+        ServiceResolver<ILogger>::reset();
         terminated = true;
     }
     catch (std::runtime_error re)
