@@ -107,7 +107,7 @@ int K2EGateway::setup(int argc, const char* argv[])
         ServiceResolver<Scheduler>::resolve()->stop();
         ServiceResolver<Scheduler>::reset();
         logger->logMessage("Shutdown completed");
-        ServiceResolver<ILogger>::reset();
+        ServiceResolver<ILogger>::resolve().reset();
         terminated = true;
     }
     catch (std::runtime_error re)
