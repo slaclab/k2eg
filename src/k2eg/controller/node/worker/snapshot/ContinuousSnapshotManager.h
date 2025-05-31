@@ -1,8 +1,8 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 
-#include "k2eg/service/epics/EpicsData.h"
-#include "k2eg/service/metric/INodeControllerMetric.h"
+#include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/metric/INodeControllerMetric.h>
 
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/ThrottlingManager.h>
