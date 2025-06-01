@@ -492,7 +492,6 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
         {
             if (auto snapshot_command_info = weak_snapshot.lock())
             {
-                logger->logMessage(STRING_FORMAT("Start snapshot %1%", snapshot_command_info->cmd->snapshot_name), LogLevel::INFO);
                 this->processSnapshot(std::static_pointer_cast<SnapshotOpInfo>(snapshot_command_info));
             }
             else
