@@ -177,7 +177,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         std::unique_lock write_lock(snapshot_runinnig_mutex_);
         if (snapshot_runinnig_.find(s_op_ptr->queue_name) != snapshot_runinnig_.end())
         {
-            manageReply(-2, STRING_FORMAT("Snapshot %1% is already running", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+            manageReply(0, STRING_FORMAT("Snapshot %1% is already running", s_op_ptr->cmd->snapshot_name), snapsthot_command);
             return;
         }
     }
@@ -185,22 +185,22 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     // check if all the command infromation are filled
     if (s_op_ptr->cmd->pv_name_list.empty())
     {
-        manageReply(-3, STRING_FORMAT("PV name list is empty for snapshot %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        manageReply(-2, STRING_FORMAT("PV name list is empty for snapshot %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
     if (s_op_ptr->cmd->repeat_delay_msec < 0)
     {
-        manageReply(-4, STRING_FORMAT("The repeat delay is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        manageReply(-3, STRING_FORMAT("The repeat delay is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
     if (s_op_ptr->cmd->time_window_msec < 0)
     {
-        manageReply(-5, STRING_FORMAT("The time window is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        manageReply(-4, STRING_FORMAT("The time window is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
     if (s_op_ptr->cmd->snapshot_name.empty())
     {
-        manageReply(-6, STRING_FORMAT("The snapshot name is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        manageReply(-5, STRING_FORMAT("The snapshot name is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
 
@@ -210,7 +210,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         auto sanitized_pv_name = epics_service_manager->sanitizePVName(pv_uri);
         if (!sanitized_pv_name)
         {
-            manageReply(-7, STRING_FORMAT("The pv uri %1% is not parsable", pv_uri), snapsthot_command);
+            manageReply(-6, STRING_FORMAT("The pv uri %1% is not parsable", pv_uri), snapsthot_command);
             return;
         }
         // add the pv to the list of pv to monitor
@@ -220,7 +220,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     // init the snapshot operation info
     if (!s_op_ptr->init(sanitized_pv_name_list))
     {
-        manageReply(-8, STRING_FORMAT("The snapshot %1% is not valid", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        manageReply(-7, STRING_FORMAT("The snapshot %1% is not valid", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
 
@@ -228,11 +228,16 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     publisher->createQueue(QueueDescription{
         .name = s_op_ptr->queue_name,
         .paritions = 3,
-        .replicas = 1, // put default to 1 need to be calculated with more compelx logic for higher values
+        .replicas = 1, // put default to 1 need to be calculated with more complex logic for higher values
         .retention_time = 1000 * 60 * 60,
         .retention_size = 1024 * 1024 * 50,
     });
 
+    // read metadata to fast the get of topic information
+    auto topic_info = publisher->getQueueMetadata(s_op_ptr->queue_name);
+    logger->logMessage(STRING_FORMAT("Topic '%1%' metadata => subscriber number:%2%",
+                                     s_op_ptr->queue_name % topic_info->subscriber_groups.size()),
+                       LogLevel::DEBUG);
     // we got no faulty during the cache preparation
     // so we can start the snapshot
     // add the snapshot to the stopped snapshot list and to the pv list
@@ -256,12 +261,19 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         epics_service_manager->monitorChannel(pv_uri, true);
     }
 
-    // submite snapshot to the thread pool
+    // submit the snapshot to the thread pool
     thread_pool->detach_task(
-        [this, s_op_ptr]()
+        [this, weak_snapshot = std::weak_ptr(s_op_ptr)]()
         {
-            logger->logMessage(STRING_FORMAT("Start snapshot %1%", s_op_ptr->cmd->snapshot_name), LogLevel::INFO);
-            this->processSnapshot(std::static_pointer_cast<SnapshotOpInfo>(s_op_ptr));
+            if (auto s_op_ptr = weak_snapshot.lock())
+            {
+                logger->logMessage(STRING_FORMAT("Start snapshot %1%", s_op_ptr->cmd->snapshot_name), LogLevel::INFO);
+                this->processSnapshot(std::static_pointer_cast<SnapshotOpInfo>(s_op_ptr));
+            }
+            else
+            {
+                logger->logMessage("Snapshot operation info is no longer valid", LogLevel::ERROR);
+            }
         });
 
     // return reply to app for submitted command
@@ -418,7 +430,9 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
             }
             return;
         }
-
+        // get data from snapshot command info
+        auto snapshot_events = snapshot_command_info->getData();
+        logger->logMessage(STRING_FORMAT("Snapshot %1% will be triggered with event [%2%]", snapshot_command_info->queue_name%snapshot_events.size()), LogLevel::INFO);
         // increment the iteration index
         snapshot_command_info->snapshot_iteration_index++;
         // get timestamp for the snapshot in unix time and utc
@@ -434,17 +448,8 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
                                    {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
         }
 
-        // snapshot event vector contains the data from all pv
-        // and the smart poiner are no more changed so we can push safetely
-        // and we have all non null pointer here
-        int elementsIndex = 0;
-        // get data from snapshot command info
-        auto snapshot_events = snapshot_command_info->getData();
         for (auto& event : snapshot_events)
         {
-            logger->logMessage(STRING_FORMAT("PV '%1%' ready to be submitted with snapshot %2%",
-                                             event->channel_data.pv_name % snapshot_command_info->cmd->snapshot_name),
-                               LogLevel::DEBUG);
             auto serialized_message = serialize(RepeatingSnaptshotData{1, snap_ts, snapshot_command_info->snapshot_iteration_index,
                                                                        MakeChannelDataShrdPtr(event->channel_data)},
                                                 snapshot_command_info->cmd->serialization);
@@ -477,17 +482,22 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
                            LogLevel::DEBUG);
     }
 
+    // manage the throttling
     throttling->update(false);
 
     // resubmit the snapshot command
     thread_pool->detach_task(
-        [this, snapshot_command_info]()
+        [this, weak_snapshot = std::weak_ptr(snapshot_command_info)]()
         {
-            this->processSnapshot(snapshot_command_info);
+            if (auto snapshot_command_info = weak_snapshot.lock())
+            {
+                this->processSnapshot(std::static_pointer_cast<SnapshotOpInfo>(snapshot_command_info));
+            }
+            else
+            {
+                logger->logMessage("Snapshot operation info is no longer valid", LogLevel::ERROR);
+            }
         });
-
-    // give some time to relax
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
 }
 
 void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstCommandShrdPtr cmd, const std::string& publishing_topic)
@@ -515,10 +525,8 @@ void ContinuousSnapshotManager::handleStatistic(TaskProperties& task_properties)
         auto&       throttling = thread_throttling_vector[i];
         std::string thread_id = std::to_string(i);
         auto        t_stat = throttling->getStats();
-        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::ThrottlingIdleCounter, t_stat.idle_counter, {{"thread_id", thread_id}});
-        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::ThrottlingEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
-        metrics.incrementCounter(
-            k2eg::service::metric::INodeControllerMetricCounterType::ThrottlingDurationCounter, t_stat.total_idle_cycles, {{"thread_id", thread_id}});
-        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::ThrottleGauge, t_stat.throttle_ms, {{"thread_id", thread_id}});
+        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
+        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotThrottleGauge, t_stat.throttle_ms, {{"thread_id", thread_id}});
+        throttling->resetEventCounter();
     }
 }

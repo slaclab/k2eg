@@ -24,7 +24,9 @@ EpicsChannel::EpicsChannel(pvac::ClientProvider& provider, const std::string& pv
     channel = std::make_shared<pvac::ClientChannel>(provider.connect(pv_name, opt));
 }
 
-EpicsChannel::~EpicsChannel() {}
+EpicsChannel::~EpicsChannel() {
+    channel.reset();
+}
 
 void EpicsChannel::init()
 {

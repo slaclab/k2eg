@@ -15,7 +15,7 @@ using namespace k2eg::service::epics_impl;
 
 typedef std::vector<msgpack::object> MsgpackObjectVector;
 
-TEST(Epics, SerializationJSON) {
+TEST(EpicsChannel, SerializationJSON) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr      pc;
   ConstDataUPtr         ser_value;
@@ -44,7 +44,7 @@ TEST(Epics, SerializationJSON) {
   EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
 }
 
-TEST(Epics, SerializationCAJSON) {
+TEST(EpicsChannel, SerializationCAJSON) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr      pc;
   ConstDataUPtr         ser_value;
@@ -74,7 +74,7 @@ TEST(Epics, SerializationCAJSON) {
   EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
 }
 
-TEST(Epics, SerializationCACompleteJSON) {
+TEST(EpicsChannel, SerializationCACompleteJSON) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr      pc;
   ConstDataUPtr         ser_value;
@@ -107,7 +107,7 @@ TEST(Epics, SerializationCACompleteJSON) {
   EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
 }
 
-TEST(Epics, SerializationCACompleteJSONOnMonitor) {
+TEST(EpicsChannel, SerializationCACompleteJSONOnMonitor) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr             pc;
   ConstDataUPtr                ser_value;
@@ -138,7 +138,7 @@ TEST(Epics, SerializationCACompleteJSONOnMonitor) {
   EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
 }
 
-TEST(Epics, SerializationWaveformJSON) {
+TEST(EpicsChannel, SerializationWaveformJSON) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr      pc;
   ConstGetOperationUPtr get_op;
@@ -169,7 +169,7 @@ TEST(Epics, SerializationWaveformJSON) {
   EXPECT_EQ(sub_obj.contains("valueAlarm"), true);
 }
 
-TEST(Epics, SerializationCAWaveformJSON) {
+TEST(EpicsChannel, SerializationCAWaveformJSON) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr      pc;
   ConstGetOperationUPtr get_op;
@@ -202,7 +202,7 @@ TEST(Epics, SerializationCAWaveformJSON) {
 }
 
 typedef std::map<std::string, msgpack::object> MapStrMsgPackObj;
-TEST(Epics, SerializationMsgpack) {
+TEST(EpicsChannel, SerializationMsgpack) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr      pc;
   ConstGetOperationUPtr get_op;
@@ -231,7 +231,7 @@ TEST(Epics, SerializationMsgpack) {
   //{"variable:sum":{"value":7,"alarm":{"severity":0,"status":0,"message":"NO_ALARM"},"timeStamp":{"secondsPastEpoch":1680995907,"nanoseconds":899753530,"userTag":0},"display":{"limitLow":0,"limitHigh":0,"description":"","units":"","precision":0,"form":{"index":0,"choices":"BIN(size:224)"}},"control":{"limitLow":0,"limitHigh":0,"minStep":0},"valueAlarm":{"active":0,"lowAlarmLimit":nan,"lowWarningLimit":nan,"highWarningLimit":nan,"highAlarmLimit":nan,"lowAlarmSeverity":0,"lowWarningSeverity":0,"highWarningSeverity":0,"highAlarmSeverity":0,"hysteresis":0}}}
 }
 
-TEST(Epics, SerializationCAMsgpack) {
+TEST(EpicsChannel, SerializationCAMsgpack) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr      pc;
   ConstGetOperationUPtr get_op;
@@ -259,7 +259,7 @@ TEST(Epics, SerializationCAMsgpack) {
   //{"variable:sum":{"value":7,"alarm":{"severity":0,"status":0,"message":"NO_ALARM"},"timeStamp":{"secondsPastEpoch":1680995907,"nanoseconds":899753530,"userTag":0},"display":{"limitLow":0,"limitHigh":0,"description":"","units":"","precision":0,"form":{"index":0,"choices":"BIN(size:224)"}},"control":{"limitLow":0,"limitHigh":0,"minStep":0},"valueAlarm":{"active":0,"lowAlarmLimit":nan,"lowWarningLimit":nan,"highWarningLimit":nan,"highAlarmLimit":nan,"lowAlarmSeverity":0,"lowWarningSeverity":0,"highWarningSeverity":0,"highAlarmSeverity":0,"hysteresis":0}}}
 }
 
-TEST(Epics, SerializationMsgpackWaveform) {
+TEST(EpicsChannel, SerializationMsgpackWaveform) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr      pc;
   ConstGetOperationUPtr get_op;
@@ -288,7 +288,7 @@ TEST(Epics, SerializationMsgpackWaveform) {
   //{"variable:sum":{"value":[2,3,4,5,6,7,8],"alarm":{"severity":0,"status":0,"message":"NO_ALARM"},"timeStamp":{"secondsPastEpoch":1680995907,"nanoseconds":899753530,"userTag":0},"display":{"limitLow":0,"limitHigh":0,"description":"","units":"","precision":0,"form":{"index":0,"choices":"BIN(size:224)"}},"control":{"limitLow":0,"limitHigh":0,"minStep":0},"valueAlarm":{"active":0,"lowAlarmLimit":nan,"lowWarningLimit":nan,"highWarningLimit":nan,"highAlarmLimit":nan,"lowAlarmSeverity":0,"lowWarningSeverity":0,"highWarningSeverity":0,"highAlarmSeverity":0,"hysteresis":0}}}
 }
 
-TEST(Epics, SerializationNTTableMsgpack) {
+TEST(EpicsChannel, SerializationNTTableMsgpack) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr      pc;
   ConstGetOperationUPtr get_op;
@@ -314,7 +314,7 @@ TEST(Epics, SerializationNTTableMsgpack) {
   EXPECT_EQ(om_sub_1.contains("timeStamp"), true);
 }
 
-TEST(Epics, SerializationNTNDArrayMsgpack) {
+TEST(EpicsChannel, SerializationNTNDArrayMsgpack) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr      pc;
   ConstGetOperationUPtr get_op;
@@ -342,7 +342,7 @@ TEST(Epics, SerializationNTNDArrayMsgpack) {
   EXPECT_EQ(om_sub_1.contains("attribute"), true);
 }
 
-TEST(Epics, SerializationMsgpackCompact) {
+TEST(EpicsChannel, SerializationMsgpackCompact) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr      pc;
   ConstGetOperationUPtr get_op;
@@ -365,7 +365,7 @@ TEST(Epics, SerializationMsgpackCompact) {
   //["variable:sum",7,0,0,"NO_ALARM",1681706068,208836822,0,0,0,"","",0,0,["Default","String","Binary","Decimal","Hex","Exponential","Engineering"],0,0,0,0,nan,nan,nan,nan,0,0,0,0,0]
 }
 
-TEST(Epics, SerializationCAMsgpackCompact) {
+TEST(EpicsChannel, SerializationCAMsgpackCompact) {
   INIT_CA_PROVIDER()
   EpicsChannelUPtr      pc;
   ConstGetOperationUPtr get_op;
@@ -389,7 +389,7 @@ TEST(Epics, SerializationCAMsgpackCompact) {
 }
 
 typedef std::vector<msgpack::object> MsgpackObjectVector;
-TEST(Epics, SerializationMsgpackCompactWaveform) {
+TEST(EpicsChannel, SerializationMsgpackCompactWaveform) {
   INIT_PVA_PROVIDER()
   EpicsChannelUPtr      pc;
   ConstGetOperationUPtr get_op;
