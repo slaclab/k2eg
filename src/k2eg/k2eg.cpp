@@ -45,7 +45,6 @@ K2EGateway::K2EGateway()
 
 K2EGateway::~K2EGateway()
 {
-    ServiceResolver<ILogger>::reset();
 }
 
 int K2EGateway::setup(int argc, const char* argv[])
