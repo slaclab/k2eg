@@ -430,10 +430,9 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
             }
             return;
         }
-
-        logger->logMessage(STRING_FORMAT("Snapshot %1% is will be triggered", snapshot_command_info->queue_name), LogLevel::INFO);
         // get data from snapshot command info
         auto snapshot_events = snapshot_command_info->getData();
+        logger->logMessage(STRING_FORMAT("Snapshot %1% will be triggered with event [%2%]", snapshot_command_info->queue_name%snapshot_events.size()), LogLevel::INFO);
         // increment the iteration index
         snapshot_command_info->snapshot_iteration_index++;
         // get timestamp for the snapshot in unix time and utc
