@@ -1,3 +1,4 @@
+#include <iostream>
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
@@ -7,12 +8,11 @@
 #include <memory>
 #include <mutex>
 
-
 using namespace k2eg::service::epics_impl;
 namespace pvd = epics::pvData;
 
 MonitorOperationImpl::MonitorOperationImpl(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field)
-    : channel(channel), pv_name(pv_name), field(field), received_event(std::make_shared<EventReceived>()), has_data(false)
+    : channel(channel), pv_name(pv_name), field(field), received_event(std::make_shared<EventReceived>())
 {
     channel->addConnectListener(this);
 }
@@ -26,18 +26,22 @@ MonitorOperationImpl::~MonitorOperationImpl()
     channel->removeConnectListener(this);
 }
 
-void MonitorOperationImpl::poll(uint element_to_fetch) const
+size_t MonitorOperationImpl::poll(size_t element_to_fetch) const
 {
-    if (!has_data)
-        return;
     int fetched = 0;
-    while (mon.poll() && (++fetched <= element_to_fetch))
     {
-        ++fetched;
-        auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
-        tmp_data->copy(*mon.root);
-        received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, "", {pv_name, tmp_data}}));
+        std::lock_guard<std::mutex> l(ce_mtx);
+        while (!mon.complete() && (fetched < element_to_fetch))
+        {
+            if (!mon.poll())
+                break;
+            ++fetched;
+            auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
+            tmp_data->copy(*mon.root);
+            received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, "", {pv_name, tmp_data}}));
+        }
     }
+
     if (fetched == 0 && force_update)
     {
         if (!get_op)
@@ -58,10 +62,13 @@ void MonitorOperationImpl::poll(uint element_to_fetch) const
     else
     {
         // destroy the get operation
-        get_op.reset();
+        if (get_op)
+            get_op.reset();
     }
-
-    has_data = !mon.complete();
+    fetched = received_event->event_data->size() + received_event->event_cancel->size() +
+              received_event->event_disconnect->size() + received_event->event_fail->size() +
+              received_event->event_timeout->size();
+    return fetched;
 }
 
 void MonitorOperationImpl::connectEvent(const pvac::ConnectEvent& evt)
@@ -104,14 +111,16 @@ void MonitorOperationImpl::monitorEvent(const pvac::MonitorEvent& evt)
         break;
     // Data queue becomes not-empty
     case pvac::MonitorEvent::Data:
-        has_data = true;
         // We drain event FIFO completely
-        // while (mon.poll()) {
-        //   auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
-        //   tmp_data->copy(*mon.root);
-        //   received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data,
-        //   evt.message, {pv_name, tmp_data}}));
-        // }
+        while (!mon.complete())
+        {
+            if (!mon.poll())
+                break;
+            ++fetched;
+            auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
+            tmp_data->copy(*mon.root);
+            received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, "", {pv_name, tmp_data}}));
+        }
         break;
     }
 }
@@ -150,10 +159,11 @@ CombinedMonitorOperation::CombinedMonitorOperation(std::shared_ptr<pvac::ClientC
 {
 }
 
-void CombinedMonitorOperation::poll(uint element_to_fetch) const
+size_t CombinedMonitorOperation::poll(size_t element_to_fetch) const
 {
-    monitor_principal_request->poll(element_to_fetch);
-    monitor_additional_request->poll(element_to_fetch);
+    size_t fetched = monitor_principal_request->poll(element_to_fetch);
+    fetched += monitor_additional_request->poll(element_to_fetch);
+    return fetched;
 }
 
 EventReceivedShrdPtr CombinedMonitorOperation::getEventData() const
