@@ -31,7 +31,7 @@ protected:
 
 public:
     virtual ~MonitorOperation() = default;
-    virtual void                 poll(uint element_to_fetch = 2) const = 0;
+    virtual void                 poll(uint element_to_fetch = 100) const = 0;
     virtual EventReceivedShrdPtr getEventData() const = 0;
     virtual bool                 hasData() const = 0;
     virtual bool                 hasEvents() const = 0;

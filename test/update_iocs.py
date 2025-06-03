@@ -28,10 +28,21 @@ def update_iocs():
     
 
 def main():
+    fast_interval = 1.0 / 100  # 100 Hz
+    slow_interval = 1.0        # 1 Hz
+    last_slow_update = time.time()
     while True:
-        start_time = time.time()
-        update_iocs()
-        time.sleep(max(0, 1.0 - (time.time() - start_time)))
+        now = time.time()
+
+        # Fast update at 100 Hz
+        ctxt.put("channel:random:fast", random.uniform(0, 100))
+
+        # Slow update at 1 Hz
+        if now - last_slow_update >= slow_interval:
+            update_iocs()
+            last_slow_update = now
+
+        time.sleep(fast_interval)
 
 
 if __name__ == "__main__":
