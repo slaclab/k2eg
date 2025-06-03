@@ -30,6 +30,14 @@ record(ao, "channel:ramp:limit")
     field(PINI, "YES")
 }
 
+record(ao, "channel:random:fast")
+{
+    field(SCAN, "Passive")  # 100 Hz
+    field(DESC, "Random value at 100Hz")
+    field(DRVH, "100")
+    field(DRVL, "0")
+}
+
 record(calc, "channel:ramp:ramp")
 {
     field(SCAN, "1 second")
