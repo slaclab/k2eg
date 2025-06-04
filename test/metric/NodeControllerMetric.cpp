@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <iostream>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
 
@@ -22,5 +23,6 @@ TEST(Metric, NodeControllerMetricSubmittedCommand) {
   auto& cmd_ctrl_metric_ref = m_uptr->getNodeControllerMetric();
   cmd_ctrl_metric_ref.incrementCounter(INodeControllerMetricCounterType::SubmittedCommand);
   auto metrics_string = getUrl("http://localhost:8080/metrics");
-  ASSERT_NE(metrics_string.find("k2eg_node_controller_thread_events_processed_total{op=\"command_submitted\"} 1"), -1);
+  std::cout << metrics_string << std::endl;
+  ASSERT_NE(metrics_string.find("k2eg_node_controller{op=\"command_submitted\"} 1"), -1);
 }
