@@ -1,9 +1,9 @@
-#include <k2eg/common/utility.h>
 #include <k2eg/common/BS_thread_pool.hpp>
+#include <k2eg/common/utility.h>
 
-#include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/data/DataStorage.h>
+#include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/metric/INodeControllerMetric.h>
 
 #include <k2eg/controller/node/NodeController.h>
@@ -26,12 +26,17 @@ using namespace k2eg::service::data::repository;
 using namespace k2eg::service::log;
 using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::metric;
+using namespace k2eg::service::scheduler;
+
+#define NODE_CONTROLLER_STAT_TASK_NAME "node-controller-stat-task"
+#define NODE_CONTROLLER_STAT_TASK_CRON "* * * * * *"
 
 NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_controller_configuration, DataStorageShrdPtr data_storage)
     : node_controller_configuration(std::move(node_controller_configuration))
     , node_configuration(std::make_shared<NodeConfiguration>(data_storage))
     , processing_pool(std::make_shared<BS::light_thread_pool>())
-    , metric(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric())
+    , metrics(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric())
+    , system_metrics(ServiceResolver<IMetricService>::resolve()->getNodeControllerSystemMetric())
 {
     // set logger
     logger = ServiceResolver<ILogger>::resolve();
@@ -43,7 +48,8 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
     // register worker for command type
     logger->logMessage("Configure command executor", LogLevel::INFO);
     auto monitor_command_worker = std::make_shared<MonitorCommandWorker>(this->node_controller_configuration->monitor_command_configuration, ServiceResolver<EpicsServiceManager>::resolve(), node_configuration);
-    if (!monitor_command_worker) {
+    if (!monitor_command_worker)
+    {
         throw std::runtime_error("Failed to create SnapshotCommandWorker");
     }
     worker_resolver.registerObjectInstance(CommandType::monitor, monitor_command_worker);
@@ -51,20 +57,33 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
     worker_resolver.registerObjectInstance(CommandType::get, std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
     worker_resolver.registerObjectInstance(CommandType::put, std::make_shared<PutCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
 
-    auto snapshotCommandWorker = std::make_shared<SnapshotCommandWorker>(this->node_controller_configuration->snapshot_command_configuration,ServiceResolver<EpicsServiceManager>::resolve());
-    if (!snapshotCommandWorker) {
+    auto snapshotCommandWorker = std::make_shared<SnapshotCommandWorker>(this->node_controller_configuration->snapshot_command_configuration, ServiceResolver<EpicsServiceManager>::resolve());
+    if (!snapshotCommandWorker)
+    {
         throw std::runtime_error("Failed to create SnapshotCommandWorker");
     }
     worker_resolver.registerObjectInstance(CommandType::snapshot, snapshotCommandWorker);
     worker_resolver.registerObjectInstance(CommandType::repeating_snapshot, snapshotCommandWorker);
     worker_resolver.registerObjectInstance(CommandType::repeating_snapshot_trigger, snapshotCommandWorker);
     worker_resolver.registerObjectInstance(CommandType::repeating_snapshot_stop, snapshotCommandWorker);
+
+    // add tak to manage the statistic
+    auto statistic_task = MakeTaskShrdPtr(NODE_CONTROLLER_STAT_TASK_NAME, // name of the task
+                                          NODE_CONTROLLER_STAT_TASK_CRON, // cron expression
+                                          std::bind(&NodeController::handleStatistic, this, std::placeholders::_1), // task handler
+                                          -1 // start at application boot time
+    );
+    ServiceResolver<Scheduler>::resolve()->addTask(statistic_task);
 }
 
 NodeController::~NodeController()
 {
+    bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(NODE_CONTROLLER_STAT_TASK_NAME);
+    logger->logMessage(STRING_FORMAT("[NodeController] Remove statistic task : %1%", erased));
+    logger->logMessage("[NodeController] Stopping node controller");
     processing_pool->wait();
     worker_resolver.clear();
+    logger->logMessage("[NodeController] Node controller stopped", LogLevel::INFO);
 }
 
 void NodeController::performManagementTask()
@@ -90,7 +109,8 @@ bool NodeController::isWorkerReady(k2eg::controller::command::cmd::CommandType c
     }
 }
 
-std::size_t NodeController::getTaskRunning(k2eg::controller::command::cmd::CommandType cmd_type) {
+std::size_t NodeController::getTaskRunning(k2eg::controller::command::cmd::CommandType cmd_type)
+{
     if (auto worker = worker_resolver.resolve(cmd_type); worker != nullptr)
     {
         return worker->getTaskRunning();
@@ -106,7 +126,7 @@ void NodeController::submitCommand(ConstCommandShrdPtrVec commands)
     // submitted command metric
     if (commands.size())
     {
-        metric.incrementCounter(INodeControllerMetricCounterType::SubmittedCommand, commands.size());
+        metrics.incrementCounter(INodeControllerMetricCounterType::SubmittedCommand, commands.size());
     }
     // apply all submitted commands
     for (auto& cmd : commands)
@@ -127,4 +147,26 @@ void NodeController::submitCommand(ConstCommandShrdPtrVec commands)
             logger->logMessage(STRING_FORMAT("No worker found for command type '%1%'", std::string(command_type_to_string(cmd->type))), LogLevel::ERROR);
         }
     }
+}
+
+void NodeController::handleStatistic(TaskProperties& task_properties) {
+    proc_system_metrics_grabber.refresh();
+    // update all the node system metrics
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::VmRSSGauge, proc_system_metrics_grabber.vm_rss, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::VmHWMGauge, proc_system_metrics_grabber.vm_hwm, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::VmSizeGauge, proc_system_metrics_grabber.vm_size, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::VmDataGauge, proc_system_metrics_grabber.vm_data, {{"node", node_configuration->getNodeName()}});  
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::VmSwapGauge, proc_system_metrics_grabber.vm_swap, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::ThreadsGauge, proc_system_metrics_grabber.threads, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::OpenFDsGauge, proc_system_metrics_grabber.open_fds, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::MaxFDsGauge, proc_system_metrics_grabber.max_fds, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::UptimeSecGauge, proc_system_metrics_grabber.uptime_sec, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::UtimeTicksCounter, proc_system_metrics_grabber.utime_ticks, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::StimeTicksCounter, proc_system_metrics_grabber.stime_ticks, {{"node", node_configuration->getNodeName()}});  
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::CpuSecondsCounter, proc_system_metrics_grabber.cpu_seconds, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::IOReadBytesCounter, proc_system_metrics_grabber.io_read_bytes, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::IOWriteBytesCounter, proc_system_metrics_grabber.io_write_bytes, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::VoluntaryCtxtSwitchesCounter, proc_system_metrics_grabber.voluntary_ctxt_switches, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::NonvoluntaryCtxtSwitchesCounter, proc_system_metrics_grabber.nonvoluntary_ctxt_switches, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::StarttimeJiffiesGauge, proc_system_metrics_grabber.starttime_jiffies, {{"node", node_configuration->getNodeName()}});
 }

@@ -37,3 +37,12 @@ DummyMetricService::getNodeControllerMetric() {
   if (!node_controller_metric) { node_controller_metric = std::shared_ptr<DummyINodeControllerMetric>(new DummyINodeControllerMetric()); }
   return *node_controller_metric;
 }
+
+INodeControllerSystemMetric& 
+DummyMetricService::getNodeControllerSystemMetric(){
+  std::lock_guard<std::mutex> lk(service_mux);
+  if (!node_controller_system_metric) {
+    node_controller_system_metric = std::shared_ptr<DummyINodeControllerSystemMetric>(new DummyINodeControllerSystemMetric());
+  }
+  return *node_controller_system_metric;
+}

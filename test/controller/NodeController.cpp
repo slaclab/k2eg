@@ -116,6 +116,7 @@ TEST(NodeController, MonitorCommandJsonSerByDefault)
 
     // check that we have json data
     EXPECT_NO_THROW(auto json_object = getJsonObject(*publisher->sent_messages[0]););
+
     // dispose all
     deinitBackend(std::move(node_controller));
 }

@@ -6,6 +6,7 @@
 
 #include <k2eg/service/data/DataStorage.h>
 #include <k2eg/service/configuration/INodeConfiguration.h>
+#include <string>
 
 namespace k2eg::controller::node::configuration {
     typedef std::vector<k2eg::service::data::repository::ChannelMonitorType> ChannelMonitorTypeConstVector;
@@ -51,6 +52,8 @@ public:
 
     // reset all channel monitor check
     void resetAllChannelMonitorCheck();
+
+    const std::string getNodeName() const;
 };
 DEFINE_PTR_TYPES(NodeConfiguration)
 } // namespace k2eg::controller::node::configuration

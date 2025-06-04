@@ -56,7 +56,7 @@ ConsuleNodeConfiguration::~ConsuleNodeConfiguration() {
 }
 
 std::string
-ConsuleNodeConfiguration::getNodeKey() {
+ConsuleNodeConfiguration::getNodeKey() const{
   char hostname[HOST_NAME_MAX];
   if (gethostname(hostname, sizeof(hostname)) == 0) { return STRING_FORMAT("k2eg-node/%1%/configuration", std::string(hostname)); }
   const char* envHostname = std::getenv("HOSTNAME");
@@ -84,4 +84,9 @@ ConsuleNodeConfiguration::setNodeConfiguration(NodeConfigurationShrdPtr node_con
   auto json_str = boost::json::serialize(json_obj);
   auto res = client->kvPut(node_configuration_key, json_str);
   return res;
+}
+
+std::string
+ConsuleNodeConfiguration::getNodeName() const {
+  return getNodeKey();
 }

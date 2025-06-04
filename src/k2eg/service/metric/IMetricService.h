@@ -1,6 +1,7 @@
 #ifndef K2EG_SERVICE_METRIC_IMETRICSERVICE_H_
 #define K2EG_SERVICE_METRIC_IMETRICSERVICE_H_
 
+#include "k2eg/service/metric/INodeControllerSystemMetric.h"
 #include <k2eg/common/types.h>
 
 #include <k2eg/service/metric/IEpicsMetric.h>
@@ -26,6 +27,7 @@ class IMetricService {
   virtual IEpicsMetric& getEpicsMetric() = 0;
   virtual ICMDControllerMetric& getCMDControllerMetric() = 0;
   virtual INodeControllerMetric& getNodeControllerMetric() = 0;
+  virtual INodeControllerSystemMetric& getNodeControllerSystemMetric() = 0;
 };
 DEFINE_PTR_TYPES(IMetricService)
 
