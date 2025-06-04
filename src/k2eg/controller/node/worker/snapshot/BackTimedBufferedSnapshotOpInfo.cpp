@@ -14,7 +14,7 @@ BackTimedBufferedSnapshotOpInfo::BackTimedBufferedSnapshotOpInfo(const std::stri
 
 bool BackTimedBufferedSnapshotOpInfo::init(std::vector<PVShrdPtr>& sanitized_pv_name_list)
 {
-    // there is nothuing to do here
+    // No initialization needed for PVs in this implementation.
     return true;
 }
 
@@ -23,7 +23,7 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout()
     auto is_timeout = SnapshotOpInfo::isTimeout();
     if (is_timeout)
     {
-        // swap thwe buffers so the getData can workw without
+        // On timeout, swap the buffers so getData works on a stable snapshot.
         std::unique_lock<std::shared_mutex> lock(buffer_mutex);
         std::swap(acquiring_buffer, processing_buffer);
     }
@@ -32,21 +32,23 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout()
 
 void BackTimedBufferedSnapshotOpInfo::addData(MonitorEventShrdPtr event_data)
 {
+    // Always add new data to the acquiring buffer.
     std::shared_lock<std::shared_mutex> lock(buffer_mutex);
-    // Add to the acquiring buffer
     acquiring_buffer->push(event_data, steady_clock::now());
 }
 
 std::vector<MonitorEventShrdPtr> BackTimedBufferedSnapshotOpInfo::getData()
 {
+    // Fetch data from the processing buffer only; buffers are circular and self-pruning.
     std::shared_lock<std::shared_mutex> lock(buffer_mutex);
     if (this->cmd->pv_field_filter_list.size() == 0)
     {
+        // No field filtering needed, return all.
         return processing_buffer->fetchWindow();
     }
     else
     {
-        // we need to filterout unneeded fileds
+        // If field filtering is needed, apply it to each event.
         return  processing_buffer->fetchWindow<MonitorEventShrdPtr>(
             [this](auto ev) -> std::optional<MonitorEventShrdPtr>
             {

@@ -5,8 +5,8 @@
 #include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusCMDControllerMetric.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusNodeControllerMetric.h>
+#include <k2eg/service/metric/impl/prometheus/PrometheusNodeControllerSystemMetric.h>
 
-#include <algorithm>
 #include <memory>
 #include <cassert>
 
@@ -56,4 +56,14 @@ PrometheusMetricService::getNodeControllerMetric() {
   }
   assert(node_controller_metric);
   return *node_controller_metric;
+}
+
+INodeControllerSystemMetric&
+PrometheusMetricService::getNodeControllerSystemMetric() {
+  std::lock_guard<std::mutex> lk(service_mux);
+  if (!node_controller_system_metric) {
+    INSTANTIATE_METRIC(PrometheusNodeControllerSystemMetric, exposer_uptr, node_controller_system_metric) 
+  }
+  assert(node_controller_system_metric);
+  return *node_controller_system_metric;
 }

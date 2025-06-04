@@ -69,6 +69,7 @@ endif()
 set(COMMON_SOURCE_FILES
   src/k2eg/k2eg.cpp
   src/k2eg/common/ProgramOptions.cpp
+  src/k2eg/common/ProcSystemMetrics.cpp
 
   src/k2eg/service/data/DataStorage.cpp
   src/k2eg/service/data/repository/ChannelRepository.cpp
@@ -96,6 +97,7 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/metric/impl/prometheus/PrometheusMetricService.cpp
   src/k2eg/service/metric/impl/prometheus/PrometheusCMDControllerMetric.cpp
   src/k2eg/service/metric/impl/prometheus/PrometheusNodeControllerMetric.cpp
+  src/k2eg/service/metric/impl/prometheus/PrometheusNodeControllerSystemMetric.cpp
   src/k2eg/service/metric/impl/DummyMetricService.cpp
 
   src/k2eg/service/log/impl/BoostLogger.cpp
@@ -165,6 +167,7 @@ set(TEST_SOURCE_FILES
   test/metric/EpicsMetric.cpp
   test/metric/CMDMetric.cpp
   test/metric/NodeControllerMetric.cpp
+  test/metric/NodeControllerSystemMetric.cpp
   test/scheduler/Scheduler.cpp
   test/configuration/ConsulConfigurationTest.cpp
   ${COMMON_SOURCE_FILES}
