@@ -10,33 +10,60 @@ using AtomicMonitorEventShrdPtr = std::atomic<k2eg::service::epics_impl::Monitor
 using ShdAtomicCacheElementShrdPtr = std::shared_ptr<AtomicMonitorEventShrdPtr>;
 
 /*
-@brief RepeatingSnapshotOpInfo is a class that holds information about a repeating snapshot operation.
+@brief SnapshotRepeatingOpInfo implements the "Normal" type of repeating snapshot operation.
 @details
-The class contains a command specification, after the command is epxired(ready to be fired)
-all the pv data is collected using the snapshot view(this permnit to get all the lasted received data)
-then it is published
+This class manages the state and data for a "Normal" repeating snapshot operation.
+It holds the command specification and, after the command expires (i.e., is ready to be fired),
+collects all PV data using the snapshot view (allowing retrieval of the latest received data for each PV).
+The collected data is then published as part of the snapshot process.
 */
 class SnapshotRepeatingOpInfo : public SnapshotOpInfo
 {
 public:
-    // per-snapshot views hold pointers into global_cache_
+    /**
+     * @brief Map of PV names to their atomic cache elements for this snapshot.
+     * Each entry holds a shared pointer to an atomic pointer of the latest MonitorEvent for a PV.
+     */
     std::unordered_map<std::string, ShdAtomicCacheElementShrdPtr> element_data;
 
-    // define when the snapshot is acquiring data
+    /**
+     * @brief Indicates whether the snapshot is currently acquiring data.
+     * Set to true while data is being collected for this snapshot.
+     */
     std::atomic<bool> taking_data;
 
+    /**
+     * @brief Constructor for SnapshotRepeatingOpInfo.
+     * @param queue_name The name of the queue associated with this snapshot.
+     * @param cmd Shared pointer to the repeating snapshot command.
+     */
     SnapshotRepeatingOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd);
 
+    /**
+     * @brief Initialize the snapshot operation with a list of PVs.
+     * @param sanitized_pv_name_list List of shared pointers to sanitized PVs.
+     * @return True if initialization is successful, false otherwise.
+     */
     bool init(std::vector<service::epics_impl::PVShrdPtr>& sanitized_pv_name_list) override;
 
+    /**
+     * @brief Check if the snapshot operation has timed out.
+     * @return True if the operation has timed out, false otherwise.
+     */
     bool isTimeout() override ;
 
     /**
-    @brief This method is called when the cache is being updated for the spiecfic pv name
-    @details It is a virtual method that can be overridden by derived classes to perform specific actions when the cache
-    is updated.
-    */
+     * @brief Add monitor event data for a specific PV to the snapshot.
+     * @details This method is called when the cache is being updated for a specific PV name.
+     * It can be overridden by derived classes to perform specific actions when the cache is updated.
+     * @param event_data Shared pointer to the monitor event data.
+     */
     void addData(k2eg::service::epics_impl::MonitorEventShrdPtr event_data) override;
+
+    /**
+     * @brief Retrieve all collected monitor event data for this snapshot.
+     * @return Vector of shared pointers to monitor event data.
+     */
     std::vector<service::epics_impl::MonitorEventShrdPtr> getData() override;
 };
 DEFINE_PTR_TYPES(SnapshotRepeatingOpInfo)

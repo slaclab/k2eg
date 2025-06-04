@@ -250,59 +250,122 @@ while ensuring exclusive access for writing. The cache is implemented as an unor
 representing the snapshot name and the value is an atomic shared pointer to the MonitorEvent object. The atomic shared
 pointer ensures that the MonitorEvent object can be safely accessed and modified by multiple threads without the need
 for additional locking mechanisms. The class provides methods to add, remove, and retrieve snapshots from the cache.
-
-Data is published se sequentially on publisher identifyed by name and iteration number
 */
 class ContinuousSnapshotManager
 {
+    // Reference to configuration for repeating snapshots (thread count, etc.)
     const RepeatingSnaptshotConfiguration& repeating_snapshot_configuration;
-    // define the run flag
+
+    // Flag indicating if the manager is running
     std::atomic<bool> run_flag = false;
-    // local logger shared instances
+
+    // Shared pointer to the logger instance
     k2eg::service::log::ILoggerShrdPtr logger;
-    // local publisher shared instance
+
+    // Shared pointer to the publisher instance for publishing snapshot data
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
     
-    // keep track of running snapshots
+    // Mutex for synchronizing access to running snapshots
     mutable std::shared_mutex snapshot_runinnig_mutex_;
+
+    // Map of currently running snapshots (snapshot name -> SnapshotOpInfo)
     RunninSnapshotMap snapshot_runinnig_;
+
+    // Multimap of PV names to their associated snapshot operations
+    // mutliple snapshots can be associated with the same PV
     PVSnapshotMap pv_snapshot_map_;
 
-    // thread pool for snapshot processing
+    // Thread pool for processing snapshot operations
     std::shared_ptr<BS::light_thread_pool> thread_pool;
-    // EPICS service manager
+
+    // Shared pointer to the EPICS service manager
     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
 
-    // Handler's liveness token
+    // Token for managing the liveness of EPICS event handlers
     k2eg::common::BroadcastToken epics_handler_token;
 
-    // metric statistic
+    // Reference to node controller metrics for statistics collection
     k2eg::service::metric::INodeControllerMetric& metrics;
-    // vector for the throttlig statistic for each thread
+
+    // Vector of throttling managers, one per processing thread
     std::vector<k2eg::common::ThrottlingManagerUPtr> thread_throttling_vector;
 
-    // Received event from EPICS IOCs that are monitored
+    /**
+     * @brief Callback for receiving EPICS monitor events.
+     * @param event_received The event data received from EPICS IOCs.
+     */
     void epicsMonitorEvent(k2eg::service::epics_impl::EpicsServiceManagerHandlerParamterType event_received);
-    // rpocess each snapshot checking if the timewindopws is epxired tahing the data from the cache
-    // and publishing the data
+
+    /**
+     * @brief Process a snapshot operation, checking time windows and publishing data.
+     * @param snapshot_command_info Shared pointer to the snapshot operation info.
+     */
     void processSnapshot(SnapshotOpInfoShrdPtr snapshot_command_info);
-    // Manager the reply to the client durin gthe snapshto submission
+
+    /**
+     * @brief Manage the reply to the client during snapshot submission.
+     * @param error_code Error code to report.
+     * @param error_message Error message string.
+     * @param command The command associated with the reply.
+     * @param publishing_topic Optional topic for publishing the reply.
+     */
     void manageReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstCommandShrdPtr command, const std::string& publishing_topic = "");
-    // is the callback for the publisher
+
+    /**
+     * @brief Callback for publisher events.
+     * @param type Event type.
+     * @param msg Pointer to the published message.
+     * @param error_message Error message string, if any.
+     */
     void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
-    // manage the start of the snapshot
+
+    /**
+     * @brief Start a new repeating snapshot operation.
+     * @param command Shared pointer to the repeating snapshot command.
+     */
     void startSnapshot(command::cmd::ConstRepeatingSnapshotCommandShrdPtr command);
-    // manage the trigger of the snapshot
+
+    /**
+     * @brief Trigger an existing repeating snapshot operation.
+     * @param command Shared pointer to the trigger command.
+     */
     void triggerSnapshot(command::cmd::ConstRepeatingSnapshotTriggerCommandShrdPtr command);
-    // manage the stop of the snapshot
+
+    /**
+     * @brief Stop a running repeating snapshot operation.
+     * @param command Shared pointer to the stop command.
+     */
     void stopSnapshot(command::cmd::ConstRepeatingSnapshotStopCommandShrdPtr command);
-    // manage the statistic collection of the snapshots engine
+
+    /**
+     * @brief Handle statistics collection for the snapshot engine.
+     * @param task_properties Properties of the scheduled statistics task.
+     */
     void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
 
 public:
+    /**
+     * @brief Construct a ContinuousSnapshotManager.
+     * @param repeating_snapshot_configuration Reference to the repeating snapshot configuration.
+     * @param epics_service_manager Shared pointer to the EPICS service manager.
+     */
     ContinuousSnapshotManager(const RepeatingSnaptshotConfiguration& repeating_snapshot_configuration, k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
+
+    /**
+     * @brief Destructor for ContinuousSnapshotManager.
+     */
     ~ContinuousSnapshotManager();
-    void        submitSnapshot(k2eg::controller::command::cmd::ConstCommandShrdPtr snapsthot_command);
+
+    /**
+     * @brief Submit a new snapshot command for processing.
+     * @param snapsthot_command Shared pointer to the snapshot command.
+     */
+    void submitSnapshot(k2eg::controller::command::cmd::ConstCommandShrdPtr snapsthot_command);
+
+    /**
+     * @brief Get the number of currently running snapshots.
+     * @return The count of running snapshots.
+     */
     std::size_t getRunningSnapshotCount() const;
 };
 
