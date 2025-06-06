@@ -666,3 +666,51 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
     // dispose all
     deinitBackend(std::move(node_controller));
 }
+
+TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeStartAndStopLoop)
+{
+    typedef std::map<std::string, msgpack::object> Map;
+    boost::json::object                            reply_msg;
+    std::unique_ptr<NodeController>                node_controller;
+
+    auto publisher = std::make_shared<DischargePublisher>();
+    node_controller = initBackend(ncs_tcp_port, publisher, false, true);
+
+    // add the number of reader from topic
+    dynamic_cast<DischargePublisher*>(publisher.get())->setConsumerNumber(1);
+    while (!node_controller->isWorkerReady(CommandType::repeating_snapshot))
+    {
+        sleep(1);
+        // print the statistics getting from http port
+    }
+
+    auto& system_metrics = ServiceResolver<IMetricService>::resolve()->getNodeControllerSystemMetric();
+    auto  start_time = std::chrono::steady_clock::now();
+    int   idx = 0;
+    while (true)
+    {
+        auto elapsed = std::chrono::steady_clock::now() - start_time;
+        if (elapsed > std::chrono::seconds(60))
+        {
+            break;
+        }
+
+        EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://channel:random:fast"}, 0, 1000, false, SnapshotType::TIMED_BUFFERED, {"value"}})}););
+
+        sleep(2);
+        // print statisdtics
+        auto metrics_string = getUrl("http://localhost:8080/metrics");
+        printSystemMetricsTable(metrics_string, idx++ == 0);
+        // stop the snapshot
+        EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+        // wait for ack command
+        sleep(1);
+    }
+    sleep(5);
+    // fetch metric at the end
+    auto metrics_string = getUrl("http://localhost:8080/metrics");
+    printSystemMetricsTable(metrics_string, false);
+
+    // dispose all
+    deinitBackend(std::move(node_controller));
+}
