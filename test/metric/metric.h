@@ -11,6 +11,9 @@
 
 using namespace std;
 
+#define RANDOM_PORT (unsigned int)(18080 + (rand() % 1000))
+#define METRIC_URL_FROM_PORT(x) "http://localhost:"+std::to_string(x)+"/metrics"
+
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp)
 {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
