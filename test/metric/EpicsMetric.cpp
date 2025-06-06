@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <iostream>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
 #include <chrono>
@@ -21,9 +22,10 @@ TEST(Metric, MetricService) {
 TEST(Metric, EpicsMetricGet) {
   IMetricServiceUPtr m_uptr;
   unsigned int port = 18080 + (rand() % 1000);
-  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=RANDOM_PORT});
+  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=port});
   EXPECT_NO_THROW(m_uptr = std::make_unique<PrometheusMetricService>(std::move(m_conf)));
   auto& e_metric_ref = m_uptr->getEpicsMetric();
+  // Increment the counter for the 'get' operation
   e_metric_ref.incrementCounter(IEpicsMetricCounterType::Get);
   auto metrics_string = getUrl(METRIC_PORT(port));
   ASSERT_NE(metrics_string.find("epics_ioc_operation{op=\"get\"} 1"), -1);
@@ -32,7 +34,7 @@ TEST(Metric, EpicsMetricGet) {
 TEST(Metric, EpicsMetricPut) {
   IMetricServiceUPtr m_uptr;
   unsigned int port = 18080 + (rand() % 1000);
-  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=RANDOM_PORT});
+  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=port});
   EXPECT_NO_THROW(m_uptr = std::make_unique<PrometheusMetricService>(std::move(m_conf)));
   auto& e_metric_ref = m_uptr->getEpicsMetric();
   e_metric_ref.incrementCounter(IEpicsMetricCounterType::Put);
@@ -44,7 +46,7 @@ TEST(Metric, EpicsMetricPut) {
 TEST(Metric, EpicsMetricMonitorData) {
   IMetricServiceUPtr m_uptr;
   unsigned int port = 18080 + (rand() % 1000);
-  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=RANDOM_PORT});
+  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=port});
   EXPECT_NO_THROW(m_uptr = std::make_unique<PrometheusMetricService>(std::move(m_conf)));
   auto& e_metric_ref = m_uptr->getEpicsMetric();
   e_metric_ref.incrementCounter(IEpicsMetricCounterType::MonitorData);
@@ -56,7 +58,7 @@ TEST(Metric, EpicsMetricMonitorData) {
 TEST(Metric, EpicsMetricMonitorCancel) {
   IMetricServiceUPtr m_uptr;
   unsigned int port = 18080 + (rand() % 1000);
-  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=RANDOM_PORT});
+  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=port});
   EXPECT_NO_THROW(m_uptr = std::make_unique<PrometheusMetricService>(std::move(m_conf)));
   auto& e_metric_ref = m_uptr->getEpicsMetric();
   e_metric_ref.incrementCounter(IEpicsMetricCounterType::MonitorCancel);
@@ -68,7 +70,7 @@ TEST(Metric, EpicsMetricMonitorCancel) {
 TEST(Metric, EpicsMetricMonitorFail) {
   IMetricServiceUPtr m_uptr;
   unsigned int port = 18080 + (rand() % 1000);
-  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=RANDOM_PORT});
+  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=port});
   EXPECT_NO_THROW(m_uptr = std::make_unique<PrometheusMetricService>(std::move(m_conf)));
   auto& e_metric_ref = m_uptr->getEpicsMetric();
   e_metric_ref.incrementCounter(IEpicsMetricCounterType::MonitorFail);
@@ -80,7 +82,7 @@ TEST(Metric, EpicsMetricMonitorFail) {
 TEST(Metric, EpicsMetricMonitorTimeout) {
   IMetricServiceUPtr m_uptr;
   unsigned int port = 18080 + (rand() % 1000);
-  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=RANDOM_PORT});
+  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=port});
   EXPECT_NO_THROW(m_uptr = std::make_unique<PrometheusMetricService>(std::move(m_conf)));
   auto& e_metric_ref = m_uptr->getEpicsMetric();
   e_metric_ref.incrementCounter(IEpicsMetricCounterType::MonitorDisconnect);
@@ -92,7 +94,7 @@ TEST(Metric, EpicsMetricMonitorTimeout) {
 TEST(Metric, EpicsMetricMonitorRates) {
   IMetricServiceUPtr m_uptr;
    unsigned int port = 18080 + (rand() % 1000);
-  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=RANDOM_PORT});
+  ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=port});
   EXPECT_NO_THROW(m_uptr = std::make_unique<PrometheusMetricService>(std::move(m_conf)));
   auto& e_metric_ref = m_uptr->getEpicsMetric();
   for(int idx = 0; idx < 1000; idx++) {
