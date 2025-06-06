@@ -3,6 +3,7 @@
 
 #include "k2eg/common/types.h"
 #include <chrono>
+#include <iostream>
 #include <memory>
 #include <vector>
 #include <mutex>
@@ -34,6 +35,13 @@ public:
     explicit TimeWindowEventBuffer(size_t window = 1000, size_t reserve = 1024, size_t grow = 2)
         : buffer(reserve), window_ms(std::chrono::milliseconds(window)), max_size(reserve), grow_factor(grow)
     {}
+
+    ~TimeWindowEventBuffer()
+    {
+        buffer.clear();
+        buffer.shrink_to_fit();
+        head = tail = count = 0;
+    }
 
     void setTimeWindow(std::chrono::milliseconds window)
     {

@@ -2,6 +2,7 @@
 #include <k2eg/service/metric/impl/prometheus/PrometheusNodeControllerSystemMetric.h>
 
 using namespace prometheus;
+using namespace k2eg::service::metric;
 using namespace k2eg::service::metric::impl::prometheus_impl;
 
 PrometheusNodeControllerSystemMetric::PrometheusNodeControllerSystemMetric()

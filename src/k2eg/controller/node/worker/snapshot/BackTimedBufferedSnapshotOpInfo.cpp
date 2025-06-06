@@ -12,6 +12,11 @@ BackTimedBufferedSnapshotOpInfo::BackTimedBufferedSnapshotOpInfo(const std::stri
 {
 }
 
+BackTimedBufferedSnapshotOpInfo::~BackTimedBufferedSnapshotOpInfo(){
+    acquiring_buffer.reset();
+    processing_buffer.reset();
+}
+
 bool BackTimedBufferedSnapshotOpInfo::init(std::vector<PVShrdPtr>& sanitized_pv_name_list)
 {
     // No initialization needed for PVs in this implementation.
@@ -40,16 +45,17 @@ void BackTimedBufferedSnapshotOpInfo::addData(MonitorEventShrdPtr event_data)
 std::vector<MonitorEventShrdPtr> BackTimedBufferedSnapshotOpInfo::getData()
 {
     // Fetch data from the processing buffer only; buffers are circular and self-pruning.
+    std::vector<MonitorEventShrdPtr> result;
     std::shared_lock<std::shared_mutex> lock(buffer_mutex);
     if (this->cmd->pv_field_filter_list.size() == 0)
     {
         // No field filtering needed, return all.
-        return processing_buffer->fetchWindow();
+        result = processing_buffer->fetchWindow();
     }
     else
     {
         // If field filtering is needed, apply it to each event.
-        return  processing_buffer->fetchWindow<MonitorEventShrdPtr>(
+        result = processing_buffer->fetchWindow<MonitorEventShrdPtr>(
             [this](auto ev) -> std::optional<MonitorEventShrdPtr>
             {
                 return std::make_optional(MakeMonitorEventShrdPtr(
@@ -57,4 +63,6 @@ std::vector<MonitorEventShrdPtr> BackTimedBufferedSnapshotOpInfo::getData()
                     ChannelData{ev->channel_data.pv_name, filterPVField(ev->channel_data.data, this->cmd->pv_field_filter_list)}));
             });
     }
+    processing_buffer->reset();
+    return result;
 }

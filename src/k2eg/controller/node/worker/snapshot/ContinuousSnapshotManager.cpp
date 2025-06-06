@@ -1,4 +1,5 @@
 
+
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.h>
@@ -428,9 +429,12 @@ void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_c
 
                 logger->logMessage(STRING_FORMAT("Snapshot %1% is cancelled", snapshot_command_info->queue_name), LogLevel::INFO);
             }
+
+            // we can force delete memory of the snapshot command info
+            snapshot_command_info.reset();
             return;
         }
-        // get data from snapshot command info
+        // // get data from snapshot command info
         auto snapshot_events = snapshot_command_info->getData();
         logger->logMessage(STRING_FORMAT("Snapshot %1% will be triggered with event [%2%]", snapshot_command_info->queue_name%snapshot_events.size()), LogLevel::INFO);
         // increment the iteration index

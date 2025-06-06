@@ -71,7 +71,7 @@ public:
     /**
      * @brief Destructor.
      */
-    ~BackTimedBufferedSnapshotOpInfo() = default;
+    virtual ~BackTimedBufferedSnapshotOpInfo();
     /**
      * @brief Initialize the snapshot operation with a sanitized list of PVs.
      * @param sanitized_pv_name_list The list of sanitized PV shared pointers.
