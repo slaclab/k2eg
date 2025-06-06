@@ -478,6 +478,45 @@ public:
     }
 };
 
+class DischargePublisher : public ControllerConsumerDummyPublisher
+{
+public:
+    DischargePublisher() = default;
+    ~DischargePublisher() = default;
+
+    void setAutoPoll(bool autopoll) {}
+
+    int setCallBackForReqType(const std::string req_type, EventCallback eventCallback)
+    {
+        return 0;
+    }
+
+    int createQueue(const QueueDescription& queue)
+    {
+        return 0;
+    }
+
+    int deleteQueue(const std::string& queue_name)
+    {
+        return 0;
+    }
+    
+    int pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& header = PublisherHeaders())
+    {
+        return 0;
+    }
+
+    int pushMessages(PublisherMessageVector& messages, const PublisherHeaders& header = PublisherHeaders())
+    {
+        return 0;
+    }
+
+    size_t getQueueMessageSize()
+    {
+        return 0;
+    }
+};
+
 inline boost::json::object getJsonObject(PublishMessage& published_message)
 {
     bs::error_code  ec;
@@ -652,6 +691,8 @@ inline std::unique_ptr<NodeController> initBackend(int& tcp_port, IPublisherShrd
     // set monitor expiration time out at minimum
     setenv(("EPICS_k2eg_" + std::string(NC_MONITOR_EXPIRATION_TIMEOUT)).c_str(), "1", 1);
     setenv(("EPICS_k2eg_" + std::string(CONFIGURATION_SERVICE_HOST)).c_str(), "consul", 1);
+    setenv(("EPICS_k2eg_" + std::string(METRIC_ENABLE)).c_str(), "true", 1);
+    setenv(("EPICS_k2eg_" + std::string(METRIC_HTTP_PORT)).c_str(), "8080", 1);
     std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
     opt->parse(argc, argv);
     ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsuleNodeConfiguration>(opt->getConfigurationServiceConfiguration()));

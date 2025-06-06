@@ -32,8 +32,10 @@
 
 #include "NodeControllerCommon.h"
 
+#include "../metric/metric.h"
 #include "k2eg/controller/command/cmd/MonitorCommand.h"
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
+#include "k2eg/service/metric/IMetricService.h"
 #include "k2eg/service/pubsub/IPublisher.h"
 #include "msgpack/v3/object_fwd_decl.hpp"
 
@@ -584,3 +586,64 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsWit
     // dispose all
     deinitBackend(std::move(node_controller));
 }
+
+TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHighRate)
+{
+    typedef std::map<std::string, msgpack::object> Map;
+    boost::json::object                            reply_msg;
+    std::unique_ptr<NodeController>                node_controller;
+
+    auto publisher = std::make_shared<DischargePublisher>();
+    node_controller = initBackend(ncs_tcp_port, publisher, false, true);
+
+    // add the number of reader from topic
+    dynamic_cast<DischargePublisher*>(publisher.get())->setConsumerNumber(1);
+    while (!node_controller->isWorkerReady(CommandType::repeating_snapshot))
+    {
+        sleep(1);
+        // print the statistics getting from http port
+    }
+
+    // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
+    // givin a new event, only for that
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://channel:random:fast"}, 0, 4000, false, SnapshotType::TIMED_BUFFERED, {"value"}})}););
+
+    // wait 60 seconds to let the snapshot start and acquire data overflowing the timewindow
+    //  get now
+    auto& system_metrics = ServiceResolver<IMetricService>::resolve()->getNodeControllerSystemMetric();
+    auto  start_time = std::chrono::steady_clock::now();
+    int idx = 0;
+    while (true)
+    {
+        auto elapsed = std::chrono::steady_clock::now() - start_time;
+        if (elapsed > std::chrono::seconds(60))
+        {
+            break;
+        }
+        // print statisdtics
+        auto metrics_string = getUrl("http://localhost:8080/metrics");
+        printSystemMetricsTable(metrics_string, idx++==0);
+        sleep(1);
+    }
+
+    // stop the snapshot
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    // wait for ack command
+    sleep(1);
+
+    // wait for the stop message succeed
+    while (node_controller->getTaskRunning(CommandType::repeating_snapshot))
+    {
+        sleep(1);
+    }
+
+    sleep(5);
+
+    // fetch metric at the end
+    auto metrics_string = getUrl("http://localhost:8080/metrics");
+    printSystemMetricsTable(metrics_string, false);
+
+    // dispose all
+    deinitBackend(std::move(node_controller));
+}
+

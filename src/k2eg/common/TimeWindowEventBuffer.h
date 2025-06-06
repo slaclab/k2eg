@@ -3,6 +3,7 @@
 
 #include "k2eg/common/types.h"
 #include <chrono>
+#include <iostream>
 #include <memory>
 #include <vector>
 #include <mutex>
