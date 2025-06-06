@@ -275,7 +275,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=Metric.NodeControllerMetricSubmittedCommand*"],
+            "args": ["--gtest_filter=Metric.*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
