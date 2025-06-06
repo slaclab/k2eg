@@ -13,9 +13,7 @@ BackTimedBufferedSnapshotOpInfo::BackTimedBufferedSnapshotOpInfo(const std::stri
 }
 
 BackTimedBufferedSnapshotOpInfo::~BackTimedBufferedSnapshotOpInfo(){
-    acquiring_buffer->reset();
     acquiring_buffer.reset();
-    processing_buffer->reset();
     processing_buffer.reset();
 }
 

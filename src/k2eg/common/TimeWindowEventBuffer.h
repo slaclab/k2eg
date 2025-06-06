@@ -36,6 +36,13 @@ public:
         : buffer(reserve), window_ms(std::chrono::milliseconds(window)), max_size(reserve), grow_factor(grow)
     {}
 
+    ~TimeWindowEventBuffer()
+    {
+        buffer.clear();
+        buffer.shrink_to_fit();
+        head = tail = count = 0;
+    }
+
     void setTimeWindow(std::chrono::milliseconds window)
     {
         window_ms = window;
