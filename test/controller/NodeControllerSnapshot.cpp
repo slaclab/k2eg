@@ -612,7 +612,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
     //  get now
     auto& system_metrics = ServiceResolver<IMetricService>::resolve()->getNodeControllerSystemMetric();
     auto  start_time = std::chrono::steady_clock::now();
-    int idx = 0;
+    int   idx = 0;
     while (true)
     {
         auto elapsed = std::chrono::steady_clock::now() - start_time;
@@ -622,7 +622,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
         }
         // print statisdtics
         auto metrics_string = getUrl("http://localhost:8080/metrics");
-        printSystemMetricsTable(metrics_string, idx++==0);
+        printSystemMetricsTable(metrics_string, idx++ == 0);
         sleep(1);
     }
 
@@ -637,6 +637,26 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
         sleep(1);
     }
 
+    // restart the snapshto
+    // givin a new event, only for that
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://channel:random:fast"}, 0, 4000, false, SnapshotType::TIMED_BUFFERED, {"value"}})}););
+    start_time = std::chrono::steady_clock::now();
+    while (true)
+    {
+        auto elapsed = std::chrono::steady_clock::now() - start_time;
+        if (elapsed > std::chrono::seconds(60))
+        {
+            break;
+        }
+        // print statisdtics
+        auto metrics_string = getUrl("http://localhost:8080/metrics");
+        printSystemMetricsTable(metrics_string, idx++ == 0);
+        sleep(1);
+    }
+
+    // stop the snapshot
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+
     sleep(5);
 
     // fetch metric at the end
@@ -646,4 +666,3 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
     // dispose all
     deinitBackend(std::move(node_controller));
 }
-
