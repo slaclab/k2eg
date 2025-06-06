@@ -686,13 +686,12 @@ inline std::unique_ptr<NodeController> initBackend(int& tcp_port, IPublisherShrd
         setenv("EPICS_k2eg_configuration-reset-on-start", "true", 1);
     }
 
-    setenv("EPICS_k2eg_metric-server-http-port", std::to_string(++tcp_port).c_str(), 1);
     setenv(("EPICS_k2eg_" + std::string(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS)).c_str(), "1", 1);
     // set monitor expiration time out at minimum
     setenv(("EPICS_k2eg_" + std::string(NC_MONITOR_EXPIRATION_TIMEOUT)).c_str(), "1", 1);
     setenv(("EPICS_k2eg_" + std::string(CONFIGURATION_SERVICE_HOST)).c_str(), "consul", 1);
     setenv(("EPICS_k2eg_" + std::string(METRIC_ENABLE)).c_str(), "true", 1);
-    setenv(("EPICS_k2eg_" + std::string(METRIC_HTTP_PORT)).c_str(), "8080", 1);
+    setenv(("EPICS_k2eg_" + std::string(METRIC_HTTP_PORT)).c_str(), std::to_string(++tcp_port).c_str(), 1);
     std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
     opt->parse(argc, argv);
     ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsuleNodeConfiguration>(opt->getConfigurationServiceConfiguration()));

@@ -621,7 +621,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
             break;
         }
         // print statisdtics
-        auto metrics_string = getUrl("http://localhost:8080/metrics");
+        auto metrics_string = getUrl(METRIC_URL_FROM_PORT(ncs_tcp_port));
         printSystemMetricsTable(metrics_string, idx++ == 0);
         sleep(1);
     }
@@ -649,7 +649,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
             break;
         }
         // print statisdtics
-        auto metrics_string = getUrl("http://localhost:8080/metrics");
+        auto metrics_string = getUrl(METRIC_URL_FROM_PORT(ncs_tcp_port));
         printSystemMetricsTable(metrics_string, idx++ == 0);
         sleep(1);
     }
@@ -660,7 +660,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
     sleep(5);
 
     // fetch metric at the end
-    auto metrics_string = getUrl("http://localhost:8080/metrics");
+    auto metrics_string = getUrl(METRIC_URL_FROM_PORT(ncs_tcp_port));
     printSystemMetricsTable(metrics_string, false);
 
     // dispose all
@@ -699,7 +699,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeStartAndStopLoop)
 
         sleep(2);
         // print statisdtics
-        auto metrics_string = getUrl("http://localhost:8080/metrics");
+        auto metrics_string = getUrl(METRIC_URL_FROM_PORT(ncs_tcp_port));
         printSystemMetricsTable(metrics_string, idx++ == 0);
         // stop the snapshot
         EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
@@ -708,7 +708,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeStartAndStopLoop)
     }
     sleep(5);
     // fetch metric at the end
-    auto metrics_string = getUrl("http://localhost:8080/metrics");
+    auto metrics_string = getUrl(METRIC_URL_FROM_PORT(ncs_tcp_port));
     printSystemMetricsTable(metrics_string, false);
 
     // dispose all
