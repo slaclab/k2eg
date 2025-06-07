@@ -1,6 +1,8 @@
 
 #include <k2eg/service/metric/impl/prometheus/PrometheusNodeControllerSystemMetric.h>
 
+#include <thread>
+
 using namespace prometheus;
 using namespace k2eg::service::metric;
 using namespace k2eg::service::metric::impl::prometheus_impl;
@@ -66,8 +68,11 @@ PrometheusNodeControllerSystemMetric::PrometheusNodeControllerSystemMetric()
     , uptime_sec_gauge_family(prometheus::BuildGauge().Name("k2eg_system_uptime_seconds").Help("Uptime in seconds").Register(*registry))
     , starttime_jiffies_gauge_family(
           prometheus::BuildGauge().Name("k2eg_system_starttime_jiffies").Help("Process start time (jiffies since boot)").Register(*registry))
+    , num_cores_gauge_family(prometheus::BuildGauge().Name("k2eg_system_num_cores").Help("Number of logical CPU cores").Register(*registry))
 {
     // Additional initialization if needed
+    unsigned int num_cores = std::thread::hardware_concurrency();
+    num_cores_gauge_family.Add({}).Set(static_cast<double>(num_cores));
 }
 
 void PrometheusNodeControllerSystemMetric::incrementCounter(INodeControllerSystemMetricType type, const double absolute_value, const std::map<std::string, std::string>& label)
@@ -112,10 +117,10 @@ void PrometheusNodeControllerSystemMetric::incrementCounter(INodeControllerSyste
             }
             else
             {
-                // First observation, just set last_value, don't increment
+                // First observation, add the absolute value to the counter
+                delta = absolute_value;
                 state.last_value = absolute_value;
                 state.initialized = true;
-                delta = 0.0;
             }
         }
         if (delta > 0)

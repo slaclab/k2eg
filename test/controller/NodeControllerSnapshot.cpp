@@ -586,7 +586,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsWit
     // dispose all
     deinitBackend(std::move(node_controller));
 }
-
+#include <malloc.h>
 TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHighRate)
 {
     typedef std::map<std::string, msgpack::object> Map;
@@ -658,7 +658,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
 
     sleep(5);
-
+    malloc_stats();
+    sleep(5);
     // fetch metric at the end
     auto metrics_string = getUrl(METRIC_URL_FROM_PORT(ncs_tcp_port));
     printSystemMetricsTable(metrics_string, false);
