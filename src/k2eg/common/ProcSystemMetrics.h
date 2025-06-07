@@ -13,6 +13,7 @@ namespace k2eg::common {
 class ProcSystemMetrics
 {
 public:
+    unsigned int num_cores;
     // Memory (in kB)
     long vm_rss = 0;   ///< Resident Set Size: non-swapped physical memory
     long vm_hwm = 0;   ///< Peak Resident Set Size ("high water mark")

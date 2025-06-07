@@ -38,6 +38,7 @@ class PrometheusNodeControllerSystemMetric : public INodeControllerSystemMetric
     prometheus::Family<prometheus::Gauge>& max_fds_gauge_family;
     prometheus::Family<prometheus::Gauge>& uptime_sec_gauge_family;
     prometheus::Family<prometheus::Gauge>& starttime_jiffies_gauge_family;
+    prometheus::Family<prometheus::Gauge>& num_cores_gauge_family;
 
     PrometheusNodeControllerSystemMetric();
 

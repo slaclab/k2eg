@@ -1,5 +1,6 @@
 #include <k2eg/common/ProcSystemMetrics.h>
 
+#include <thread> 
 #include <dirent.h>
 #include <fstream>
 #include <sstream>
@@ -9,7 +10,9 @@
 
 using namespace k2eg::common;
 
-ProcSystemMetrics::ProcSystemMetrics() {}
+ProcSystemMetrics::ProcSystemMetrics() {
+    num_cores = std::thread::hardware_concurrency();
+}
 
 void ProcSystemMetrics::refresh()
 {
