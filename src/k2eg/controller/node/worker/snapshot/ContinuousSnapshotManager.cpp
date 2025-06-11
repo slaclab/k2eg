@@ -432,8 +432,13 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                         it = snapshot_runinnig_.erase(it);
                         continue; // move to next snapshot after erase
                     } else {
+                        // print log with submisison information
                         thread_pool->detach_task([this, s_op_ptr]() mutable {
-                            SnapshotSubmissionTask task(s_op_ptr, std::move(s_op_ptr->getData()), this->publisher, this->logger);
+                            auto submission = s_op_ptr->getData();
+                            logger->logMessage(STRING_FORMAT("Snapshot %1% will be submitted with %2% events with submission type %3%",
+                                                             s_op_ptr->cmd->snapshot_name % submission.snapshot_events.size() % static_cast<int>(submission.submission_type)),
+                                             LogLevel::INFO);
+                            SnapshotSubmissionTask task(s_op_ptr, std::move(submission), this->publisher, this->logger);
                             task();
                         });
                     }

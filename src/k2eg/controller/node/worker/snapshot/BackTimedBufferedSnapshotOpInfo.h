@@ -55,9 +55,13 @@ specified fields if requested.
 class BackTimedBufferedSnapshotOpInfo : public SnapshotOpInfo
 {
     // define when the snapshot is acquiring data
-    mutable std::shared_mutex     buffer_mutex;
-    MonitoEventBacktimeBufferUPtr acquiring_buffer;
-    MonitoEventBacktimeBufferUPtr processing_buffer;
+    mutable std::shared_mutex             buffer_mutex;
+    MonitoEventBacktimeBufferUPtr         acquiring_buffer;
+    MonitoEventBacktimeBufferUPtr         processing_buffer;
+    std::chrono::steady_clock::time_point last_forced_expire = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point last_timeout_check = std::chrono::steady_clock::now();
+    bool                                  header_sent = false;
+    bool                                  win_time_expired = false;
 
 public:
     // Buffer to store all received values during the time window
