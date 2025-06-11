@@ -8,6 +8,72 @@
 #include <k2eg/controller/node/worker/CommandWorker.h>
 
 namespace k2eg::controller::node::worker::snapshot {
+
+enum class SnapshotSubmissionType
+{
+    None = 0,
+    Header = 1 << 0,
+    Data = 1 << 1,
+    Tail = 1 << 2
+};
+
+// Bitwise operators for SnapshotSubmissionType
+inline SnapshotSubmissionType operator|(SnapshotSubmissionType a, SnapshotSubmissionType b)
+{
+    return static_cast<SnapshotSubmissionType>(static_cast<int>(a) | static_cast<int>(b));
+}
+
+inline SnapshotSubmissionType operator&(SnapshotSubmissionType a, SnapshotSubmissionType b)
+{
+    return static_cast<SnapshotSubmissionType>(static_cast<int>(a) & static_cast<int>(b));
+}
+
+inline SnapshotSubmissionType& operator|=(SnapshotSubmissionType& a, SnapshotSubmissionType b)
+{
+    a = a | b;
+    return a;
+}
+
+// forward declaration
+class SnapshotOpInfo;
+
+// the class for the submition of a snapshot
+class SnapshotSubmission
+{
+public:
+    std::int64_t                                          snap_ts = 0; // timestamp for the snapshot
+    std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events;
+    SnapshotSubmissionType                                submission_type;
+
+    // Constructor
+    SnapshotSubmission(std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events, SnapshotSubmissionType submission_type)
+        : snapshot_events(std::move(snapshot_events)), submission_type(submission_type)
+    {
+    }
+
+    // Move constructor
+    SnapshotSubmission(SnapshotSubmission&& other) noexcept
+        : snapshot_events(std::move(other.snapshot_events))
+        , submission_type(other.submission_type)
+    {
+    }
+
+    // Move assignment operator
+    SnapshotSubmission& operator=(SnapshotSubmission&& other) noexcept
+    {
+        if (this != &other)
+        {
+            snapshot_events = std::move(other.snapshot_events);
+            submission_type = other.submission_type;
+        }
+        return *this;
+    }
+
+    // Delete copy constructor and copy assignment to enforce move semantics
+    SnapshotSubmission(const SnapshotSubmission&) = delete;
+    SnapshotSubmission& operator=(const SnapshotSubmission&) = delete;
+};
+
 /*
 @brief define the snapshot operation info
 @details This class is used to store the information and data about the snapshot operation
@@ -38,7 +104,7 @@ public:
 
     // Indicates if the operation is currently running
     bool is_running = true;
-    
+
     // Constructor: initializes with queue name and command pointer
     SnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd);
 
@@ -52,7 +118,7 @@ public:
     virtual void addData(k2eg::service::epics_impl::MonitorEventShrdPtr event_data) = 0;
 
     // Retrieve collected monitor event data
-    virtual std::vector<service::epics_impl::MonitorEventShrdPtr> getData() = 0;
+    virtual SnapshotSubmission getData() = 0;
 
     // Check if the operation has timed out
     virtual bool isTimeout();

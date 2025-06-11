@@ -94,7 +94,7 @@ public:
      *        If field filtering is enabled, only the specified fields are included.
      * @return A vector of shared pointers to MonitorEvent objects.
      */
-    std::vector<service::epics_impl::MonitorEventShrdPtr> getData() override;
+    SnapshotSubmission getData() override;
 };
 DEFINE_PTR_TYPES(BackTimedBufferedSnapshotOpInfo)
 } // namespace k2eg::controller::node::worker::snapshot

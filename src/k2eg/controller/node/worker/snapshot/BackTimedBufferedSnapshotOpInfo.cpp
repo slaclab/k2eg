@@ -42,7 +42,7 @@ void BackTimedBufferedSnapshotOpInfo::addData(MonitorEventShrdPtr event_data)
     acquiring_buffer->push(event_data, steady_clock::now());
 }
 
-std::vector<MonitorEventShrdPtr> BackTimedBufferedSnapshotOpInfo::getData()
+SnapshotSubmission BackTimedBufferedSnapshotOpInfo::getData()
 {
     // Fetch data from the processing buffer only; buffers are circular and self-pruning.
     std::vector<MonitorEventShrdPtr> result;
@@ -64,5 +64,8 @@ std::vector<MonitorEventShrdPtr> BackTimedBufferedSnapshotOpInfo::getData()
             });
     }
     processing_buffer->reset();
-    return result;
+    return SnapshotSubmission(
+        std::move(result),
+        (SnapshotSubmissionType::Header | SnapshotSubmissionType::Data | SnapshotSubmissionType::Tail)
+    );;
 }

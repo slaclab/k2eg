@@ -243,18 +243,15 @@ DEFINE_UOMAP_FOR_TYPE(std::string, std::shared_ptr<SnapshotOpInfo>, RunninSnapsh
 using PVSnapshotMap = std::unordered_multimap<std::string, std::shared_ptr<SnapshotOpInfo>>;
 
 // class used to submit data to the publisher
-class SnapshotSubmissionTask {
-    std::shared_ptr<SnapshotOpInfo> snapshot_command_info;
-    std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events;
+class SnapshotSubmissionTask
+{
+    std::shared_ptr<SnapshotOpInfo>          snapshot_command_info; // shared pointer to the snapshot operation info
+    SnapshotSubmission                       submission;
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
-    k2eg::service::log::ILoggerShrdPtr logger;
+    k2eg::service::log::ILoggerShrdPtr       logger;
 
 public:
-    SnapshotSubmissionTask(
-        std::shared_ptr<SnapshotOpInfo> snapshot_op,
-        std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events,
-        k2eg::service::pubsub::IPublisherShrdPtr publisher,
-        k2eg::service::log::ILoggerShrdPtr logger);
+    SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmission&& submission, k2eg::service::pubsub::IPublisherShrdPtr publisher, k2eg::service::log::ILoggerShrdPtr logger);
 
     void operator()();
 };
@@ -308,8 +305,8 @@ class ContinuousSnapshotManager
     // Vector of throttling managers, one per processing thread
     std::vector<k2eg::common::ThrottlingManagerUPtr> thread_throttling_vector;
 
-    std::thread             expiration_thread;
-    std::atomic<bool>       expiration_thread_running{false};
+    std::thread       expiration_thread;
+    std::atomic<bool> expiration_thread_running{false};
 
     /**
      * @brief Callback for receiving EPICS monitor events.
