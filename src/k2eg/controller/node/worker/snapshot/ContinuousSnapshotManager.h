@@ -21,11 +21,11 @@
 #include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <shared_mutex>
 #include <string>
-#include <cstddef>
 #include <unordered_map>
 
 namespace k2eg::controller::node::worker::snapshot {
@@ -241,6 +241,24 @@ using ShdAtomicCacheElementShrdPtr = std::shared_ptr<AtomicMonitorEventShrdPtr>;
 
 DEFINE_UOMAP_FOR_TYPE(std::string, std::shared_ptr<SnapshotOpInfo>, RunninSnapshotMap)
 using PVSnapshotMap = std::unordered_multimap<std::string, std::shared_ptr<SnapshotOpInfo>>;
+
+// class used to submit data to the publisher
+class SnapshotSubmissionTask {
+    std::shared_ptr<SnapshotOpInfo> snapshot_command_info;
+    std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events;
+    k2eg::service::pubsub::IPublisherShrdPtr publisher;
+    k2eg::service::log::ILoggerShrdPtr logger;
+
+public:
+    SnapshotSubmissionTask(
+        std::shared_ptr<SnapshotOpInfo> snapshot_op,
+        std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events,
+        k2eg::service::pubsub::IPublisherShrdPtr publisher,
+        k2eg::service::log::ILoggerShrdPtr logger);
+
+    void operator()();
+};
+
 /*
 @brief ContinuousSnapshotManager is a class that manages the continuous snapshot of EPICS events.
 It provides a local cache for continuous snapshots and ensures thread-safe access to the cache.
@@ -264,7 +282,7 @@ class ContinuousSnapshotManager
 
     // Shared pointer to the publisher instance for publishing snapshot data
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
-    
+
     // Mutex for synchronizing access to running snapshots
     mutable std::shared_mutex snapshot_runinnig_mutex_;
 
@@ -289,6 +307,9 @@ class ContinuousSnapshotManager
 
     // Vector of throttling managers, one per processing thread
     std::vector<k2eg::common::ThrottlingManagerUPtr> thread_throttling_vector;
+
+    std::thread             expiration_thread;
+    std::atomic<bool>       expiration_thread_running{false};
 
     /**
      * @brief Callback for receiving EPICS monitor events.
@@ -342,6 +363,7 @@ class ContinuousSnapshotManager
      * @param task_properties Properties of the scheduled statistics task.
      */
     void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
+    void expirationCheckerLoop();
 
 public:
     /**
