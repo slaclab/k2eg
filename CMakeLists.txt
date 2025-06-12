@@ -83,6 +83,7 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/epics/EpicsServiceManager.cpp
   src/k2eg/service/epics/JsonSerialization.cpp
   src/k2eg/service/epics/MsgPackSerialization.cpp
+  src/k2eg/service/epics/MsgpackEpicsConverter.cpp
   src/k2eg/service/epics/MsgpackCompactSerialization.cpp
   
   src/k2eg/service/pubsub/IPublisher.cpp
@@ -156,6 +157,7 @@ set(TEST_SOURCE_FILES
   test/k2eg.cpp
   test/data/DataStorage.cpp
   test/epics/epics.cpp
+  test/epics/epics_msgpack_converter.cpp
   test/epics/epics_data_serialization.cpp
   test/pubsub/kafka.cpp
   test/common/ProgramOptions.cpp
@@ -245,7 +247,7 @@ ExternalProject_Add(
   BUILD_COMMAND make -j 3 INSTALL_LOCATION=${CMAKE_INSTALL_PREFIX} install
 )
 
-SET(BUILD_LIBRARY ${BUILD_LIBRARY} pvaClient pvAccess Com pvData pvDatabase pvAccessCA)
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} nt pvaClient pvAccess Com pvData pvDatabase pvAccessCA)
 ADD_DEPENDENCIES(${PROJECT_NAME} epics)
 ADD_DEPENDENCIES(${PROJECT_NAME}-test epics)
 TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/os/${CMAKE_SYSTEM_NAME})
