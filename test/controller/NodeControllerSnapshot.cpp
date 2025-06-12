@@ -587,6 +587,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsWit
     deinitBackend(std::move(node_controller));
 }
 
+
 #include <malloc.h>
 
 TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHighRate)
