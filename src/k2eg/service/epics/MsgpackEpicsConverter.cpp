@@ -1,5 +1,6 @@
-#include "pvType.h"
 #include <k2eg/service/epics/MsgpackEpicsConverter.h>
+
+#include <pvType.h>
 #include <pv/convert.h>
 
 namespace pvd = epics::pvData;
