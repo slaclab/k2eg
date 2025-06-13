@@ -243,11 +243,11 @@
                 }
             ]
         },{
-            "name": "Test EPICS Serialization",
+            "name": "Test EPICS EpicsChannel Serialization",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=Epics.Serialization*"],
+            "args": ["--gtest_filter=EpicsChannel.Serialization*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

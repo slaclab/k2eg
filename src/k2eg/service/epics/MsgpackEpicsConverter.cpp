@@ -1,7 +1,7 @@
 #include <k2eg/service/epics/MsgpackEpicsConverter.h>
 
-#include <pvType.h>
 #include <pv/convert.h>
+#include <pvType.h>
 
 namespace pvd = epics::pvData;
 using namespace k2eg::service::epics_impl;
@@ -28,6 +28,11 @@ void MsgpackEpicsConverter::epicsToMsgpack(const pvd::PVStructurePtr& pvStruct, 
 
 void MsgpackEpicsConverter::packField(msgpack::packer<msgpack::sbuffer>& pk, const pvd::PVFieldPtr& field)
 {
+    if (!field)
+    {
+        pk.pack_nil();
+        return;
+    }
     switch (field->getField()->getType())
     {
     case pvd::scalar:
