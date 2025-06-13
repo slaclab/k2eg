@@ -1,3 +1,4 @@
+#include "k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h"
 #include <k2eg/controller/node/worker/snapshot/SnapshotRepeatingOpInfo.h>
 
 using namespace k2eg::controller::node::worker::snapshot;
@@ -41,7 +42,7 @@ void SnapshotRepeatingOpInfo::addData(MonitorEventShrdPtr event_data)
     }
 }
 
-std::vector<MonitorEventShrdPtr> SnapshotRepeatingOpInfo::getData()
+SnapshotSubmission SnapshotRepeatingOpInfo::getData()
 {
     // Temporarily stop taking data while collecting the snapshot.
     taking_data.store(false, std::memory_order_release);
@@ -58,5 +59,8 @@ std::vector<MonitorEventShrdPtr> SnapshotRepeatingOpInfo::getData()
     }
     // Resume taking data after snapshot collection.
     taking_data.store(true, std::memory_order_release);
-    return result;
+    return SnapshotSubmission(
+        std::move(result),
+        (SnapshotSubmissionType::Header | SnapshotSubmissionType::Data | SnapshotSubmissionType::Tail)
+    );
 }

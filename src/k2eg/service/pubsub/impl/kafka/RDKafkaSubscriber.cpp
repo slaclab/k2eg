@@ -121,7 +121,7 @@ RDKafkaSubscriber::getMsg(SubscriberInterfaceElementVector &messages, unsigned i
 }
 
 int
-RDKafkaSubscriber::internalConsume(std::unique_ptr<RdKafka::Message> message, SubscriberInterfaceElementVector &messages) {
+RDKafkaSubscriber::internalConsume(std::unique_ptr<RdKafka::Message> message, SubscriberInterfaceElementVector& messages) {
   size_t                  len = message->len();
   std::unique_ptr<char[]> buffer(new char[len]);
   // copy message

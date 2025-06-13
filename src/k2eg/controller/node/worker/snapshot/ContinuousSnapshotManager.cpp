@@ -19,6 +19,7 @@
 #include <memory>
 #include <mutex>
 #include <regex>
+#include <utility>
 
 using namespace k2eg::controller::command::cmd;
 using namespace k2eg::controller::node::worker;
@@ -75,11 +76,20 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnaptshotCon
                                           -1 // start at application boot time
     );
     ServiceResolver<Scheduler>::resolve()->addTask(statistic_task);
+
+    // start expiration checker
+    expiration_thread_running = true;
+    expiration_thread = std::thread(&ContinuousSnapshotManager::expirationCheckerLoop, this);
 }
 
 ContinuousSnapshotManager::~ContinuousSnapshotManager()
 {
     logger->logMessage("[ContinuousSnapshotManager] Stopping continuous snapshot manager");
+    expiration_thread_running = false;
+    if (expiration_thread.joinable())
+    {
+        expiration_thread.join();
+    }
     // set the run flag to false
     run_flag = false;
     // remove epics monitor handler
@@ -93,7 +103,9 @@ ContinuousSnapshotManager::~ContinuousSnapshotManager()
 
 std::size_t ContinuousSnapshotManager::getRunningSnapshotCount() const
 {
-    return thread_pool->get_tasks_running() + thread_pool->get_tasks_queued();
+    std::unique_lock write_lock(snapshot_runinnig_mutex_);
+    // check if the snapshot is already stopped
+    return snapshot_runinnig_.size();
 }
 
 void ContinuousSnapshotManager::publishEvtCB(pubsub::EventType type, PublishMessage* const msg, const std::string& error_message)
@@ -262,21 +274,6 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         epics_service_manager->monitorChannel(pv_uri, true);
     }
 
-    // submit the snapshot to the thread pool
-    thread_pool->detach_task(
-        [this, weak_snapshot = std::weak_ptr(s_op_ptr)]()
-        {
-            if (auto s_op_ptr = weak_snapshot.lock())
-            {
-                logger->logMessage(STRING_FORMAT("Start snapshot %1%", s_op_ptr->cmd->snapshot_name), LogLevel::INFO);
-                this->processSnapshot(std::static_pointer_cast<SnapshotOpInfo>(s_op_ptr));
-            }
-            else
-            {
-                logger->logMessage("Snapshot operation info is no longer valid", LogLevel::ERROR);
-            }
-        });
-
     // return reply to app for submitted command
     manageReply(0, STRING_FORMAT("The snapshot '%1%' has been started", s_op_ptr->cmd->snapshot_name), snapsthot_command,
                 s_op_ptr->queue_name);
@@ -376,132 +373,71 @@ void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerPara
     }
 }
 
-void ContinuousSnapshotManager::processSnapshot(SnapshotOpInfoShrdPtr snapshot_command_info)
+void ContinuousSnapshotManager::expirationCheckerLoop()
 {
-    // check the run flag
-    if (!run_flag)
+    while (expiration_thread_running)
     {
-        return;
-    }
-
-    const auto thread_index = BS::this_thread::get_index();
-    if (!thread_index.has_value())
-        return;
-    auto& throttling = thread_throttling_vector[thread_index.value()];
-    // check if the time window is expired
-    if (snapshot_command_info->isTimeout())
-    {
-        throttling->update(true);
-        // before triggering the snapshot we need to check if the snapshot is still running
-        if (!snapshot_command_info->is_running)
         {
-            // we need to stop this trigger
             std::unique_lock lock(snapshot_runinnig_mutex_);
-            if (auto it = snapshot_runinnig_.find(snapshot_command_info->queue_name); it != snapshot_runinnig_.end())
+            for (auto it = snapshot_runinnig_.begin(); it != snapshot_runinnig_.end();)
             {
-
-                logger->logMessage(
-                    STRING_FORMAT("Snapshot %1% is stopped and will be removed from queue", snapshot_command_info->queue_name), LogLevel::INFO);
-                // remove the snapshot from the running list
-                snapshot_runinnig_.erase(snapshot_command_info->queue_name);
-                // erase the snapshot from the pv_snapshot_map_
-                logger->logMessage(
-                    STRING_FORMAT("Remove Snapshot %1% from all his pv snapshot map", snapshot_command_info->cmd->snapshot_name), LogLevel::INFO);
-                for (auto& pv_uri : snapshot_command_info->cmd->pv_name_list)
+                auto& queue_name = it->first;
+                // we take the copy and not the reference to manage the last data forward after the snapshot is removed
+                auto s_op_ptr = it->second;
+                // timeout is true also if runnign is false
+                if (s_op_ptr && s_op_ptr->isTimeout())
                 {
-                    auto s_pv = epics_service_manager->sanitizePVName(pv_uri);
-                    auto range = pv_snapshot_map_.equal_range(s_pv->name);
-                    for (auto it = range.first; it != range.second; ++it)
+                    // If the snapshot is not running, remove it and clean up PV associations
+                    if (!s_op_ptr->is_running)
                     {
-                        if (it->second == snapshot_command_info)
+                        logger->logMessage(STRING_FORMAT("Snapshot %1% is stopped and will be removed from queue", queue_name), LogLevel::INFO);
+
+                        // Remove from pv_snapshot_map_
+                        logger->logMessage(
+                            STRING_FORMAT("Remove Snapshot %1% from all its pv snapshot map", s_op_ptr->cmd->snapshot_name), LogLevel::INFO);
+                        for (auto& pv_uri : s_op_ptr->cmd->pv_name_list)
                         {
-                            logger->logMessage(
-                                STRING_FORMAT("Snapshot '%1%' is removed from PV map %2%", snapshot_command_info->cmd->snapshot_name % s_pv->name), LogLevel::INFO);
-                            pv_snapshot_map_.erase(it);
-                            break;
+                            auto s_pv = epics_service_manager->sanitizePVName(pv_uri);
+                            auto range = pv_snapshot_map_.equal_range(s_pv->name);
+                            for (auto pv_it = range.first; pv_it != range.second; ++pv_it)
+                            {
+                                if (pv_it->second == s_op_ptr)
+                                {
+                                    logger->logMessage(
+                                        STRING_FORMAT("Snapshot '%1%' is removed from PV map %2%", s_op_ptr->cmd->snapshot_name % s_pv->name), LogLevel::INFO);
+                                    pv_snapshot_map_.erase(pv_it);
+                                    break;
+                                }
+                            }
+                            // Disable monitor for this PV
+                            logger->logMessage(STRING_FORMAT("PV '%1%' disabling monitor", pv_uri), LogLevel::DEBUG);
+                            epics_service_manager->monitorChannel(pv_uri, false);
                         }
+
+                        logger->logMessage(STRING_FORMAT("Snapshot %1% is cancelled", queue_name), LogLevel::INFO);
+                        it = snapshot_runinnig_.erase(it);
                     }
 
-                    // remove instance of epics channel
-                    logger->logMessage(STRING_FORMAT("PV '%1%' disabling monitor", pv_uri), LogLevel::DEBUG);
-                    epics_service_manager->monitorChannel(pv_uri, false);
+                    // also if the snapshot has been removed forward the last data and close the snapshot to the client
+                    // print log with submisison information
+                    thread_pool->detach_task(
+                        [this, s_op_ptr]() mutable
+                        {
+                            auto                   submission = s_op_ptr->getData();
+                            SnapshotSubmissionTask task(s_op_ptr, std::move(submission), this->publisher, this->logger);
+                            task();
+                        });
                 }
-
-                logger->logMessage(STRING_FORMAT("Snapshot %1% is cancelled", snapshot_command_info->queue_name), LogLevel::INFO);
-            }
-
-            // we can force delete memory of the snapshot command info
-            snapshot_command_info.reset();
-            return;
-        }
-        // // get data from snapshot command info
-        auto snapshot_events = snapshot_command_info->getData();
-        logger->logMessage(STRING_FORMAT("Snapshot %1% will be triggered with event [%2%]", snapshot_command_info->queue_name%snapshot_events.size()), LogLevel::INFO);
-        // increment the iteration index
-        snapshot_command_info->snapshot_iteration_index++;
-        // get timestamp for the snapshot in unix time and utc
-        std::int64_t snap_ts =
-            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        {
-            auto serialized_header_message = serialize(
-                RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, snapshot_command_info->snapshot_iteration_index},
-                snapshot_command_info->cmd->serialization);
-            // send the header for the snapshot
-            publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
-                                                                snapshot_command_info->cmd->snapshot_name, serialized_header_message),
-                                   {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
-        }
-
-        for (auto& event : snapshot_events)
-        {
-            auto serialized_message = serialize(RepeatingSnaptshotData{1, snap_ts, snapshot_command_info->snapshot_iteration_index,
-                                                                       MakeChannelDataShrdPtr(event->channel_data)},
-                                                snapshot_command_info->cmd->serialization);
-            if (serialized_message)
-            {
-                // publish the data
-                publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
-                                                                    snapshot_command_info->cmd->snapshot_name, serialized_message),
-                                       {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
-            }
-            else
-            {
-                logger->logMessage(STRING_FORMAT("Failing serializing snapshot %1% for PV %2%",
-                                                 snapshot_command_info->cmd->snapshot_name % event->channel_data.pv_name),
-                                   LogLevel::ERROR);
+                if (it != snapshot_runinnig_.end())
+                {
+                    // Only increment if we didn't erase the current element
+                    ++it;
+                }
             }
         }
-
-        // send completion for this snapshot submission
-        auto serialized_completion_message = serialize(RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, snap_ts,
-                                                                                    snapshot_command_info->snapshot_iteration_index},
-                                                       snapshot_command_info->cmd->serialization);
-        // publish the data
-        publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
-                                                            snapshot_command_info->cmd->snapshot_name, serialized_completion_message),
-                               {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
-        logger->logMessage(STRING_FORMAT("Snapshot %1% iteration %2% fired with data [%3%]", snapshot_command_info->cmd->snapshot_name %
-                                                                                                 snapshot_command_info->snapshot_iteration_index %
-                                                                                                 snapshot_events.size()),
-                           LogLevel::DEBUG);
+        // Sleep OUTSIDE the lock
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-
-    // manage the throttling
-    throttling->update(false);
-
-    // resubmit the snapshot command
-    thread_pool->detach_task(
-        [this, weak_snapshot = std::weak_ptr(snapshot_command_info)]()
-        {
-            if (auto snapshot_command_info = weak_snapshot.lock())
-            {
-                this->processSnapshot(std::static_pointer_cast<SnapshotOpInfo>(snapshot_command_info));
-            }
-            else
-            {
-                logger->logMessage("Snapshot operation info is no longer valid", LogLevel::ERROR);
-            }
-        });
 }
 
 void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstCommandShrdPtr cmd, const std::string& publishing_topic)
@@ -532,5 +468,87 @@ void ContinuousSnapshotManager::handleStatistic(TaskProperties& task_properties)
         metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
         metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotThrottleGauge, t_stat.throttle_ms, {{"thread_id", thread_id}});
         throttling->resetEventCounter();
+    }
+}
+
+#pragma region Submission Task
+
+SnapshotSubmissionTask::SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmission&& submission, IPublisherShrdPtr publisher, ILoggerShrdPtr logger)
+    : snapshot_command_info(snapshot_command_info), submission(std::move(submission)), publisher(std::move(publisher)), logger(std::move(logger))
+{
+}
+
+void SnapshotSubmissionTask::operator()()
+{
+    if (!snapshot_command_info)
+        return;
+    // get timestamp for the snapshot in unix time and utc
+    submission.snap_ts =
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+
+    if ((submission.submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
+    {
+
+        // increment the iteration index
+        snapshot_command_info->snapshot_iteration_index++;
+        logger->logMessage(STRING_FORMAT("[Header] Snapshot %1% iteration %2% started",
+                                         snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index),
+                           LogLevel::DEBUG);
+
+        {
+            auto serialized_header_message =
+                serialize(RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, submission.snap_ts,
+                                                   snapshot_command_info->snapshot_iteration_index},
+                          snapshot_command_info->cmd->serialization);
+            // send the header for the snapshot
+            publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
+                                                                snapshot_command_info->cmd->snapshot_name, serialized_header_message),
+                                   {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
+        }
+    }
+
+    if ((submission.submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None &&
+        !submission.snapshot_events.empty())
+    {
+        logger->logMessage(STRING_FORMAT("[Data] Snapshot %1% iteration %2% with %3% events",
+                                         snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index %
+                                             submission.snapshot_events.size()),
+                           LogLevel::DEBUG);
+        for (auto& event : submission.snapshot_events)
+        {
+            auto serialized_message = serialize(RepeatingSnaptshotData{1, submission.snap_ts, snapshot_command_info->snapshot_iteration_index,
+                                                                       MakeChannelDataShrdPtr(event->channel_data)},
+                                                snapshot_command_info->cmd->serialization);
+            if (serialized_message)
+            {
+                // publish the data
+                publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
+                                                                    snapshot_command_info->cmd->snapshot_name, serialized_message),
+                                       {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
+            }
+            else
+            {
+                logger->logMessage(STRING_FORMAT("Failing serializing snapshot %1% for PV %2%",
+                                                 snapshot_command_info->cmd->snapshot_name % event->channel_data.pv_name),
+                                   LogLevel::ERROR);
+            }
+        }
+    }
+
+    if ((submission.submission_type & SnapshotSubmissionType::Tail) != SnapshotSubmissionType::None)
+    {
+        logger->logMessage(STRING_FORMAT("[Tail] Snapshot %1% iteration %2% completed",
+                                         snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index),
+                           LogLevel::DEBUG);
+        // send completion for this snapshot submission
+        auto serialized_completion_message =
+            serialize(RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, submission.snap_ts,
+                                                   snapshot_command_info->snapshot_iteration_index},
+                      snapshot_command_info->cmd->serialization);
+        // publish the data
+        publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
+                                                            snapshot_command_info->cmd->snapshot_name, serialized_completion_message),
+                               {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
     }
 }

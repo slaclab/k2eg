@@ -52,13 +52,18 @@ specified fields if requested.
 - Efficient memory usage with automatic pruning.
 - Thread-safe operation for concurrent acquisition and processing.
 */
+
+#define FAST_EXPIRE_TIME_MSEC 1000
 class BackTimedBufferedSnapshotOpInfo : public SnapshotOpInfo
 {
     // define when the snapshot is acquiring data
-    mutable std::shared_mutex     buffer_mutex;
-    MonitoEventBacktimeBufferUPtr acquiring_buffer;
-    MonitoEventBacktimeBufferUPtr processing_buffer;
-
+    mutable std::shared_mutex             buffer_mutex;
+    MonitoEventBacktimeBufferUPtr         acquiring_buffer;
+    MonitoEventBacktimeBufferUPtr         processing_buffer;
+    std::chrono::steady_clock::time_point last_forced_expire = std::chrono::steady_clock::now();
+    bool                                  header_sent = false;
+    bool                                  win_time_expired = false;
+    std::int64_t                          fast_expire_time_msec = 0; // fast expire time in milliseconds
 public:
     // Buffer to store all received values during the time window
     std::map<std::string, std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr>> value_buffer;
@@ -94,7 +99,7 @@ public:
      *        If field filtering is enabled, only the specified fields are included.
      * @return A vector of shared pointers to MonitorEvent objects.
      */
-    std::vector<service::epics_impl::MonitorEventShrdPtr> getData() override;
+    SnapshotSubmission getData() override;
 };
 DEFINE_PTR_TYPES(BackTimedBufferedSnapshotOpInfo)
 } // namespace k2eg::controller::node::worker::snapshot

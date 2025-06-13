@@ -70,7 +70,7 @@ void RDKafkaPublisher::init()
         throw std::runtime_error("Logger service is not initialized");
     }
     std::string errstr;
-    logger->logMessage(STRING_FORMAT("Initializing RDKafkaPublisher with server address: %1% ",configuration->server_address), LogLevel::INFO);
+    logger->logMessage(STRING_FORMAT("Initializing RDKafkaPublisher with server address: %1% ", configuration->server_address), LogLevel::INFO);
     RDK_CONF_SET(conf, "bootstrap.servers", configuration->server_address.c_str())
     RDK_CONF_SET(conf, "compression.type", "snappy")
 
@@ -103,7 +103,8 @@ void RDKafkaPublisher::autoPoll()
         if (producer->outq_len() > 0)
         {
             // If there are messages, poll immediately (no sleep)
-            logger->logMessage(STRING_FORMAT("Auto polling RDKafkaPublisher queue size: %1%", producer->outq_len()), LogLevel::DEBUG);
+            // logger->logMessage(STRING_FORMAT("Auto polling RDKafkaPublisher queue size: %1%", producer->outq_len()),
+            // LogLevel::DEBUG);
             flush(configuration->flush_timeout_ms);
         }
         else
@@ -116,19 +117,19 @@ void RDKafkaPublisher::autoPoll()
 
 void RDKafkaPublisher::deinit()
 {
-    //if(logger)logger->logMessage("Deinitializing RDKafkaPublisher", LogLevel::INFO);
+    // if(logger)logger->logMessage("Deinitializing RDKafkaPublisher", LogLevel::INFO);
     int retry = 100;
     while (producer->outq_len() > 0 && retry > 0)
     {
         producer->poll(1000);
         retry--;
     }
-    if (_auto_poll)
+    if (_auto_poll && auto_poll_thread.joinable())
     {
         _stop_inner_thread = true;
         auto_poll_thread.join();
     }
-    //if(logger)logger->logMessage("RDKafkaPublisher deinitialized", LogLevel::INFO);
+    // if(logger)logger->logMessage("RDKafkaPublisher deinitialized", LogLevel::INFO);
 }
 
 int RDKafkaPublisher::flush(const int timeo)

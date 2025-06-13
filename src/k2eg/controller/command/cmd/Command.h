@@ -27,6 +27,8 @@ namespace k2eg::controller::command::cmd {
 #define KEY_TIME_WINDOW_MSEC        "time_window_msec"
 #define KEY_TRIGGERED               "triggered"
 #define KET_TAGS                    "tags"
+#define KEY_SUB_PUSH_DELAY_MSEC     "sub_push_delay_msec"
+
 // are all the possible command
 enum class CommandType
 {
