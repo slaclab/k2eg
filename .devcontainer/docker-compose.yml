@@ -63,6 +63,7 @@ services:
         - |
           apt update
           apt install -y tmux
+          pip install --upgrade pip
           pip install numpy p4p pyepics
           tmux new-session -d "python3 /app/update_iocs.py"
           tail -f /dev/null

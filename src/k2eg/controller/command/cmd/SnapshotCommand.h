@@ -106,6 +106,8 @@ struct RepeatingSnapshotCommand : public Command
     std::int32_t repeat_delay_msec;
     // the time window to collect data
     std::int32_t time_window_msec;
+    // if > 0 represent the sub time window used to push partial alredy taken data to the subscriber
+    std::int32_t sub_push_delay_msec = 0; // delay to push the data to the subscriber
     // identify a triggered snapshot
     // if true the snapshot is triggered by the user
     // if false the snapshot is triggered by the repeating snapshot
@@ -189,6 +191,8 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Repe
       {"pv_name_list", std::move(pv_array)}, 
       {"repeat_delay_msec", c.repeat_delay_msec}, 
       {"time_window_msec", c.time_window_msec},
+      {"sub_push_delay_msec", c.sub_push_delay_msec},
+      {"pv_field_filter_list", boost::json::array(c.pv_field_filter_list.begin(), c.pv_field_filter_list.end())},
       {"triggered", c.triggered},
       {"type", snapshot_type_to_string(c.type)},
     };

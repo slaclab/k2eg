@@ -8,11 +8,35 @@ using namespace k2eg::controller::command::cmd;
 using namespace k2eg::service::epics_impl;
 using namespace std::chrono;
 
-#define FAST_EXPIRE_TIME_MSEC 100
-
 BackTimedBufferedSnapshotOpInfo::BackTimedBufferedSnapshotOpInfo(const std::string& queue_name, ConstRepeatingSnapshotCommandShrdPtr cmd)
     : SnapshotOpInfo(queue_name, cmd), acquiring_buffer(MakeMonitoEventBacktimeBufferUPtr(cmd->time_window_msec)), processing_buffer(MakeMonitoEventBacktimeBufferUPtr(cmd->time_window_msec))
 {
+    if (cmd->sub_push_delay_msec > 0)
+    {
+        if (cmd->sub_push_delay_msec < cmd->time_window_msec)
+        {
+            fast_expire_time_msec = cmd->sub_push_delay_msec;
+        }
+        else
+        {
+            // If sub_push_delay_msec is not less than time_window_msec, use time_window_msec or a default
+            fast_expire_time_msec = (cmd->time_window_msec > 0) ? cmd->time_window_msec : cmd->sub_push_delay_msec;
+        }
+    }
+    else
+    {
+        // If sub_push_delay_msec is not set, check if the time window is greate then the default vclaue of sub push
+        // delay
+        if (cmd->time_window_msec > FAST_EXPIRE_TIME_MSEC)
+        {
+            fast_expire_time_msec = FAST_EXPIRE_TIME_MSEC;
+        }
+        else
+        {
+            // Use the default fast expire time
+            fast_expire_time_msec = cmd->time_window_msec;
+        }
+    }
 }
 
 BackTimedBufferedSnapshotOpInfo::~BackTimedBufferedSnapshotOpInfo()
@@ -30,6 +54,7 @@ bool BackTimedBufferedSnapshotOpInfo::init(std::vector<PVShrdPtr>& sanitized_pv_
 bool BackTimedBufferedSnapshotOpInfo::isTimeout()
 {
     bool timeout = false;
+    win_time_expired = false;
     if (is_triggered)
     {
         // In triggered mode, only swap buffers on real timeout (trigger or stop).
@@ -48,10 +73,9 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout()
         bool expired = SnapshotOpInfo::isTimeout();
         bool force_100ms_expire = false;
 
-        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_forced_expire).count() >= FAST_EXPIRE_TIME_MSEC)
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_forced_expire).count() >= fast_expire_time_msec)
         {
             force_100ms_expire = true;
-            last_forced_expire = now;
         }
 
         // Memorize the real window expiration
@@ -59,10 +83,10 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout()
 
         if (expired || force_100ms_expire)
         {
-            last_timeout_check = now;
+            timeout = true;
+            last_forced_expire = now;
             std::unique_lock<std::shared_mutex> lock(buffer_mutex);
             std::swap(acquiring_buffer, processing_buffer);
-            timeout = true;
         }
     }
     return timeout;
@@ -79,8 +103,6 @@ SnapshotSubmission BackTimedBufferedSnapshotOpInfo::getData()
 {
     SnapshotSubmissionType                                      type = SnapshotSubmissionType::None;
     std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr> result;
-
-    auto now = steady_clock::now();
     {
         std::shared_lock lock(buffer_mutex);
 
@@ -95,7 +117,22 @@ SnapshotSubmission BackTimedBufferedSnapshotOpInfo::getData()
 
         if (processing_buffer)
         {
-            result = processing_buffer->fetchWindow();
+            if (cmd->pv_field_filter_list.size() > 0)
+            {
+                // If field filtering is needed, apply it to each event.
+                result = processing_buffer->fetchWindow<MonitorEventShrdPtr>(
+                    [this](auto ev) -> std::optional<MonitorEventShrdPtr>
+                    {
+                        return std::make_optional(MakeMonitorEventShrdPtr(
+                            ev->type, ev->message,
+                            ChannelData{ev->channel_data.pv_name, filterPVField(ev->channel_data.data, this->cmd->pv_field_filter_list)}));
+                    });
+            }
+            else
+            {
+                // Fetch all events without filtering
+                result = processing_buffer->fetchWindow();
+            }
             if (!result.empty())
             {
                 type |= SnapshotSubmissionType::Data;
@@ -105,14 +142,13 @@ SnapshotSubmission BackTimedBufferedSnapshotOpInfo::getData()
         }
 
         // Emit tail only at the end of the window (timeout)
-        // If tail_sent is false and the processing buffer is empty (after timeout), emit tail
-        if (win_time_expired)
+        // or as last messag ewhen the snapshot is killed.
+        if (win_time_expired || !is_running)
         {
             // This means isTimeout() was just called and window swapped
             type |= SnapshotSubmissionType::Tail;
             header_sent = false; // Reset header for the next window
         }
     }
-    std::cout << "BackTimedBufferedSnapshotOpInfo::getData() - type: " << static_cast<int>(type) << ", result size: " << result.size() << std::endl;
     return SnapshotSubmission(std::move(result), type);
 }

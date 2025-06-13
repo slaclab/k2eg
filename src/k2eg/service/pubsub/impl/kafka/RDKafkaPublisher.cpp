@@ -103,7 +103,7 @@ void RDKafkaPublisher::autoPoll()
         if (producer->outq_len() > 0)
         {
             // If there are messages, poll immediately (no sleep)
-            logger->logMessage(STRING_FORMAT("Auto polling RDKafkaPublisher queue size: %1%", producer->outq_len()), LogLevel::DEBUG);
+            // logger->logMessage(STRING_FORMAT("Auto polling RDKafkaPublisher queue size: %1%", producer->outq_len()), LogLevel::DEBUG);
             flush(configuration->flush_timeout_ms);
         }
         else
