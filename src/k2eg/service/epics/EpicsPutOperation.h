@@ -12,7 +12,7 @@ class PutOperation : public pvac::ClientChannel::PutCallback, public pvac::Clien
     std::shared_ptr<pvac::ClientChannel>                   channel;
     pvac::Operation                                        op;
     const std::string                                      field;
-    const std::string                                      value;
+    const std::unique_ptr<msgpack::object>                 value;
     std::string                                            message;
     pvac::PutEvent                                         evt;
     const epics::pvData::PVStructure::const_shared_pointer pv_req;
@@ -21,7 +21,7 @@ class PutOperation : public pvac::ClientChannel::PutCallback, public pvac::Clien
     virtual void putDone(const pvac::PutEvent& evt) OVERRIDE FINAL;
 
 public:
-    PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const epics::pvData::PVStructure::const_shared_pointer& pvReq, const std::string& field, const std::string& value);
+    PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const epics::pvData::PVStructure::const_shared_pointer& pv_req, const std::string& field, std::unique_ptr<msgpack::object> value);
     virtual ~PutOperation();
 
     const std::string     getOpName() const;

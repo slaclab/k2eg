@@ -45,6 +45,11 @@ ConstPutOperationUPtr EpicsChannel::put(const std::string& field, const std::str
     return MakePutOperationUPtr(channel, pvReq, field, value);
 }
 
+ConstPutOperationUPtr EpicsChannel::put(const std::string& field, const msgpack::object& object)
+{
+    return MakePutOperationUPtr(channel, pvReq, field, value);
+}
+
 ConstGetOperationUPtr EpicsChannel::get() const
 {
     if (fetch_additional_field.empty())

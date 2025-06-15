@@ -168,6 +168,15 @@ TEST(NodeControllerReplyMessages, PutCommandReplyWithMessage) {
   auto msgpack_object = msg.get();
 };
 
+TEST(NodeControllerReplyMessages, PutCommandMsgpack) {
+  INIT_PVA_PROVIDER()
+  EpicsChannelUPtr      pc;
+  ConstDataUPtr         ser_value;
+  ConstGetOperationUPtr get_op;
+  EXPECT_NO_THROW(pc = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
+  EXPECT_NO_THROW(get_op = pc->get(););
+};
+
 TEST(NodeControllerReplyMessages, MonitorCommandActivateReply) {
   typedef std::map<std::string, msgpack::object> Map;
   INIT_PVA_PROVIDER()

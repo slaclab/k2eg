@@ -36,6 +36,7 @@ public:
     static void                  init();
     static void                  deinit();
     ConstPutOperationUPtr        put(const std::string& field, const std::string& value);
+    ConstPutOperationUPtr        put(const std::string& field, const msgpack::object& object);
     ConstGetOperationUPtr        get() const;
     ConstMonitorOperationShrdPtr monitor() const;
 };
