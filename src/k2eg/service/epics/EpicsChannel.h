@@ -2,6 +2,7 @@
 #define K2EG_SERVICE_EPICS_EPICSCHANNEL_H_
 
 #include <k2eg/common/types.h>
+#include <k2eg/common/MsgpackSerialization.h>
 
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsPutOperation.h>
@@ -35,7 +36,7 @@ public:
     ~EpicsChannel();
     static void                  init();
     static void                  deinit();
-    ConstPutOperationUPtr        put(const std::string& field, std::unique_ptr<msgpack::object> value);
+    ConstPutOperationUPtr        put(const std::string& field, std::unique_ptr<k2eg::common::MsgpackObjectWithZone> value);
     ConstGetOperationUPtr        get() const;
     ConstMonitorOperationShrdPtr monitor() const;
 };

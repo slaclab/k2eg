@@ -6,6 +6,7 @@
 
 #include <memory>
 
+using namespace k2eg::common;
 using namespace k2eg::service::epics_impl;
 
 namespace pva = epics::pvAccess;
@@ -40,7 +41,7 @@ void EpicsChannel::deinit()
     pva::ca::CAClientFactory::stop();
 }
 
-ConstPutOperationUPtr EpicsChannel::put(const std::string& field, std::unique_ptr<msgpack::object> value)
+ConstPutOperationUPtr EpicsChannel::put(const std::string& field, std::unique_ptr<MsgpackObjectWithZone> value)
 {
     return MakePutOperationUPtr(channel, pvReq, field, std::move(value));
 }

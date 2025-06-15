@@ -9,7 +9,7 @@ using namespace k2eg::service::epics_impl;
 
 namespace pvd = epics::pvData;
 
-PutOperation::PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const pvd::PVStructure::const_shared_pointer& pv_req, const std::string& field, std::unique_ptr<msgpack::object> value)
+PutOperation::PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const pvd::PVStructure::const_shared_pointer& pv_req, const std::string& field, std::unique_ptr<k2eg::common::MsgpackObjectWithZone> value)
     : channel(channel), field(field), value(std::move(value)), pv_req(pv_req), done(false)
 {
     
@@ -45,7 +45,7 @@ void PutOperation::putBuild(const epics::pvData::StructureConstPtr& build, pvac:
         throw std::runtime_error("Field is immutable");
     }
 
-    auto put_obj = MsgpackEpicsConverter::msgpackToEpics(*value, build);
+    auto put_obj = MsgpackEpicsConverter::msgpackToEpics(*value->object, build);
     fld->copy(*put_obj);
     // attempt convert string to actual field type
     // valfld->putFrom(value);

@@ -3,10 +3,21 @@
 #include <k2eg/common/BaseSerialization.h>
 #include <memory>
 #include <msgpack.hpp>
-#include "k2eg/common/types.h"
+#include <k2eg/common/types.h>
 
 namespace k2eg::common {
 
+struct MsgpackObjectWithZone {
+    std::shared_ptr<msgpack::zone> zone;
+    std::shared_ptr<msgpack::object> object;
+};
+
+inline std::unique_ptr<MsgpackObjectWithZone> unpack_msgpack_object(const std::vector<unsigned char>& data) {
+    msgpack::object_handle oh = msgpack::unpack(reinterpret_cast<const char*>(data.data()), data.size());
+    auto zone = std::make_unique<msgpack::zone>();
+    auto object = std::make_unique<msgpack::object>(oh.get(), *zone);
+    return std::make_unique<MsgpackObjectWithZone>(MsgpackObjectWithZone{std::move(zone), std::move(object)});
+}
 
 class MsgpackMessage;
 class MsgpackData : public Data {

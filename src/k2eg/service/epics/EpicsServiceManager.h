@@ -5,6 +5,7 @@
 #include <k2eg/common/ThrottlingManager.h>
 #include <k2eg/common/broadcaster.h>
 #include <k2eg/common/types.h>
+#include <k2eg/common/MsgpackSerialization.h>
 
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
@@ -95,7 +96,7 @@ public:
     void                         forceMonitorChannelUpdate(const std::string& pv_name_uri);
     ConstMonitorOperationShrdPtr getMonitorOp(const std::string& pv_name_uri);
     ConstGetOperationUPtr        getChannelData(const std::string& pv_name_uri);
-    ConstPutOperationUPtr        putChannelData(const std::string& pv_name, std::unique_ptr<msgpack::object> value);
+    ConstPutOperationUPtr        putChannelData(const std::string& pv_name, std::unique_ptr<k2eg::common::MsgpackObjectWithZone> value);
     size_t                       getChannelMonitoredSize();
     /*
     give some sanitizaiton to epics pv names patter <pvname>.<value>

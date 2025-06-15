@@ -211,7 +211,7 @@ ConstGetOperationUPtr EpicsServiceManager::getChannelData(const std::string& pv_
     return result;
 }
 
-ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_name_uri, std::unique_ptr<msgpack::object> value)
+ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_name_uri, std::unique_ptr<MsgpackObjectWithZone> value)
 {
     ConstPutOperationUPtr result;
     WriteLockCM           write_lock(channel_map_mutex);
