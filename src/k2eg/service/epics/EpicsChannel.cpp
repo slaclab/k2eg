@@ -40,14 +40,9 @@ void EpicsChannel::deinit()
     pva::ca::CAClientFactory::stop();
 }
 
-ConstPutOperationUPtr EpicsChannel::put(const std::string& field, const std::string& value)
+ConstPutOperationUPtr EpicsChannel::put(const std::string& field, std::unique_ptr<msgpack::object> value)
 {
-    return MakePutOperationUPtr(channel, pvReq, field, value);
-}
-
-ConstPutOperationUPtr EpicsChannel::put(const std::string& field, const msgpack::object& object)
-{
-    return MakePutOperationUPtr(channel, pvReq, field, value);
+    return MakePutOperationUPtr(channel, pvReq, field, std::move(value));
 }
 
 ConstGetOperationUPtr EpicsChannel::get() const

@@ -35,8 +35,7 @@ public:
     ~EpicsChannel();
     static void                  init();
     static void                  deinit();
-    ConstPutOperationUPtr        put(const std::string& field, const std::string& value);
-    ConstPutOperationUPtr        put(const std::string& field, const msgpack::object& object);
+    ConstPutOperationUPtr        put(const std::string& field, std::unique_ptr<msgpack::object> value);
     ConstGetOperationUPtr        get() const;
     ConstMonitorOperationShrdPtr monitor() const;
 };

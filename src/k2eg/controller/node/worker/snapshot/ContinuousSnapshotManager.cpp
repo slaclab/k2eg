@@ -260,7 +260,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         snapshot_runinnig_.emplace(s_op_ptr->queue_name, s_op_ptr);
         for (auto& pv_uri : sanitized_pv_name_list)
         {
-            logger->logMessage(STRING_FORMAT("associate snapshot '%1%' to pv '%2%'", s_op_ptr->cmd->snapshot_name % pv_uri), LogLevel::DEBUG);
+            logger->logMessage(STRING_FORMAT("associate snapshot '%1%' to pv '%2%'", s_op_ptr->cmd->snapshot_name % pv_uri->name), LogLevel::DEBUG);
             // associate snaphsot to each pv, so the epics handler can
             // find the snapshot to fiil with data
             pv_snapshot_map_.emplace(std::make_pair(pv_uri->name, s_op_ptr));

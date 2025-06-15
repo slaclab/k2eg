@@ -211,7 +211,7 @@ ConstGetOperationUPtr EpicsServiceManager::getChannelData(const std::string& pv_
     return result;
 }
 
-ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_name_uri, const std::string& value)
+ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_name_uri, std::unique_ptr<msgpack::object> value)
 {
     ConstPutOperationUPtr result;
     WriteLockCM           write_lock(channel_map_mutex);
@@ -223,7 +223,7 @@ ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_
     if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
     {
         // allocate channel and return data
-        result = channel_map[sanitized_pv->name].channel->put(sanitized_pv->field, value);
+        result = channel_map[sanitized_pv->name].channel->put(sanitized_pv->field, std::move(value));
     }
     else
     {
@@ -232,7 +232,7 @@ ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_
             .to_force = false,
             .keep_alive = 0,
         };
-        result = channel.channel->put(sanitized_pv->field, value);
+        result = channel.channel->put(sanitized_pv->field, std::move(value));
     }
     return result;
 }

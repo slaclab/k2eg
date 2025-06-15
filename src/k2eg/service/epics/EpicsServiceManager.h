@@ -95,7 +95,7 @@ public:
     void                         forceMonitorChannelUpdate(const std::string& pv_name_uri);
     ConstMonitorOperationShrdPtr getMonitorOp(const std::string& pv_name_uri);
     ConstGetOperationUPtr        getChannelData(const std::string& pv_name_uri);
-    ConstPutOperationUPtr        putChannelData(const std::string& pv_name, const std::string& value);
+    ConstPutOperationUPtr        putChannelData(const std::string& pv_name, std::unique_ptr<msgpack::object> value);
     size_t                       getChannelMonitoredSize();
     /*
     give some sanitizaiton to epics pv names patter <pvname>.<value>
