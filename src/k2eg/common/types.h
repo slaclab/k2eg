@@ -10,10 +10,10 @@
 namespace k2eg::common {
 
 #define DEFINE_PTR_TYPES(x) \
-typedef std::unique_ptr<x> x##UPtr; \
-typedef std::unique_ptr<const x> Const##x##UPtr; \
-typedef std::shared_ptr<x> x##ShrdPtr; \
-typedef std::shared_ptr<const x> Const##x##ShrdPtr; \
+using  x##UPtr = std::unique_ptr<x>; \
+using Const##x##UPtr = std::unique_ptr<const x> ; \
+using x##ShrdPtr = std::shared_ptr<x> ; \
+using Const##x##ShrdPtr = std::shared_ptr<const x> ; \
 template<typename... Args> \
 inline x##UPtr Make##x##UPtr(Args&&... __args) \
 { \
