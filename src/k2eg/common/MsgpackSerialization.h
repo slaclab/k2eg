@@ -11,7 +11,8 @@ namespace k2eg::common {
 class MsgpackObject
 {
 public:
-    virtual msgpack::object get() const = 0;
+    virtual msgpack::object            get() const = 0;
+    virtual std::vector<unsigned char> toBuffer() const = 0;
 };
 
 class MsgpackObjectWithZone : public MsgpackObject
@@ -36,20 +37,35 @@ public:
     {
         return handle.get();
     }
+
+    std::vector<unsigned char> toBuffer() const
+    {
+        msgpack::sbuffer sbuf;
+        msgpack::pack(sbuf, handle.get());
+        return std::vector<unsigned char>(sbuf.data(), sbuf.data() + sbuf.size());
+    }
 };
 
 class MsgpackObjectFromBuffer : public MsgpackObject
 {
     const std::vector<unsigned char> buff;
-    msgpack::unpacked                msg;
+    msgpack::object_handle           oh;
 
 public:
     // New constructor from handle
-    MsgpackObjectFromBuffer(const std::vector<unsigned char>&& buff) : buff(std::move(buff)) {}
+    MsgpackObjectFromBuffer(const std::vector<unsigned char>&& buff) : buff(std::move(buff))
+    {
+        msgpack::unpack(oh, (const char*)this->buff.data(), buff.size());
+    }
 
     msgpack::object get() const
     {
-        return msg.get();
+        return oh.get();
+    }
+
+    std::vector<unsigned char> toBuffer() const
+    {
+        return buff; // Return the original buffer
     }
 };
 

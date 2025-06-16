@@ -20,25 +20,19 @@
 #include <boost/json.hpp>
 #include <chrono>
 #include <cstddef>
-#include <cstdint>
 #include <cstdlib>
 #include <ctime>
-#include <filesystem>
 #include <latch>
 #include <memory>
 #include <msgpack.hpp>
 #include <ostream>
 #include <random>
-#include <ratio>
 #include <string>
 #include <thread>
 
 #include "NodeControllerCommon.h"
 #include "boost/json/object.hpp"
 #include "k2eg/controller/command/cmd/MonitorCommand.h"
-#include "k2eg/controller/command/cmd/SnapshotCommand.h"
-#include "k2eg/service/metric/IMetricService.h"
-#include "k2eg/service/pubsub/IPublisher.h"
 #include "msgpack/v3/object_fwd_decl.hpp"
 
 namespace bs = boost::system;
@@ -761,7 +755,9 @@ TEST(NodeController, PutCommandScalar)
     // set environment variable for test
     auto node_controller = initBackend(tcp_port, publisher);
     auto random_scalar = uniform_dist(e1);
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::Msgpack, "reply-topic", "PUT_REPLY_ID", "pva://variable:b", std::to_string(random_scalar)})}););
+
+    auto random_scalar_b64 = msgpack_to_base64("value", random_scalar);
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::Msgpack, "reply-topic", "PUT_REPLY_ID", "pva://variable:b", random_scalar_b64})}););
     // give some time for the timeout
     wait_forPublished_message_size(*publisher, 1, 2000);
 
@@ -777,7 +773,7 @@ TEST(NodeController, PutCommandScalar)
     EXPECT_STREQ(map_reply[KEY_REPLY_ID].as<std::string>().c_str(), "PUT_REPLY_ID");
 
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://variable:b"})}););
-    wait_forPublished_message_size(*publisher, 2, 200000);
+    wait_forPublished_message_size(*publisher, 2, 2000);
     EXPECT_EQ(publisher->sent_messages.size(), 2);
 
     // check for get reply
@@ -805,7 +801,10 @@ TEST(NodeController, PutCommandScalarArray)
     // set environment variable for test
     auto node_controller = initBackend(tcp_port,publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID", "pva://channel:waveform", "8 0 0 0 0 0 0 0 0"})}););
+    std::vector<int> vector_values = {8, 0, 0, 0, 0, 0, 0, 0, 0};
+    auto vector_values_b64 = msgpack_to_base64("value", vector_values);
+
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID", "pva://channel:waveform", vector_values_b64})}););
     // give some time for the timeout
     wait_forPublished_message_size(*publisher, 1, 2000);
     EXPECT_EQ(publisher->sent_messages.size(), 1);
@@ -831,6 +830,34 @@ TEST(NodeController, PutCommandScalarArray)
     EXPECT_EQ(map_reply["channel:waveform"].type, msgpack::type::ARRAY);
     auto vec_reply = map_reply["channel:waveform"].as<Vec>();
     EXPECT_EQ(vec_reply[0].type, msgpack::type::ARRAY);
+    // dispose all
+    deinitBackend(std::move(node_controller));
+}
+
+TEST(NodeController, PutCommandEmptyValue)
+{
+    typedef std::map<std::string, msgpack::object> Map;
+    typedef std::vector<msgpack::object>           Vec;
+    msgpack::unpacked                              msgpack_unpacked;
+    msgpack::object                                msgpack_object;
+    ConstChannelDataUPtr                           value_readout;
+    auto                                           publisher = std::make_shared<DummyPublisherNoSignal>();
+    // set environment variable for test
+    auto node_controller = initBackend(tcp_port,publisher);
+
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID", "pva://channel:waveform", ""})}););
+    // give some time for the timeout
+    wait_forPublished_message_size(*publisher, 1, 2000);
+    EXPECT_EQ(publisher->sent_messages.size(), 1);
+    EXPECT_NO_THROW(msgpack_unpacked = getMsgPackObject(*publisher->sent_messages[0]););
+    msgpack_object = msgpack_unpacked.get();
+    EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
+    auto map_reply = msgpack_object.as<Map>();
+    EXPECT_EQ(map_reply.contains("error"), true);
+    EXPECT_EQ(map_reply["error"].as<int>(), -1);
+    EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
+    EXPECT_STREQ(map_reply[KEY_REPLY_ID].as<std::string>().c_str(), "PUT_REPLY_ID");
+
     // dispose all
     deinitBackend(std::move(node_controller));
 }
@@ -875,10 +902,15 @@ TEST(NodeController, PutCommandMultithreadCheck)
     // set environment variable for test
     auto node_controller = initBackend(tcp_port,publisher);
 
+    std::vector<int> vector_values = {8, 0, 0, 0, 0, 0, 0, 0, 0};
+    auto vector_values_b64 = msgpack_to_base64("value", vector_values);
+
+    auto int_value_b64 = msgpack_to_base64("value", 1);
+
     // this should wait the tiemout
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID_1", "pva://channel:wrong_pv_name", "8 0 0 0 0 0 0 0 0"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID_1", "pva://channel:wrong_pv_name", vector_values_b64})}););
     // this should coplete first
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID_2", "pva://variable:b", "1"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID_2", "pva://variable:b", int_value_b64})}););
     // give some time for the timeout
     wait_forPublished_message_size(*publisher, 2, 100000);
     EXPECT_EQ(publisher->sent_messages.size(), 2);

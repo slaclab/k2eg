@@ -140,7 +140,6 @@ TEST(NodeControllerReplyMessages, PutCommandReplyWithMessage) {
   auto msgpack_object = msg.get();
 };
 
-
 TEST(NodeControllerReplyMessages, MonitorCommandActivateReply) {
   typedef std::map<std::string, msgpack::object> Map;
   MonitorCommandReply cr            = {0, "rep_id", "Activated"};

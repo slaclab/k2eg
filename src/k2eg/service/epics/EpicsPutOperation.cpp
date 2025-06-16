@@ -1,3 +1,4 @@
+#include <iostream>
 #include <k2eg/service/epics/EpicsPutOperation.h>
 #include <k2eg/service/epics/MsgpackEpicsConverter.h>
 #include <pv/createRequest.h>
@@ -24,6 +25,44 @@ PutOperation::~PutOperation()
     channel->removeConnectListener(this);
 }
 
+void PutOperation::collectFieldOffsets(epics::pvData::PVStructurePtr root, const msgpack::object& obj, pvac::ClientChannel::PutCallback::Args& args)
+{
+    if (obj.type != msgpack::type::MAP)
+        return;
+
+    for (uint32_t i = 0; i < obj.via.map.size; ++i)
+    {
+        std::string            key = obj.via.map.ptr[i].key.as<std::string>();
+        const msgpack::object& value = obj.via.map.ptr[i].val;
+
+        auto field = root->getSubField(key);
+
+        if (!field)
+            continue;
+
+        if (value.type == msgpack::type::MAP)
+        {
+            // Recurse into sub-structures, passing only the sub-structure and value
+            auto subStruct = std::dynamic_pointer_cast<epics::pvData::PVStructure>(field);
+            if (subStruct)
+            {
+                // set bit for this struct itself
+                args.tosend.set(field->getFieldOffset());
+                collectFieldOffsets(subStruct, value, args);
+            }
+        }
+        else
+        {
+            if(field->isImmutable())
+            {
+                throw std::runtime_error("Filed '" + key + "' is immutable and cannot be updated");
+            }
+            // Scalar or leaf: set the bit
+            args.tosend.set(field->getFieldOffset());
+        }
+    }
+}
+
 /*
  This function updates the EPICS structure using the user-provided Msgpack object.
  It first checks that the Msgpack object is a map, extracts all keys, and verifies
@@ -35,7 +74,6 @@ PutOperation::~PutOperation()
  */
 void PutOperation::putBuild(const epics::pvData::StructureConstPtr& build, pvac::ClientChannel::PutCallback::Args& args)
 {
-    std::size_t         field_bit = 0;
     pvd::PVStructurePtr root(pvd::getPVDataCreate()->createPVStructure(build));
 
     // check if msgpack object is a map:
@@ -44,34 +82,16 @@ void PutOperation::putBuild(const epics::pvData::StructureConstPtr& build, pvac:
         throw std::runtime_error("Put object must be a map");
     }
 
-    // get all map keys as std::strings
-    std::vector<std::string> keys;
-    for (uint32_t i = 0; i < put_object->get().via.map.size; ++i)
-    {
-        keys.push_back(put_object->get().via.map.ptr[i].key.as<std::string>());
-    }
-
-    // calculate the field_bit for all requested fields to update
-    for (const auto& key : keys)
-    {
-        // check if the field exists in the structure
-        auto fld = root->getSubFieldT<pvd::PVField>(key);
-        if (!fld)
-        {
-            throw std::runtime_error("Field '" + key + "' has not been found");
-        }
-        // calculate the field_bit for the field
-        field_bit |= fld->getFieldOffset();
-    }
+    // calculate the filed bit to set all field to update
+    collectFieldOffsets(root, put_object->get(),  args);
 
     // convert the Msgpack object to a PVStructure and copy its values into the root structure
     auto put_obj_structure = MsgpackEpicsConverter::msgpackToEpics(put_object->get(), build);
-
+    std::cout << "Put object structure: " << *put_obj_structure << std::endl;
     root->copy(*put_obj_structure);
-
+    std::cout << "Root structure after copy: " << *root << std::endl;
     args.root = root; // non-const -> const
     // mark only the fields specified by field_bit to be sent in the put operation
-    args.tosend.set(field_bit);
 }
 
 void PutOperation::putDone(const pvac::PutEvent& evt)

@@ -20,6 +20,7 @@ class PutOperation : public pvac::ClientChannel::PutCallback, public pvac::Clien
     bool                                                   done;
     virtual void putBuild(const epics::pvData::StructureConstPtr& build, pvac::ClientChannel::PutCallback::Args& args) OVERRIDE FINAL;
     virtual void putDone(const pvac::PutEvent& evt) OVERRIDE FINAL;
+    void collectFieldOffsets(epics::pvData::PVStructurePtr root, const msgpack::object& obj, pvac::ClientChannel::PutCallback::Args& args);
 
 public:
     PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const epics::pvData::PVStructure::const_shared_pointer& pv_req, std::unique_ptr<k2eg::common::MsgpackObject> put_object);

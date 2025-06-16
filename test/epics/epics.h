@@ -20,12 +20,19 @@
   int r = retry; \
   do { std::this_thread::sleep_for(std::chrono::milliseconds(sleep_m_sec)); r--;} while (x == v && r > 0)
 
-template <typename Scalar>
-std::unique_ptr<k2eg::common::MsgpackObjectWithZone> msgpack_from_scalar(const std::string& key, const Scalar& value)
+template <typename Type>
+std::unique_ptr<k2eg::common::MsgpackObject> msgpack_from_scalar(const std::string& key, const Type& value)
 {
-    std::map<std::string, Scalar> val = {{key, value}};
+    std::map<std::string, Type> val = {{key, value}};
     // Create a MsgpackObjectWithZone to hold the packed data
     return std::make_unique<k2eg::common::MsgpackObjectWithZone>(val);
 }
 
-#define MOVE_MSGPACK_SCALAR(f, t, x) std::move(msgpack_from_scalar<t>(f, x))
+template <typename Type>
+std::unique_ptr<k2eg::common::MsgpackObject> msgpack_from_object(const Type& value)
+{
+    // Create a MsgpackObjectWithZone to hold the packed data
+    return std::make_unique<k2eg::common::MsgpackObjectWithZone>(value);
+}
+#define MOVE_MSGPACK_TYPED(f, t, x) std::move(msgpack_from_scalar<t>(f, x))
+#define MOVE_MSGPACK_TYPED_OBJECT(t, x) std::move(msgpack_from_object<t>(x))
