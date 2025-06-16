@@ -79,19 +79,19 @@ TEST(EpicsChannel, ChannelPutValue)
     EXPECT_NO_THROW(pc_sum = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
     EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:a"););
     EXPECT_NO_THROW(pc_b = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:b"););
-    EXPECT_NO_THROW(put_op_a = pc_a->put("value", MOVE_MSGPACK_SCALAR("value", double, 0)););
+    EXPECT_NO_THROW(put_op_a = pc_a->put(MOVE_MSGPACK_SCALAR("value", double, 0)););
     WHILE_OP(put_op_a, false);
     EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::event_t::Success);
-    EXPECT_NO_THROW(put_op_b = pc_b->put("value", MOVE_MSGPACK_SCALAR("value", double, 0)));
+    EXPECT_NO_THROW(put_op_b = pc_b->put(MOVE_MSGPACK_SCALAR("value", double, 0)));
     WHILE_OP(put_op_b, false);
     EXPECT_EQ(put_op_b->getState().event, pvac::PutEvent::event_t::Success);
     // give time to update
     sleep(2);
     EXPECT_EQ(retry_eq(pc_sum->get(), "value", 0, 1000, 10), true);
-    EXPECT_NO_THROW(put_op_a = pc_a->put("value", MOVE_MSGPACK_SCALAR("value", double, 5)));
+    EXPECT_NO_THROW(put_op_a = pc_a->put(MOVE_MSGPACK_SCALAR("value", double, 5)));
     WHILE_OP(put_op_a, false);
     EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::event_t::Success);
-    EXPECT_NO_THROW(put_op_b = pc_b->put("value", MOVE_MSGPACK_SCALAR("value", double, 5)));
+    EXPECT_NO_THROW(put_op_b = pc_b->put(MOVE_MSGPACK_SCALAR("value", double, 5)));
     WHILE_OP(put_op_b, false);
     EXPECT_EQ(put_op_b->getState().event, pvac::PutEvent::event_t::Success);
     // give time to update
@@ -108,7 +108,7 @@ TEST(EpicsChannel, ChannelMonitor)
     epics::pvData::PVStructure::const_shared_pointer val;
     EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:a"););
     // enable monitor
-    EXPECT_NO_THROW(put_op = pc_a->put("value", MOVE_MSGPACK_SCALAR("value", double, 0)););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_SCALAR("value", double, 0)););
     WHILE_OP(put_op, false);
     EXPECT_EQ(retry_eq(pc_a->get(), "value", 0, 500, 3), true);
 
@@ -119,9 +119,9 @@ TEST(EpicsChannel, ChannelMonitor)
     EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
     EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 0);
 
-    EXPECT_NO_THROW(put_op = pc_a->put("value", MOVE_MSGPACK_SCALAR("value", double, 1)););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_SCALAR("value", double, 1)););
     WHILE_OP(put_op, false);
-    EXPECT_NO_THROW(put_op = pc_a->put("value", MOVE_MSGPACK_SCALAR("value", double, 2)););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_SCALAR("value", double, 2)););
     WHILE_OP(put_op, false);
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -184,7 +184,7 @@ TEST(EpicsChannel, ChannelMonitorCombinedRequestCA)
     epics::pvData::PVStructure::const_shared_pointer val;
     EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:a"););
     // enable monitor
-    EXPECT_NO_THROW(put_op = pc_a->put("value", MOVE_MSGPACK_SCALAR("value", double, 0)););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_SCALAR("value", double, 0)););
     WHILE_OP(put_op, false);
     EXPECT_EQ(retry_eq(pc_a->get(), "value", 0, 500, 3), true);
 
@@ -195,9 +195,9 @@ TEST(EpicsChannel, ChannelMonitorCombinedRequestCA)
     EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
     EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 0);
 
-    EXPECT_NO_THROW(put_op = pc_a->put("value", MOVE_MSGPACK_SCALAR("value", double, 1)););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_SCALAR("value", double, 1)););
     WHILE_OP(put_op, false);
-    EXPECT_NO_THROW(put_op = pc_a->put("value", MOVE_MSGPACK_SCALAR("value", double, 2)););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_SCALAR("value", double, 2)););
     WHILE_OP(put_op, false);
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -243,7 +243,7 @@ TEST(EpicsChannel, ChannelCAMonitor)
     epics::pvData::PVStructure::const_shared_pointer val;
     EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:a"););
     // enable monitor
-    EXPECT_NO_THROW(put_op = pc_a->put("value", MOVE_MSGPACK_SCALAR("value", double, 0)););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_SCALAR("value", double, 0)););
     WHILE_OP(put_op, false);
     EXPECT_EQ(retry_eq(pc_a->get(), "value", 0, 500, 3), true);
 
@@ -253,9 +253,9 @@ TEST(EpicsChannel, ChannelCAMonitor)
     EXPECT_EQ(fetched->event_data->size(), 1);
     EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
     EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 0);
-    EXPECT_NO_THROW(put_op = pc_a->put("value", MOVE_MSGPACK_SCALAR("value", double, 1)););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_SCALAR("value", double, 1)););
     WHILE_OP(put_op, false);
-    EXPECT_NO_THROW(put_op = pc_a->put("value", MOVE_MSGPACK_SCALAR("value", double, 2)););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_SCALAR("value", double, 2)););
     WHILE_OP(put_op, false);
     std::this_thread::sleep_for(std::chrono::seconds(1));
 

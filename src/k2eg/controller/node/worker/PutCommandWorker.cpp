@@ -58,7 +58,7 @@ void PutCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> com
         manageReply(-1, "Base64 decode error", p_ptr);
         return;
     }
-    auto msgpack_object = unpack_msgpack_object(b64_decode);
+    auto msgpack_object = unpack_msgpack_object(std::move(b64_decode));
     if (msgpack_object == nullptr || msgpack_object == nullptr)
     {
         logger->logMessage(STRING_FORMAT("Unpack msgpack object error for %1%", p_ptr->pv_name), LogLevel::ERROR);

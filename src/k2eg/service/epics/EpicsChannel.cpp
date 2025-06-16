@@ -1,3 +1,4 @@
+#include "k2eg/common/MsgpackSerialization.h"
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
 
@@ -41,9 +42,9 @@ void EpicsChannel::deinit()
     pva::ca::CAClientFactory::stop();
 }
 
-ConstPutOperationUPtr EpicsChannel::put(const std::string& field, std::unique_ptr<MsgpackObjectWithZone> value)
+ConstPutOperationUPtr EpicsChannel::put(std::unique_ptr<MsgpackObject> value)
 {
-    return MakePutOperationUPtr(channel, pvReq, field, std::move(value));
+    return MakePutOperationUPtr(channel, pvReq, std::move(value));
 }
 
 ConstGetOperationUPtr EpicsChannel::get() const

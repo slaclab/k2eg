@@ -1,3 +1,4 @@
+#include "k2eg/common/MsgpackSerialization.h"
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/ThrottlingManager.h>
 #include <k2eg/common/utility.h>
@@ -211,7 +212,7 @@ ConstGetOperationUPtr EpicsServiceManager::getChannelData(const std::string& pv_
     return result;
 }
 
-ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_name_uri, std::unique_ptr<MsgpackObjectWithZone> value)
+ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_name_uri, std::unique_ptr<MsgpackObject> value)
 {
     ConstPutOperationUPtr result;
     WriteLockCM           write_lock(channel_map_mutex);
@@ -223,7 +224,7 @@ ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_
     if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
     {
         // allocate channel and return data
-        result = channel_map[sanitized_pv->name].channel->put(sanitized_pv->field, std::move(value));
+        result = channel_map[sanitized_pv->name].channel->put(std::move(value));
     }
     else
     {
@@ -232,7 +233,7 @@ ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_
             .to_force = false,
             .keep_alive = 0,
         };
-        result = channel.channel->put(sanitized_pv->field, std::move(value));
+        result = channel.channel->put(std::move(value));
     }
     return result;
 }

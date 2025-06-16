@@ -4,30 +4,59 @@
 #include <k2eg/common/types.h>
 #include <memory>
 #include <msgpack.hpp>
+#include <vector>
 
 namespace k2eg::common {
 
-struct MsgpackObjectWithZone
+class MsgpackObject
+{
+public:
+    virtual msgpack::object get() const = 0;
+};
+
+class MsgpackObjectWithZone : public MsgpackObject
 {
     msgpack::object_handle handle;
+    msgpack::unpacked      msg;
 
+public:
     // Existing constructor from value
-    template<class T>
-    MsgpackObjectWithZone(const T& val) {
+    template <class T>
+    MsgpackObjectWithZone(const T& val)
+    {
         msgpack::sbuffer buffer;
         msgpack::pack(buffer, val);
         handle = msgpack::unpack(buffer.data(), buffer.size());
     }
 
     // New constructor from handle
-    MsgpackObjectWithZone(msgpack::object_handle&& h)
-        : handle(std::move(h)) {}
+    MsgpackObjectWithZone(msgpack::object_handle&& h) : handle(std::move(h)) {}
+
+    msgpack::object get() const
+    {
+        return handle.get();
+    }
 };
 
-inline std::unique_ptr<MsgpackObjectWithZone> unpack_msgpack_object(const std::vector<unsigned char>& data)
+class MsgpackObjectFromBuffer : public MsgpackObject
+{
+    const std::vector<unsigned char> buff;
+    msgpack::unpacked                msg;
+
+public:
+    // New constructor from handle
+    MsgpackObjectFromBuffer(const std::vector<unsigned char>&& buff) : buff(std::move(buff)) {}
+
+    msgpack::object get() const
+    {
+        return msg.get();
+    }
+};
+
+inline std::unique_ptr<MsgpackObject> unpack_msgpack_object(std::vector<unsigned char>&& data)
 {
     msgpack::object_handle oh = msgpack::unpack(reinterpret_cast<const char*>(data.data()), data.size());
-    return std::make_unique<MsgpackObjectWithZone>(std::move(oh));
+    return std::make_unique<MsgpackObjectFromBuffer>(std::move(data));
 }
 
 class MsgpackMessage;

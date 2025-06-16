@@ -36,7 +36,7 @@ public:
     ~EpicsChannel();
     static void                  init();
     static void                  deinit();
-    ConstPutOperationUPtr        put(const std::string& field, std::unique_ptr<k2eg::common::MsgpackObjectWithZone> value);
+    ConstPutOperationUPtr        put(std::unique_ptr<k2eg::common::MsgpackObject> value);
     ConstGetOperationUPtr        get() const;
     ConstMonitorOperationShrdPtr monitor() const;
 };
