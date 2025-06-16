@@ -1,6 +1,6 @@
+#include <k2eg/common/MsgpackSerialization.h>
 #include <k2eg/common/base64.h>
 #include <k2eg/common/utility.h>
-#include <k2eg/common/MsgpackSerialization.h>
 
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/epics/EpicsPutOperation.h>
@@ -47,17 +47,16 @@ void PutCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> com
         return;
     }
 
-    ConstPutCommandShrdPtr            p_ptr = static_pointer_cast<const PutCommand>(command);
+    ConstPutCommandShrdPtr p_ptr = static_pointer_cast<const PutCommand>(command);
     logger->logMessage(STRING_FORMAT("Perform put command for %1%", p_ptr->pv_name), LogLevel::DEBUG);
-    // TODO: at this point value should be a msgapck object, so for now conver the string to a msgpack object
-    
-    auto b64_decode = Base64::decode(p_ptr->pv_name) ;
+
+    // value is a base64 msgpack serialization
+    auto b64_decode = Base64::decode(p_ptr->value);
     if (b64_decode.empty())
     {
         logger->logMessage(STRING_FORMAT("Base64 decode error for %1%", p_ptr->pv_name), LogLevel::ERROR);
         manageReply(-1, "Base64 decode error", p_ptr);
         return;
-    
     }
     auto msgpack_object = unpack_msgpack_object(b64_decode);
     if (msgpack_object == nullptr || msgpack_object == nullptr)
@@ -65,7 +64,6 @@ void PutCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> com
         logger->logMessage(STRING_FORMAT("Unpack msgpack object error for %1%", p_ptr->pv_name), LogLevel::ERROR);
         manageReply(-2, "Unpack msgpack object error", p_ptr);
         return;
-    
     }
 
     auto put_op = epics_service_manager->putChannelData(p_ptr->pv_name, std::move(msgpack_object));
