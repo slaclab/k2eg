@@ -1,3 +1,6 @@
+#include "msgpack/v3/pack_decl.hpp"
+#include <k2eg/common/MsgpackSerialization.h>
+
 #define INIT_PVA_PROVIDER()                                                                                                      \
   epics::pvAccess::Configuration::shared_pointer test_pva_conf     = epics::pvAccess::ConfigurationBuilder().push_env().build(); \
   std::unique_ptr<pvac::ClientProvider>          test_pva_provider = std::make_unique<pvac::ClientProvider>("pva", test_pva_conf);
@@ -16,3 +19,13 @@
 #define TIMEOUT(x, v, retry, sleep_m_sec) \
   int r = retry; \
   do { std::this_thread::sleep_for(std::chrono::milliseconds(sleep_m_sec)); r--;} while (x == v && r > 0)
+
+template <typename Scalar>
+std::unique_ptr<k2eg::common::MsgpackObjectWithZone> msgpack_from_scalar(const std::string& key, const Scalar& value)
+{
+    std::map<std::string, Scalar> val = {{key, value}};
+    // Create a MsgpackObjectWithZone to hold the packed data
+    return std::make_unique<k2eg::common::MsgpackObjectWithZone>(val);
+}
+
+#define MOVE_MSGPACK_SCALAR(f, t, x) std::move(msgpack_from_scalar<t>(f, x))

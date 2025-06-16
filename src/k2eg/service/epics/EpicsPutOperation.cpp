@@ -12,7 +12,7 @@ namespace pvd = epics::pvData;
 PutOperation::PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const pvd::PVStructure::const_shared_pointer& pv_req, const std::string& field, std::unique_ptr<k2eg::common::MsgpackObjectWithZone> value)
     : channel(channel), field(field), value(std::move(value)), pv_req(pv_req), done(false)
 {
-    
+    channel->addConnectListener(this);
 }
 
 PutOperation::~PutOperation()
@@ -39,14 +39,23 @@ void PutOperation::putBuild(const epics::pvData::StructureConstPtr& build, pvac:
     {
         throw std::runtime_error("Field has not been found");
     }
+
     bool immutable = fld->isImmutable();
     if (immutable)
     {
         throw std::runtime_error("Field is immutable");
     }
-
-    auto put_obj = MsgpackEpicsConverter::msgpackToEpics(*value->object, build);
-    fld->copy(*put_obj);
+    // retrieve the schema of only the field identified by the variable 'field'
+    auto put_obj_structure = MsgpackEpicsConverter::msgpackToEpics(value->handle.get(), build);
+    auto field_put = put_obj_structure->getSubFieldT<pvd::PVField>(field);
+    if (!field_put)
+    {
+        throw std::runtime_error("Field src has not been found");
+    }
+    // Iterate over all PVFields in put_obj and set them in build
+   
+    std::cout << "PutOperation::putBuild: field=" << field << ", value=" << *field_put << std::endl;
+    fld->copy(*field_put);
     // attempt convert string to actual field type
     // valfld->putFrom(value);
     args.root = root; // non-const -> const
