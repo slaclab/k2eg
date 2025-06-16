@@ -537,10 +537,12 @@ TEST_F(Epics, EpicsServiceManagerPutOtherField)
     EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::Success);
     EXPECT_NO_THROW(get_op_a = manager->getChannelData("pva://variable:a"););
     WHILE_OP(get_op_a, false);
-    epics::pvData::PVScalar::const_shared_pointer scalar_result;
+    epics::pvData::PVScalar::const_shared_pointer scalar_result_hihi;
+    epics::pvData::PVScalar::const_shared_pointer scalar_result_value;
     std::cout << "Get operation completed:" << *get_op_a->getChannelData()->data << std::endl;
-    EXPECT_NO_THROW(scalar_result = get_op_a->getChannelData()->data->getSubField<epics::pvData::PVScalar>("valueAlarm.highWarningLimit"));
-    int hihi_result = scalar_result->getAs<epics::pvData::uint32>();
-    EXPECT_EQ(hihi_result, 200);
+    EXPECT_NO_THROW(scalar_result_value = get_op_a->getChannelData()->data->getSubField<epics::pvData::PVScalar>("value"));
+    EXPECT_NO_THROW(scalar_result_hihi = get_op_a->getChannelData()->data->getSubField<epics::pvData::PVScalar>("valueAlarm.highWarningLimit"));
+    EXPECT_EQ(scalar_result_value->getAs<epics::pvData::uint32>(), 1);
+    EXPECT_EQ(scalar_result_hihi->getAs<epics::pvData::uint32>(), 100);
     manager.reset();
 }
