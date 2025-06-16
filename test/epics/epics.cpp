@@ -476,34 +476,35 @@ TEST_F(Epics, EpicsServiceManagerGetPut)
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_NO_THROW(sum_data = manager->getChannelData("pva://variable:sum"););
     WHILE_OP(sum_data, false);
-    EXPECT_EQ(sum_data->getChannelData()->data->getSubField<epics::pvData::PVDouble>("value")->get(), 3);
+    EXPECT_EQ(sum_data->getChannelData()->data->getSubField<epics::pvData::PVDouble>("value")->get(), 4);
     manager.reset();
 }
 
 TEST_F(Epics, EpicsServiceManagerGetPutWaveForm)
 {
-    // ConstGetOperationUPtr                sum_data;
-    // ConstPutOperationUPtr                put_op_a;
-    // ConstPutOperationUPtr                put_op_b;
-    // std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-    // EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://channel:waveform", "1 2 3 4 5 6 7 8"););
-    // WHILE_OP(put_op_a, false);
-    // EXPECT_NO_THROW(sum_data = manager->getChannelData("pva://channel:waveform"););
-    // WHILE_OP(sum_data, false);
-    // epics::pvData::PVScalarArray::const_shared_pointer arr_result;
-    // EXPECT_NO_THROW(arr_result = sum_data->getChannelData()->data->getSubField<epics::pvData::PVScalarArray>("value"));
-    // epics::pvData::shared_vector<const double> arr;
-    // arr_result->getAs<const double>(arr);
-    // EXPECT_EQ(arr.size(), 8);
-    // EXPECT_EQ(arr[0], 1);
-    // EXPECT_EQ(arr[1], 2);
-    // EXPECT_EQ(arr[2], 3);
-    // EXPECT_EQ(arr[3], 4);
-    // EXPECT_EQ(arr[4], 5);
-    // EXPECT_EQ(arr[5], 6);
-    // EXPECT_EQ(arr[6], 7);
-    // EXPECT_EQ(arr[7], 8);
-    // manager.reset();
+    ConstGetOperationUPtr                waveform_get_op;
+    ConstPutOperationUPtr                waveform_put_op;
+    std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
+    std::vector<double> values = {1, 2, 3, 4, 5, 6, 7, 8};
+    
+    EXPECT_NO_THROW(waveform_put_op = manager->putChannelData("pva://channel:waveform", MOVE_MSGPACK_SCALAR("value", std::vector<double>, values)););
+    WHILE_OP(waveform_put_op, false);
+    EXPECT_NO_THROW(waveform_get_op = manager->getChannelData("pva://channel:waveform"););
+    WHILE_OP(waveform_get_op, false);
+    epics::pvData::PVScalarArray::const_shared_pointer arr_result;
+    EXPECT_NO_THROW(arr_result = waveform_get_op->getChannelData()->data->getSubField<epics::pvData::PVScalarArray>("value"));
+    epics::pvData::shared_vector<const double> arr;
+    arr_result->getAs<const double>(arr);
+    EXPECT_EQ(arr.size(), 8);
+    EXPECT_EQ(arr[0], 1);
+    EXPECT_EQ(arr[1], 2);
+    EXPECT_EQ(arr[2], 3);
+    EXPECT_EQ(arr[3], 4);
+    EXPECT_EQ(arr[4], 5);
+    EXPECT_EQ(arr[5], 6);
+    EXPECT_EQ(arr[6], 7);
+    EXPECT_EQ(arr[7], 8);
+    manager.reset();
 }
 
 TEST_F(Epics, EpicsServiceManagerPutWrongField)
