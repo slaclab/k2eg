@@ -2,12 +2,14 @@
 #define NODECONTROLLERCOMMON_H_
 
 #include <gtest/gtest.h>
+#include "../epics/epics.h"
 
 #include <latch>
 #include <map>
 #include <string>
 
 #include "boost/json/object.hpp"
+#include "k2eg/common/base64.h"
 #include "k2eg/common/ProgramOptions.h"
 #include "k2eg/service/ServiceResolver.h"
 #include "k2eg/service/log/ILogger.h"
@@ -23,6 +25,7 @@
 #include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
 #include <k2eg/service/pubsub/pubsub.h>
 #include <k2eg/service/scheduler/Scheduler.h>
+#include <k2eg/common/MsgpackSerialization.h>
 
 #include <filesystem>
 
@@ -54,6 +57,16 @@ using namespace k2eg::service::metric::impl::prometheus_impl;
 namespace bs = boost::system;
 namespace bj = boost::json;
 namespace fs = std::filesystem;
+
+template <typename Type>
+inline std::string msgpack_to_base64(const std::string& key, const Type& value)
+{
+    // Create a MsgpackObjectWithZone to hold the packed data
+    std::unique_ptr<k2eg::common::MsgpackObject> msgpack_object = msgpack_from_scalar<Type>(key, value);
+    // Convert the Msgpack object to a buffer and encode it in Base64
+    return Base64::encode(msgpack_object->toBuffer());
+}
+
 
 class DummyPublisherCounter : public IPublisher
 {

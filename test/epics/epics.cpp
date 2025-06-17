@@ -9,6 +9,7 @@
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/metric/impl/DummyMetricService.h>
 #include <k2eg/service/scheduler/Scheduler.h>
+#include <map>
 #include <unistd.h>
 
 #include <chrono>
@@ -21,6 +22,7 @@
 #include "pvData.h"
 
 using namespace k2eg::service::epics_impl;
+using namespace epics::pvData;
 
 TEST(EpicsChannel, ChannelFault)
 {
@@ -79,19 +81,19 @@ TEST(EpicsChannel, ChannelPutValue)
     EXPECT_NO_THROW(pc_sum = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:sum"););
     EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:a"););
     EXPECT_NO_THROW(pc_b = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:b"););
-    EXPECT_NO_THROW(put_op_a = pc_a->put("value", "0"));
+    EXPECT_NO_THROW(put_op_a = pc_a->put(MOVE_MSGPACK_TYPED("value", double, 0)););
     WHILE_OP(put_op_a, false);
     EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::event_t::Success);
-    EXPECT_NO_THROW(put_op_b = pc_b->put("value", "0"));
+    EXPECT_NO_THROW(put_op_b = pc_b->put(MOVE_MSGPACK_TYPED("value", double, 0)));
     WHILE_OP(put_op_b, false);
     EXPECT_EQ(put_op_b->getState().event, pvac::PutEvent::event_t::Success);
     // give time to update
     sleep(2);
     EXPECT_EQ(retry_eq(pc_sum->get(), "value", 0, 1000, 10), true);
-    EXPECT_NO_THROW(put_op_a = pc_a->put("value", "5"));
+    EXPECT_NO_THROW(put_op_a = pc_a->put(MOVE_MSGPACK_TYPED("value", double, 5)));
     WHILE_OP(put_op_a, false);
     EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::event_t::Success);
-    EXPECT_NO_THROW(put_op_b = pc_b->put("value", "5"));
+    EXPECT_NO_THROW(put_op_b = pc_b->put(MOVE_MSGPACK_TYPED("value", double, 5)));
     WHILE_OP(put_op_b, false);
     EXPECT_EQ(put_op_b->getState().event, pvac::PutEvent::event_t::Success);
     // give time to update
@@ -108,7 +110,7 @@ TEST(EpicsChannel, ChannelMonitor)
     epics::pvData::PVStructure::const_shared_pointer val;
     EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_pva_provider, "variable:a"););
     // enable monitor
-    EXPECT_NO_THROW(put_op = pc_a->put("value", "0"););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_TYPED("value", double, 0)););
     WHILE_OP(put_op, false);
     EXPECT_EQ(retry_eq(pc_a->get(), "value", 0, 500, 3), true);
 
@@ -119,9 +121,9 @@ TEST(EpicsChannel, ChannelMonitor)
     EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
     EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 0);
 
-    EXPECT_NO_THROW(put_op = pc_a->put("value", "1"););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_TYPED("value", double, 1)););
     WHILE_OP(put_op, false);
-    EXPECT_NO_THROW(put_op = pc_a->put("value", "2"););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_TYPED("value", double, 2)););
     WHILE_OP(put_op, false);
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -184,7 +186,7 @@ TEST(EpicsChannel, ChannelMonitorCombinedRequestCA)
     epics::pvData::PVStructure::const_shared_pointer val;
     EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:a"););
     // enable monitor
-    EXPECT_NO_THROW(put_op = pc_a->put("value", "0"););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_TYPED("value", double, 0)););
     WHILE_OP(put_op, false);
     EXPECT_EQ(retry_eq(pc_a->get(), "value", 0, 500, 3), true);
 
@@ -195,9 +197,9 @@ TEST(EpicsChannel, ChannelMonitorCombinedRequestCA)
     EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
     EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 0);
 
-    EXPECT_NO_THROW(put_op = pc_a->put("value", "1"););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_TYPED("value", double, 1)););
     WHILE_OP(put_op, false);
-    EXPECT_NO_THROW(put_op = pc_a->put("value", "2"););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_TYPED("value", double, 2)););
     WHILE_OP(put_op, false);
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -243,7 +245,7 @@ TEST(EpicsChannel, ChannelCAMonitor)
     epics::pvData::PVStructure::const_shared_pointer val;
     EXPECT_NO_THROW(pc_a = std::make_unique<EpicsChannel>(*test_ca_provider, "variable:a"););
     // enable monitor
-    EXPECT_NO_THROW(put_op = pc_a->put("value", "0"););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_TYPED("value", double, 0)););
     WHILE_OP(put_op, false);
     EXPECT_EQ(retry_eq(pc_a->get(), "value", 0, 500, 3), true);
 
@@ -253,9 +255,9 @@ TEST(EpicsChannel, ChannelCAMonitor)
     EXPECT_EQ(fetched->event_data->size(), 1);
     EXPECT_EQ(fetched->event_data->at(0)->type, EventType::Data);
     EXPECT_EQ(fetched->event_data->at(0)->channel_data.data->getSubField<epics::pvData::PVDouble>("value")->get(), 0);
-    EXPECT_NO_THROW(put_op = pc_a->put("value", "1"););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_TYPED("value", double, 1)););
     WHILE_OP(put_op, false);
-    EXPECT_NO_THROW(put_op = pc_a->put("value", "2"););
+    EXPECT_NO_THROW(put_op = pc_a->put(MOVE_MSGPACK_TYPED("value", double, 2)););
     WHILE_OP(put_op, false);
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -468,30 +470,31 @@ TEST_F(Epics, EpicsServiceManagerGetPut)
     ConstPutOperationUPtr                put_op_a;
     ConstPutOperationUPtr                put_op_b;
     std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-    EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://variable:a", "1"););
+    EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://variable:a", MOVE_MSGPACK_TYPED("value", double, 2)););
     WHILE_OP(put_op_a, false);
-    EXPECT_NO_THROW(put_op_b = manager->putChannelData("pva://variable:b", "2"););
+    EXPECT_NO_THROW(put_op_b = manager->putChannelData("pva://variable:b", MOVE_MSGPACK_TYPED("value", double, 2)););
     WHILE_OP(put_op_b, false);
     // give time to update
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_NO_THROW(sum_data = manager->getChannelData("pva://variable:sum"););
     WHILE_OP(sum_data, false);
-    EXPECT_EQ(sum_data->getChannelData()->data->getSubField<epics::pvData::PVDouble>("value")->get(), 3);
+    EXPECT_EQ(sum_data->getChannelData()->data->getSubField<epics::pvData::PVDouble>("value")->get(), 4);
     manager.reset();
 }
 
 TEST_F(Epics, EpicsServiceManagerGetPutWaveForm)
 {
-    ConstGetOperationUPtr                sum_data;
-    ConstPutOperationUPtr                put_op_a;
-    ConstPutOperationUPtr                put_op_b;
+    ConstGetOperationUPtr                waveform_get_op;
+    ConstPutOperationUPtr                waveform_put_op;
     std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-    EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://channel:waveform", "1 2 3 4 5 6 7 8"););
-    WHILE_OP(put_op_a, false);
-    EXPECT_NO_THROW(sum_data = manager->getChannelData("pva://channel:waveform"););
-    WHILE_OP(sum_data, false);
+    std::vector<double>                  values = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    EXPECT_NO_THROW(waveform_put_op = manager->putChannelData("pva://channel:waveform", MOVE_MSGPACK_TYPED("value", std::vector<double>, values)););
+    WHILE_OP(waveform_put_op, false);
+    EXPECT_NO_THROW(waveform_get_op = manager->getChannelData("pva://channel:waveform"););
+    WHILE_OP(waveform_get_op, false);
     epics::pvData::PVScalarArray::const_shared_pointer arr_result;
-    EXPECT_NO_THROW(arr_result = sum_data->getChannelData()->data->getSubField<epics::pvData::PVScalarArray>("value"));
+    EXPECT_NO_THROW(arr_result = waveform_get_op->getChannelData()->data->getSubField<epics::pvData::PVScalarArray>("va" "lu" "e"));
     epics::pvData::shared_vector<const double> arr;
     arr_result->getAs<const double>(arr);
     EXPECT_EQ(arr.size(), 8);
@@ -508,30 +511,119 @@ TEST_F(Epics, EpicsServiceManagerGetPutWaveForm)
 
 TEST_F(Epics, EpicsServiceManagerPutWrongField)
 {
-    ConstGetOperationUPtr                sum_data;
     ConstPutOperationUPtr                put_op_a;
-    ConstPutOperationUPtr                put_op_b;
     std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-    EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://variable:a.HIHI", "100"););
+    EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://variable:a", MOVE_MSGPACK_TYPED("wrongField", double, 100)););
     WHILE_OP(put_op_a, false);
     EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::Fail);
     manager.reset();
 }
 
-TEST_F(Epics, EpicsServiceManagerPutOtherField)
+TEST_F(Epics, EpicsServiceManagerPutNTTable)
 {
-    ConstGetOperationUPtr                sum_data;
+    using msgpack_variant = msgpack::type::variant;
+    ConstGetOperationUPtr                get_op_a;
     ConstPutOperationUPtr                put_op_a;
-    ConstPutOperationUPtr                put_op_b;
     std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-    // EXPECT_NO_THROW(put_op_a = manager->putChannelData("variable:a.valueAlarm.highWarningLimit", "200"););
-    // WHILE(put_op_a, false);
-    // EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::Success);
-    // EXPECT_NO_THROW(sum_data = manager->getChannelData("variable:a"););
-    // WHILE(sum_data, false);
-    // epics::pvData::PVScalar::const_shared_pointer scalar_result;
-    // EXPECT_NO_THROW(scalar_result =
-    // sum_data->getChannelData()->data->getSubField<epics::pvData::PVScalar>("valueAlarm.highWarningLimit")); int
-    // hihi_result = scalar_result->getAs<epics::pvData::uint32>(); EXPECT_EQ(hihi_result, 200);
+    NTTableBuilder                       tbl;
+    // 1) Define all labels
+    const std::vector<std::string> nt_labels = {"element", "device_name", "s",      "z",      "length", "p0c",
+                                                "alpha_x", "beta_x",      "eta_x",  "etap_x", "psi_x",  "alpha_y",
+                                                "beta_y",  "eta_y",       "etap_y", "psi_y"};
+    tbl.addLabels(nt_labels);
+
+    // 2) Fill 'element' & 'device_name' as string arrays
+    tbl.addValue("element", std::vector<msgpack_variant>{std::string("SOL9000"), std::string("XC99"), std::string("YC99")});
+    tbl.addValue("device_name", std::vector<msgpack_variant>{std::string("SOL:IN20:111"), std::string("XCOR:IN20:112"), std::string("YCOR:IN20:113")});
+    tbl.addValue("s", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("z", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("length", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("p0c", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("alpha_x", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("beta_x", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("eta_x", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("etap_x", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("psi_x", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("alpha_y", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("beta_y", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("eta_y", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("etap_y", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("psi_y", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+
+    auto root_map = tbl.root();
+    auto msg_pack_obj = std::make_unique<k2eg::common::MsgpackObjectWithZone>(root_map);
+    EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://K2EG:TEST:TWISS", std::move(msg_pack_obj)););
+    WHILE_OP(put_op_a, false);
+    EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::Success);
+    EXPECT_NO_THROW(get_op_a = manager->getChannelData("pva://K2EG:TEST:TWISS"););
+    WHILE_OP(get_op_a, false);
+    epics::pvData::PVScalar::const_shared_pointer scalar_result_hihi;
+    epics::pvData::PVScalar::const_shared_pointer scalar_result_value;
+
+    // verify the nttable has been written correctly
+    PVStructure::const_shared_pointer data = get_op_a->getChannelData()->data;
+    ASSERT_NE(data, nullptr);
+    // 1) Verify "labels"
+    auto labelsField = data->getSubField("labels");
+    auto labelsArr = std::dynamic_pointer_cast<const PVStringArray>(labelsField);
+    ASSERT_TRUE(labelsArr);
+    auto                     labels = labelsArr->view();
+    std::vector<std::string> expectedLabels = {"element", "device_name", "s",      "z",      "length", "p0c",
+                                               "alpha_x", "beta_x",      "eta_x",  "etap_x", "psi_x",  "alpha_y",
+                                               "beta_y",  "eta_y",       "etap_y", "psi_y"};
+    ASSERT_EQ(labels.size(), expectedLabels.size());
+    for (size_t i = 0; i < labels.size(); ++i)
+    {
+        EXPECT_EQ(labels[i], expectedLabels[i]);
+    }
+
+    // 2) Verify the "value" structure
+    auto valueField = data->getSubField("value");
+    auto valueStruct = std::dynamic_pointer_cast<const PVStructure>(valueField);
+    ASSERT_TRUE(valueStruct);
+
+    // 2a) element (string[])
+    {
+        auto fld = valueStruct->getSubField("element");
+        auto arr = std::dynamic_pointer_cast<const PVStringArray>(fld);
+        ASSERT_TRUE(arr);
+        auto                     view = arr->view();
+        std::vector<std::string> exp = {"SOL9000", "XC99", "YC99"};
+        ASSERT_EQ(view.size(), exp.size());
+        for (size_t i = 0; i < exp.size(); ++i)
+        {
+            EXPECT_EQ(view[i], exp[i]);
+        }
+    }
+
+    // 2b) device_name (string[])
+    {
+        auto fld = valueStruct->getSubField("device_name");
+        auto arr = std::dynamic_pointer_cast<const PVStringArray>(fld);
+        ASSERT_TRUE(arr);
+        auto                     view = arr->view();
+        std::vector<std::string> exp = {"SOL:IN20:111", "XCOR:IN20:112", "YCOR:IN20:113"};
+        ASSERT_EQ(view.size(), exp.size());
+        for (size_t i = 0; i < exp.size(); ++i)
+        {
+            EXPECT_EQ(view[i], exp[i]);
+        }
+    }
+
+    // 2c) double[] columns: expected [1.0, 2.0, 3.0]
+    std::vector<std::string> dblCols = {"s",      "z",     "length",  "p0c",    "alpha_x", "beta_x", "eta_x",
+                                        "etap_x", "psi_x", "alpha_y", "beta_y", "eta_y",   "etap_y", "psi_y"};
+    for (auto const& name : dblCols)
+    {
+        SCOPED_TRACE("column: " + name);
+        auto fld = valueStruct->getSubField(name);
+        auto arr = std::dynamic_pointer_cast<const PVDoubleArray>(fld);
+        ASSERT_TRUE(arr);
+        auto view = arr->view();
+        ASSERT_EQ(view.size(), 3u);
+        EXPECT_DOUBLE_EQ(view[0], 1.0);
+        EXPECT_DOUBLE_EQ(view[1], 2.0);
+        EXPECT_DOUBLE_EQ(view[2], 3.0);
+    }
     manager.reset();
 }

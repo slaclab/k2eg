@@ -1,3 +1,4 @@
+#include "k2eg/common/MsgpackSerialization.h"
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
 
@@ -6,6 +7,7 @@
 
 #include <memory>
 
+using namespace k2eg::common;
 using namespace k2eg::service::epics_impl;
 
 namespace pva = epics::pvAccess;
@@ -13,8 +15,8 @@ namespace pva = epics::pvAccess;
 EpicsChannel::EpicsChannel(pvac::ClientProvider& provider, const std::string& pv_name, const std::string& address)
     : pv_name(pv_name)
     , address(address)
-    , fetch_principal_field(provider.name().compare("ca") == 0 ? "field(value," "timeStamp," "alarm)" : "field()")
-    , fetch_additional_field(provider.name().compare("ca") == 0 ? "field(" "dis" "pla" "y," "control," "valueAlarm)" : "")
+    , fetch_principal_field(provider.name().compare("ca") == 0 ? "field(value,timeStamp,alarm)" : "field()")
+    , fetch_additional_field(provider.name().compare("ca") == 0 ? "field(display,control,valueAlarm)" : "")
 {
     pvac::ClientChannel::Options opt;
     if (!address.empty())
@@ -40,9 +42,9 @@ void EpicsChannel::deinit()
     pva::ca::CAClientFactory::stop();
 }
 
-ConstPutOperationUPtr EpicsChannel::put(const std::string& field, const std::string& value)
+ConstPutOperationUPtr EpicsChannel::put(std::unique_ptr<MsgpackObject> value)
 {
-    return MakePutOperationUPtr(channel, pvReq, field, value);
+    return MakePutOperationUPtr(channel, pvReq, std::move(value));
 }
 
 ConstGetOperationUPtr EpicsChannel::get() const

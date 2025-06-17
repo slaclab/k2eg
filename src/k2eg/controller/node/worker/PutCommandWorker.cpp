@@ -1,3 +1,5 @@
+#include <k2eg/common/MsgpackSerialization.h>
+#include <k2eg/common/base64.h>
 #include <k2eg/common/utility.h>
 
 #include <k2eg/service/ServiceResolver.h>
@@ -8,6 +10,8 @@
 #include <k2eg/controller/node/worker/PutCommandWorker.h>
 
 #include <boost/json.hpp>
+
+#include <msgpack.hpp>
 
 #include <chrono>
 #include <memory>
@@ -42,13 +46,36 @@ void PutCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> com
     {
         return;
     }
+
     ConstPutCommandShrdPtr p_ptr = static_pointer_cast<const PutCommand>(command);
     logger->logMessage(STRING_FORMAT("Perform put command for %1%", p_ptr->pv_name), LogLevel::DEBUG);
-    auto put_op = epics_service_manager->putChannelData(p_ptr->pv_name, p_ptr->value);
+
+    // value is a base64 msgpack serialization
+    auto b64_decode = Base64::decode(p_ptr->value);
+    if (b64_decode.empty())
+    {
+        manageReply(-1, "Base64 decode error", p_ptr);
+        return;
+    }
+    auto msgpack_object = unpack_msgpack_object(std::move(b64_decode));
+    if (msgpack_object == nullptr)
+    {
+        // unpack error
+        manageReply(-2, "Unpack msgpack object error", p_ptr);
+        return;
+    }
+    if (msgpack_object->get().type != msgpack::type::MAP)
+    {
+        // unpack error
+        manageReply(-3, "Masgpack object need to be a map", p_ptr);
+        return; 
+    }
+
+    auto put_op = epics_service_manager->putChannelData(p_ptr->pv_name, std::move(msgpack_object));
     if (!put_op)
     {
         // fire error
-        manageReply(-1, "PV name malformed", p_ptr);
+        manageReply(-4, "PV name malformed", p_ptr);
     }
     else
     {

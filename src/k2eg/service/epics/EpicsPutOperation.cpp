@@ -1,5 +1,6 @@
+#include <iostream>
 #include <k2eg/service/epics/EpicsPutOperation.h>
-
+#include <k2eg/service/epics/MsgpackEpicsConverter.h>
 #include <pv/createRequest.h>
 #include <pvData.h>
 
@@ -9,8 +10,8 @@ using namespace k2eg::service::epics_impl;
 
 namespace pvd = epics::pvData;
 
-PutOperation::PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const pvd::PVStructure::const_shared_pointer& pv_req, const std::string& field, const std::string& value)
-    : channel(channel), field(field), value(value), pv_req(pv_req), done(false)
+PutOperation::PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const pvd::PVStructure::const_shared_pointer& pv_req, std::unique_ptr<k2eg::common::MsgpackObject> put_object)
+    : channel(channel), put_object(std::move(put_object)), pv_req(pv_req), done(false)
 {
     channel->addConnectListener(this);
 }
@@ -24,60 +25,75 @@ PutOperation::~PutOperation()
     channel->removeConnectListener(this);
 }
 
+void PutOperation::collectFieldOffsets(epics::pvData::PVStructurePtr root, const msgpack::object& obj, pvac::ClientChannel::PutCallback::Args& args)
+{
+    if (obj.type != msgpack::type::MAP)
+        return;
+
+    for (uint32_t i = 0; i < obj.via.map.size; ++i)
+    {
+        std::string            key = obj.via.map.ptr[i].key.as<std::string>();
+        const msgpack::object& value = obj.via.map.ptr[i].val;
+
+        auto field = root->getSubField(key);
+
+        if (!field)
+            continue;
+
+        if (value.type == msgpack::type::MAP)
+        {
+            // Recurse into sub-structures, passing only the sub-structure and value
+            auto subStruct = std::dynamic_pointer_cast<epics::pvData::PVStructure>(field);
+            if (subStruct)
+            {
+                // set bit for this struct itself
+                // args.tosend.set(field->getFieldOffset());
+                collectFieldOffsets(subStruct, value, args);
+            }
+        }
+        else
+        {
+            if(field->isImmutable())
+            {
+                throw std::runtime_error("Filed '" + key + "' is immutable and cannot be updated");
+            }
+            // Scalar or leaf: set the bit
+            args.tosend.set(field->getFieldOffset());
+        }
+    }
+}
+
+/*
+ This function updates the EPICS structure using the user-provided Msgpack object.
+ It first checks that the Msgpack object is a map, extracts all keys, and verifies
+ that each key corresponds to a valid field in the EPICS structure. For each valid
+ field, it calculates the field bitmask to indicate which fields will be updated.
+ The Msgpack object is then converted to a PVStructure matching the schema, and
+ its values are copied into the root structure. Finally, the updated structure and
+ field bitmask are set in the args for the put operation.
+ */
 void PutOperation::putBuild(const epics::pvData::StructureConstPtr& build, pvac::ClientChannel::PutCallback::Args& args)
 {
-    // At this point we have the user provided value string 'value'
-    // and the server provided structure (with types).
-    // note: an exception thrown here will result in putDone() w/ Fail
-    // allocate a new structure instance.
-    // we are one-shot so don't bother to re-use
-    std::size_t         field_bit = 0;
     pvd::PVStructurePtr root(pvd::getPVDataCreate()->createPVStructure(build));
-    // we only know about writes to scalar 'value' field
-    auto fld = root->getSubField(field);
-    if (!fld)
+
+    // check if msgpack object is a map:
+    if (put_object->get().type != msgpack::type::MAP)
     {
-        throw std::runtime_error("Field has not been found");
+        throw std::runtime_error("Put object must be a map");
     }
-    bool immutable = fld->isImmutable();
-    switch (fld->getField()->getType())
+
+    // calculate the filed bit to set all field to update
+    collectFieldOffsets(root, put_object->get(),  args);
+
+    if(args.tosend.isEmpty())
     {
-    case pvd::scalar:
-        {
-            pvd::PVScalarPtr pv = static_pointer_cast<pvd::PVScalar>(fld);
-            pv->putFrom(value);
-            field_bit = pv->getFieldOffset();
-            break;
-        }
-    case pvd::scalarArray:
-        {
-            pvd::PVScalarArrayPtr       pvArray = static_pointer_cast<pvd::PVScalarArray>(fld);
-            std::string                 cn;
-            std::istringstream          array_stream(value);
-            pvd::PVStringArray::svector vec_values;
-            // std::vector<std::string> vec_values;
-            while (true)
-            {
-                array_stream >> cn;
-                if (!(array_stream))
-                    break;
-                vec_values.push_back(cn);
-            }
-            pvArray->putFrom<std::string>(freeze(vec_values));
-            field_bit = pvArray->getFieldOffset();
-            break;
-        }
-    case epics::pvData::structure: break;
-    case epics::pvData::structureArray: break;
-    case epics::pvData::union_: break;
-    case epics::pvData::unionArray: break;
+        throw std::runtime_error("No fields to update in the provided Msgpack object");
     }
-    // attempt convert string to actual field type
-    // valfld->putFrom(value);
+
+    // convert the Msgpack object to a PVStructure and copy its values into the root structure
+    auto put_obj_structure = MsgpackEpicsConverter::msgpackToEpics(put_object->get(), build);
+    root->copy(*put_obj_structure);
     args.root = root; // non-const -> const
-    // mark only 'value' field to be sent.
-    // other fields w/ default values won't be sent.
-    args.tosend.set(field_bit);
 }
 
 void PutOperation::putDone(const pvac::PutEvent& evt)

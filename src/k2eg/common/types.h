@@ -1,38 +1,28 @@
 
 #ifndef TYPES_H
 #define TYPES_H
-#include <string>
-#include <vector>
+#include <boost/json.hpp>
 #include <map>
 #include <msgpack.hpp>
-#include <boost/json.hpp>
+#include <string>
+#include <vector>
 
-namespace k2eg::common
-{
+namespace k2eg::common {
+
 #define DEFINE_PTR_TYPES(x) \
-typedef std::unique_ptr<x> x##UPtr; \
-typedef std::unique_ptr<const x> Const##x##UPtr; \
-typedef std::shared_ptr<x> x##ShrdPtr; \
-typedef std::shared_ptr<const x> Const##x##ShrdPtr; \
-template<typename... _Args> \
-inline x##UPtr Make##x##UPtr(_Args&... __args) \
+using  x##UPtr = std::unique_ptr<x>; \
+using Const##x##UPtr = std::unique_ptr<const x> ; \
+using x##ShrdPtr = std::shared_ptr<x> ; \
+using Const##x##ShrdPtr = std::shared_ptr<const x> ; \
+template<typename... Args> \
+inline x##UPtr Make##x##UPtr(Args&&... __args) \
 { \
-    return std::make_unique<x>(__args...); \
+    return std::make_unique<x>(std::forward<Args>(__args)...); \
 } \
-template<typename... _Args> \
-inline x##UPtr Make##x##UPtr(_Args&&... __args) \
+template<typename... Args> \
+inline x##ShrdPtr Make##x##ShrdPtr(Args&&... __args) \
 { \
-    return std::make_unique<x>(__args...); \
-} \
-template<typename... _Args> \
-inline x##ShrdPtr Make##x##ShrdPtr(_Args&... __args) \
-{ \
-    return std::make_shared<x>(__args...); \
-} \
-template<typename... _Args> \
-inline x##ShrdPtr Make##x##ShrdPtr(_Args&&... __args) \
-{ \
-    return std::make_shared<x>(__args...); \
+    return std::make_shared<x>(std::forward<Args>(__args)...); \
 }
 
 #define DEFINE_VECTOR_FOR_TYPE(t, n)              \
@@ -58,8 +48,8 @@ inline x##ShrdPtr Make##x##ShrdPtr(_Args&&... __args) \
     typedef std::multimap<t1, t2>::const_iterator n##ConstIterator; \
     typedef std::pair<t1, t2> n##Pair;
 
-    DEFINE_VECTOR_FOR_TYPE(std::string, StringVector);
+DEFINE_VECTOR_FOR_TYPE(std::string, StringVector);
 
-    DEFINE_MAP_FOR_TYPE(std::string, std::string, MapStrKV);
-}
+DEFINE_MAP_FOR_TYPE(std::string, std::string, MapStrKV);
+} // namespace k2eg::common
 #endif // __TYPES_H__

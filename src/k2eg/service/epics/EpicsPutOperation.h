@@ -1,6 +1,7 @@
 #ifndef K2EG_SERVICE_EPICS_PUTOPERATION_H_
 #define K2EG_SERVICE_EPICS_PUTOPERATION_H_
 
+#include <k2eg/common/MsgpackSerialization.h>
 #include <k2eg/common/types.h>
 
 #include <pva/client.h>
@@ -12,16 +13,17 @@ class PutOperation : public pvac::ClientChannel::PutCallback, public pvac::Clien
     std::shared_ptr<pvac::ClientChannel>                   channel;
     pvac::Operation                                        op;
     const std::string                                      field;
-    const std::string                                      value;
+    const std::unique_ptr<k2eg::common::MsgpackObject>     put_object;
     std::string                                            message;
     pvac::PutEvent                                         evt;
     const epics::pvData::PVStructure::const_shared_pointer pv_req;
     bool                                                   done;
     virtual void putBuild(const epics::pvData::StructureConstPtr& build, pvac::ClientChannel::PutCallback::Args& args) OVERRIDE FINAL;
     virtual void putDone(const pvac::PutEvent& evt) OVERRIDE FINAL;
+    void collectFieldOffsets(epics::pvData::PVStructurePtr root, const msgpack::object& obj, pvac::ClientChannel::PutCallback::Args& args);
 
 public:
-    PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const epics::pvData::PVStructure::const_shared_pointer& pvReq, const std::string& field, const std::string& value);
+    PutOperation(std::shared_ptr<pvac::ClientChannel> channel, const epics::pvData::PVStructure::const_shared_pointer& pv_req, std::unique_ptr<k2eg::common::MsgpackObject> put_object);
     virtual ~PutOperation();
 
     const std::string     getOpName() const;

@@ -191,7 +191,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=EpicsChannel.*"],
+            "args": ["--gtest_filter=EpicsChannel.EpicsServiceManagerPutWrongField*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
@@ -219,7 +219,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=Epics.*"],
+            "args": ["--gtest_filter=Epics.EpicsServiceManagerPutWrongField*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
@@ -419,7 +419,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=NodeController.*"],
+            "args": ["--gtest_filter=NodeController.PutCommandEmptyValue*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
