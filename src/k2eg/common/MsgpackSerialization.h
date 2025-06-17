@@ -36,7 +36,7 @@ public:
     // New constructor from handle
     MsgpackObjectWithZone(msgpack::object_handle&& h) : handle(std::move(h)) {}
 
-    ~MsgpackObjectWithZone() = default;
+    virtual ~MsgpackObjectWithZone() = default;
 
     msgpack::object get() const
     {
@@ -63,7 +63,7 @@ public:
         msgpack::unpack(oh, (const char*)this->buff.data(), buff.size());
     }
 
-   ~MsgpackObjectFromBuffer() = default;
+    virtual ~MsgpackObjectFromBuffer() = default;
 
     msgpack::object get() const
     {
