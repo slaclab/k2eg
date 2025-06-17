@@ -10,7 +10,10 @@ namespace k2eg::common {
 
 class MsgpackObject
 {
+
 public:
+    MsgpackObject() = default;
+    virtual ~MsgpackObject() = default;
     virtual msgpack::object            get() const = 0;
     virtual std::vector<unsigned char> toBuffer() const = 0;
 };
@@ -32,6 +35,8 @@ public:
 
     // New constructor from handle
     MsgpackObjectWithZone(msgpack::object_handle&& h) : handle(std::move(h)) {}
+
+    ~MsgpackObjectWithZone() = default;
 
     msgpack::object get() const
     {
@@ -57,6 +62,8 @@ public:
     {
         msgpack::unpack(oh, (const char*)this->buff.data(), buff.size());
     }
+
+   ~MsgpackObjectFromBuffer() = default;
 
     msgpack::object get() const
     {
