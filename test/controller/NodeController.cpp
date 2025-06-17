@@ -882,7 +882,7 @@ TEST(NodeController, PutCommandOnWrongPVCheckReply)
     EXPECT_EQ(msgpack_object.type, msgpack::type::MAP);
     auto map_reply = msgpack_object.as<Map>();
     EXPECT_EQ(map_reply.contains("error"), true);
-    EXPECT_EQ(map_reply["error"].as<int>(), -3);
+    EXPECT_EQ(map_reply["error"].as<int>(), -1);
     EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
     EXPECT_STREQ(map_reply[KEY_REPLY_ID].as<std::string>().c_str(), "PUT_REPLY_ID");
     EXPECT_EQ(map_reply.contains("message"), true);

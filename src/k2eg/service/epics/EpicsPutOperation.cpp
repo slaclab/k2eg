@@ -84,6 +84,12 @@ void PutOperation::putBuild(const epics::pvData::StructureConstPtr& build, pvac:
 
     // calculate the filed bit to set all field to update
     collectFieldOffsets(root, put_object->get(),  args);
+
+    if(args.tosend.isEmpty())
+    {
+        throw std::runtime_error("No fields to update in the provided Msgpack object");
+    }
+
     // convert the Msgpack object to a PVStructure and copy its values into the root structure
     auto put_obj_structure = MsgpackEpicsConverter::msgpackToEpics(put_object->get(), build);
     root->copy(*put_obj_structure);

@@ -513,7 +513,7 @@ TEST_F(Epics, EpicsServiceManagerPutWrongField)
 {
     ConstPutOperationUPtr                put_op_a;
     std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
-    EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://variable:a", MOVE_MSGPACK_TYPED("HIHI", double, 100)););
+    EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://variable:a", MOVE_MSGPACK_TYPED("wrongField", double, 100)););
     WHILE_OP(put_op_a, false);
     EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::Fail);
     manager.reset();
