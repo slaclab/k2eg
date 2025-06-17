@@ -15,8 +15,8 @@ namespace pva = epics::pvAccess;
 EpicsChannel::EpicsChannel(pvac::ClientProvider& provider, const std::string& pv_name, const std::string& address)
     : pv_name(pv_name)
     , address(address)
-    , fetch_principal_field(provider.name().compare("ca") == 0 ? "field(value," "timeStamp," "alarm)" : "field()")
-    , fetch_additional_field(provider.name().compare("ca") == 0 ? "field(" "dis" "pla" "y," "control," "valueAlarm)" : "")
+    , fetch_principal_field(provider.name().compare("ca") == 0 ? "field(value,timeStamp,alarm)" : "field()")
+    , fetch_additional_field(provider.name().compare("ca") == 0 ? "field(display,control,valueAlarm)" : "")
 {
     pvac::ClientChannel::Options opt;
     if (!address.empty())

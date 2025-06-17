@@ -30,6 +30,7 @@ protected:
         MsgpackEpicsConverter::epicsToMsgpack(original, pk);
 
         msgpack::object_handle oh = msgpack::unpack(buffer.data(), buffer.size());
+        std::cout << "Unpacked Msgpack object: " << oh.get() << std::endl;
         auto                   restored = MsgpackEpicsConverter::msgpackToEpics(oh.get(), original->getStructure());
 
         ASSERT_TRUE(restored != nullptr);

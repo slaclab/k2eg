@@ -47,7 +47,7 @@ void PutOperation::collectFieldOffsets(epics::pvData::PVStructurePtr root, const
             if (subStruct)
             {
                 // set bit for this struct itself
-                args.tosend.set(field->getFieldOffset());
+                // args.tosend.set(field->getFieldOffset());
                 collectFieldOffsets(subStruct, value, args);
             }
         }
@@ -84,14 +84,10 @@ void PutOperation::putBuild(const epics::pvData::StructureConstPtr& build, pvac:
 
     // calculate the filed bit to set all field to update
     collectFieldOffsets(root, put_object->get(),  args);
-
     // convert the Msgpack object to a PVStructure and copy its values into the root structure
     auto put_obj_structure = MsgpackEpicsConverter::msgpackToEpics(put_object->get(), build);
-    std::cout << "Put object structure: " << *put_obj_structure << std::endl;
     root->copy(*put_obj_structure);
-    std::cout << "Root structure after copy: " << *root << std::endl;
     args.root = root; // non-const -> const
-    // mark only the fields specified by field_bit to be sent in the put operation
 }
 
 void PutOperation::putDone(const pvac::PutEvent& evt)

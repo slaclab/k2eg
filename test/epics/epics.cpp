@@ -22,6 +22,7 @@
 #include "pvData.h"
 
 using namespace k2eg::service::epics_impl;
+using namespace epics::pvData;
 
 TEST(EpicsChannel, ChannelFault)
 {
@@ -518,31 +519,111 @@ TEST_F(Epics, EpicsServiceManagerPutWrongField)
     manager.reset();
 }
 
-TEST_F(Epics, EpicsServiceManagerPutOtherField)
+TEST_F(Epics, EpicsServiceManagerPutNTTable)
 {
     using msgpack_variant = msgpack::type::variant;
     ConstGetOperationUPtr                get_op_a;
     ConstPutOperationUPtr                put_op_a;
     std::unique_ptr<EpicsServiceManager> manager = std::make_unique<EpicsServiceManager>();
+    NTTableBuilder                       tbl;
+    // 1) Define all labels
+    const std::vector<std::string> nt_labels = {"element", "device_name", "s",      "z",      "length", "p0c",
+                                                "alpha_x", "beta_x",      "eta_x",  "etap_x", "psi_x",  "alpha_y",
+                                                "beta_y",  "eta_y",       "etap_y", "psi_y"};
+    tbl.addLabels(nt_labels);
 
-    // Construct the value
-    std::map<msgpack_variant, msgpack_variant> inner_map;
-    inner_map["highWarningLimit"] = 100.0;  // Implicit conversion works for values
-    std::map<msgpack_variant, msgpack_variant> value_map;
-    value_map["valueAlarm"] = inner_map;    // Use variant-converted keys
-    value_map["value"] = 1.0;
+    // 2) Fill 'element' & 'device_name' as string arrays
+    tbl.addValue("element", std::vector<msgpack_variant>{std::string("SOL9000"), std::string("XC99"), std::string("YC99")});
+    tbl.addValue("device_name", std::vector<msgpack_variant>{std::string("SOL:IN20:111"), std::string("XCOR:IN20:112"), std::string("YCOR:IN20:113")});
+    tbl.addValue("s", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("z", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("length", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("p0c", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("alpha_x", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("beta_x", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("eta_x", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("etap_x", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("psi_x", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("alpha_y", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("beta_y", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("eta_y", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("etap_y", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
+    tbl.addValue("psi_y", std::vector<msgpack_variant>{1.0, 2.0, 3.0});
 
-    EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://variable:a",std::move(msgpack_from_object(value_map))););
+    auto root_map = tbl.root();
+    auto msg_pack_obj = std::make_unique<k2eg::common::MsgpackObjectWithZone>(root_map);
+    EXPECT_NO_THROW(put_op_a = manager->putChannelData("pva://K2EG:TEST:TWISS", std::move(msg_pack_obj)););
     WHILE_OP(put_op_a, false);
     EXPECT_EQ(put_op_a->getState().event, pvac::PutEvent::Success);
-    EXPECT_NO_THROW(get_op_a = manager->getChannelData("pva://variable:a"););
+    EXPECT_NO_THROW(get_op_a = manager->getChannelData("pva://K2EG:TEST:TWISS"););
     WHILE_OP(get_op_a, false);
     epics::pvData::PVScalar::const_shared_pointer scalar_result_hihi;
     epics::pvData::PVScalar::const_shared_pointer scalar_result_value;
-    std::cout << "Get operation completed:" << *get_op_a->getChannelData()->data << std::endl;
-    EXPECT_NO_THROW(scalar_result_value = get_op_a->getChannelData()->data->getSubField<epics::pvData::PVScalar>("value"));
-    EXPECT_NO_THROW(scalar_result_hihi = get_op_a->getChannelData()->data->getSubField<epics::pvData::PVScalar>("valueAlarm.highWarningLimit"));
-    EXPECT_EQ(scalar_result_value->getAs<epics::pvData::uint32>(), 1);
-    EXPECT_EQ(scalar_result_hihi->getAs<epics::pvData::uint32>(), 100);
+
+    // verify the nttable has been written correctly
+    PVStructure::const_shared_pointer data = get_op_a->getChannelData()->data;
+    ASSERT_NE(data, nullptr);
+    // 1) Verify "labels"
+    auto labelsField = data->getSubField("labels");
+    auto labelsArr = std::dynamic_pointer_cast<const PVStringArray>(labelsField);
+    ASSERT_TRUE(labelsArr);
+    auto                     labels = labelsArr->view();
+    std::vector<std::string> expectedLabels = {"element", "device_name", "s",      "z",      "length", "p0c",
+                                               "alpha_x", "beta_x",      "eta_x",  "etap_x", "psi_x",  "alpha_y",
+                                               "beta_y",  "eta_y",       "etap_y", "psi_y"};
+    ASSERT_EQ(labels.size(), expectedLabels.size());
+    for (size_t i = 0; i < labels.size(); ++i)
+    {
+        EXPECT_EQ(labels[i], expectedLabels[i]);
+    }
+
+    // 2) Verify the "value" structure
+    auto valueField = data->getSubField("value");
+    auto valueStruct = std::dynamic_pointer_cast<const PVStructure>(valueField);
+    ASSERT_TRUE(valueStruct);
+
+    // 2a) element (string[])
+    {
+        auto fld = valueStruct->getSubField("element");
+        auto arr = std::dynamic_pointer_cast<const PVStringArray>(fld);
+        ASSERT_TRUE(arr);
+        auto                     view = arr->view();
+        std::vector<std::string> exp = {"SOL9000", "XC99", "YC99"};
+        ASSERT_EQ(view.size(), exp.size());
+        for (size_t i = 0; i < exp.size(); ++i)
+        {
+            EXPECT_EQ(view[i], exp[i]);
+        }
+    }
+
+    // 2b) device_name (string[])
+    {
+        auto fld = valueStruct->getSubField("device_name");
+        auto arr = std::dynamic_pointer_cast<const PVStringArray>(fld);
+        ASSERT_TRUE(arr);
+        auto                     view = arr->view();
+        std::vector<std::string> exp = {"SOL:IN20:111", "XCOR:IN20:112", "YCOR:IN20:113"};
+        ASSERT_EQ(view.size(), exp.size());
+        for (size_t i = 0; i < exp.size(); ++i)
+        {
+            EXPECT_EQ(view[i], exp[i]);
+        }
+    }
+
+    // 2c) double[] columns: expected [1.0, 2.0, 3.0]
+    std::vector<std::string> dblCols = {"s",      "z",     "length",  "p0c",    "alpha_x", "beta_x", "eta_x",
+                                        "etap_x", "psi_x", "alpha_y", "beta_y", "eta_y",   "etap_y", "psi_y"};
+    for (auto const& name : dblCols)
+    {
+        SCOPED_TRACE("column: " + name);
+        auto fld = valueStruct->getSubField(name);
+        auto arr = std::dynamic_pointer_cast<const PVDoubleArray>(fld);
+        ASSERT_TRUE(arr);
+        auto view = arr->view();
+        ASSERT_EQ(view.size(), 3u);
+        EXPECT_DOUBLE_EQ(view[0], 1.0);
+        EXPECT_DOUBLE_EQ(view[1], 2.0);
+        EXPECT_DOUBLE_EQ(view[2], 3.0);
+    }
     manager.reset();
 }
