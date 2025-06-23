@@ -64,7 +64,7 @@ public:
      * @brief Retrieve all collected monitor event data for this snapshot.
      * @return Vector of shared pointers to monitor event data.
      */
-    SnapshotSubmission getData() override;
+    SnapshotSubmissionShrdPtr getData() override;
 };
 DEFINE_PTR_TYPES(SnapshotRepeatingOpInfo)
 

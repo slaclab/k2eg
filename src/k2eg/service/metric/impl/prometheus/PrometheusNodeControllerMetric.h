@@ -19,10 +19,8 @@ class PrometheusNodeControllerMetric : public INodeControllerMetric
 {
     friend class PrometheusMetricService;
     std::shared_ptr<prometheus::Registry>    registry;
-    prometheus::Family<prometheus::Counter>& node_controller_counter;
+    prometheus::Family<prometheus::Counter>& node_controller_command_family;
     prometheus::Family<prometheus::Counter>& snapshot_event_counter_family;
-    prometheus::Family<prometheus::Gauge>&   snapshot_throttle_gauge_family;
-    prometheus::Counter&                     submitted_command;
     PrometheusNodeControllerMetric();
 
 public:

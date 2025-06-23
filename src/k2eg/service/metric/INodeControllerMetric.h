@@ -8,8 +8,7 @@ namespace k2eg::service::metric {
 // epics counter types
 enum class INodeControllerMetricCounterType { 
     SubmittedCommand,
-    SnapshotEventCounter,
-    SnapshotThrottleGauge
+    SnapshotEventCounter
     };
 
 // Epics metric group

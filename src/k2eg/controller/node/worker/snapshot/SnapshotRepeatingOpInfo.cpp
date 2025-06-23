@@ -42,7 +42,7 @@ void SnapshotRepeatingOpInfo::addData(MonitorEventShrdPtr event_data)
     }
 }
 
-SnapshotSubmission SnapshotRepeatingOpInfo::getData()
+SnapshotSubmissionShrdPtr SnapshotRepeatingOpInfo::getData()
 {
     // Temporarily stop taking data while collecting the snapshot.
     taking_data.store(false, std::memory_order_release);
@@ -59,7 +59,7 @@ SnapshotSubmission SnapshotRepeatingOpInfo::getData()
     }
     // Resume taking data after snapshot collection.
     taking_data.store(true, std::memory_order_release);
-    return SnapshotSubmission(
+    return MakeSnapshotSubmissionShrdPtr(
         std::move(result),
         (SnapshotSubmissionType::Header | SnapshotSubmissionType::Data | SnapshotSubmissionType::Tail)
     );

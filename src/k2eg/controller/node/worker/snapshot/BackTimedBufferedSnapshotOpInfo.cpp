@@ -99,7 +99,7 @@ void BackTimedBufferedSnapshotOpInfo::addData(MonitorEventShrdPtr event_data)
     acquiring_buffer->push(event_data, steady_clock::now());
 }
 
-SnapshotSubmission BackTimedBufferedSnapshotOpInfo::getData()
+SnapshotSubmissionShrdPtr BackTimedBufferedSnapshotOpInfo::getData()
 {
     SnapshotSubmissionType                                      type = SnapshotSubmissionType::None;
     std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr> result;
@@ -150,5 +150,5 @@ SnapshotSubmission BackTimedBufferedSnapshotOpInfo::getData()
             header_sent = false; // Reset header for the next window
         }
     }
-    return SnapshotSubmission(std::move(result), type);
+    return MakeSnapshotSubmissionShrdPtr(std::move(result), type);
 }

@@ -73,7 +73,7 @@ public:
     SnapshotSubmission(const SnapshotSubmission&) = delete;
     SnapshotSubmission& operator=(const SnapshotSubmission&) = delete;
 };
-
+DEFINE_PTR_TYPES(SnapshotSubmission);
 /*
 @brief define the snapshot operation info
 @details This class is used to store the information and data about the snapshot operation
@@ -118,7 +118,7 @@ public:
     virtual void addData(k2eg::service::epics_impl::MonitorEventShrdPtr event_data) = 0;
 
     // Retrieve collected monitor event data
-    virtual SnapshotSubmission getData() = 0;
+    virtual SnapshotSubmissionShrdPtr getData() = 0;
 
     // Check if the operation has timed out
     virtual bool isTimeout();
