@@ -20,10 +20,10 @@ bool SnapshotRepeatingOpInfo::init(std::vector<service::epics_impl::PVShrdPtr>& 
     return true;
 }
 
-bool SnapshotRepeatingOpInfo::isTimeout()
+bool SnapshotRepeatingOpInfo::isTimeout(const std::chrono::steady_clock::time_point& now)
 {
     // Use base class timeout logic for periodic snapshots.
-    auto timeout = SnapshotOpInfo::isTimeout();
+    auto timeout = SnapshotOpInfo::isTimeout(now);
     return timeout;
 }
 
@@ -60,6 +60,7 @@ SnapshotSubmissionShrdPtr SnapshotRepeatingOpInfo::getData()
     // Resume taking data after snapshot collection.
     taking_data.store(true, std::memory_order_release);
     return MakeSnapshotSubmissionShrdPtr(
+        std::chrono::steady_clock::now(),
         std::move(result),
         (SnapshotSubmissionType::Header | SnapshotSubmissionType::Data | SnapshotSubmissionType::Tail)
     );

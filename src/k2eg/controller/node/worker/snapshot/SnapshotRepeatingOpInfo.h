@@ -50,7 +50,7 @@ public:
      * @brief Check if the snapshot operation has timed out.
      * @return True if the operation has timed out, false otherwise.
      */
-    bool isTimeout() override ;
+    bool isTimeout(const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now()) override ;
 
     /**
      * @brief Add monitor event data for a specific PV to the snapshot.

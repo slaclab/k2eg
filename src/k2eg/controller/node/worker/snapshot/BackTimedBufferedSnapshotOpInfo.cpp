@@ -1,3 +1,4 @@
+#include <chrono>
 #include <iostream>
 #include <k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.h>
 #include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
@@ -51,14 +52,14 @@ bool BackTimedBufferedSnapshotOpInfo::init(std::vector<PVShrdPtr>& sanitized_pv_
     return true;
 }
 
-bool BackTimedBufferedSnapshotOpInfo::isTimeout()
+bool BackTimedBufferedSnapshotOpInfo::isTimeout(const std::chrono::steady_clock::time_point& now)
 {
     bool timeout = false;
     win_time_expired = false;
     if (is_triggered)
     {
         // In triggered mode, only swap buffers on real timeout (trigger or stop).
-        timeout = win_time_expired = SnapshotOpInfo::isTimeout();
+        timeout = win_time_expired = SnapshotOpInfo::isTimeout(now);
         if (timeout)
         {
             // On timeout, swap the buffers so getData works on a stable snapshot.
@@ -69,8 +70,7 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout()
     else
     {
         // In timed mode, swap buffers on real timeout or every 100ms for fast processing.
-        auto now = steady_clock::now();
-        bool expired = SnapshotOpInfo::isTimeout();
+        bool expired = SnapshotOpInfo::isTimeout(now);
         bool force_100ms_expire = false;
 
         if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_forced_expire).count() >= fast_expire_time_msec)
@@ -150,5 +150,5 @@ SnapshotSubmissionShrdPtr BackTimedBufferedSnapshotOpInfo::getData()
             header_sent = false; // Reset header for the next window
         }
     }
-    return MakeSnapshotSubmissionShrdPtr(std::move(result), type);
+    return MakeSnapshotSubmissionShrdPtr(std::chrono::steady_clock::now(),std::move(result), type);
 }

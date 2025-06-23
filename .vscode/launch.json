@@ -219,7 +219,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=Epics.EpicsServiceManagerPutWrongField*"],
+            "args": ["--gtest_filter=Epics.EpicsServiceManagerPutNTTable*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
@@ -451,7 +451,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=NodeControllerSnapshot.RepeatingSnapshotTimeBufferedTypeFilteringFieldsWithManualTrigger*"],
+            "args": ["--gtest_filter=NodeControllerSnapshot.RepeatingTriggeredSnapshotStartTriggerStop*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

@@ -9,7 +9,7 @@ SnapshotOpInfo::SnapshotOpInfo(const std::string& queue_name, k2eg::controller::
 
 SnapshotOpInfo::~SnapshotOpInfo() = default;
 
-bool SnapshotOpInfo::isTimeout()
+bool SnapshotOpInfo::isTimeout(const std::chrono::steady_clock::time_point& now)
 {
     // For triggered snapshots, timeout occurs if a trigger is requested or the snapshot is stopped.
     if (is_triggered)
@@ -29,7 +29,7 @@ bool SnapshotOpInfo::isTimeout()
         // Not triggered and not stopped: do not expire.
         return false;
     }
-    return WorkerAsyncOperation::isTimeout();
+    return WorkerAsyncOperation::isTimeout(now);
 }
 
 const epics::pvData::PVStructure::const_shared_pointer SnapshotOpInfo::filterPVField(const epics::pvData::PVStructure::const_shared_pointer& src, 

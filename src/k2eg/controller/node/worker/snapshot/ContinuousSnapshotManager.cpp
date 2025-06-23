@@ -449,7 +449,7 @@ SnapshotSubmissionTask::SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> s
     : snapshot_command_info(snapshot_command_info), submission_shrd_ptr(submission_shrd_ptr), publisher(std::move(publisher)), logger(std::move(logger))
 {
 }
-
+#define CHRONO_TO_UNIX_INT64(x) (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())
 void SnapshotSubmissionTask::operator()()
 {
     if (!snapshot_command_info)
@@ -457,9 +457,8 @@ void SnapshotSubmissionTask::operator()()
     const auto thread_index = BS::this_thread::get_index();
     if (!thread_index.has_value())
         return;
-
+    auto snap_ts = CHRONO_TO_UNIX_INT64(submission_shrd_ptr->snap_time);
     // get timestamp for the snapshot in unix time and utc
-
     if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
     {
 
@@ -471,7 +470,7 @@ void SnapshotSubmissionTask::operator()()
 
         {
             auto serialized_header_message =
-                serialize(RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, submission_shrd_ptr->snap_ts,
+                serialize(RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts,
                                                    snapshot_command_info->snapshot_iteration_index},
                           snapshot_command_info->cmd->serialization);
             // send the header for the snapshot
@@ -490,7 +489,7 @@ void SnapshotSubmissionTask::operator()()
                            LogLevel::DEBUG);
         for (auto& event : submission_shrd_ptr->snapshot_events)
         {
-            auto serialized_message = serialize(RepeatingSnaptshotData{1, submission_shrd_ptr->snap_ts, snapshot_command_info->snapshot_iteration_index,
+            auto serialized_message = serialize(RepeatingSnaptshotData{1, snap_ts, snapshot_command_info->snapshot_iteration_index,
                                                                        MakeChannelDataShrdPtr(event->channel_data)},
                                                 snapshot_command_info->cmd->serialization);
             if (serialized_message)
@@ -516,7 +515,7 @@ void SnapshotSubmissionTask::operator()()
                            LogLevel::DEBUG);
         // send completion for this snapshot submission
         auto serialized_completion_message =
-            serialize(RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, submission_shrd_ptr->snap_ts,
+            serialize(RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, snap_ts,
                                                    snapshot_command_info->snapshot_iteration_index},
                       snapshot_command_info->cmd->serialization);
         // publish the data
