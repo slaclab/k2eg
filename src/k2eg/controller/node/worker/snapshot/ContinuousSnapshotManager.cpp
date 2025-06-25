@@ -391,7 +391,7 @@ void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerPara
             }
         }
     }
-    logger->logMessage(STRING_FORMAT("EPICS forwarded %1% data events for PVs: %2%", event_received->event_data->size() % get_pv_names(pv_names)), LogLevel::DEBUG);   
+    // logger->logMessage(STRING_FORMAT("EPICS forwarded %1% data events for PVs: %2%", event_received->event_data->size() % get_pv_names(pv_names)), LogLevel::DEBUG);
 }
 
 void ContinuousSnapshotManager::expirationCheckerLoop()
@@ -555,9 +555,9 @@ void SnapshotSubmissionTask::operator()()
             }
         }
 
-        logger->logMessage(STRING_FORMAT("[Data] Snapshot %1% iteration %2% with %3% events from %4% PVs completed",
+        logger->logMessage(STRING_FORMAT("[Data] Snapshot %1% iteration %2% with %3% events from [n. %4%] - %5% - PVs completed",
                                          snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index %
-                                             submission.snapshot_events.size() % get_pv_names(pv_names_published)),
+                                             submission.snapshot_events.size() %pv_names_published.size()% get_pv_names(pv_names_published)),
                            LogLevel::DEBUG);
     }
 
