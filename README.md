@@ -52,6 +52,40 @@ The application architecture consists of two primary layers:
 
 ![K2EG Software Layer Interaction](doc/image/scheme.png)
 
+## Node Types
+
+K2EG supports two operational modes that can be specified using the `--node-type` parameter:
+
+### Gateway Mode (Default)
+The standard gateway mode provides full bidirectional communication between Kafka and EPICS, including:
+- Command processing (Get, Put, Monitor, Snapshot)
+- EPICS data publishing to Kafka
+- Real-time monitoring and control capabilities
+
+### Storage Mode
+The storage mode operates as a specialized archival and replay system for EPICS data. Key features include:
+
+- **Distributed Data Archiving**: Consumes MsgPack-encoded EPICS data from Kafka topics
+- **Intelligent Indexing**: Extracts and indexes key PV fields in MongoDB for fast queries
+- **Scalable Storage**: Archives complete snapshot payloads in S3 or local filesystem
+- **Dynamic Topic Discovery**: Uses Consul KV for automatic topic management
+- **Parallel Processing**: Multi-threaded consumption with one reader per topic
+- **Snapshot Replay**: Timestamp-based retrieval and replay capabilities
+- **Fault Tolerance**: Horizontally scalable and fault-tolerant architecture
+
+The storage node consumes data from Kafka topics, processes MsgPack payloads, and provides both metadata indexing (MongoDB) and blob storage (S3) for efficient data archival and retrieval.
+
+**Usage:**
+```bash
+# Run in storage mode
+./k2eg --node-type=storage
+
+# Run in gateway mode (default)
+./k2eg --node-type=gateway
+```
+
+For detailed information about storage node configuration, architecture, and usage, see the [Storage Documentation](doc/storage.md).
+
 ## Getting Started
 
 k2eg acts as a gateway for interacting with EPICS IOCs using Kafka. It listens to a Kafka input topic for JSON-encoded commands and performs IO operations on EPICS IOCs.

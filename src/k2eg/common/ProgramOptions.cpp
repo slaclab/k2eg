@@ -34,12 +34,14 @@ namespace po = boost::program_options;
 namespace fs = std::filesystem;
 
 const std::string DEFAULT_CRON_STRING = "* * * * * *"; // every seconds
+const static std::map<std::string, NodeType> type_map = {{"gateway", NodeType::GATEWAY}, {"storage", NodeType::STORAGE}};
 
 // clang-format off
 ProgramOptions::ProgramOptions() {
   const std::string actual_path = fs::path(fs::current_path()) / "k2eg.sqlite";
   options.add_options()
       (HELP, "Produce help information")(VERSION, "Print the application version")
+      (NODE_TYPE, po::value<NodeType>(&node_type_)->default_value(NodeType::GATEWAY), "Set the run mode of the k2eg application [gateway, storage]")
       (CONF_FILE, po::value<bool>()->default_value(false), "Specify if we need to load configuration from file")
       (CONF_FILE_NAME, po::value<std::string>()->default_value(""), "Specify the configuration file")
       (LOG_LEVEL, po::value<std::string>()->default_value("info"), "Specify the log level[trace, debug, info, error, fatal]")
@@ -174,59 +176,51 @@ ConstCMDControllerConfigUPtr ProgramOptions::getCMDControllerConfiguration()
 ConstNodeControllerConfigurationUPtr ProgramOptions::getNodeControllerConfiguration()
 {
     // node controller configuration
-  return std::make_unique<const NodeControllerConfiguration>(
-    NodeControllerConfiguration{
-      .monitor_command_configuration =
-            // monitor command configuration
-        MonitorCommandConfiguration{
-            .cron_scheduler_monitor_check = GET_OPTION(MONITOR_WORKER_SCHEDULE_CRON_CONFIGURATION, std::string, DEFAULT_CRON_STRING),
-            // monitor command checker configurtion
-            .monitor_checker_configuration = MonitorCheckerConfiguration{
-                .monitor_expiration_timeout     = GET_OPTION(NC_MONITOR_EXPIRATION_TIMEOUT, int64_t, 60 * 60),
-                .purge_queue_on_monitor_timeout = GET_OPTION(NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT, bool, true),
-                .filter_out_regex               = GET_OPTION(NC_MONITOR_CONSUMER_FILTEROUT_REGEX, std::vector<std::string>, std::vector<std::string>())}},
-      .snapshot_command_configuration = SnapshotCommandConfiguration{
-        .continuous_snapshot_configuration = RepeatingSnaptshotConfiguration{
-            .snapshot_processing_thread_count = GET_OPTION(SNAPSHOT_REPEATING_SCHEDULER_THREAD, std::size_t, 1)
-        }
-      }
-    });
+    return std::make_unique<const NodeControllerConfiguration>(NodeControllerConfiguration{.monitor_command_configuration =
+                                                                                               // monitor command
+                                                                                               // configuration
+                                                                                           MonitorCommandConfiguration{.cron_scheduler_monitor_check = GET_OPTION(MONITOR_WORKER_SCHEDULE_CRON_CONFIGURATION, std::string, DEFAULT_CRON_STRING),
+                                                                                                                       // monitor command checker configurtion
+                                                                                                                       .monitor_checker_configuration = MonitorCheckerConfiguration{.monitor_expiration_timeout = GET_OPTION(NC_MONITOR_EXPIRATION_TIMEOUT, int64_t, 60 * 60), .purge_queue_on_monitor_timeout = GET_OPTION(NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT, bool, true), .filter_out_regex = GET_OPTION(NC_MONITOR_CONSUMER_FILTEROUT_REGEX, std::vector<std::string>, std::vector<std::string>())}},
+                                                                                           .snapshot_command_configuration = SnapshotCommandConfiguration{.continuous_snapshot_configuration = RepeatingSnaptshotConfiguration{.snapshot_processing_thread_count = GET_OPTION(SNAPSHOT_REPEATING_SCHEDULER_THREAD, std::size_t, 1)}}});
 }
 
-ConstPublisherConfigurationUPtr
-ProgramOptions::getPublisherConfiguration() {
-        return std::make_unique<const PublisherConfiguration>(PublisherConfiguration{
-            .server_address = GET_OPTION(PUB_SERVER_ADDRESS, std::string, ""), 
-            .flush_timeout_ms = GET_OPTION(PUB_FLUSH_TIMEOUT_MS, size_t, 500),
-            .custom_impl_parameter = parseKVCustomParam(GET_OPTION(PUB_IMPL_KV, std::vector<std::string>, std::vector<std::string>()))});
+ConstPublisherConfigurationUPtr ProgramOptions::getPublisherConfiguration()
+{
+    return std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = GET_OPTION(PUB_SERVER_ADDRESS, std::string, ""), .flush_timeout_ms = GET_OPTION(PUB_FLUSH_TIMEOUT_MS, size_t, 500), .custom_impl_parameter = parseKVCustomParam(GET_OPTION(PUB_IMPL_KV, std::vector<std::string>, std::vector<std::string>()))});
 }
 
-ConstSubscriberConfigurationUPtr
-ProgramOptions::getSubscriberConfiguration() {
-        return std::make_unique<const SubscriberConfiguration>(SubscriberConfiguration{.server_address = GET_OPTION(SUB_SERVER_ADDRESS, std::string, ""), .group_id = GET_OPTION(SUB_GROUP_ID, std::string, ""), .custom_impl_parameter = parseKVCustomParam(GET_OPTION(SUB_IMPL_KV, std::vector<std::string>, std::vector<std::string>()))});
+ConstSubscriberConfigurationUPtr ProgramOptions::getSubscriberConfiguration()
+{
+    return std::make_unique<const SubscriberConfiguration>(SubscriberConfiguration{.server_address = GET_OPTION(SUB_SERVER_ADDRESS, std::string, ""), .group_id = GET_OPTION(SUB_GROUP_ID, std::string, ""), .custom_impl_parameter = parseKVCustomParam(GET_OPTION(SUB_IMPL_KV, std::vector<std::string>, std::vector<std::string>()))});
 }
 
-ConstMetricConfigurationUPtr
-ProgramOptions::getMetricConfiguration() {
-        return std::make_unique<const MetricConfiguration>(MetricConfiguration{.enable = GET_OPTION(METRIC_ENABLE, bool, false), .tcp_port = GET_OPTION(METRIC_HTTP_PORT, unsigned int, 8080)});
+ConstMetricConfigurationUPtr ProgramOptions::getMetricConfiguration()
+{
+    return std::make_unique<const MetricConfiguration>(MetricConfiguration{.enable = GET_OPTION(METRIC_ENABLE, bool, false), .tcp_port = GET_OPTION(METRIC_HTTP_PORT, unsigned int, 8080)});
 }
 
-ConstSchedulerConfigurationUPtr
-ProgramOptions::getSchedulerConfiguration() {
-        return std::make_unique<const SchedulerConfiguration>(SchedulerConfiguration{.check_every_amount_of_seconds = GET_OPTION(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS, unsigned int, 60), .thread_number = GET_OPTION(SCHEDULER_THREAD_NUMBER, unsigned int, 1)});
+ConstSchedulerConfigurationUPtr ProgramOptions::getSchedulerConfiguration()
+{
+    return std::make_unique<const SchedulerConfiguration>(SchedulerConfiguration{.check_every_amount_of_seconds = GET_OPTION(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS, unsigned int, 60), .thread_number = GET_OPTION(SCHEDULER_THREAD_NUMBER, unsigned int, 1)});
 }
 
-ConstEpicsServiceManagerConfigUPtr
-ProgramOptions::getEpicsManagerConfiguration() {
-        return std::make_unique<const EpicsServiceManagerConfig>(EpicsServiceManagerConfig{.thread_count = GET_OPTION(EPICS_MONITOR_THREAD_COUNT, std::int32_t, 1)});
+ConstEpicsServiceManagerConfigUPtr ProgramOptions::getEpicsManagerConfiguration()
+{
+    return std::make_unique<const EpicsServiceManagerConfig>(EpicsServiceManagerConfig{.thread_count = GET_OPTION(EPICS_MONITOR_THREAD_COUNT, std::int32_t, 1)});
 }
 
-ConstConfigurationServceiConfigUPtr
-ProgramOptions::getConfigurationServiceConfiguration() {
-        return std::make_unique<const ::ConfigurationServceiConfig>(ConfigurationServceiConfig{.config_server_host = GET_OPTION(CONFIGURATION_SERVICE_HOST, std::string, "localhost"), .config_server_port = GET_OPTION(CONFIGURATION_SERVICE_PORT, short, static_cast<short>(8500)), .reset_on_start = GET_OPTION(CONFIGURATION_SERVICE_RESET_ON_START, bool, false)});
+ConstConfigurationServceiConfigUPtr ProgramOptions::getConfigurationServiceConfiguration()
+{
+    return std::make_unique<const ::ConfigurationServceiConfig>(ConfigurationServceiConfig{.config_server_host = GET_OPTION(CONFIGURATION_SERVICE_HOST, std::string, "localhost"), .config_server_port = GET_OPTION(CONFIGURATION_SERVICE_PORT, short, static_cast<short>(8500)), .reset_on_start = GET_OPTION(CONFIGURATION_SERVICE_RESET_ON_START, bool, false)});
 }
 
-const std::string
-ProgramOptions::getStoragePath() {
-        return GET_OPTION_NO_DEF(STORAGE_PATH, std::string);
+const std::string ProgramOptions::getStoragePath()
+{
+    return GET_OPTION_NO_DEF(STORAGE_PATH, std::string);
+}
+
+NodeType ProgramOptions::getNodeType() const
+{
+    return node_type_;
 }

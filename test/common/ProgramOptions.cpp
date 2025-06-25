@@ -21,6 +21,22 @@ TEST(ProgramOptions, CPPStandardOptions) {
     opt->parse(argc, argv);
     auto log_level = opt->getOption<std::string>("log-level");
     EXPECT_STREQ(log_level.c_str(), "debug");
+
+    auto node_type = opt->getNodeType();
+    EXPECT_EQ(node_type, NodeType::GATEWAY);
+}
+
+TEST(ProgramOptions, CPPStorageOptions) {
+    int argc = 1;
+    const char* argv[1] = {"epics-k2eg-test"};
+    // set environment variable for test
+    clearenv();
+    setenv("EPICS_k2eg_node-type", "storage", 1);
+    std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
+    opt->parse(argc, argv);
+
+    auto node_type = opt->getNodeType();
+    EXPECT_EQ(node_type, NodeType::STORAGE);
 }
 
 #define VAR_NAME(a, b) a #b
