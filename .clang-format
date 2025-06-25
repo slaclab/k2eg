@@ -9,7 +9,7 @@ AlignConsecutiveMacros: None
 AlignConsecutiveShortCaseStatements:
   Enabled: false
 AlignEscapedNewlines: Left
-AlignOperands: Align
+AlignOperands: DontAlign
 AlignTrailingComments:
   Kind: Always
   OverEmptyLines: 0
@@ -28,7 +28,7 @@ AlwaysBreakAfterReturnType: None
 AlwaysBreakBeforeMultilineStrings: false
 AlwaysBreakTemplateDeclarations: Yes
 AttributeMacros: []
-BinPackArguments: true
+BinPackArguments: false
 BinPackParameters: false
 BitFieldColonSpacing: Both
 BraceWrapping:
@@ -61,7 +61,7 @@ BreakConstructorInitializers: BeforeComma
 BreakConstructorInitializersBeforeComma: true
 BreakInheritanceList: BeforeColon
 BreakStringLiterals: false
-ColumnLimit: 120
+ColumnLimit: 160
 CompactNamespaces: false
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 ConstructorInitializerIndentWidth: 4
@@ -101,11 +101,11 @@ ObjCSpaceAfterProperty: false
 ObjCSpaceBeforeProtocolList: true
 PPIndentWidth: -1
 PackConstructorInitializers: BinPack
-PenaltyBreakAssignment: 0
-PenaltyBreakBeforeFirstCallParameter: 0
+PenaltyBreakAssignment: 200
+PenaltyBreakBeforeFirstCallParameter: 200
 PenaltyBreakComment: 0
 PenaltyBreakFirstLessLess: 0
-PenaltyBreakOpenParenthesis: 0
+PenaltyBreakOpenParenthesis: 200
 PenaltyBreakString: 0
 PenaltyBreakTemplateDeclaration: 0
 PenaltyExcessCharacter: 0
@@ -158,3 +158,4 @@ Standard: Latest
 TabWidth: 4
 UseCRLF: false
 UseTab: Never
+PenaltyBreakFirstCallParameter: 1

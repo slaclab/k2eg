@@ -1,6 +1,7 @@
 #ifndef k2eg_CONTROLLER_NODE_NODECONTROLLER_H_
 #define k2eg_CONTROLLER_NODE_NODECONTROLLER_H_
 
+#include "k2eg/common/ProgramOptions.h"
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/ObjectFactory.h>
 #include <k2eg/common/ProcSystemMetrics.h>
@@ -25,7 +26,7 @@ namespace k2eg::controller::node {
 
 struct NodeControllerConfiguration
 {
-    // monitor configuration
+    k2eg::common::NodeType                       node_type;
     worker::monitor::MonitorCommandConfiguration monitor_command_configuration;
     worker::SnapshotCommandConfiguration         snapshot_command_configuration;
 };
