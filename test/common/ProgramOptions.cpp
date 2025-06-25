@@ -8,6 +8,7 @@
 #include <k2eg/common/ProgramOptions.h>
 
 using namespace k2eg::common;
+using namespace k2eg::controller::node;
 using namespace k2eg::service::pubsub;
 namespace fs = std::filesystem;
 #ifdef __linux__

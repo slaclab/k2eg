@@ -1,7 +1,7 @@
 #ifndef __PROGRAMOPTIONS_H__
 #define __PROGRAMOPTIONS_H__
 
-#include "k2eg/controller/node/NodeController.h"
+#include <k2eg/controller/node/NodeController.h>
 #include <boost/program_options.hpp>
 
 #include <k2eg/common/types.h>
@@ -69,12 +69,6 @@ static const char* const CONFIGURATION_SERVICE_RESET_ON_START = "configuration-r
 
 namespace k2eg {
 namespace common {
-    enum class NodeType
-    {
-        GATEWAY,
-        STORAGE
-    };
-
     /**
      * Options management
      */
@@ -85,7 +79,7 @@ namespace common {
 
         MapStrKV parseKVCustomParam(const std::vector<std::string>& kv_vec);
 
-        NodeType node_type_ = NodeType::GATEWAY;
+        k2eg::controller::node::NodeType node_type_ = k2eg::controller::node::NodeType::GATEWAY;
 
     public:
         ProgramOptions();
@@ -110,36 +104,12 @@ namespace common {
             return vm[name].as<T>();
         }
 
-        NodeType          getNodeType() const;
-        bool              hasOption(const std::string& option);
-        const std::string getHelpDescription();
+        k2eg::controller::node::NodeType getNodeType() const;
+        bool                             hasOption(const std::string& option);
+        const std::string                getHelpDescription();
     };
     DEFINE_PTR_TYPES(ProgramOptions)
 } // namespace common
 
 } // namespace k2eg
-
-namespace boost {
-template <>
-inline std::string lexical_cast<std::string, k2eg::common::NodeType>(const k2eg::common::NodeType& type)
-{
-    switch (type)
-    {
-    case k2eg::common::NodeType::GATEWAY: return "gateway";
-    case k2eg::common::NodeType::STORAGE: return "storage";
-    }
-    throw boost::bad_lexical_cast(); // fallback
-}
-
-template <>
-inline k2eg::common::NodeType lexical_cast<k2eg::common::NodeType, std::string>(const std::string& str)
-{
-    if (str == "gateway")
-        return k2eg::common::NodeType::GATEWAY;
-    if (str == "storage")
-        return k2eg::common::NodeType::STORAGE;
-    throw boost::bad_lexical_cast(); // fallback
-}
-} // namespace boost
-
 #endif // __PROGRAMOPTIONS_H__
