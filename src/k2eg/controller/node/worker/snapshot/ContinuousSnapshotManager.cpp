@@ -391,11 +391,11 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                     // If the snapshot is not running, remove it and clean up PV associations
                     if (!s_op_ptr->is_running)
                     {
-                        logger->logMessage(STRING_FORMAT("Snapshot %1% is stopped and will be removed from queue", queue_name), LogLevel::INFO);
+                        logger->logMessage(STRING_FORMAT("Snapshot '%1%' is stopped and will be removed from queue", queue_name), LogLevel::INFO);
 
                         // Remove from pv_snapshot_map_
                         logger->logMessage(
-                            STRING_FORMAT("Remove Snapshot %1% from all its pv snapshot map", s_op_ptr->cmd->snapshot_name), LogLevel::INFO);
+                            STRING_FORMAT("Remove Snapshot '%1%' from all its pv snapshot map", s_op_ptr->cmd->snapshot_name), LogLevel::INFO);
                         for (auto& pv_uri : s_op_ptr->cmd->pv_name_list)
                         {
                             auto s_pv = epics_service_manager->sanitizePVName(pv_uri);
@@ -415,7 +415,7 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                             epics_service_manager->monitorChannel(pv_uri, false);
                         }
 
-                        logger->logMessage(STRING_FORMAT("Snapshot %1% is cancelled", queue_name), LogLevel::INFO);
+                        logger->logMessage(STRING_FORMAT("Snapshot '%1%' is cancelled", queue_name), LogLevel::INFO);
                         it = snapshot_runinnig_.erase(it);
                     }
 
@@ -485,7 +485,7 @@ void SnapshotSubmissionTask::operator()()
 
         // increment the iteration index
         snapshot_command_info->snapshot_iteration_index++;
-        logger->logMessage(STRING_FORMAT("[Header] Snapshot %1% iteration %2% started",
+        logger->logMessage(STRING_FORMAT("[Header] Snapshot '%1%' iteration %2% started",
                                          snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index),
                            LogLevel::DEBUG);
 
@@ -528,7 +528,7 @@ void SnapshotSubmissionTask::operator()()
             }
         }
 
-        logger->logMessage(STRING_FORMAT("[Data] Snapshot %1% iteration %2% with %3% events from [n. %4%] - %5% - PVs completed",
+        logger->logMessage(STRING_FORMAT("[Data] Snapshot '%1%' iteration %2% with %3% events from [n. %4%] - %5% - PVs completed",
                                          snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index %
                                              submission_shrd_ptr->snapshot_events.size() %pv_names_published.size()% get_pv_names(pv_names_published)),
                            LogLevel::DEBUG);
@@ -536,7 +536,7 @@ void SnapshotSubmissionTask::operator()()
 
     if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Tail) != SnapshotSubmissionType::None)
     {
-        logger->logMessage(STRING_FORMAT("[Tail] Snapshot %1% iteration %2% completed",
+        logger->logMessage(STRING_FORMAT("[Tail] Snapshot '%1%' iteration %2% completed",
                                          snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index),
                            LogLevel::DEBUG);
         // send completion for this snapshot submission
