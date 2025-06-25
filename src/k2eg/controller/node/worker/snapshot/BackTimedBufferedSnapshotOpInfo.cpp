@@ -62,7 +62,7 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout()
         if (timeout)
         {
             // On timeout, swap the buffers so getData works on a stable snapshot.
-            std::unique_lock<std::shared_mutex> lock(buffer_mutex);
+            std::unique_lock lock(buffer_mutex);
             std::swap(acquiring_buffer, processing_buffer);
         }
     }
@@ -85,7 +85,7 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout()
         {
             timeout = true;
             last_forced_expire = now;
-            std::unique_lock<std::shared_mutex> lock(buffer_mutex);
+            std::unique_lock lock(buffer_mutex);
             std::swap(acquiring_buffer, processing_buffer);
         }
     }
@@ -95,7 +95,7 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout()
 void BackTimedBufferedSnapshotOpInfo::addData(MonitorEventShrdPtr event_data)
 {
     // Always add new data to the acquiring buffer.
-    std::shared_lock<std::shared_mutex> lock(buffer_mutex);
+    std::unique_lock lock(buffer_mutex);
     acquiring_buffer->push(event_data, steady_clock::now());
 }
 

@@ -19,6 +19,8 @@
 #include <memory>
 #include <mutex>
 #include <regex>
+#include <set>
+#include <string>
 #include <utility>
 
 using namespace k2eg::controller::command::cmd;
@@ -45,6 +47,21 @@ void set_snapshot_thread_name(const std::size_t idx)
 {
     const std::string name = "Repeating Snapshot " + std::to_string(idx);
     const bool        result = BS::this_thread::set_os_thread_name(name);
+}
+
+
+std::string get_pv_names(std::set<std::string> name_set)
+{
+    std::string all_pv_names;
+    for (const auto& pv_name : name_set)
+    {
+        if (!all_pv_names.empty())
+        {
+            all_pv_names += ", ";
+        }
+        all_pv_names += pv_name;
+    }
+    return all_pv_names;
 }
 
 ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnaptshotConfiguration& repeating_snapshot_configuration, k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager)
@@ -260,7 +277,8 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         snapshot_runinnig_.emplace(s_op_ptr->queue_name, s_op_ptr);
         for (auto& pv_uri : sanitized_pv_name_list)
         {
-            logger->logMessage(STRING_FORMAT("associate snapshot '%1%' to pv '%2%'", s_op_ptr->cmd->snapshot_name % pv_uri->name), LogLevel::DEBUG);
+            logger->logMessage(
+                STRING_FORMAT("associate snapshot '%1%' to pv '%2%'", s_op_ptr->cmd->snapshot_name % pv_uri->name), LogLevel::DEBUG);
             // associate snaphsot to each pv, so the epics handler can
             // find the snapshot to fiil with data
             pv_snapshot_map_.emplace(std::make_pair(pv_uri->name, s_op_ptr));
@@ -358,9 +376,11 @@ void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerPara
     // }
 
     // manage the received data
+    std::set<std::string> pv_names;
     for (auto& event : *event_received->event_data)
     {
         const std::string pv_name = event->channel_data.pv_name;
+        pv_names.insert(pv_name);
         // store event on the global cache using the atomic pointer
         auto range = pv_snapshot_map_.equal_range(pv_name);
         for (auto it = range.first; it != range.second; ++it)
@@ -371,6 +391,7 @@ void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerPara
             }
         }
     }
+    // logger->logMessage(STRING_FORMAT("EPICS forwarded %1% data events for PVs: %2%", event_received->event_data->size() % get_pv_names(pv_names)), LogLevel::DEBUG);
 }
 
 void ContinuousSnapshotManager::expirationCheckerLoop()
@@ -486,7 +507,6 @@ void SnapshotSubmissionTask::operator()()
     submission.snap_ts =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
-
     if ((submission.submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
     {
 
@@ -511,12 +531,12 @@ void SnapshotSubmissionTask::operator()()
     if ((submission.submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None &&
         !submission.snapshot_events.empty())
     {
-        logger->logMessage(STRING_FORMAT("[Data] Snapshot %1% iteration %2% with %3% events",
-                                         snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index %
-                                             submission.snapshot_events.size()),
-                           LogLevel::DEBUG);
+
+        // gfet all the pv name from the submission
+        std::set<std::string> pv_names_published;
         for (auto& event : submission.snapshot_events)
         {
+            pv_names_published.insert(event->channel_data.pv_name);
             auto serialized_message = serialize(RepeatingSnaptshotData{1, submission.snap_ts, snapshot_command_info->snapshot_iteration_index,
                                                                        MakeChannelDataShrdPtr(event->channel_data)},
                                                 snapshot_command_info->cmd->serialization);
@@ -534,6 +554,11 @@ void SnapshotSubmissionTask::operator()()
                                    LogLevel::ERROR);
             }
         }
+
+        logger->logMessage(STRING_FORMAT("[Data] Snapshot %1% iteration %2% with %3% events from [n. %4%] - %5% - PVs completed",
+                                         snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index %
+                                             submission.snapshot_events.size() %pv_names_published.size()% get_pv_names(pv_names_published)),
+                           LogLevel::DEBUG);
     }
 
     if ((submission.submission_type & SnapshotSubmissionType::Tail) != SnapshotSubmissionType::None)
