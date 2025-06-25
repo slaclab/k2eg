@@ -41,20 +41,19 @@ class SnapshotOpInfo;
 class SnapshotSubmission
 {
 public:
-    std::int64_t                                          snap_ts = 0; // timestamp for the snapshot
+    std::chrono::steady_clock::time_point                 snap_time;   // time point for the snapshot
     std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events;
     SnapshotSubmissionType                                submission_type;
 
     // Constructor
-    SnapshotSubmission(std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events, SnapshotSubmissionType submission_type)
-        : snapshot_events(std::move(snapshot_events)), submission_type(submission_type)
+    SnapshotSubmission(const std::chrono::steady_clock::time_point& snap_time, std::vector<service::epics_impl::MonitorEventShrdPtr>&& snapshot_events, SnapshotSubmissionType submission_type)
+        : snap_time(snap_time), snapshot_events(std::move(snapshot_events)), submission_type(submission_type)
     {
     }
 
     // Move constructor
     SnapshotSubmission(SnapshotSubmission&& other) noexcept
-        : snapshot_events(std::move(other.snapshot_events))
-        , submission_type(other.submission_type)
+        : snapshot_events(std::move(other.snapshot_events)), submission_type(other.submission_type)
     {
     }
 
@@ -73,6 +72,8 @@ public:
     SnapshotSubmission(const SnapshotSubmission&) = delete;
     SnapshotSubmission& operator=(const SnapshotSubmission&) = delete;
 };
+
+DEFINE_PTR_TYPES(SnapshotSubmission);
 
 /*
 @brief define the snapshot operation info
@@ -118,10 +119,10 @@ public:
     virtual void addData(k2eg::service::epics_impl::MonitorEventShrdPtr event_data) = 0;
 
     // Retrieve collected monitor event data
-    virtual SnapshotSubmission getData() = 0;
+    virtual SnapshotSubmissionShrdPtr getData() = 0;
 
     // Check if the operation has timed out
-    virtual bool isTimeout();
+    virtual bool isTimeout(const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now()) override;
 };
 DEFINE_PTR_TYPES(SnapshotOpInfo)
 } // namespace k2eg::controller::node::worker::snapshot

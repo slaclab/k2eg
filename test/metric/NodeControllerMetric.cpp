@@ -21,8 +21,8 @@ TEST(Metric, NodeControllerMetricSubmittedCommand)
     ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port = port});
     EXPECT_NO_THROW(m_uptr = std::make_unique<PrometheusMetricService>(std::move(m_conf)));
     auto& cmd_ctrl_metric_ref = m_uptr->getNodeControllerMetric();
-    cmd_ctrl_metric_ref.incrementCounter(INodeControllerMetricCounterType::SubmittedCommand);
+    cmd_ctrl_metric_ref.incrementCounter(INodeControllerMetricCounterType::SubmittedCommand, 1, {{"op", "command_submitted"}});
     auto metrics_string = getUrl(METRIC_URL_FROM_PORT(port));
     std::cout << metrics_string << std::endl;
-    ASSERT_NE(metrics_string.find("k2eg_node_controller{op=\"command_submitted\"} 1"), -1);
+    ASSERT_NE(metrics_string.find("k2eg_node_controller_submitted_command_counter{op=\"command_submitted\"} 1"), -1);
 }
