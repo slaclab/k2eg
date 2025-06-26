@@ -60,6 +60,8 @@ PrometheusNodeControllerSystemMetric::PrometheusNodeControllerSystemMetric()
     , vmsize_gauge_family(prometheus::BuildGauge().Name("k2eg_system_vmsize_kb").Help("Virtual Memory Size (kB)").Register(*registry))
     , vmdata_gauge_family(prometheus::BuildGauge().Name("k2eg_system_vmdata_kb").Help("Data Segment Size (kB)").Register(*registry))
     , vmswap_gauge_family(prometheus::BuildGauge().Name("k2eg_system_vmswap_kb").Help("Swap Size (kB)").Register(*registry))
+    , rss_anon_gauge_family(prometheus::BuildGauge().Name("k2eg_system_rss_anon_kb").Help("Anonymous Memory Size (kB)").Register(*registry))
+    , rss_file_gauge_family(prometheus::BuildGauge().Name("k2eg_system_rss_file_kb").Help("File-backed Memory Size (kB)").Register(*registry))
     , threads_gauge_family(prometheus::BuildGauge().Name("k2eg_system_threads").Help("Number of threads").Register(*registry))
     , open_fds_gauge_family(
           prometheus::BuildGauge().Name("k2eg_system_open_fds").Help("Number of open file descriptors").Register(*registry))
@@ -162,6 +164,8 @@ void PrometheusNodeControllerSystemMetric::incrementCounter(INodeControllerSyste
         case INodeControllerSystemMetricType::VmSizeGauge: vmsize_gauge_family.Add(label).Set(absolute_value); break;
         case INodeControllerSystemMetricType::VmDataGauge: vmdata_gauge_family.Add(label).Set(absolute_value); break;
         case INodeControllerSystemMetricType::VmSwapGauge: vmswap_gauge_family.Add(label).Set(absolute_value); break;
+        case INodeControllerSystemMetricType::RssAnonGauge: rss_anon_gauge_family.Add(label).Set(absolute_value); break;
+        case INodeControllerSystemMetricType::RssFileGauge: rss_file_gauge_family.Add(label).Set(absolute_value); break;
         case INodeControllerSystemMetricType::ThreadsGauge: threads_gauge_family.Add(label).Set(absolute_value); break;
         case INodeControllerSystemMetricType::OpenFDsGauge: open_fds_gauge_family.Add(label).Set(absolute_value); break;
         case INodeControllerSystemMetricType::MaxFDsGauge: max_fds_gauge_family.Add(label).Set(absolute_value); break;

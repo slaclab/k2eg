@@ -33,6 +33,8 @@ class PrometheusNodeControllerSystemMetric : public INodeControllerSystemMetric
     prometheus::Family<prometheus::Gauge>& vmsize_gauge_family;
     prometheus::Family<prometheus::Gauge>& vmdata_gauge_family;
     prometheus::Family<prometheus::Gauge>& vmswap_gauge_family;
+    prometheus::Family<prometheus::Gauge>& rss_anon_gauge_family;
+    prometheus::Family<prometheus::Gauge>& rss_file_gauge_family;
     prometheus::Family<prometheus::Gauge>& threads_gauge_family;
     prometheus::Family<prometheus::Gauge>& open_fds_gauge_family;
     prometheus::Family<prometheus::Gauge>& max_fds_gauge_family;

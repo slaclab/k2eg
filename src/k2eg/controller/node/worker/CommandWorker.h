@@ -129,9 +129,8 @@ public:
     {
     }
 
-    virtual bool isTimeout()
+    virtual bool isTimeout(const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now())
     {
-        auto now = std::chrono::steady_clock::now();
         if ((now - begin) > timeout_ms)
         {
             begin = now; // renew begin after timeout

@@ -20,6 +20,8 @@ public:
     long vm_size = 0;  ///< Virtual memory size
     long vm_data = 0;  ///< Size of data segment
     long vm_swap = 0;  ///< Swapped-out virtual memory size
+    long rss_anon = 0; ///< Anonymous memory size (not backed by a file: heap, stack, etc.)
+    long rss_file = 0; ///< File-backed memory size (memory-mapped files and shared libraries)
 
     // CPU
     long   utime_ticks = 0; ///< User mode CPU time (clock ticks)

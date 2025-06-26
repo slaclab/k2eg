@@ -34,9 +34,6 @@ using namespace k2eg::service::metric;
 using namespace k2eg::service::scheduler;
 using namespace k2eg::service::epics_impl;
 
-#define CSM_STAT_TASK_NAME "csm-stat-task"
-#define CSM_STAT_TASK_CRON "* * * * * *"
-
 #define GET_QUEUE_FROM_SNAPSHOT_NAME(snapshot_name) ([](const std::string& name) { \
     std::string norm = std::regex_replace(name, std::regex(R"([^A-Za-z0-9\-])"), "_"); \
     std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower); \
@@ -48,7 +45,6 @@ void set_snapshot_thread_name(const std::size_t idx)
     const std::string name = "Repeating Snapshot " + std::to_string(idx);
     const bool        result = BS::this_thread::set_os_thread_name(name);
 }
-
 
 std::string get_pv_names(std::set<std::string> name_set)
 {
@@ -79,21 +75,6 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnaptshotCon
     // set the run flag to true
     run_flag = true;
 
-    // init thread_throttling_vector vector
-    auto thread_count = thread_pool->get_thread_count();
-    for (size_t i = 0; i < thread_count; ++i)
-    {
-        thread_throttling_vector.emplace_back(std::make_unique<k2eg::common::ThrottlingManager>());
-    }
-
-    // add tak to manage the statistic
-    auto statistic_task = MakeTaskShrdPtr(CSM_STAT_TASK_NAME, // name of the task
-                                          CSM_STAT_TASK_CRON, // cron expression
-                                          std::bind(&ContinuousSnapshotManager::handleStatistic, this, std::placeholders::_1), // task handler
-                                          -1 // start at application boot time
-    );
-    ServiceResolver<Scheduler>::resolve()->addTask(statistic_task);
-
     // start expiration checker
     expiration_thread_running = true;
     expiration_thread = std::thread(&ContinuousSnapshotManager::expirationCheckerLoop, this);
@@ -113,8 +94,6 @@ ContinuousSnapshotManager::~ContinuousSnapshotManager()
     epics_handler_token.reset();
     // stop all the thread
     thread_pool->wait();
-    bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(CSM_STAT_TASK_NAME);
-    logger->logMessage(STRING_FORMAT("[ContinuousSnapshotManager] Remove statistic task : %1%", erased));
     logger->logMessage("[ContinuousSnapshotManager] Continuous snapshot manager stopped");
 }
 
@@ -257,8 +236,8 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     // create topic where publish the snapshot
     publisher->createQueue(QueueDescription{
         .name = s_op_ptr->queue_name,
-        .paritions = 3,
-        .replicas = 1, // put default to 1 need to be calculated with more complex logic for higher values
+        .paritions = 1, // put default to 1 need to be calculated with more complex logic for higher values
+        .replicas = 1,  // put default to 1 need to be calculated with more complex logic for higher values
         .retention_time = 1000 * 60 * 60,
         .retention_size = 1024 * 1024 * 50,
     });
@@ -391,7 +370,8 @@ void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerPara
             }
         }
     }
-    // logger->logMessage(STRING_FORMAT("EPICS forwarded %1% data events for PVs: %2%", event_received->event_data->size() % get_pv_names(pv_names)), LogLevel::DEBUG);
+    // logger->logMessage(STRING_FORMAT("EPICS forwarded %1% data events for PVs: %2%",
+    // event_received->event_data->size() % get_pv_names(pv_names)), LogLevel::DEBUG);
 }
 
 void ContinuousSnapshotManager::expirationCheckerLoop()
@@ -441,11 +421,18 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
 
                     // also if the snapshot has been removed forward the last data and close the snapshot to the client
                     // print log with submisison information
+
+                    // increment metric for the rpocessed events
+                    auto submission_shard_ptr = s_op_ptr->getData();
+                    if ((submission_shard_ptr->submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None)
+                    {
+                        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotEventCounter,
+                                                 submission_shard_ptr->snapshot_events.size());
+                    }
                     thread_pool->detach_task(
-                        [this, s_op_ptr]() mutable
+                        [this, s_op_ptr, submission_shard_ptr]() mutable
                         {
-                            auto                   submission = s_op_ptr->getData();
-                            SnapshotSubmissionTask task(s_op_ptr, std::move(submission), this->publisher, this->logger);
+                            SnapshotSubmissionTask task(s_op_ptr, submission_shard_ptr, this->publisher, this->logger);
                             task();
                         });
                 }
@@ -477,37 +464,25 @@ void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const 
     }
 }
 
-void ContinuousSnapshotManager::handleStatistic(TaskProperties& task_properties)
-{
-    // update throttle metric
-    // Assuming you have a metric object, otherwise replace 'metric' with the correct instance or accessor
-    for (size_t i = 0; i < thread_throttling_vector.size(); ++i)
-    {
-        auto&       throttling = thread_throttling_vector[i];
-        std::string thread_id = std::to_string(i);
-        auto        t_stat = throttling->getStats();
-        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
-        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotThrottleGauge, t_stat.throttle_ms, {{"thread_id", thread_id}});
-        throttling->resetEventCounter();
-    }
-}
-
 #pragma region Submission Task
 
-SnapshotSubmissionTask::SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmission&& submission, IPublisherShrdPtr publisher, ILoggerShrdPtr logger)
-    : snapshot_command_info(snapshot_command_info), submission(std::move(submission)), publisher(std::move(publisher)), logger(std::move(logger))
+SnapshotSubmissionTask::SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, IPublisherShrdPtr publisher, ILoggerShrdPtr logger)
+    : snapshot_command_info(snapshot_command_info), submission_shrd_ptr(submission_shrd_ptr), publisher(std::move(publisher)), logger(std::move(logger))
 {
 }
+
+#define CHRONO_TO_UNIX_INT64(x) (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())
 
 void SnapshotSubmissionTask::operator()()
 {
     if (!snapshot_command_info)
         return;
+    const auto thread_index = BS::this_thread::get_index();
+    if (!thread_index.has_value())
+        return;
+    auto snap_ts = CHRONO_TO_UNIX_INT64(submission_shrd_ptr->snap_time);
     // get timestamp for the snapshot in unix time and utc
-    submission.snap_ts =
-        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-
-    if ((submission.submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
+    if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
     {
 
         // increment the iteration index
@@ -517,10 +492,9 @@ void SnapshotSubmissionTask::operator()()
                            LogLevel::DEBUG);
 
         {
-            auto serialized_header_message =
-                serialize(RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, submission.snap_ts,
-                                                   snapshot_command_info->snapshot_iteration_index},
-                          snapshot_command_info->cmd->serialization);
+            auto serialized_header_message = serialize(
+                RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, snapshot_command_info->snapshot_iteration_index},
+                snapshot_command_info->cmd->serialization);
             // send the header for the snapshot
             publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
                                                                 snapshot_command_info->cmd->snapshot_name, serialized_header_message),
@@ -528,16 +502,15 @@ void SnapshotSubmissionTask::operator()()
         }
     }
 
-    if ((submission.submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None &&
-        !submission.snapshot_events.empty())
+    if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None &&
+        !submission_shrd_ptr->snapshot_events.empty())
     {
-
         // gfet all the pv name from the submission
         std::set<std::string> pv_names_published;
-        for (auto& event : submission.snapshot_events)
+        for (auto& event : submission_shrd_ptr->snapshot_events)
         {
             pv_names_published.insert(event->channel_data.pv_name);
-            auto serialized_message = serialize(RepeatingSnaptshotData{1, submission.snap_ts, snapshot_command_info->snapshot_iteration_index,
+            auto serialized_message = serialize(RepeatingSnaptshotData{1, snap_ts, snapshot_command_info->snapshot_iteration_index,
                                                                        MakeChannelDataShrdPtr(event->channel_data)},
                                                 snapshot_command_info->cmd->serialization);
             if (serialized_message)
@@ -557,20 +530,19 @@ void SnapshotSubmissionTask::operator()()
 
         logger->logMessage(STRING_FORMAT("[Data] Snapshot %1% iteration %2% with %3% events from [n. %4%] - %5% - PVs completed",
                                          snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index %
-                                             submission.snapshot_events.size() %pv_names_published.size()% get_pv_names(pv_names_published)),
+                                             submission_shrd_ptr->snapshot_events.size() % pv_names_published.size() % get_pv_names(pv_names_published)),
                            LogLevel::DEBUG);
     }
 
-    if ((submission.submission_type & SnapshotSubmissionType::Tail) != SnapshotSubmissionType::None)
+    if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Tail) != SnapshotSubmissionType::None)
     {
         logger->logMessage(STRING_FORMAT("[Tail] Snapshot %1% iteration %2% completed",
                                          snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index),
                            LogLevel::DEBUG);
         // send completion for this snapshot submission
-        auto serialized_completion_message =
-            serialize(RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, submission.snap_ts,
-                                                   snapshot_command_info->snapshot_iteration_index},
-                      snapshot_command_info->cmd->serialization);
+        auto serialized_completion_message = serialize(RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, snap_ts,
+                                                                                    snapshot_command_info->snapshot_iteration_index},
+                                                       snapshot_command_info->cmd->serialization);
         // publish the data
         publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
                                                             snapshot_command_info->cmd->snapshot_name, serialized_completion_message),

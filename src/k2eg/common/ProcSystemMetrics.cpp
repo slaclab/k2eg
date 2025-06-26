@@ -1,16 +1,17 @@
 #include <k2eg/common/ProcSystemMetrics.h>
 
-#include <thread> 
 #include <dirent.h>
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <sys/types.h>
+#include <thread>
 #include <unistd.h>
 
 using namespace k2eg::common;
 
-ProcSystemMetrics::ProcSystemMetrics() {
+ProcSystemMetrics::ProcSystemMetrics()
+{
     num_cores = std::thread::hardware_concurrency();
 }
 
@@ -26,8 +27,8 @@ void ProcSystemMetrics::refresh()
 
 void ProcSystemMetrics::readStatus()
 {
-    std::ifstream file("/proc/self/status");
     std::string   line;
+    std::ifstream file("/proc/self/status");
     while (std::getline(file, line))
     {
         std::istringstream iss(line);
@@ -73,6 +74,17 @@ void ProcSystemMetrics::readStatus()
         {
             iss >> key >> value;
             nonvoluntary_ctxt_switches = value;
+        }
+        // --- Added for RssAnon and RssFile ---
+        else if (line.find("RssAnon:") == 0)
+        {
+            iss >> key >> value >> unit;
+            rss_anon = value;
+        }
+        else if (line.find("RssFile:") == 0)
+        {
+            iss >> key >> value >> unit;
+            rss_file = value;
         }
     }
 }

@@ -88,7 +88,7 @@ public:
      *        If so, swap the acquiring and processing buffers.
      * @return true if timeout occurred and buffers were swapped, false otherwise.
      */
-    bool isTimeout() override;
+    bool isTimeout(const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now()) override;
     /**
      * @brief Add a new monitor event to the acquiring buffer.
      * @param event_data The event data to add.
@@ -99,7 +99,7 @@ public:
      *        If field filtering is enabled, only the specified fields are included.
      * @return A vector of shared pointers to MonitorEvent objects.
      */
-    SnapshotSubmission getData() override;
+    SnapshotSubmissionShrdPtr getData() override;
 };
 DEFINE_PTR_TYPES(BackTimedBufferedSnapshotOpInfo)
 } // namespace k2eg::controller::node::worker::snapshot

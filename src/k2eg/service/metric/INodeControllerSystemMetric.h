@@ -14,7 +14,9 @@ enum class INodeControllerSystemMetricType
     VmSizeGauge, // Virtual Memory Size (kB)
     VmDataGauge, // Data Segment Size (kB)
     VmSwapGauge, // Swap Size (kB)
-
+    RssAnonGauge, // Anonymous Memory Size (kB)
+    RssFileGauge, // File-backed Memory Size (kB)
+    
     // CPU metrics (Counter)
     UtimeTicksCounter, // User mode ticks
     StimeTicksCounter, // Kernel mode ticks

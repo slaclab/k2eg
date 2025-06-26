@@ -246,12 +246,12 @@ using PVSnapshotMap = std::unordered_multimap<std::string, std::shared_ptr<Snaps
 class SnapshotSubmissionTask
 {
     std::shared_ptr<SnapshotOpInfo>          snapshot_command_info; // shared pointer to the snapshot operation info
-    SnapshotSubmission                       submission;
+    SnapshotSubmissionShrdPtr                submission_shrd_ptr;
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
     k2eg::service::log::ILoggerShrdPtr       logger;
 
 public:
-    SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmission&& submission, k2eg::service::pubsub::IPublisherShrdPtr publisher, k2eg::service::log::ILoggerShrdPtr logger);
+    SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, k2eg::service::pubsub::IPublisherShrdPtr publisher, k2eg::service::log::ILoggerShrdPtr logger);
 
     void operator()();
 };
@@ -301,9 +301,6 @@ class ContinuousSnapshotManager
 
     // Reference to node controller metrics for statistics collection
     k2eg::service::metric::INodeControllerMetric& metrics;
-
-    // Vector of throttling managers, one per processing thread
-    std::vector<k2eg::common::ThrottlingManagerUPtr> thread_throttling_vector;
 
     std::thread       expiration_thread;
     std::atomic<bool> expiration_thread_running{false};

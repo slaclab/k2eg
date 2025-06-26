@@ -31,6 +31,8 @@ using namespace k2eg::service::scheduler;
 #define NODE_CONTROLLER_STAT_TASK_NAME "node-controller-stat-task"
 #define NODE_CONTROLLER_STAT_TASK_CRON "* * * * * *"
 
+const std::map<std::string, std::string> submitted_command_labels = {{"op", "command_submitted"}};
+const std::map<std::string, std::string> submitted_command_no_workef_found_labels = {{"op", "no_worker_found"}};
 NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_controller_configuration, DataStorageShrdPtr data_storage)
     : node_controller_configuration(std::move(node_controller_configuration))
     , node_configuration(std::make_shared<NodeConfiguration>(data_storage))
@@ -134,12 +136,11 @@ void NodeController::submitCommand(ConstCommandShrdPtrVec commands)
     // submitted command metric
     if (commands.size())
     {
-        metrics.incrementCounter(INodeControllerMetricCounterType::SubmittedCommand, commands.size());
+        metrics.incrementCounter(INodeControllerMetricCounterType::SubmittedCommand, commands.size(), submitted_command_labels);
     }
     // apply all submitted commands
     for (auto& cmd : commands)
     {
-        logger->logMessage(STRING_FORMAT("Process command => %1%", to_json_string(cmd)));
         // submit command to appropiate worker
         if (auto worker = worker_resolver.resolve(cmd->type); worker != nullptr)
         {
@@ -153,6 +154,7 @@ void NodeController::submitCommand(ConstCommandShrdPtrVec commands)
         else
         {
             logger->logMessage(STRING_FORMAT("No worker found for command type '%1%'", std::string(command_type_to_string(cmd->type))), LogLevel::ERROR);
+            metrics.incrementCounter(INodeControllerMetricCounterType::SubmittedCommand, commands.size(), submitted_command_no_workef_found_labels);
         }
     }
 }
@@ -167,6 +169,8 @@ void NodeController::handleStatistic(TaskProperties& task_properties)
     system_metrics.incrementCounter(INodeControllerSystemMetricType::VmSizeGauge, proc_system_metrics_grabber.vm_size, {{"node", node_configuration->getNodeName()}});
     system_metrics.incrementCounter(INodeControllerSystemMetricType::VmDataGauge, proc_system_metrics_grabber.vm_data, {{"node", node_configuration->getNodeName()}});
     system_metrics.incrementCounter(INodeControllerSystemMetricType::VmSwapGauge, proc_system_metrics_grabber.vm_swap, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::RssAnonGauge, proc_system_metrics_grabber.rss_anon, {{"node", node_configuration->getNodeName()}});
+    system_metrics.incrementCounter(INodeControllerSystemMetricType::RssFileGauge, proc_system_metrics_grabber.rss_file, {{"node", node_configuration->getNodeName()}});
     system_metrics.incrementCounter(INodeControllerSystemMetricType::ThreadsGauge, proc_system_metrics_grabber.threads, {{"node", node_configuration->getNodeName()}});
     system_metrics.incrementCounter(INodeControllerSystemMetricType::OpenFDsGauge, proc_system_metrics_grabber.open_fds,{{"node", node_configuration->getNodeName()}});
     system_metrics.incrementCounter(INodeControllerSystemMetricType::MaxFDsGauge, proc_system_metrics_grabber.max_fds, {{"node", node_configuration->getNodeName()}});
