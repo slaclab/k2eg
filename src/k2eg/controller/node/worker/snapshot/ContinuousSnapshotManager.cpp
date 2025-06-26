@@ -46,7 +46,6 @@ void set_snapshot_thread_name(const std::size_t idx)
     const bool        result = BS::this_thread::set_os_thread_name(name);
 }
 
-
 std::string get_pv_names(std::set<std::string> name_set)
 {
     std::string all_pv_names;
@@ -238,7 +237,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     publisher->createQueue(QueueDescription{
         .name = s_op_ptr->queue_name,
         .paritions = 1, // put default to 1 need to be calculated with more complex logic for higher values
-        .replicas = 1, // put default to 1 need to be calculated with more complex logic for higher values
+        .replicas = 1,  // put default to 1 need to be calculated with more complex logic for higher values
         .retention_time = 1000 * 60 * 60,
         .retention_size = 1024 * 1024 * 50,
     });
@@ -371,7 +370,8 @@ void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerPara
             }
         }
     }
-    // logger->logMessage(STRING_FORMAT("EPICS forwarded %1% data events for PVs: %2%", event_received->event_data->size() % get_pv_names(pv_names)), LogLevel::DEBUG);
+    // logger->logMessage(STRING_FORMAT("EPICS forwarded %1% data events for PVs: %2%",
+    // event_received->event_data->size() % get_pv_names(pv_names)), LogLevel::DEBUG);
 }
 
 void ContinuousSnapshotManager::expirationCheckerLoop()
@@ -426,7 +426,8 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                     auto submission_shard_ptr = s_op_ptr->getData();
                     if ((submission_shard_ptr->submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None)
                     {
-                        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotEventCounter, submission_shard_ptr->snapshot_events.size());
+                        metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotEventCounter,
+                                                 submission_shard_ptr->snapshot_events.size());
                     }
                     thread_pool->detach_task(
                         [this, s_op_ptr, submission_shard_ptr]() mutable
@@ -469,7 +470,9 @@ SnapshotSubmissionTask::SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> s
     : snapshot_command_info(snapshot_command_info), submission_shrd_ptr(submission_shrd_ptr), publisher(std::move(publisher)), logger(std::move(logger))
 {
 }
+
 #define CHRONO_TO_UNIX_INT64(x) (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())
+
 void SnapshotSubmissionTask::operator()()
 {
     if (!snapshot_command_info)
@@ -489,10 +492,9 @@ void SnapshotSubmissionTask::operator()()
                            LogLevel::DEBUG);
 
         {
-            auto serialized_header_message =
-                serialize(RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts,
-                                                   snapshot_command_info->snapshot_iteration_index},
-                          snapshot_command_info->cmd->serialization);
+            auto serialized_header_message = serialize(
+                RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, snapshot_command_info->snapshot_iteration_index},
+                snapshot_command_info->cmd->serialization);
             // send the header for the snapshot
             publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
                                                                 snapshot_command_info->cmd->snapshot_name, serialized_header_message),
@@ -505,10 +507,10 @@ void SnapshotSubmissionTask::operator()()
     {
         // gfet all the pv name from the submission
         std::set<std::string> pv_names_published;
-        for (auto& event : submission.snapshot_events)
+        for (auto& event : submission_shrd_ptr->snapshot_events)
         {
             pv_names_published.insert(event->channel_data.pv_name);
-            auto serialized_message = serialize(RepeatingSnaptshotData{1, submission.snap_ts, snapshot_command_info->snapshot_iteration_index,
+            auto serialized_message = serialize(RepeatingSnaptshotData{1, snap_ts, snapshot_command_info->snapshot_iteration_index,
                                                                        MakeChannelDataShrdPtr(event->channel_data)},
                                                 snapshot_command_info->cmd->serialization);
             if (serialized_message)
@@ -528,7 +530,7 @@ void SnapshotSubmissionTask::operator()()
 
         logger->logMessage(STRING_FORMAT("[Data] Snapshot %1% iteration %2% with %3% events from [n. %4%] - %5% - PVs completed",
                                          snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index %
-                                             submission.snapshot_events.size() %pv_names_published.size()% get_pv_names(pv_names_published)),
+                                             submission_shrd_ptr->snapshot_events.size() % pv_names_published.size() % get_pv_names(pv_names_published)),
                            LogLevel::DEBUG);
     }
 
@@ -538,10 +540,9 @@ void SnapshotSubmissionTask::operator()()
                                          snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index),
                            LogLevel::DEBUG);
         // send completion for this snapshot submission
-        auto serialized_completion_message =
-            serialize(RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, snap_ts,
-                                                   snapshot_command_info->snapshot_iteration_index},
-                      snapshot_command_info->cmd->serialization);
+        auto serialized_completion_message = serialize(RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, snap_ts,
+                                                                                    snapshot_command_info->snapshot_iteration_index},
+                                                       snapshot_command_info->cmd->serialization);
         // publish the data
         publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
                                                             snapshot_command_info->cmd->snapshot_name, serialized_completion_message),
