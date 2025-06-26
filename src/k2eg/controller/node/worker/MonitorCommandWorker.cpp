@@ -342,8 +342,12 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
         std::shared_lock slock(channel_map_mtx);
         for (auto& event : *event_received->event_fail)
         {
-            channel_topics_map[event->channel_data.pv_name].active = false;
-            logger->logMessage(STRING_FORMAT("PV %1% is not connected", event->channel_data.pv_name), LogLevel::DEBUG);
+            auto it = channel_topics_map.find(event->channel_data.pv_name);
+            if (it != channel_topics_map.end())
+            {
+                it->second.active = false;
+                logger->logMessage(STRING_FORMAT("PV %1% is not connected", event->channel_data.pv_name), LogLevel::DEBUG);
+            }
         }
     }
 
@@ -353,16 +357,18 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
     {
         // publisher
         std::shared_lock slock(channel_map_mtx);
+        auto it = channel_topics_map.find(event->channel_data.pv_name);
+        if (it == channel_topics_map.end()) {continue;}
 
         // set channel as active
-        if (!channel_topics_map[event->channel_data.pv_name].active)
+        if (!it->second.active)
         {
-            channel_topics_map[event->channel_data.pv_name].active = true;
+            it->second.active = true;
             logger->logMessage(STRING_FORMAT("PV %1% is connected", event->channel_data.pv_name), LogLevel::DEBUG);
         }
 
         // forward messages
-        for (auto& monitor_info : channel_topics_map[event->channel_data.pv_name].cmd_vec)
+        for (auto& monitor_info : it->second.cmd_vec)
         {
             logger->logMessage(
                 STRING_FORMAT("Publish channel %1% on topic %2%", event->channel_data.pv_name % monitor_info.channel_destination), LogLevel::TRACE);

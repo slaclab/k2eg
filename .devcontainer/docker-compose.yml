@@ -34,9 +34,9 @@ services:
 
   consul:
     image: consul:1.15
-    ports:
-      - "8500:8500"  # Consul HTTP API and UI
-      - "8600:8600/udp"  # DNS interface (if needed)
+    # ports:
+      # - "8500:8500"  # Consul HTTP API and UI
+      # - "8600:8600/udp"  # DNS interface (if needed)
     command: agent -dev -ui -client=0.0.0.0
     volumes:
       - consul_data:/consul/data  # Optional persistent storage for Consul data

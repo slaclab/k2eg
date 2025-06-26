@@ -19,13 +19,21 @@
 #include <k2eg/controller/node/worker/MonitorCommandWorker.h>
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
 
+#include <boost/lexical_cast.hpp>
+
 #include <memory>
 
 namespace k2eg::controller::node {
 
+enum class NodeType
+{
+    GATEWAY,
+    STORAGE
+};
+
 struct NodeControllerConfiguration
 {
-    // monitor configuration
+    NodeType                                     node_type;
     worker::monitor::MonitorCommandConfiguration monitor_command_configuration;
     worker::SnapshotCommandConfiguration         snapshot_command_configuration;
 };
@@ -115,5 +123,30 @@ public:
 };
 DEFINE_PTR_TYPES(NodeController)
 } // namespace k2eg::controller::node
+
+
+namespace boost {
+template <>
+inline std::string lexical_cast<std::string, k2eg::controller::node::NodeType>(const k2eg::controller::node::NodeType& type)
+{
+    switch (type)
+    {
+    case k2eg::controller::node::NodeType::GATEWAY: return "gateway";
+    case k2eg::controller::node::NodeType::STORAGE: return "storage";
+    }
+    throw boost::bad_lexical_cast(); // fallback
+}
+
+template <>
+inline k2eg::controller::node::NodeType lexical_cast<k2eg::controller::node::NodeType, std::string>(const std::string& str)
+{
+    if (str == "gateway")
+        return k2eg::controller::node::NodeType::GATEWAY;
+    if (str == "storage")
+        return k2eg::controller::node::NodeType::STORAGE;
+    throw boost::bad_lexical_cast(); // fallback
+}
+} // namespace boost
+
 
 #endif // k2eg_CONTROLLER_NODE_NODECONTROLLER_H_
