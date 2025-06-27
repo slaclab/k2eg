@@ -98,19 +98,29 @@ void RDKafkaPublisher::init()
 
 void RDKafkaPublisher::autoPoll()
 {
+    const int max_events_per_poll = 1000; // Process more events per poll
+    const int busy_poll_threshold = 100;  // Switch to busy polling when queue is large
+    const int sleep_duration_usec = 100;  // Sleep duration in microseconds when idle
     while (!this->_stop_inner_thread)
     {
-        if (producer->outq_len() > 0)
+        int queue_len = producer->outq_len();
+        if (queue_len > 0)
         {
-            // If there are messages, poll immediately (no sleep)
-            // logger->logMessage(STRING_FORMAT("Auto polling RDKafkaPublisher queue size: %1%", producer->outq_len()),
-            // LogLevel::DEBUG);
-            flush(configuration->flush_timeout_ms);
+            if (queue_len > busy_poll_threshold)
+            {
+                // Busy polling for high throughput
+                producer->poll(0); // Non-blocking poll
+            }
+            else
+            {
+                // Short timeout for moderate load
+                producer->poll(1);
+            }
         }
         else
         {
-            // If queue is empty, sleep to avoid busy-waiting
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            // Sleep when idle to reduce CPU usage
+            std::this_thread::sleep_for(std::chrono::microseconds(sleep_duration_usec));
         }
     }
 }
@@ -410,6 +420,7 @@ QueueSubscriberGroupInfoUPtr RDKafkaPublisher::get_group_info(const char* group)
 
 int RDKafkaPublisher::pushMessage(PublishMessageUniquePtr message, const std::map<std::string, std::string>& headers)
 {
+
     RdKafka::ErrorCode resp = RdKafka::ERR_NO_ERROR;
     RdKafka::Headers*  kafka_headers = RdKafka::Headers::create();
     for (auto& kv : headers)
@@ -418,31 +429,75 @@ int RDKafkaPublisher::pushMessage(PublishMessageUniquePtr message, const std::ma
     }
     const std::string distribution_key = message->getDistributionKey();
     auto              msg_ptr = message.release();
-    resp = producer->produce(msg_ptr->getQueue(), RdKafka::Topic::PARTITION_UA, 0 /* zero copy management */,
-                             /* Value */
-                             (void*)msg_ptr->getBufferPtr(), msg_ptr->getBufferSize(),
-                             /* Key */
-                             distribution_key.c_str(), distribution_key.size(),
-                             /* Timestamp (defaults to now) */
-                             0,
-                             /* Message headers, if any */
-                             kafka_headers,
-                             /* pass PublishMessage instance to opaque information */
-                             msg_ptr);
-    if (resp != RdKafka::ERR_NO_ERROR)
+
+    // Retry configuration
+    const int max_retries = 3;
+    const int base_retry_delay_ms = 10;
+    int       retry_count = 0;
+    while (retry_count <= max_retries)
     {
-        logger->logMessage(STRING_FORMAT("Error producing message: %1% (%2%)", RdKafka::err2str(resp) % msg_ptr->getQueue()), LogLevel::ERROR);
-        /* Headers are automatically deleted on produce() success. */
-        delete kafka_headers;
-        delete msg_ptr;
-        return -1;
+        resp = producer->produce(msg_ptr->getQueue(), RdKafka::Topic::PARTITION_UA, 0 /* zero copy management */,
+                                 /* Value */
+                                 (void*)msg_ptr->getBufferPtr(), msg_ptr->getBufferSize(),
+                                 /* Key */
+                                 distribution_key.c_str(), distribution_key.size(),
+                                 /* Timestamp (defaults to now) */
+                                 0,
+                                 /* Message headers, if any */
+                                 kafka_headers,
+                                 /* pass PublishMessage instance to opaque information */
+                                 msg_ptr);
+        if (resp == RdKafka::ERR_NO_ERROR)
+        {
+            return 0; // Message successfully produced
+        }
+        else if (resp == RdKafka::ERR__QUEUE_FULL && retry_count < max_retries)
+        {
+            // Queue is full, implement retry logic with exponential backoff
+            retry_count++;
+
+            // Calculate backoff delay (exponential backoff with jitter)
+            int delay_ms = base_retry_delay_ms * (1 << (retry_count - 1)); // 10ms, 20ms, 40ms
+            delay_ms += (std::rand() % 10);                                // Add jitter to avoid thundering herd
+
+            logger->logMessage(STRING_FORMAT("Queue full for message to %1%, retry %2%/%3% in %4%ms", msg_ptr->getQueue() % retry_count % max_retries % delay_ms), LogLevel::INFO);
+
+            // Poll to free up space in the queue
+            producer->poll(delay_ms);
+
+            // Additional aggressive polling if queue is still very full
+            int queue_len = producer->outq_len();
+            if (queue_len > 1000)
+            {
+                for (int poll_attempts = 0; poll_attempts < 5 && producer->outq_len() > 500; poll_attempts++)
+                {
+                    producer->poll(5); // Short polls to drain queue
+                }
+            }
+        }
+        else
+        {
+            // Different error or max retries exceeded, break out of loop
+            break;
+        }
+    }
+
+    // If we reach here, either we had a non-recoverable error or max retries exceeded
+    if (resp == RdKafka::ERR__QUEUE_FULL)
+    {
+        logger->logMessage(STRING_FORMAT("Failed to produce message after %1% retries - queue persistently full: %2%", 
+                          max_retries % msg_ptr->getQueue()), LogLevel::ERROR);
     }
     else
     {
-        // whe need to release the message memory becaus is not more owned by this
-        // instance
-        return 0;
+        logger->logMessage(STRING_FORMAT("Error producing message: %1% (%2%)", 
+                          RdKafka::err2str(resp) % msg_ptr->getQueue()), LogLevel::ERROR);
     }
+    
+    // Cleanup on failure
+    delete kafka_headers;
+    delete msg_ptr;
+    return -1;
 }
 
 int RDKafkaPublisher::pushMessages(PublisherMessageVector& messages, const std::map<std::string, std::string>& headers)
