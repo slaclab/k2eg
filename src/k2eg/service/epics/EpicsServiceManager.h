@@ -41,6 +41,10 @@ struct EpicsServiceManagerConfig
     // the number of thread for execute the poll
     // on the epics monitor operation
     std::int32_t thread_count = 1;
+
+    // the maximum number of events to fetch from the monitor queue
+    // this is used to limit the number of events to process
+    std::int32_t max_event_from_monitor_queue = 100;
 };
 
 // describe a channel ellement in map per each PV

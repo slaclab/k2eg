@@ -1,3 +1,4 @@
+#include <chrono>
 #include <k2eg/common/utility.h>
 
 #include <k2eg/service/ServiceResolver.h>
@@ -9,9 +10,9 @@
 
 #include <cstddef>
 #include <cstring>
-#include <iostream>
 #include <memory>
 #include <string>
+#include <string_view>
 
 using namespace k2eg::service::log;
 
@@ -100,7 +101,7 @@ void RDKafkaPublisher::autoPoll()
 {
     const int max_events_per_poll = 1000; // Process more events per poll
     const int busy_poll_threshold = 100;  // Switch to busy polling when queue is large
-    const int sleep_duration_usec = 100;  // Sleep duration in microseconds when idle
+    const int sleep_duration_msec = 5;    // Sleep duration in microseconds when idle
     while (!this->_stop_inner_thread)
     {
         int queue_len = producer->outq_len();
@@ -120,7 +121,7 @@ void RDKafkaPublisher::autoPoll()
         else
         {
             // Sleep when idle to reduce CPU usage
-            std::this_thread::sleep_for(std::chrono::microseconds(sleep_duration_usec));
+            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_duration_msec));
         }
     }
 }
@@ -418,17 +419,18 @@ QueueSubscriberGroupInfoUPtr RDKafkaPublisher::get_group_info(const char* group)
     return result;
 }
 
-int RDKafkaPublisher::pushMessage(PublishMessageUniquePtr message, const std::map<std::string, std::string>& headers)
+int RDKafkaPublisher::pushMessage(PublishMessageUniquePtr message, const std::map<std::string_view, std::string_view>& headers)
 {
 
     RdKafka::ErrorCode resp = RdKafka::ERR_NO_ERROR;
     RdKafka::Headers*  kafka_headers = RdKafka::Headers::create();
     for (auto& kv : headers)
     {
-        kafka_headers->add(kv.first, kv.second);
+        kafka_headers->add(std::string(kv.first), std::string(kv.second));
     }
-    const std::string distribution_key = message->getDistributionKey();
-    auto              msg_ptr = message.release();
+
+    auto& distribution_key = message->getDistributionKey();
+    auto  msg_ptr = message.release();
 
     // Retry configuration
     const int max_retries = 3;
@@ -485,22 +487,22 @@ int RDKafkaPublisher::pushMessage(PublishMessageUniquePtr message, const std::ma
     // If we reach here, either we had a non-recoverable error or max retries exceeded
     if (resp == RdKafka::ERR__QUEUE_FULL)
     {
-        logger->logMessage(STRING_FORMAT("Failed to produce message after %1% retries - queue persistently full: %2%", 
-                          max_retries % msg_ptr->getQueue()), LogLevel::ERROR);
+        logger->logMessage(STRING_FORMAT("Failed to produce message after %1% retries - queue persistently full: %2%",
+                                         max_retries % msg_ptr->getQueue()),
+                           LogLevel::ERROR);
     }
     else
     {
-        logger->logMessage(STRING_FORMAT("Error producing message: %1% (%2%)", 
-                          RdKafka::err2str(resp) % msg_ptr->getQueue()), LogLevel::ERROR);
+        logger->logMessage(STRING_FORMAT("Error producing message: %1% (%2%)", RdKafka::err2str(resp) % msg_ptr->getQueue()), LogLevel::ERROR);
     }
-    
+
     // Cleanup on failure
     delete kafka_headers;
     delete msg_ptr;
     return -1;
 }
 
-int RDKafkaPublisher::pushMessages(PublisherMessageVector& messages, const std::map<std::string, std::string>& headers)
+int RDKafkaPublisher::pushMessages(PublisherMessageVector& messages, const std::map<std::string_view, std::string_view>& headers)
 {
     int  err = 0;
     auto message = messages.begin();

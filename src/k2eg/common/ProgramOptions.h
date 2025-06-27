@@ -61,7 +61,10 @@ static const char* const SNAPSHOT_REPEATING_SCHEDULER_THREAD = "snapshot-repeati
 static const char* const METRIC_ENABLE = "metric-enable";
 static const char* const METRIC_HTTP_PORT = "metric-server-http-port";
 
+// the number of thread to use for the epics monitor operation (process pv monitor queue in parallel)
 static const char* const EPICS_MONITOR_THREAD_COUNT = "epics-monitor-thread-count";
+// the maximum number of events to fetch from the single PV monitor queue
+static const char* const EPICS_MONITOR_CHANNEL_POLL_MAX = "epics-monitor-channel-poll-max";
 
 static const char* const CONFIGURATION_SERVICE_HOST = "configuration-server-host";
 static const char* const CONFIGURATION_SERVICE_PORT = "configuration-server-port";

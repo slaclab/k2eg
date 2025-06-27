@@ -332,7 +332,10 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
                 monitor_op->forceUpdate();
                 info->to_force = false;
             }
-            monitor_op->poll();
+            // fetch the data from the monitor operation
+            monitor_op->poll(config->max_event_from_monitor_queue);
+
+            // check if the channel has got data
             if (monitor_op->hasEvents() && !handler_broadcaster.targets.empty())
             {
                 auto received_event = monitor_op->getEventData();
@@ -358,11 +361,6 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
         channel_map.erase(monitor_op->getPVName());
         return; // Exit without resubmitting task.
     }
-
-    // manage throtling on situation where to much pv returtn nothing to reduce pressure
-    constexpr int min_throttle_ms = 1;
-    constexpr int max_throttle_ms = 100;
-    constexpr int idle_threshold = 10; // how many idle cycles before backoff increases
 
     // manqage throtling
     throttling.update(had_events);

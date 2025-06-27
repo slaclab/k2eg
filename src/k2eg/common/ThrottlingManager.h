@@ -68,7 +68,7 @@ public:
         {
             stats.idle_counter = 0;
             stats.total_events_processed++;
-            stats.throttle_ms = std::max(stats.throttle_ms / 2, min_throttle_ms_);
+            stats.throttle_ms = min_throttle_ms;
         }
     }
 
