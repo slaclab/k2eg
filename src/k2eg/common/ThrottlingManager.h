@@ -13,16 +13,16 @@ struct ThrottlingStats {
     int idle_counter;
     int total_idle_cycles;
     std::atomic<int> total_events_processed;
-    int throttle_ms;
+    int throttle_us;
     ThrottlingStats(int idle = 0, int idle_cycles = 0, int events = 0, int throttle = 1)
-        : idle_counter(idle), total_idle_cycles(idle_cycles), total_events_processed(events), throttle_ms(throttle) {}
+        : idle_counter(idle), total_idle_cycles(idle_cycles), total_events_processed(events), throttle_us(throttle) {}
 
     // Custom copy constructor
     ThrottlingStats(const ThrottlingStats& other)
         : idle_counter(other.idle_counter),
           total_idle_cycles(other.total_idle_cycles),
           total_events_processed(other.total_events_processed.load(std::memory_order_relaxed)),
-          throttle_ms(other.throttle_ms) {}
+          throttle_us(other.throttle_us) {}
 
     //reset operator
     ThrottlingStats& operator=(const ThrottlingStats& other)
@@ -32,7 +32,7 @@ struct ThrottlingStats {
             idle_counter = other.idle_counter;
             total_idle_cycles = other.total_idle_cycles;
             total_events_processed.store(other.total_events_processed.load(std::memory_order_relaxed), std::memory_order_relaxed);
-            throttle_ms = other.throttle_ms;
+            throttle_us = other.throttle_us;
         }
         return *this;
     }
@@ -41,15 +41,15 @@ struct ThrottlingStats {
 class ThrottlingManager
 {
 public:
-    constexpr static int min_throttle_ms = 1;
-    constexpr static int max_throttle_ms = 100;
+    constexpr static int min_throttle_us = 500;
+    constexpr static int max_throttle_us = 100000;
     constexpr static int idle_threshold = 10;
 
     ThrottlingManager() noexcept
-        : stats{0, 0, 0, min_throttle_ms} {}
+        : stats{0, 0, 0, min_throttle_us} {}
 
-    ThrottlingManager(int min_ms, int max_ms, int threshold) noexcept
-        : stats{0, 0, 0, min_ms}, min_throttle_ms_(min_ms), max_throttle_ms_(max_ms), idle_threshold_(threshold) {}
+    ThrottlingManager(int min_us, int max_us, int threshold) noexcept
+        : stats{0, 0, 0, min_us}, min_throttle_us_(min_us), max_throttle_us_(max_us), idle_threshold_(threshold) {}
 
     void update(bool had_events)
     {
@@ -59,8 +59,8 @@ public:
             stats.total_idle_cycles++;
             if (stats.idle_counter >= idle_threshold_)
             {
-                stats.throttle_ms = std::min(stats.throttle_ms * 2, max_throttle_ms_);
-                std::this_thread::sleep_for(std::chrono::milliseconds(stats.throttle_ms));
+                stats.throttle_us = std::min(stats.throttle_us * 2, max_throttle_us_);
+                std::this_thread::sleep_for(std::chrono::microseconds(stats.throttle_us));
                 stats.idle_counter = 0;
             }
         }
@@ -68,7 +68,7 @@ public:
         {
             stats.idle_counter = 0;
             stats.total_events_processed++;
-            stats.throttle_ms = min_throttle_ms;
+            stats.throttle_us = min_throttle_us_;
         }
     }
 
@@ -79,7 +79,7 @@ public:
 
     void reset() noexcept
     {
-        stats = {0, 0, 0, min_throttle_ms_};
+        stats = {0, 0, 0, max_throttle_us_};
     }
 
     void resetEventCounter() noexcept
@@ -92,8 +92,8 @@ public:
 
 private:
     ThrottlingStats stats;
-    int min_throttle_ms_ = min_throttle_ms;
-    int max_throttle_ms_ = max_throttle_ms;
+    int min_throttle_us_ = min_throttle_us;
+    int max_throttle_us_ = max_throttle_us;
     int idle_threshold_ = idle_threshold;
 };
 

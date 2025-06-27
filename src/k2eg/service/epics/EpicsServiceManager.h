@@ -2,14 +2,15 @@
 #define EpicsServiceManager_H
 
 #include <k2eg/common/BS_thread_pool.hpp>
+#include <k2eg/common/MsgpackSerialization.h>
 #include <k2eg/common/ThrottlingManager.h>
 #include <k2eg/common/broadcaster.h>
 #include <k2eg/common/types.h>
-#include <k2eg/common/MsgpackSerialization.h>
 
 #include <k2eg/service/epics/EpicsChannel.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
 #include <k2eg/service/epics/Serialization.h>
+#include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/scheduler/Scheduler.h>
 
@@ -69,6 +70,7 @@ DEFINE_MAP_FOR_TYPE(std::string, ChannelMapElement, ChannelMap)
 
 class EpicsServiceManager
 {
+    k2eg::service::log::ILoggerShrdPtr                                logger;
     ConstEpicsServiceManagerConfigUPtr                                config;
     std::shared_mutex                                                 channel_map_mutex;
     ChannelMap                                                        channel_map;
@@ -100,8 +102,8 @@ public:
     void                         forceMonitorChannelUpdate(const std::string& pv_name_uri);
     ConstMonitorOperationShrdPtr getMonitorOp(const std::string& pv_name_uri);
     ConstGetOperationUPtr        getChannelData(const std::string& pv_name_uri);
-    ConstPutOperationUPtr        putChannelData(const std::string& pv_name, std::unique_ptr<k2eg::common::MsgpackObject> value);
-    size_t                       getChannelMonitoredSize();
+    ConstPutOperationUPtr putChannelData(const std::string& pv_name, std::unique_ptr<k2eg::common::MsgpackObject> value);
+    size_t getChannelMonitoredSize();
     /*
     give some sanitizaiton to epics pv names patter <pvname>.<value>
     this method always return a valid pointer if the name is totaly

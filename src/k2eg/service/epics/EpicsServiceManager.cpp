@@ -19,13 +19,16 @@
 
 using namespace k2eg::common;
 
+using namespace k2eg::service;
+;
+using namespace k2eg::service::log;
 using namespace k2eg::service::scheduler;
 using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::metric;
 
 #define SELECT_PROVIDER(p) (p.find("pva") == 0 ? *pva_provider : *ca_provider)
 #define EPICS_MANAGER_STAT_TASK_NAME "epics-manager-stat-task"
-#define EPICS_MANAGER_STAT_TASK_CRON "* * * * * *"
+#define EPICS_MANAGER_STAT_TASK_CRON "*/1 * * * * *"
 
 void set_thread_name(const std::size_t idx)
 {
@@ -40,6 +43,7 @@ EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr conf
     , processing_pool(std::make_shared<BS::light_thread_pool>(this->config->thread_count, set_thread_name))
     , metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric())
 {
+    logger = ServiceResolver<ILogger>::resolve();
     pva_provider = std::make_unique<pvac::ClientProvider>("pva", epics::pvAccess::ConfigurationBuilder().push_env().build());
     ca_provider = std::make_unique<pvac::ClientProvider>("ca", epics::pvAccess::ConfigurationBuilder().push_env().build());
     auto statistic_task = MakeTaskShrdPtr(EPICS_MANAGER_STAT_TASK_NAME, // name of the task
@@ -48,6 +52,9 @@ EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr conf
                                           -1 // start at application boot time
     );
     ServiceResolver<Scheduler>::resolve()->addTask(statistic_task);
+    logger->logMessage(STRING_FORMAT("[EpicsServiceManager] Epics Service Manager started [tthread_cout=%1%, poll_to=%2%]",
+                                     this->config->thread_count % this->config->max_event_from_monitor_queue),
+                       LogLevel::INFO);
 }
 
 EpicsServiceManager::~EpicsServiceManager()
@@ -57,10 +64,13 @@ EpicsServiceManager::~EpicsServiceManager()
     // Stop processing monitor tasks and wait for scheduled tasks to finish.
     end_processing = true;
     processing_pool->wait();
-    // Clear all registered channels and reset providers.
+    // Clear all registered channels, reset providers and logger
     channel_map.clear();
     pva_provider->reset();
+    pva_provider.reset();
     ca_provider->reset();
+    ca_provider->reset();
+    logger.reset();
 }
 
 void EpicsServiceManager::addChannel(const std::string& pv_name_uri)
@@ -359,6 +369,7 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
         WriteLockCM write_lock(channel_map_mutex);
         // Remove the channel from the map if marked for deletion.
         channel_map.erase(monitor_op->getPVName());
+        throttling.reset(); // Reset throttling stats for this thread.
         return; // Exit without resubmitting task.
     }
 
@@ -375,25 +386,35 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
 
 void EpicsServiceManager::handleStatistic(TaskProperties& task_properties)
 {
-    ReadLockCM read_lock(channel_map_mutex);
-    int        active_pv = std::count_if(std::execution::par, channel_map.begin(), channel_map.end(),
-                                         [](const auto& pair)
-                                         {
+    int         active_pv = 0;
+    int         total_pv = 0;
+    std::string throttling_info;
+    {
+        ReadLockCM read_lock(channel_map_mutex);
+        active_pv = std::count_if(std::execution::par, channel_map.begin(), channel_map.end(),
+                                  [](const auto& pair)
+                                  {
                                       return pair.second.active == true;
                                   });
-
-    metric.incrementCounter(IEpicsMetricCounterType::ActiveMonitor, active_pv);
-    metric.incrementCounter(IEpicsMetricCounterType::TotalMonitor, channel_map.size());
-
+        total_pv = channel_map.size();
+    }
+    metric.incrementCounter(IEpicsMetricCounterType::ActiveMonitorGauge, active_pv);
+    metric.incrementCounter(IEpicsMetricCounterType::TotalMonitorGauge, total_pv);
     auto& thread_throttling_vector = getThreadThrottlingInfo();
     for (std::size_t i = 0; i < thread_throttling_vector.size(); ++i)
     {
         const auto& throttling = thread_throttling_vector[i];
         std::string thread_id = std::to_string(i);
         auto        t_stat = throttling.getStats();
-        metric.incrementCounter(IEpicsMetricCounterType::ThrottlingIdleCounter, t_stat.idle_counter, {{"thread_id", thread_id}});
+        metric.incrementCounter(IEpicsMetricCounterType::ThrottlingIdleGauge, t_stat.idle_counter, {{"thread_id", thread_id}});
         metric.incrementCounter(IEpicsMetricCounterType::ThrottlingEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
-        metric.incrementCounter(IEpicsMetricCounterType::ThrottlingDurationCounter, t_stat.total_idle_cycles, {{"thread_id", thread_id}});
+        metric.incrementCounter(IEpicsMetricCounterType::ThrottlingDurationGauge, t_stat.total_idle_cycles, {{"thread_id", thread_id}});
         metric.incrementCounter(IEpicsMetricCounterType::ThrottleGauge, t_stat.throttle_ms, {{"thread_id", thread_id}});
+
+        throttling_info += STRING_FORMAT(
+            "-Thr %1% - IdlCnt: %2%, ProcEvt: %3%, IdleCyc: %4%, TrtUsec: %5% us-",
+            thread_id % t_stat.idle_counter % t_stat.total_events_processed % t_stat.total_idle_cycles % t_stat.throttle_ms);
     }
+    // Log the statistics
+    logger->logMessage(STRING_FORMAT("EPICS Monitor Statistics: Active PVs: %1%, Total PVs: %2%, Thread Throttling: %3%", active_pv % total_pv % throttling_info), LogLevel::TRACE);
 }
