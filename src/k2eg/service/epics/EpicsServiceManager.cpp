@@ -409,11 +409,11 @@ void EpicsServiceManager::handleStatistic(TaskProperties& task_properties)
         metric.incrementCounter(IEpicsMetricCounterType::ThrottlingIdleGauge, t_stat.idle_counter, {{"thread_id", thread_id}});
         metric.incrementCounter(IEpicsMetricCounterType::ThrottlingEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
         metric.incrementCounter(IEpicsMetricCounterType::ThrottlingDurationGauge, t_stat.total_idle_cycles, {{"thread_id", thread_id}});
-        metric.incrementCounter(IEpicsMetricCounterType::ThrottleGauge, t_stat.throttle_ms, {{"thread_id", thread_id}});
+        metric.incrementCounter(IEpicsMetricCounterType::ThrottleGauge, t_stat.throttle_us, {{"thread_id", thread_id}});
 
         throttling_info += STRING_FORMAT(
             "-Thr %1% - IdlCnt: %2%, ProcEvt: %3%, IdleCyc: %4%, TrtUsec: %5% us-",
-            thread_id % t_stat.idle_counter % t_stat.total_events_processed % t_stat.total_idle_cycles % t_stat.throttle_ms);
+            thread_id % t_stat.idle_counter % t_stat.total_events_processed % t_stat.total_idle_cycles % t_stat.throttle_us);
     }
     // Log the statistics
     logger->logMessage(STRING_FORMAT("EPICS Monitor Statistics: Active PVs: %1%, Total PVs: %2%, Thread Throttling: %3%", active_pv % total_pv % throttling_info), LogLevel::TRACE);
