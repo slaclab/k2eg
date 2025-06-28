@@ -19,7 +19,7 @@ def update_iocs():
     temp_pv.value = random.uniform(89, 91)
 
     # Update timestamp of table, any monitor will get a new result
-    ctxt.put('K2EG:TEST:TWISS', table_pv)
+    # ctxt.put('K2EG:TEST:TWISS', table_pv)
     image_size = int(ctxt.get('K2EG:TEST:IMAGESIZE'))
 
     # Update image
