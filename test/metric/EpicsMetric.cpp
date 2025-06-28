@@ -115,12 +115,12 @@ TEST(Metric, EpicsMetricMonitorCount) {
   e_metric_ref.incrementCounter(IEpicsMetricCounterType::ActiveMonitorGauge, 5);
   auto metrics_string = getUrl(METRIC_URL_FROM_PORT(port));
   ASSERT_NE(metrics_string.length(), 0);
-  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_count{type=\"total\"} 10"), -1);
-  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_count{type=\"active\"} 5"), -1);
+  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_gauge{type=\"total\"} 10"), -1);
+  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_gauge{type=\"active\"} 5"), -1);
   e_metric_ref.incrementCounter(IEpicsMetricCounterType::TotalMonitorGauge, 5);
   e_metric_ref.incrementCounter(IEpicsMetricCounterType::ActiveMonitorGauge, 4);
   metrics_string = getUrl(METRIC_URL_FROM_PORT(port));
   ASSERT_NE(metrics_string.length(), 0);
-  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_count{type=\"total\"} 5"), -1);
-  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_count{type=\"active\"} 4"), -1);
+  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_gauge{type=\"total\"} 5"), -1);
+  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_gauge{type=\"active\"} 4"), -1);
 }
