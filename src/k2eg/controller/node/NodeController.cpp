@@ -39,6 +39,7 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
     , processing_pool(std::make_shared<BS::light_thread_pool>())
     , metrics(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric())
     , system_metrics(ServiceResolver<IMetricService>::resolve()->getNodeControllerSystemMetric())
+    , epics_service_manager_shrd_ptr(ServiceResolver<EpicsServiceManager>::resolve())
 {
     // set logger
     logger = ServiceResolver<ILogger>::resolve();
@@ -50,7 +51,7 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
     // register worker for command type
     // Each command type gets its own worker instance as needed
     logger->logMessage("Configure command executor", LogLevel::INFO);
-    auto monitor_command_worker = std::make_shared<MonitorCommandWorker>(this->node_controller_configuration->monitor_command_configuration, ServiceResolver<EpicsServiceManager>::resolve(), node_configuration);
+    auto monitor_command_worker = std::make_shared<MonitorCommandWorker>(this->node_controller_configuration->monitor_command_configuration, epics_service_manager_shrd_ptr, node_configuration);
     if (!monitor_command_worker)
     {
         throw std::runtime_error("Failed to create SnapshotCommandWorker");
@@ -58,10 +59,10 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
     worker_resolver.registerObjectInstance(CommandType::monitor, monitor_command_worker);
     worker_resolver.registerObjectInstance(CommandType::multi_monitor, monitor_command_worker);
 
-    worker_resolver.registerObjectInstance(CommandType::get, std::make_shared<GetCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
-    worker_resolver.registerObjectInstance(CommandType::put, std::make_shared<PutCommandWorker>(ServiceResolver<EpicsServiceManager>::resolve()));
+    worker_resolver.registerObjectInstance(CommandType::get, std::make_shared<GetCommandWorker>(epics_service_manager_shrd_ptr));
+    worker_resolver.registerObjectInstance(CommandType::put, std::make_shared<PutCommandWorker>(epics_service_manager_shrd_ptr));
 
-    auto snapshotCommandWorker = std::make_shared<SnapshotCommandWorker>(this->node_controller_configuration->snapshot_command_configuration, ServiceResolver<EpicsServiceManager>::resolve());
+    auto snapshotCommandWorker = std::make_shared<SnapshotCommandWorker>(this->node_controller_configuration->snapshot_command_configuration, epics_service_manager_shrd_ptr);
     if (!snapshotCommandWorker)
     {
         throw std::runtime_error("Failed to create SnapshotCommandWorker");

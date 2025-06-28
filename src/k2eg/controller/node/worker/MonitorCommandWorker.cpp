@@ -330,13 +330,6 @@ void MonitorCommandWorker::manageReply(const std::int8_t error_code, const std::
 
 void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType event_received)
 {
-#ifdef __DEBUG__
-    logger->logMessage(STRING_FORMAT("Received epics monitor event count:\ndata: %1%\ncancel: %2%\ndisconnect: "
-                                     "%3%\nfail: %4%",
-                                     event_received->event_data->size() % event_received->event_cancel->size() %
-                                         event_received->event_disconnect->size() % event_received->event_fail->size()),
-                       LogLevel::TRACE);
-#endif
     // check fail to connect pv
     {
         std::shared_lock slock(channel_map_mtx);

@@ -19,7 +19,7 @@ namespace k2eg::controller::command::cmd {
 struct SnapshotCommand : public Command
 {
     // the list of PV to be monitored
-    std::vector<std::string> pv_name_list;
+    std::unordered_set<std::string> pv_name_list;
     // the time window to collect data
     std::int32_t time_window_msec;
 };
@@ -101,7 +101,7 @@ struct RepeatingSnapshotCommand : public Command
     // the name of the snapshot
     std::string snapshot_name;
     // the list of PV to be monitored
-    std::vector<std::string> pv_name_list;
+    std::unordered_set<std::string> pv_name_list;
     // the repeat delay after the last snapshot
     std::int32_t repeat_delay_msec;
     // the time window to collect data

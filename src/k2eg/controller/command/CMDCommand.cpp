@@ -159,14 +159,14 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
             const SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
             if (auto fields = checkFields(obj, {{KEY_PV_NAME_LIST, kind::array}}); fields != nullptr)
             {
-                std::vector<std::string> pv_name_list;
+                std::unordered_set<std::string> pv_name_list;
                 auto json_array = std::any_cast<boost::json::array>(fields->find(KEY_PV_NAME_LIST)->second);
                 // find all stirng in the vector
                 for (auto& element : json_array)
                 {
                     if (element.kind() != kind::string)
                         continue;
-                    pv_name_list.push_back(value_to<std::string>(element));
+                    pv_name_list.insert(value_to<std::string>(element));
                 }
                 if (pv_name_list.size())
                 {
@@ -255,7 +255,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
             const SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
             if (auto fields = checkFields(obj, {{KEY_PV_NAME_LIST, kind::array}, {KEY_REPLY_TOPIC, kind::string}, {KEY_REPLY_ID, kind::string}}); fields != nullptr)
             {
-                std::vector<std::string> pv_name_list;
+                std::unordered_set<std::string> pv_name_list;
 
                 const std::string        reply_id = check_for_reply_id(obj, logger);
                 const std::string        reply_topic = check_reply_topic(obj, logger);
@@ -266,7 +266,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 {
                     if (element.kind() != kind::string)
                         continue;
-                    pv_name_list.push_back(value_to<std::string>(element));
+                    pv_name_list.insert(value_to<std::string>(element));
                 }
 
                 if (pv_name_list.size())
@@ -296,7 +296,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
             const SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
             if (auto fields = checkFields(obj, {{KEY_PV_NAME_LIST, kind::array}, {KEY_REPLY_TOPIC, kind::string}, {KEY_REPLY_ID, kind::string}}); fields != nullptr)
             {
-                std::vector<std::string>            pv_name_list;
+                std::unordered_set<std::string>            pv_name_list;
                 std::unordered_set<std::string>     pv_field_filter_list;
                 const std::string        reply_id = check_for_reply_id(obj, logger);
                 const std::string        reply_topic = check_reply_topic(obj, logger);
@@ -313,7 +313,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 {
                     if (element.kind() != kind::string)
                         continue;
-                    pv_name_list.push_back(value_to<std::string>(element));
+                    pv_name_list.insert(value_to<std::string>(element));
                 }
                 for (auto& element : json_array_field_filter)
                 {

@@ -20,14 +20,14 @@ PrometheusEpicsMetric::PrometheusEpicsMetric()
                               .Name("k2eg_epics_ioc_operation_rate")
                               .Help("Metric set for all Operation Rate performed on the IOCs")
                               .Register(*registry))
-    , ioc_pv_count(BuildGauge().Name("k2eg_epics_ioc_pv_count").Help("Metric set for all pv counting information").Register(*registry))
-    , idle_counter_family(
-          BuildCounter().Name("k2eg_epics_thread_idle_cycles_total").Help("Total number of idle cycles per thread").Register(*registry))
+    , ioc_pv_gauge(BuildGauge().Name("k2eg_epics_ioc_pv_gauge").Help("The infromation about the epics PV managed").Register(*registry))
+    , idle_gauge_family(
+          BuildGauge().Name("k2eg_epics_thread_idle_cycles_total_gauge").Help("Total number of idle cycles per thread").Register(*registry))
     , event_counter_family(
-          BuildCounter().Name("k2eg_epics_thread_events_processed_total").Help("Total number of events processed per thread").Register(*registry))
-    , duration_counter_family(prometheus::BuildCounter()
-                                  .Name("k2eg_epics_thread_poll_duration_microseconds")
-                                  .Help("Total poll time in microseconds per thread")
+          BuildCounter().Name("k2eg_epics_thread_total_events_processed_gauge").Help("Total number of events processed per thread").Register(*registry))
+    , duration_gauge_family(prometheus::BuildGauge()
+                                  .Name("k2eg_epics_thread_poll_duration_microseconds_gauge")
+                                  .Help("Total poll time in microseconds per thread to wait for events")
                                   .Register(*registry))
     , throttle_gauge_family(BuildGauge().Name("k2eg_epics_thread_throttle_ms").Help("Current throttle delay per thread in ms").Register(*registry))
     , get_ok_counter(ioc_read_write.Add({{"op", "get"}}))
@@ -37,8 +37,8 @@ PrometheusEpicsMetric::PrometheusEpicsMetric()
     , monitor_event_fail(ioc_read_write.Add({{"op", "monitor"}, {"evt_type", "fail"}}))
     , monitor_event_cancel(ioc_read_write.Add({{"op", "monitor"}, {"evt_type", "cancel"}}))
     , monitor_event_disconnected(ioc_read_write.Add({{"op", "monitor"}, {"evt_type", "disconnect"}}))
-    , total_monitor_pv(ioc_pv_count.Add({{"type", "total"}}))
-    , active_monitor_pv(ioc_pv_count.Add({{"type", "active"}}))
+    , total_monitor_pv_gauge(ioc_pv_gauge.Add({{"type", "total"}}))
+    , active_monitor_pv_gauge(ioc_pv_gauge.Add({{"type", "active"}}))
     , run_rate_thread(true)
     , start_sample_ts(std::chrono::steady_clock::now())
     , rate_thread(&PrometheusEpicsMetric::calcRateThread, this)
@@ -84,13 +84,11 @@ void PrometheusEpicsMetric::incrementCounter(IEpicsMetricCounterType type, const
     case IEpicsMetricCounterType::MonitorCancel: monitor_event_cancel.Increment(inc_value); break;
     case IEpicsMetricCounterType::MonitorDisconnect: monitor_event_disconnected.Increment(inc_value); break;
     case IEpicsMetricCounterType::MonitorTimeout: break;
-    case IEpicsMetricCounterType::TotalMonitor: total_monitor_pv.Set(inc_value); break;
-    case IEpicsMetricCounterType::ActiveMonitor: active_monitor_pv.Set(inc_value); break;
-    case IEpicsMetricCounterType::ThrottlingIdleCounter: idle_counter_family.Add(label).Increment(inc_value); break;
+    case IEpicsMetricCounterType::TotalMonitorGauge: total_monitor_pv_gauge.Set(inc_value); break;
+    case IEpicsMetricCounterType::ActiveMonitorGauge: active_monitor_pv_gauge.Set(inc_value); break;
+    case IEpicsMetricCounterType::ThrottlingIdleGauge: idle_gauge_family.Add(label).Set(inc_value); break;
     case IEpicsMetricCounterType::ThrottlingEventCounter: event_counter_family.Add(label).Increment(inc_value); break;
-    case IEpicsMetricCounterType::ThrottlingDurationCounter:
-        duration_counter_family.Add(label).Increment(inc_value);
-        break;
+    case IEpicsMetricCounterType::ThrottlingDurationGauge: duration_gauge_family.Add(label).Set(inc_value); break;
     case IEpicsMetricCounterType::ThrottleGauge: throttle_gauge_family.Add(label).Set(inc_value); break;
     }
 }

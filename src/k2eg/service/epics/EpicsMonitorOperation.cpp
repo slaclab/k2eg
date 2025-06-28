@@ -31,7 +31,7 @@ size_t MonitorOperationImpl::poll(size_t element_to_fetch) const
     int fetched = 0;
     {
         std::lock_guard<std::mutex> l(ce_mtx);
-        while (!mon.complete() && (fetched < element_to_fetch))
+        while (!mon.complete()) // && (fetched < element_to_fetch)
         {
             if (!mon.poll())
                 break;

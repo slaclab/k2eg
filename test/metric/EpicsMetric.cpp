@@ -111,16 +111,16 @@ TEST(Metric, EpicsMetricMonitorCount) {
   ConstMetricConfigurationUPtr m_conf = MakeMetricConfigurationUPtr(MetricConfiguration{.tcp_port=port});
   EXPECT_NO_THROW(m_uptr = std::make_unique<PrometheusMetricService>(std::move(m_conf)));
   auto& e_metric_ref = m_uptr->getEpicsMetric();
-  e_metric_ref.incrementCounter(IEpicsMetricCounterType::TotalMonitor, 10);
-  e_metric_ref.incrementCounter(IEpicsMetricCounterType::ActiveMonitor, 5);
+  e_metric_ref.incrementCounter(IEpicsMetricCounterType::TotalMonitorGauge, 10);
+  e_metric_ref.incrementCounter(IEpicsMetricCounterType::ActiveMonitorGauge, 5);
   auto metrics_string = getUrl(METRIC_URL_FROM_PORT(port));
   ASSERT_NE(metrics_string.length(), 0);
-  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_count{type=\"total\"} 10"), -1);
-  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_count{type=\"active\"} 5"), -1);
-  e_metric_ref.incrementCounter(IEpicsMetricCounterType::TotalMonitor, 5);
-  e_metric_ref.incrementCounter(IEpicsMetricCounterType::ActiveMonitor, 4);
+  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_gauge{type=\"total\"} 10"), -1);
+  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_gauge{type=\"active\"} 5"), -1);
+  e_metric_ref.incrementCounter(IEpicsMetricCounterType::TotalMonitorGauge, 5);
+  e_metric_ref.incrementCounter(IEpicsMetricCounterType::ActiveMonitorGauge, 4);
   metrics_string = getUrl(METRIC_URL_FROM_PORT(port));
   ASSERT_NE(metrics_string.length(), 0);
-  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_count{type=\"total\"} 5"), -1);
-  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_count{type=\"active\"} 4"), -1);
+  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_gauge{type=\"total\"} 5"), -1);
+  ASSERT_NE(metrics_string.find("k2eg_epics_ioc_pv_gauge{type=\"active\"} 4"), -1);
 }

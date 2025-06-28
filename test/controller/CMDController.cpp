@@ -208,7 +208,7 @@ CMDControllerCommandHandler acquire_multi_pv_test_default_ser = [](ConstCommandS
   ASSERT_EQ(received_command[0]->type, CommandType::multi_monitor);
   ASSERT_EQ(received_command[0]->serialization, SerializationType::Msgpack); // the default serializaiton value
   // ASSERT_EQ(received_command[0]->protocol.compare("pva"), 0);
-  const std::vector<std::string>& pv_array = reinterpret_cast<const MultiMonitorCommand*>(received_command[0].get())->pv_name_list;
+  auto& pv_array = reinterpret_cast<const MultiMonitorCommand*>(received_command[0].get())->pv_name_list;
   ASSERT_NE(std::find(pv_array.begin(), pv_array.end(), "pva://channel::a"), pv_array.end());
   ASSERT_NE(std::find(pv_array.begin(), pv_array.end(), "pva://channel::b"), pv_array.end());
   ASSERT_EQ(reinterpret_cast<const MultiMonitorCommand*>(received_command[0].get())->reply_topic.compare("topic-dest"), 0);

@@ -29,7 +29,7 @@ tag_invoke(boost::json::value_from_tag, boost::json::value& jv, MonitorCommand c
 
 // automatic start monitor for multiple pv
 struct MultiMonitorCommand : public Command {
-  std::vector<std::string> pv_name_list;
+  std::unordered_set<std::string> pv_name_list;
 };
 DEFINE_PTR_TYPES(MultiMonitorCommand)
 static void

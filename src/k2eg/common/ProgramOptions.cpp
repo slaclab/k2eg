@@ -59,7 +59,8 @@ ProgramOptions::ProgramOptions() {
       (NC_MONITOR_EXPIRATION_TIMEOUT, po::value<int64_t>()->default_value(60 * 60), "Specify the amount of time with no consumer on a queue after which monitor can be stopped")
       (NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT, po::value<bool>()->default_value(true), "Specify when the a queue purged when the monitor that push data onto is stopped")
       (NC_MONITOR_CONSUMER_FILTEROUT_REGEX, po::value<std::vector<std::string>>()->multitoken(), "Specify regular expression to used to filter out consumer group from those used to calculate the number of active consumer of monitor queue")
-      (EPICS_MONITOR_THREAD_COUNT, po::value<std::int32_t>(), "Epics processing event thread count")
+      (EPICS_MONITOR_THREAD_COUNT, po::value<std::int32_t>()->default_value(1), "Epics monitor pv processing thread count")
+      (EPICS_MONITOR_CHANNEL_POLL_MAX, po::value<std::int32_t>()->default_value(100), "Epics processing pv monitor queue max events to fetch per poll")
       (CONFIGURATION_SERVICE_HOST, po::value<std::string>(), "Configuration server hostname")
       (CONFIGURATION_SERVICE_PORT, po::value<short>(), "Configuration server port")
       (CONFIGURATION_SERVICE_RESET_ON_START, po::value<bool>(), "Reset the node at startup, as a new node")
@@ -222,7 +223,8 @@ ConstEpicsServiceManagerConfigUPtr
 ProgramOptions::getEpicsManagerConfiguration() {
   return std::make_unique<const EpicsServiceManagerConfig>(
       EpicsServiceManagerConfig{
-          .thread_count = GET_OPTION(EPICS_MONITOR_THREAD_COUNT, std::int32_t, 1)});
+          .thread_count = GET_OPTION_NO_DEF(EPICS_MONITOR_THREAD_COUNT, std::int32_t),
+          .max_event_from_monitor_queue = GET_OPTION_NO_DEF(EPICS_MONITOR_CHANNEL_POLL_MAX, std::int32_t)});
 }
 
 ConstConfigurationServceiConfigUPtr

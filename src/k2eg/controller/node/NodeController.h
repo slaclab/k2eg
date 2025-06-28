@@ -61,7 +61,7 @@ class NodeController
     /// Logger instance for logging events and errors.
     k2eg::service::log::ILoggerShrdPtr logger;
     /// Manages EPICS service instances.
-    k2eg::service::epics_impl::EpicsServiceManager epics_service_manager;
+    k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager_shrd_ptr;
     /// Reference to the node controller metric service.
     k2eg::service::metric::INodeControllerMetric& metrics;
     /// Reference to the node controller system metric service.
