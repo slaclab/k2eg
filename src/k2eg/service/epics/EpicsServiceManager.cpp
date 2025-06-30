@@ -351,9 +351,9 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
                 auto received_event = monitor_op->getEventData();
                 had_events = true;
                 // check if the channel is active or not
-                info->active = received_event->event_data->empty() &&
-                               (!received_event->event_cancel->empty() || !received_event->event_disconnect->empty() ||
-                                !received_event->event_fail->empty());
+                info->active = !received_event->event_data->empty() &&
+                               (received_event->event_cancel->empty() || received_event->event_disconnect->empty() ||
+                                received_event->event_fail->empty());
                 metric.incrementCounter(IEpicsMetricCounterType::MonitorData, received_event->event_data->size());
                 metric.incrementCounter(IEpicsMetricCounterType::MonitorCancel, received_event->event_cancel->size());
                 metric.incrementCounter(IEpicsMetricCounterType::MonitorDisconnect, received_event->event_disconnect->size());
