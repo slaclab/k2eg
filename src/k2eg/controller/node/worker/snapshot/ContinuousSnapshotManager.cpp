@@ -439,7 +439,7 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                             // RAII guard automatically handles acquisition and release
                             IterationGuard guard(*iteration_sync_, s_op_ptr->cmd->snapshot_name);
 
-                            s_op_ptr->snapshot_iteration_index = guard.getIterationIndex();
+                            s_op_ptr->snapshot_iteration_index = guard.getIterationId();
 
                             // Create task with the iteration ID from the guard
                             SnapshotSubmissionTask task(s_op_ptr, submission_shard_ptr, this->publisher, this->logger);
