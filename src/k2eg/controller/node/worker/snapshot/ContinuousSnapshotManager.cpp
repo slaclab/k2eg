@@ -437,9 +437,9 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                         [this, s_op_ptr, submission_shard_ptr]() mutable
                         {
                             // RAII guard automatically handles acquisition and release
-                            IterationGuard guard(*iteration_sync_, s_op_ptr->cmd->snapshot_name);
+                            //IterationGuard guard(*iteration_sync_, s_op_ptr->cmd->snapshot_name);
 
-                            s_op_ptr->snapshot_iteration_index = guard.getIterationId();
+                            //s_op_ptr->snapshot_iteration_index = guard.getIterationId();
 
                             // Create task with the iteration ID from the guard
                             SnapshotSubmissionTask task(s_op_ptr, submission_shard_ptr, this->publisher, this->logger);
@@ -498,7 +498,7 @@ void SnapshotSubmissionTask::operator()()
     {
 
         // increment the iteration index
-        // snapshot_command_info->snapshot_iteration_index++;
+        snapshot_command_info->snapshot_iteration_index++;
         logger->logMessage(STRING_FORMAT("[Header] Snapshot %1% iteration %2% started",
                                          snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index),
                            LogLevel::DEBUG);
