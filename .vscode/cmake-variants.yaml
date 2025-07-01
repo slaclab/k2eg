@@ -30,6 +30,18 @@ useAsan:
       short: NoAsan
       settings: 
         ENABLE_ASAN: no
+useTsan:
+  default: NoTsan
+  description: "Address Sinitizer"
+  choices:
+    Asan:
+      short: Tsan
+      settings: 
+        ENABLE_TSAN: yes
+    NoAsan:
+      short: NoTsan
+      settings: 
+        ENABLE_TSAN: no
 useCoverage:
   default: NoCover
   description: "Code coverage"
