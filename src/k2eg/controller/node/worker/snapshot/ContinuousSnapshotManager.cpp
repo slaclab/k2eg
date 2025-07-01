@@ -67,6 +67,7 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnaptshotCon
     , epics_service_manager(epics_service_manager)
     , thread_pool(std::make_shared<BS::light_thread_pool>(repeating_snapshot_configuration.snapshot_processing_thread_count, set_snapshot_thread_name))
     , metrics(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric())
+    , iteration_sync_(std::make_unique<SnapshotIterationSynchronizer>())
 {
     // add epics manager monitor handler
     epics_handler_token = epics_service_manager->addHandler(std::bind(&ContinuousSnapshotManager::epicsMonitorEvent, this, std::placeholders::_1));
@@ -393,6 +394,9 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                     {
                         logger->logMessage(STRING_FORMAT("Snapshot %1% is stopped and will be removed from queue", queue_name), LogLevel::INFO);
 
+                        // Clean up synchronizer for this snapshot
+                        iteration_sync_->removeSnapshot(s_op_ptr->cmd->snapshot_name);
+
                         // Remove from pv_snapshot_map_
                         logger->logMessage(
                             STRING_FORMAT("Remove Snapshot %1% from all its pv snapshot map", s_op_ptr->cmd->snapshot_name), LogLevel::INFO);
@@ -432,8 +436,16 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                     thread_pool->detach_task(
                         [this, s_op_ptr, submission_shard_ptr]() mutable
                         {
+                            // RAII guard automatically handles acquisition and release
+                            IterationGuard guard(*iteration_sync_, s_op_ptr->cmd->snapshot_name);
+
+                            s_op_ptr->snapshot_iteration_index = guard.getIterationIndex();
+
+                            // Create task with the iteration ID from the guard
                             SnapshotSubmissionTask task(s_op_ptr, submission_shard_ptr, this->publisher, this->logger);
                             task();
+
+                            // Guard destructor automatically releases the iteration lock when task completes
                         });
                 }
                 if (it != snapshot_runinnig_.end())
@@ -486,7 +498,7 @@ void SnapshotSubmissionTask::operator()()
     {
 
         // increment the iteration index
-        snapshot_command_info->snapshot_iteration_index++;
+        // snapshot_command_info->snapshot_iteration_index++;
         logger->logMessage(STRING_FORMAT("[Header] Snapshot %1% iteration %2% started",
                                          snapshot_command_info->cmd->snapshot_name % snapshot_command_info->snapshot_iteration_index),
                            LogLevel::DEBUG);
@@ -548,4 +560,68 @@ void SnapshotSubmissionTask::operator()()
                                                             snapshot_command_info->cmd->snapshot_name, serialized_completion_message),
                                {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
     }
+}
+
+#pragma region snapshot iteration synchronization
+
+// Reserve an iteration number and wait if previous iteration is still in progress
+int64_t SnapshotIterationSynchronizer::acquireIteration(const std::string& snapshot_name)
+{
+    std::unique_lock<std::mutex> lock(iteration_mutex_);
+
+    // Initialize if first time
+    if (current_iteration_.find(snapshot_name) == current_iteration_.end())
+    {
+        current_iteration_[snapshot_name] = 0;
+        iteration_in_progress_[snapshot_name] = false;
+    }
+
+    // Wait until previous iteration completes
+    iteration_cv_[snapshot_name].wait(lock,
+                                      [&]()
+                                      {
+                                          return !iteration_in_progress_[snapshot_name].load();
+                                      });
+
+    // Reserve next iteration
+    uint64_t iteration = ++current_iteration_[snapshot_name];
+    iteration_in_progress_[snapshot_name] = true;
+
+    return iteration;
+}
+
+// Release the iteration, allowing next one to proceed
+void SnapshotIterationSynchronizer::releaseIteration(const std::string& snapshot_name)
+{
+    std::lock_guard<std::mutex> lock(iteration_mutex_);
+    iteration_in_progress_[snapshot_name] = false;
+    iteration_cv_[snapshot_name].notify_one();
+}
+
+// Clean up when snapshot is removed
+void SnapshotIterationSynchronizer::removeSnapshot(const std::string& snapshot_name)
+{
+    std::lock_guard<std::mutex> lock(iteration_mutex_);
+    current_iteration_.erase(snapshot_name);
+    iteration_in_progress_.erase(snapshot_name);
+    iteration_cv_.erase(snapshot_name);
+}
+
+#pragma regione Itreration Guard
+
+IterationGuard::IterationGuard(SnapshotIterationSynchronizer& sync, const std::string& snapshot_name)
+    : sync_(sync), snapshot_name_(snapshot_name), iteration_id_(0)
+{
+    iteration_id_ = sync_.acquireIteration(snapshot_name_);
+}
+
+IterationGuard::~IterationGuard()
+{
+    sync_.releaseIteration(snapshot_name_);
+    
+}
+
+int64_t IterationGuard::getIterationId() const
+{
+    return iteration_id_;
 }

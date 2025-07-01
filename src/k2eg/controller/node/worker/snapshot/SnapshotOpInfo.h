@@ -3,6 +3,7 @@
 
 #include "k2eg/common/types.h"
 #include "k2eg/service/epics/EpicsServiceManager.h"
+#include <atomic>
 #include <k2eg/service/epics/EpicsData.h>
 
 #include <k2eg/controller/node/worker/CommandWorker.h>
