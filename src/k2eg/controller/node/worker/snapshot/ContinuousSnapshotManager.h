@@ -256,6 +256,45 @@ public:
     void operator()();
 };
 
+class SnapshotIterationSynchronizer
+{
+private:
+    mutable std::mutex                                       iteration_mutex_;
+    std::unordered_map<std::string, std::atomic<int64_t>>    current_iteration_;
+    std::unordered_map<std::string, std::condition_variable> iteration_cv_;
+    std::unordered_map<std::string, std::atomic<bool>>       iteration_in_progress_;
+
+public:
+    // Reserve an iteration number and wait if previous iteration is still in progress
+    int64_t acquireIteration(const std::string& snapshot_name);
+
+    // Release the iteration, allowing next one to proceed
+    void releaseIteration(const std::string& snapshot_name);
+
+    // Clean up when snapshot is removed
+    void removeSnapshot(const std::string& snapshot_name);
+};
+
+// Add this RAII guard class at the top of the file after the includes
+class IterationGuard
+{
+public:
+    IterationGuard(SnapshotIterationSynchronizer& sync, const std::string& snapshot_name);
+
+    ~IterationGuard();
+
+    // Delete copy operations
+    IterationGuard(const IterationGuard&) = delete;
+    IterationGuard& operator=(const IterationGuard&) = delete;
+
+    int64_t getIterationId() const;
+
+private:
+    SnapshotIterationSynchronizer& sync_;
+    std::string                                     snapshot_name_;
+    int64_t                                         iteration_id_;
+};
+
 /*
 @brief ContinuousSnapshotManager is a class that manages the continuous snapshot of EPICS events.
 It provides a local cache for continuous snapshots and ensures thread-safe access to the cache.
@@ -302,8 +341,9 @@ class ContinuousSnapshotManager
     // Reference to node controller metrics for statistics collection
     k2eg::service::metric::INodeControllerMetric& metrics;
 
-    std::thread       expiration_thread;
-    std::atomic<bool> expiration_thread_running{false};
+    std::thread                                    expiration_thread;
+    std::atomic<bool>                              expiration_thread_running{false};
+    std::unique_ptr<SnapshotIterationSynchronizer> iteration_sync_;
 
     /**
      * @brief Callback for receiving EPICS monitor events.
