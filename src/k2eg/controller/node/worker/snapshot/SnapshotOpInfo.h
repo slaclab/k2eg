@@ -42,7 +42,7 @@ class SnapshotOpInfo;
 class SnapshotSubmission
 {
 public:
-    std::chrono::steady_clock::time_point                 snap_time;   // time point for the snapshot
+    std::chrono::steady_clock::time_point                 snap_time; // time point for the snapshot
     std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events;
     SnapshotSubmissionType                                submission_type;
 
@@ -89,11 +89,12 @@ protected:
     const epics::pvData::PVStructure::const_shared_pointer filterPVField(const epics::pvData::PVStructure::const_shared_pointer& src, const std::unordered_set<std::string>& fields_to_include);
 
 public:
+    std::promise<void> removal_promise;
     // Pointer to the repeating snapshot command associated with this operation
     k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd;
 
     // Index of the current snapshot iteration
-    std::int64_t snapshot_iteration_index = 0;
+    std::atomic<int64_t> snapshot_iteration_index = 0;
 
     // Name of the queue associated with this operation
     const std::string queue_name;

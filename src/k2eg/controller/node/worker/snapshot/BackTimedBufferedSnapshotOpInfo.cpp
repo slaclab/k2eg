@@ -71,17 +71,17 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout(const std::chrono::steady_clock:
     {
         // In timed mode, swap buffers on real timeout or every 100ms for fast processing.
         bool expired = SnapshotOpInfo::isTimeout(now);
-        bool force_100ms_expire = false;
+        bool force_fast_expire = false;
 
-        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_forced_expire).count() >= fast_expire_time_msec)
+        if (!expired && std::chrono::duration_cast<std::chrono::milliseconds>(now - last_forced_expire).count() >= fast_expire_time_msec)
         {
-            force_100ms_expire = true;
+            force_fast_expire = true;
         }
 
         // Memorize the real window expiration
         win_time_expired = expired;
 
-        if (expired || force_100ms_expire)
+        if (expired || force_fast_expire)
         {
             timeout = true;
             last_forced_expire = now;

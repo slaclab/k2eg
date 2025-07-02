@@ -242,57 +242,82 @@ using ShdAtomicCacheElementShrdPtr = std::shared_ptr<AtomicMonitorEventShrdPtr>;
 DEFINE_UOMAP_FOR_TYPE(std::string, std::shared_ptr<SnapshotOpInfo>, RunninSnapshotMap)
 using PVSnapshotMap = std::unordered_multimap<std::string, std::shared_ptr<SnapshotOpInfo>>;
 
-// class used to submit data to the publisher
-class SnapshotSubmissionTask
+struct IterationState
 {
-    std::shared_ptr<SnapshotOpInfo>          snapshot_command_info; // shared pointer to the snapshot operation info
-    SnapshotSubmissionShrdPtr                submission_shrd_ptr;
-    k2eg::service::pubsub::IPublisherShrdPtr publisher;
-    k2eg::service::log::ILoggerShrdPtr       logger;
-
-public:
-    SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, k2eg::service::pubsub::IPublisherShrdPtr publisher, k2eg::service::log::ILoggerShrdPtr logger);
-
-    void operator()();
+    std::atomic<int>  active_tasks{0};
+    std::atomic<bool> tail_processed{false};
 };
 
 class SnapshotIterationSynchronizer
 {
 private:
-    mutable std::mutex                                       iteration_mutex_;
-    std::unordered_map<std::string, std::atomic<int64_t>>    current_iteration_;
-    std::unordered_map<std::string, std::condition_variable> iteration_cv_;
-    std::unordered_map<std::string, std::atomic<bool>>       iteration_in_progress_;
+    mutable std::shared_mutex                                                     iteration_mutex_;
+    std::unordered_map<std::string, uint64_t>                                     current_iteration_;
+    std::unordered_map<std::string, std::atomic<bool>>                            iteration_in_progress_;
+    std::unordered_map<std::string, std::unique_ptr<std::condition_variable_any>> iteration_cv_;
+    std::unordered_map<std::string, std::unordered_map<uint64_t, std::shared_ptr<IterationState>>> iteration_states_;
+
+    // Private helper to release the lock and notify the next waiting iteration.
+    void releaseLock(const std::string& snapshot_name, uint64_t iteration_id_to_clear);
 
 public:
-    // Reserve an iteration number and wait if previous iteration is still in progress
+    // Default constructor and destructor.
+    SnapshotIterationSynchronizer() = default;
+
+    // Deleted copy constructor and assignment operator to prevent copying.
+    ~SnapshotIterationSynchronizer() = default;
+
+    // Reserve an iteration number and wait if the previous iteration is still in progress.
     int64_t acquireIteration(const std::string& snapshot_name);
 
-    // Release the iteration, allowing next one to proceed
-    void releaseIteration(const std::string& snapshot_name);
+    // A task calls this to announce it has started.
+    void startTask(const std::string& snapshot_name, uint64_t iteration_id);
 
-    // Clean up when snapshot is removed
+    // A task calls this to announce it has finished.
+    void finishTask(const std::string& snapshot_name, uint64_t iteration_id);
+
+    // The Tail task calls this to mark the logical end of the iteration.
+    void markTailProcessed(const std::string& snapshot_name, uint64_t iteration_id);
+
+    // Clean up when a snapshot is removed entirely.
     void removeSnapshot(const std::string& snapshot_name);
 };
 
-// Add this RAII guard class at the top of the file after the includes
-class IterationGuard
+// RAII helper to ensure startTask/finishTask are always paired for exception safety.
+class TaskGuard
 {
 public:
-    IterationGuard(SnapshotIterationSynchronizer& sync, const std::string& snapshot_name);
+    TaskGuard(SnapshotIterationSynchronizer& sync, const std::string& name, uint64_t id)
+        : sync_(sync), name_(name), id_(id)
+    {
+        sync_.startTask(name_, id_);
+    }
 
-    ~IterationGuard();
-
-    // Delete copy operations
-    IterationGuard(const IterationGuard&) = delete;
-    IterationGuard& operator=(const IterationGuard&) = delete;
-
-    int64_t getIterationId() const;
+    ~TaskGuard()
+    {
+        sync_.finishTask(name_, id_);
+    }
 
 private:
     SnapshotIterationSynchronizer& sync_;
-    std::string                                     snapshot_name_;
-    int64_t                                         iteration_id_;
+    const std::string&             name_;
+    uint64_t                       id_;
+};
+
+// class used to submit data to the publisher
+class SnapshotSubmissionTask
+{
+    bool                                     last_submition = false; // flag to indicate if the task should close
+    std::shared_ptr<SnapshotOpInfo>          snapshot_command_info; // shared pointer to the snapshot operation info
+    SnapshotSubmissionShrdPtr                submission_shrd_ptr;
+    k2eg::service::pubsub::IPublisherShrdPtr publisher;
+    k2eg::service::log::ILoggerShrdPtr       logger;
+    SnapshotIterationSynchronizer&           iteration_sync_;
+
+public:
+    SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, k2eg::service::pubsub::IPublisherShrdPtr publisher, k2eg::service::log::ILoggerShrdPtr logger, SnapshotIterationSynchronizer& iteration_sync, bool last_submition = false);
+
+    void operator()();
 };
 
 /*

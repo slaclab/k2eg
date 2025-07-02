@@ -38,6 +38,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
 set(CMAKE_BINARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)
 set(SQLITE_INCLUDE ${CMAKE_INSTALL_PREFIX}/include)
 
+
 # ----------------------------------------------------
 # Suppress deprecated-declarations warnings (e.g. from Boost)
 # ----------------------------------------------------
@@ -57,6 +58,15 @@ if(${ENABLE_ASAN})
   set (CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=address -static-libasan")
 else()
   message(STATUS "Disable address sanitizer")
+endif()
+
+option(ENABLE_TSAN "Enable thread sanitizer" OFF)
+if(${ENABLE_TSAN})
+  message(STATUS "Enable thread sanitizer")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=thread")
+  set (CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=thread")
+  # Disable ASan if both are set
+  set(ENABLE_ASAN OFF)
 endif()
 
 configure_file(k2eg.h.in ../src/k2eg/config.h)

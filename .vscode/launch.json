@@ -15,7 +15,7 @@
                 "--nc-monitor-consumer-filterout-regex=.*k2eg.*",
                 "--log-on-console",
                 "--cmd-input-topic=cmd-topic-in",
-                "--log-level=trace",
+                "--log-level=debug",
                 "--sub-server-address=kafka:9092",
                 "--pub-server-address=kafka:9092",
                 "--scheduler-check-delay-seconds=5",
@@ -29,6 +29,7 @@
                 // "--pub-impl-kv=queue.buffering.max.ms:1",
                 "--sub-impl-kv=session.timeout.ms:6000",
                 "--sub-impl-kv=max.poll.interval.ms:10000",
+                "--snapshot-repeating-scheduler-thread=2"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
