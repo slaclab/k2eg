@@ -20,7 +20,7 @@
 using namespace k2eg::common;
 
 using namespace k2eg::service;
-;
+
 using namespace k2eg::service::log;
 using namespace k2eg::service::scheduler;
 using namespace k2eg::service::epics_impl;
@@ -32,15 +32,18 @@ using namespace k2eg::service::metric;
 
 void set_thread_name(const std::size_t idx)
 {
-    const std::string name = "EPICS Monitor " + std::to_string(idx);
-    const bool        result = BS::this_thread::set_os_thread_name(name);
+    // Use a local variable, not static/global
+    std::ostringstream oss;
+    oss << "Epics Service Monitor " << idx;
+    const std::string name = oss.str();
+    BS::this_thread::set_os_thread_name(name);
 }
-
+inline auto thread_namer = [](unsigned long idx) { set_thread_name(idx); };
 EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config)
     : config(std::move(config))
     , end_processing(false)
     , thread_throttling_vector(this->config->thread_count)
-    , processing_pool(std::make_shared<BS::light_thread_pool>(this->config->thread_count, set_thread_name))
+    , processing_pool(std::make_shared<BS::light_thread_pool>(this->config->thread_count, thread_namer))
     , metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric())
 {
     logger = ServiceResolver<ILogger>::resolve();

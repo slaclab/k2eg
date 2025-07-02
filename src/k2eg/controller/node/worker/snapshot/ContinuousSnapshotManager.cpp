@@ -43,8 +43,11 @@ using namespace k2eg::service::epics_impl;
 
 void set_snapshot_thread_name(const std::size_t idx)
 {
-    const std::string name = "Repeating Snapshot " + std::to_string(idx);
-    const bool        result = BS::this_thread::set_os_thread_name(name);
+    // Use a local variable, not static/global
+    std::ostringstream oss;
+    oss << "Repeating Snapshot " << idx;
+    const std::string name = oss.str();
+    BS::this_thread::set_os_thread_name(name);
 }
 
 std::string get_pv_names(std::set<std::string> name_set)
@@ -61,12 +64,17 @@ std::string get_pv_names(std::set<std::string> name_set)
     return all_pv_names;
 }
 
+inline auto thread_namer = [](unsigned long idx)
+{
+    set_snapshot_thread_name(idx);
+};
+
 ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnaptshotConfiguration& repeating_snapshot_configuration, k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager)
     : repeating_snapshot_configuration(repeating_snapshot_configuration)
     , logger(ServiceResolver<ILogger>::resolve())
     , publisher(ServiceResolver<IPublisher>::resolve())
     , epics_service_manager(epics_service_manager)
-    , thread_pool(std::make_shared<BS::light_thread_pool>(repeating_snapshot_configuration.snapshot_processing_thread_count, set_snapshot_thread_name))
+    , thread_pool(std::make_shared<BS::light_thread_pool>(repeating_snapshot_configuration.snapshot_processing_thread_count, thread_namer))
     , metrics(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric())
     , iteration_sync_(std::make_unique<SnapshotIterationSynchronizer>())
 {
@@ -80,6 +88,7 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnaptshotCon
     // start expiration checker
     expiration_thread_running = true;
     expiration_thread = std::thread(&ContinuousSnapshotManager::expirationCheckerLoop, this);
+    pthread_setname_np(expiration_thread.native_handle(), "SnapshotExpirationChecker");
 }
 
 ContinuousSnapshotManager::~ContinuousSnapshotManager()
@@ -397,14 +406,6 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
     std::vector<std::function<void()>> tasks_to_submit;
     tasks_to_submit.reserve(repeating_snapshot_configuration.snapshot_processing_thread_count);
 
-    struct RemovalJob
-    {
-        std::string        snapshot_name;
-        std::promise<void> promise;
-    };
-
-    std::vector<RemovalJob> snapshots_to_remove;
-
     while (expiration_thread_running)
     {
         auto now = std::chrono::steady_clock::now();
@@ -418,13 +419,15 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                 // A snapshot needs processing if its timer has expired OR it has been manually stopped.
                 if (s_op_ptr && (s_op_ptr->isTimeout(now)))
                 {
+                    // --- CAPTURE DATA BEFORE ERASE ---
+                    std::string queue_name_copy = queue_name;
+                    auto        submission_shard_ptr = s_op_ptr->getData();
+                    bool        to_continue = false;
+                    bool        last_submission = false;
                     // If the snapshot is not running, it must be cleaned up.
                     if (!s_op_ptr->is_running)
                     {
-                        logger->logMessage(STRING_FORMAT("Snapshot %1% is stopped and will be removed from queue", queue_name), LogLevel::INFO);
-
-                        // Schedule the synchronizer state for deferred removal.
-                        snapshots_to_remove.emplace_back(s_op_ptr->cmd->snapshot_name, std::move(s_op_ptr->removal_promise));
+                        logger->logMessage(STRING_FORMAT("Snapshot %1% is stopped and will be removed from queue", queue_name_copy), LogLevel::INFO);
 
                         // Remove from pv_snapshot_map_
                         for (auto& pv_uri : s_op_ptr->cmd->pv_name_list)
@@ -443,45 +446,32 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                         }
                         // Now erase the snapshot and advance the iterator correctly.
                         it = snapshot_runinnig_.erase(it);
-                        logger->logMessage(STRING_FORMAT("Snapshot %1% is cancelled", queue_name), LogLevel::INFO);
+                        logger->logMessage(STRING_FORMAT("Snapshot %1% is cancelled", queue_name_copy), LogLevel::INFO);
+                        last_submission = to_continue = true; // exit this iteration, do not increment iterator
                     }
-
-                    // also if the snapshot has been removed forward the last data and close the snapshot to the client
-                    // print log with submisison information
-                    auto submission_shard_ptr = s_op_ptr->getData();
+                    // also if the snapshot has been removed forward the last data and close the snapshot to the
+                    // client print log with submisison information
                     if ((submission_shard_ptr->submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None)
                     {
                         metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotEventCounter,
                                                  submission_shard_ptr->snapshot_events.size());
                     }
-                    tasks_to_submit.emplace_back(
-                        [this, s_op_ptr, submission_shard_ptr]() mutable
+                    thread_pool->detach_task(
+                        [this, s_op_ptr, submission_shard_ptr, last_submission]() mutable
                         {
-                            SnapshotSubmissionTask task(s_op_ptr, submission_shard_ptr, this->publisher, this->logger, *this->iteration_sync_);
+                            SnapshotSubmissionTask task(s_op_ptr, submission_shard_ptr, this->publisher, this->logger, *this->iteration_sync_, last_submission);
                             task();
                         });
+                    if (to_continue)
+                    {
+                        continue; // Skip the increment, as we already erased the current item.
+                    }
                 }
-                else if (s_op_ptr->is_running)
-                {
-                    ++it; // Move to the next snapshot in the map.
-                }
+
+                // Only increment if not erased
+                ++it;
             }
         } // The lock on snapshot_runinnig_mutex_ is released here.
-
-        // Perform the deferred removal of snapshot synchronization state.
-        for (auto& job : snapshots_to_remove)
-        {
-            iteration_sync_->removeSnapshot(job.snapshot_name);
-            job.promise.set_value();
-        }
-        snapshots_to_remove.clear();
-
-        // Now, submit all collected tasks to the thread pool without holding any locks.
-        for (auto& task : tasks_to_submit)
-        {
-            thread_pool->detach_task(std::move(task));
-        }
-        tasks_to_submit.clear();
 
         // Sleep OUTSIDE the lock
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -506,8 +496,8 @@ void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const 
 
 #pragma region Submission Task
 
-SnapshotSubmissionTask::SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, IPublisherShrdPtr publisher, ILoggerShrdPtr logger, SnapshotIterationSynchronizer& iteration_sync)
-    : snapshot_command_info(snapshot_command_info), submission_shrd_ptr(submission_shrd_ptr), publisher(std::move(publisher)), logger(std::move(logger)), iteration_sync_(iteration_sync)
+SnapshotSubmissionTask::SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, IPublisherShrdPtr publisher, ILoggerShrdPtr logger, SnapshotIterationSynchronizer& iteration_sync, bool last_submition)
+    : snapshot_command_info(snapshot_command_info), submission_shrd_ptr(submission_shrd_ptr), publisher(std::move(publisher)), logger(std::move(logger)), iteration_sync_(iteration_sync), last_submition(last_submition)
 {
 }
 
@@ -592,6 +582,12 @@ void SnapshotSubmissionTask::operator()()
         // Mark the tail as processed. The lock will be released by finishTask either now (if this is the last task)
         // or later when the last running Data task calls its TaskGuard destructor.
         iteration_sync_.markTailProcessed(snapshot_command_info->cmd->snapshot_name, current_iteration);
+
+        if (last_submition)
+        {
+            iteration_sync_.removeSnapshot(snapshot_command_info->cmd->snapshot_name);
+            snapshot_command_info->removal_promise.set_value(); // Notify that the snapshot is fully removed.
+        }
     }
 }
 
@@ -710,9 +706,19 @@ void SnapshotIterationSynchronizer::releaseLock(const std::string& snapshot_name
 // Clean up when a snapshot is removed entirely.
 void SnapshotIterationSynchronizer::removeSnapshot(const std::string& snapshot_name)
 {
-    std::lock_guard<std::shared_mutex> lock(iteration_mutex_);
-    current_iteration_.erase(snapshot_name);
-    iteration_in_progress_.erase(snapshot_name);
-    iteration_cv_.erase(snapshot_name);
-    iteration_states_.erase(snapshot_name);
+    {
+        std::lock_guard<std::shared_mutex> lk(iteration_mutex_);
+        if (auto it = iteration_cv_.find(snapshot_name); it != iteration_cv_.end())
+            it->second->notify_all(); // wake any waiter
+    }
+
+    std::this_thread::yield(); // give woken threads a chance to run
+
+    {
+        std::lock_guard<std::shared_mutex> lk(iteration_mutex_);
+        current_iteration_.erase(snapshot_name);
+        iteration_in_progress_.erase(snapshot_name);
+        iteration_cv_.erase(snapshot_name); // now nobody can be waiting on it
+        iteration_states_.erase(snapshot_name);
+    }
 }
