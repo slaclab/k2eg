@@ -30,6 +30,7 @@ set(ZLIB_VERSION v1.2.13)
 set(PROMETHEUS_VERSION v1.3.0)
 SET(CRONCPP_VERSION v2023.03.30)
 SET(OATPP_VERSION 1.3.0)
+set(MONGOCXX_VERSION r4.1.1)
 set(GTEST_VERSION 1.8.0)
 
 set(CMAKE_BINARY_DIR ${CMAKE_INSTALL_PREFIX}/bin)
@@ -84,6 +85,9 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/data/DataStorage.cpp
   src/k2eg/service/data/repository/ChannelRepository.cpp
 
+  src/k2eg/service/storage/impl/MongoDBStorageService.cpp
+  src/k2eg/service/storage/StorageServiceFactory.cpp
+
   src/k2eg/service/epics/EpicsData.cpp
   src/k2eg/service/epics/PVStructureMerger.cpp
   src/k2eg/service/epics/EpicsChannel.cpp
@@ -129,10 +133,13 @@ set(COMMON_SOURCE_FILES
   src/k2eg/controller/node/worker/GetCommandWorker.cpp
   src/k2eg/controller/node/worker/PutCommandWorker.cpp
   src/k2eg/controller/node/worker/SnapshotCommandWorker.cpp
+  src/k2eg/controller/node/worker/StorageWorker.cpp
   src/k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.cpp
   src/k2eg/controller/node/worker/snapshot/SnapshotOpInfo.cpp
   src/k2eg/controller/node/worker/snapshot/SnapshotRepeatingOpInfo.cpp
   src/k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.cpp
+
+  src/k2eg/controller/node/archiver/ArchiverWorker.cpp
 )
 
 set(SOURCE_FILES
@@ -579,6 +586,43 @@ TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/i
 TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC  ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION})
 TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC  ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION})
 SET(BUILD_LIBRARY ${BUILD_LIBRARY} oatpp-consul oatpp-curl oatpp)
+
+
+# ----------------------------------------------------
+# Configure MongoDB CXX driver dependencies
+# ----------------------------------------------------
+MESSAGE(STATUS "Configure MongoDB CXX driver version ${MONGOCXX_VERSION}")
+ExternalProject_Add(
+  mongo-cxx-driver
+  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/mongo-cxx-driver
+  GIT_REPOSITORY https://github.com/mongodb/mongo-cxx-driver.git
+  GIT_TAG ${MONGOCXX_VERSION}
+  GIT_PROGRESS 1
+  LOG_DOWNLOAD 1
+  LOG_UPDATE 1
+  LOG_CONFIGURE 1
+  LOG_BUILD 1
+  LOG_INSTALL 1
+  CMAKE_ARGS
+    -DCMAKE_BUILD_TYPE=Release
+    -DBUILD_SHARED_LIBS=ON
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+    -DCMAKE_PREFIX_PATH=${CMAKE_INSTALL_PREFIX}
+    -DENABLE_TESTS=OFF
+    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+    -DCMAKE_CXX_STANDARD=17
+)
+
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/bsoncxx/v_noabi)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/mongocxx/v_noabi)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/bsoncxx/v_noabi)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/mongocxx/v_noabi)
+
+
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} mongocxx bsoncxx)
+ADD_DEPENDENCIES(${PROJECT_NAME} mongo-cxx-driver)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test mongo-cxx-driver)
 
 # ----------------------------------------------------
 # Configure Google Test dependencies

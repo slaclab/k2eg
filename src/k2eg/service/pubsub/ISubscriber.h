@@ -58,7 +58,7 @@ public:
      */
     virtual int getMsg(SubscriberInterfaceElementVector& dataVector, unsigned int m_num, unsigned int timeo = 10) = 0;
 };
-
+DEFINE_PTR_TYPES(ISubscriber)
 } // namespace k2eg::service::pubsub
 
 #endif
