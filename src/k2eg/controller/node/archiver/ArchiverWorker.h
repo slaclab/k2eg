@@ -6,7 +6,7 @@
 #include <k2eg/service/configuration/INodeConfiguration.h>
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/common/types.h>
-#include <memory>
+
 #include <vector>
 #include <atomic>
 #include <thread>
@@ -17,8 +17,8 @@ namespace k2eg::controller::node::archiver {
  * @brief Configuration for archiver worker
  */
 struct ArchiverConfiguration {
-    k2eg::controller::node::worker::StorageWorkerConfiguration storage_config;
-    std::string storage_backend_type = "mongodb"; // "mongodb", "sqlite", etc.
+    std::string consumer_group_id = "k2eg-archiver"; // Consumer group ID for Kafka
+    size_t worker_thread_count = 4; // Number of threads for storage workers
     std::chrono::seconds topic_discovery_interval = std::chrono::seconds(30);
     bool auto_discover_topics = true;
     std::string topic_pattern = "epics.*"; // Regex pattern for topic discovery

@@ -1,8 +1,8 @@
 #ifndef __PROGRAMOPTIONS_H__
 #define __PROGRAMOPTIONS_H__
 
-#include <k2eg/controller/node/NodeController.h>
 #include <boost/program_options.hpp>
+#include <k2eg/controller/node/NodeController.h>
 
 #include <k2eg/common/types.h>
 #include <k2eg/controller/command/CMDController.h>
@@ -13,6 +13,7 @@
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/pubsub/ISubscriber.h>
 #include <k2eg/service/scheduler/Scheduler.h>
+#include <k2eg/service/storage/StorageServiceFactory.h>
 
 namespace po = boost::program_options;
 
@@ -98,6 +99,7 @@ namespace common {
         k2eg::service::scheduler::ConstSchedulerConfigurationUPtr         getSchedulerConfiguration();
         k2eg::service::epics_impl::ConstEpicsServiceManagerConfigUPtr     getEpicsManagerConfiguration();
         k2eg::service::configuration::ConstConfigurationServceiConfigUPtr getConfigurationServiceConfiguration();
+        k2eg::service::storage::StorageServiceConfigurationShrdPtr        getStorageServiceConfiguration();
         const std::string                                                 getStoragePath();
         bool                                                              optionConfigure(const std::string& name);
 

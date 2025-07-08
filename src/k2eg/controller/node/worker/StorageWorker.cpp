@@ -3,7 +3,7 @@
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/worker/StorageWorker.h>
 #include <k2eg/service/ServiceResolver.h>
-#include <sstream>
+
 
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::service;
@@ -41,12 +41,6 @@ bool StorageWorker::start()
     if (running_.load())
     {
         logger->logMessage("StorageWorker is already running", LogLevel::INFO);
-        return false;
-    }
-
-    if (!storage_service_->initialize())
-    {
-        logger->logMessage("Failed to initialize storage service", LogLevel::ERROR);
         return false;
     }
 
@@ -96,9 +90,6 @@ void StorageWorker::stop()
 
     // Flush any remaining batch
     flushBatch();
-
-    // Shutdown storage service
-    storage_service_->shutdown();
 
     running_.store(false);
     logger->logMessage("StorageWorker stopped successfully", LogLevel::INFO);

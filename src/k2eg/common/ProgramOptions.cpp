@@ -10,32 +10,34 @@
 #include <ostream>
 #include <string>
 
-#include "k2eg/controller/node/NodeController.h"
-#include "k2eg/controller/node/worker/MonitorCommandWorker.h"
-#include "k2eg/controller/node/worker/monitor/MonitorChecker.h"
-#include "k2eg/service/epics/EpicsServiceManager.h"
-#include "k2eg/service/metric/IMetricService.h"
-#include "k2eg/service/scheduler/Scheduler.h"
+#include <k2eg/controller/node/NodeController.h>
+#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
+#include <k2eg/controller/node/worker/monitor/MonitorChecker.h>
+#include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/scheduler/Scheduler.h>
+
 
 using namespace k2eg::common;
+
 using namespace k2eg::service::log;
 using namespace k2eg::controller::command;
 using namespace k2eg::controller::node;
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::node::worker::snapshot;
 using namespace k2eg::controller::node::worker::monitor;
+
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::metric;
 using namespace k2eg::service::scheduler;
 using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::configuration;
+using namespace k2eg::service::storage;
 
 namespace po = boost::program_options;
 namespace fs = std::filesystem;
 
 const std::string DEFAULT_CRON_STRING = "* * * * * *"; // every seconds
-const static std::map<std::string, NodeType> type_map = {
-    {"gateway", NodeType::GATEWAY}, {"storage", NodeType::STORAGE}};
 
 // clang-format off
 ProgramOptions::ProgramOptions() {
@@ -77,10 +79,12 @@ ProgramOptions::ProgramOptions() {
       (SNAPSHOT_REPEATING_SCHEDULER_THREAD, po::value<std::size_t>()->default_value(1), "The number of thread used to process the repeating snapshot command")
       (METRIC_ENABLE, po::value<bool>()->default_value(false), "Enable metric management")
       (METRIC_HTTP_PORT, po::value<unsigned int>()->default_value(8080), "The port used for publish the http metric server");
+
+  // add configuration for storage factory
+  StorageServiceFactory::addConfigurations(options);
 }
 
 // clang-format on
-
 void ProgramOptions::parse(int argc, const char *argv[]) {
   try {
     po::store(po::command_line_parser(argc, argv)
@@ -234,6 +238,11 @@ ProgramOptions::getConfigurationServiceConfiguration() {
           .config_server_host = GET_OPTION(CONFIGURATION_SERVICE_HOST, std::string, "localhost"),
           .config_server_port = GET_OPTION(CONFIGURATION_SERVICE_PORT, short, static_cast<short>(8500)),
           .reset_on_start = GET_OPTION(CONFIGURATION_SERVICE_RESET_ON_START, bool, false)});
+}
+
+StorageServiceConfigurationShrdPtr        
+ProgramOptions::getStorageServiceConfiguration() {
+  return StorageServiceFactory::getConfigurations(vm);
 }
 
 const std::string ProgramOptions::getStoragePath() {

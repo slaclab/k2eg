@@ -1,13 +1,19 @@
 #ifndef K2EG_SERVICE_STORAGE_IMPL_MONGODBSTORAGESERVICE_H_
 #define K2EG_SERVICE_STORAGE_IMPL_MONGODBSTORAGESERVICE_H_
 
-#include "k2eg/service/log/ILogger.h"
+
+#include <k2eg/common/types.h>
+#include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/storage/IStorageService.h>
+
 #include <mongocxx/client.hpp>
 #include <mongocxx/database.hpp>
 #include <mongocxx/collection.hpp>
 #include <mongocxx/instance.hpp>
 #include <mongocxx/pool.hpp>
+
+#include <boost/program_options.hpp>
+
 #include <memory>
 #include <string>
 #include <mutex>
@@ -17,7 +23,7 @@ namespace k2eg::service::storage::impl {
 /**
  * @brief Configuration for MongoDB storage service
  */
-struct MongoDBStorageConfiguration {
+struct MongoDBStorageImplementationConfig : public StorageImplementationConfig {
     std::string connection_string = "mongodb://localhost:27017";
     std::string database_name = "k2eg_archive";
     std::string collection_name = "epics_data";
@@ -25,7 +31,13 @@ struct MongoDBStorageConfiguration {
     size_t connection_pool_size = 10;
     size_t batch_size = 1000;
     bool create_indexes = true;
+    int timeout_ms = 5000;
 };
+DEFINE_PTR_TYPES(MongoDBStorageImplementationConfig);
+
+void fill_mongodb_program_option(boost::program_options::options_description& desc);
+ConstStorageImplementationConfigShrdPtr get_mongodb_program_option(const boost::program_options::variables_map& vm);
+
 
 /**
  * @brief MongoDB implementation of the storage service
@@ -37,7 +49,7 @@ class MongoDBStorageService : public IStorageService {
 private:
     log::ILoggerShrdPtr logger;    
 
-    MongoDBStorageConfiguration config_;
+    ConstMongoDBStorageImplementationConfigShrdPtr config_;
     std::unique_ptr<mongocxx::instance> instance_;
     std::unique_ptr<mongocxx::pool> pool_;
     mutable std::mutex stats_mutex_;
@@ -45,7 +57,6 @@ private:
     // Statistics
     size_t stored_records_count_ = 0;
     size_t failed_operations_count_ = 0;
-    std::chrono::system_clock::time_point last_operation_time_;
 
     /**
      * @brief Create necessary indexes for optimal query performance
@@ -63,8 +74,8 @@ private:
     ArchiveRecord bsonToRecord(const bsoncxx::document::view& doc);
 
 public:
-    explicit MongoDBStorageService(const MongoDBStorageConfiguration& config);
-    ~MongoDBStorageService() override = default;
+    explicit MongoDBStorageService(ConstStorageImplementationConfigShrdPtr config);
+    virtual ~MongoDBStorageService() override;
 
     // IStorageService interface
     bool initialize() override;
@@ -72,8 +83,6 @@ public:
     bool store(const ArchiveRecord& record) override;
     size_t storeBatch(const std::vector<ArchiveRecord>& records) override;
     ArchiveQueryResult query(const ArchiveQuery& query) override;
-    std::optional<ArchiveRecord> getLatest(const std::string& pv_name) override;
-    std::string getStatistics() override;
     bool isHealthy() override;
 };
 

@@ -2,13 +2,16 @@
 #define K2EG_SERVICE_STORAGE_ISTORAGESERVICE_H_
 
 #include <k2eg/common/types.h>
-#include <memory>
+
 #include <string>
 #include <vector>
 #include <chrono>
 #include <optional>
 
 namespace k2eg::service::storage {
+
+struct StorageImplementationConfig {};
+DEFINE_PTR_TYPES(StorageImplementationConfig);
 
 /**
  * @brief Data structure for storing archived EPICS data
@@ -83,19 +86,6 @@ public:
      * @return Query result with matching records
      */
     virtual ArchiveQueryResult query(const ArchiveQuery& query) = 0;
-
-    /**
-     * @brief Get the latest record for a specific PV
-     * @param pv_name The PV name
-     * @return Optional record if found
-     */
-    virtual std::optional<ArchiveRecord> getLatest(const std::string& pv_name) = 0;
-
-    /**
-     * @brief Get storage statistics
-     * @return JSON string with storage statistics
-     */
-    virtual std::string getStatistics() = 0;
 
     /**
      * @brief Check if the storage service is healthy
