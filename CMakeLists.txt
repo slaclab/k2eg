@@ -86,6 +86,7 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/data/repository/ChannelRepository.cpp
 
   src/k2eg/service/storage/impl/MongoDBStorageService.cpp
+  src/k2eg/service/storage/impl/MsgpackToBsonConverter.cpp
   src/k2eg/service/storage/StorageServiceFactory.cpp
 
   src/k2eg/service/epics/EpicsData.cpp
@@ -189,6 +190,7 @@ set(TEST_SOURCE_FILES
   test/metric/NodeControllerSystemMetric.cpp
   test/scheduler/Scheduler.cpp
   test/configuration/ConsulConfigurationTest.cpp
+  test/storage/mongodb/MsgpackToJsonConverter.cpp
   ${COMMON_SOURCE_FILES}
 )
 

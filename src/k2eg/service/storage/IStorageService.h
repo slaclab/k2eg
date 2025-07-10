@@ -3,55 +3,88 @@
 
 #include <k2eg/common/types.h>
 
-#include <string>
-#include <vector>
 #include <chrono>
 #include <optional>
+#include <string>
+#include <vector>
 
 namespace k2eg::service::storage {
 
-struct StorageImplementationConfig {};
+struct StorageImplementationConfig
+{
+};
+
 DEFINE_PTR_TYPES(StorageImplementationConfig);
+
+/**
+ * @brief Enum representing the processing state of an archive record
+ */
+enum class ProcessingState
+{
+    RAW_STORED,        // Only raw data stored
+    ENRICHMENT_QUEUED, // Enrichment task queued
+    ENRICHED,          // Metadata extracted and stored
+    ENRICHMENT_FAILED  // Enrichment failed, raw data still available
+};
+
+/**
+ * @brief Simplified archive record for raw storage
+ */
+struct RawMsgPackRecord
+{
+    std::string                           pv_name;
+    std::string                           topic;
+    std::chrono::system_clock::time_point timestamp;
+    std::vector<uint8_t>                  msgpack_data; // Raw msgpack payload
+    uint64_t                              message_id;
+    ProcessingState                                      processing_state = ProcessingState::RAW_STORED;
+    std::chrono::system_clock::time_point                created_at;
+    std::optional<std::chrono::system_clock::time_point> enriched_at;
+};
 
 /**
  * @brief Data structure for storing archived EPICS data
  */
-struct ArchiveRecord {
-    std::string pv_name;
-    std::string topic;
+struct ArchiveRecord
+{
+    std::string                           pv_name;
+    std::string                           topic;
     std::chrono::system_clock::time_point timestamp;
-    std::vector<uint8_t> data;
-    std::string metadata; // JSON metadata
-    uint64_t message_id;
+    std::vector<uint8_t>                  data;
+    std::string                           metadata; // JSON metadata
+    uint64_t                              message_id;
 };
 
 /**
  * @brief Query parameters for retrieving archived data
  */
-struct ArchiveQuery {
-    std::string pv_name;
+struct ArchiveQuery
+{
+    std::string                                          pv_name;
     std::optional<std::chrono::system_clock::time_point> start_time;
     std::optional<std::chrono::system_clock::time_point> end_time;
-    std::optional<size_t> limit;
-    std::optional<std::string> topic;
+    std::optional<size_t>                                limit;
+    std::optional<std::string>                           topic;
 };
 
 /**
  * @brief Result structure for archive queries
  */
-struct ArchiveQueryResult {
+struct ArchiveQueryResult
+{
     std::vector<ArchiveRecord> records;
-    size_t total_count;
-    bool has_more;
+    size_t                     total_count;
+    bool                       has_more;
 };
 
 /**
  * @brief Abstract interface for storage services
- * 
+ *
  * This interface defines the contract for different storage implementations
  * (MongoDB, SQLite, etc.) used by the archiver workers.
  */
-class IStorageService {
+class IStorageService
+{
 public:
     virtual ~IStorageService() = default;
 

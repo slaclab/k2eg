@@ -9,7 +9,6 @@
 
 #include <string>
 
-
 namespace k2eg::service::storage {
 
 /**
@@ -20,34 +19,58 @@ enum class BackendType
     MongoDB
 };
 
-// Add stream operator for BackendType
-inline std::ostream& operator<<(std::ostream& os, const BackendType& type) {
-    switch (type) {
-        case BackendType::MongoDB:
-            return os << "MongoDB";
-        default:
-            return os << "Unknown";
+/**
+ * @brief Output stream operator for BackendType
+ *
+ * This allows printing the BackendType to an output stream.
+ * Useful for logging and debugging purposes.
+ */
+inline std::ostream& operator<<(std::ostream& os, const BackendType& type)
+{
+    switch (type)
+    {
+    case BackendType::MongoDB: return os << "MongoDB";
+    default: return os << "Unknown";
     }
 }
 
-// Add conversion from string for boost::program_options
-inline std::istream& operator>>(std::istream& is, BackendType& type) {
+/**
+ * @brief Input stream operator for BackendType
+ *
+ * This allows reading the BackendType from an input stream.
+ * Useful for parsing configuration files or command line arguments.
+ */
+inline std::istream& operator>>(std::istream& is, BackendType& type)
+{
     std::string token;
     is >> token;
-    if (token == "mongodb" || token == "MongoDB") {
+    if (token == "mongodb" || token == "MongoDB")
+    {
         type = BackendType::MongoDB;
-    } else {
-        throw boost::program_options::validation_error(
-            boost::program_options::validation_error::invalid_option_value,
-            "backend-type", token);
+    }
+    else
+    {
+        throw boost::program_options::validation_error(boost::program_options::validation_error::invalid_option_value, "backend-type", token);
     }
     return is;
 }
 
+/**
+ * @brief Configuration for storage service
+ */
 struct StorageServiceConfiguration
 {
-    BackendType backend_type = BackendType::MongoDB; // Default to MongoDB
-    ConstStorageImplementationConfigShrdPtr implementation_config; // Optional implementation-specific configuration
+    /**
+     * @brief Backend type for the storage service
+     * This determines which storage implementation to use (e.g., MongoDB, SQLite)
+     */
+    BackendType backend_type = BackendType::MongoDB;
+    /**
+     * @brief Optional implementation-specific configuration
+     * This can be used to pass additional parameters to the storage backend
+     * (e.g., MongoDB connection string, SQLite file path, etc.)
+     */
+    ConstStorageImplementationConfigShrdPtr implementation_config;
 };
 
 DEFINE_PTR_TYPES(StorageServiceConfiguration);
@@ -87,6 +110,7 @@ private:
 
 } // namespace k2eg::service::storage
 
+// Extend boost::lexical_cast for BackendType
 namespace boost {
 template <>
 inline std::string lexical_cast<std::string, k2eg::service::storage::BackendType>(const k2eg::service::storage::BackendType& type)
