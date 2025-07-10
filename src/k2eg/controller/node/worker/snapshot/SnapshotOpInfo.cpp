@@ -11,29 +11,29 @@ SnapshotOpInfo::~SnapshotOpInfo() = default;
 
 bool SnapshotOpInfo::isTimeout(const std::chrono::steady_clock::time_point& now)
 {
+    if (!is_running)
+    {
+        // If stopped, reset trigger request and expire immediately.
+        request_to_trigger = false;
+        return true;
+    }
+
     // For triggered snapshots, timeout occurs if a trigger is requested or the snapshot is stopped.
     if (is_triggered)
     {
-        if (!is_running)
-        {
-            // If stopped, reset trigger request and expire immediately.
-            request_to_trigger = false;
-            return true;
-        }
         if (request_to_trigger)
         {
             // If triggered, reset and expire.
             request_to_trigger = false;
             return true;
         }
-        // Not triggered and not stopped: do not expire.
+        // Not triggered and not stopped do not expire.
         return false;
     }
     return WorkerAsyncOperation::isTimeout(now);
 }
 
-const epics::pvData::PVStructure::const_shared_pointer SnapshotOpInfo::filterPVField(const epics::pvData::PVStructure::const_shared_pointer& src, 
-                                                                                     const std::unordered_set<std::string>& fields_to_include)
+const epics::pvData::PVStructure::const_shared_pointer SnapshotOpInfo::filterPVField(const epics::pvData::PVStructure::const_shared_pointer& src, const std::unordered_set<std::string>& fields_to_include)
 {
     using namespace epics::pvData;
     if (!src)
