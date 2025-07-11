@@ -53,6 +53,11 @@ ConstStorageWorkerConfigurationShrdPtr get_storage_worker_program_option(const b
 {
     auto config = std::make_shared<StorageWorkerConfiguration>();
 
+    if(vm.count(STORAGE_WORKER_SECTION_KEY) == 0)
+    {
+        return config; // Return default configuration if section is not present
+    }
+
     // Extract batch size
     if (vm.count(BATCH_SIZE_KEY))
     {

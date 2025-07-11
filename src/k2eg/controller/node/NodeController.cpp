@@ -47,7 +47,7 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
     logger = ServiceResolver<ILogger>::resolve();
 
     // load current node configuration
-    logger->logMessage("Load node configuration", LogLevel::INFO);
+    logger->logMessage(STRING_FORMAT("Starting k2eg %1% node", this->node_controller_configuration->node_type), LogLevel::INFO);
     node_configuration->loadNodeConfiguration();
 
     // register worker for command type

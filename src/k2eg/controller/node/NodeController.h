@@ -32,6 +32,29 @@ enum class NodeType
     STORAGE
 };
 
+/**
+ * @brief Output stream operator for BackendType
+ *
+ * This allows printing the BackendType to an output stream.
+ * Useful for logging and debugging purposes.
+ */
+inline std::ostream& operator<<(std::ostream& os, const NodeType& type)
+{
+    switch (type)
+    {
+    case NodeType::GATEWAY: return os << "Gateway";
+    case NodeType::STORAGE: return os << "Storage";
+    default: return os << "Unknown";
+    }
+}
+
+
+/**
+ * @brief Node controller configuration
+ *
+ * This structure holds the configuration for the node controller,
+ * including command worker configurations and storage worker settings.
+ */
 struct NodeControllerConfiguration
 {
     NodeType                                       node_type;

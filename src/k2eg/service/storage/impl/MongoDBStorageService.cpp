@@ -8,7 +8,6 @@
 #include <k2eg/service/storage/impl/MongoDBStorageService.h>
 #include <mongocxx/exception/exception.hpp>
 
-
 using namespace k2eg::service::storage;
 using namespace k2eg::service::storage::impl;
 using namespace k2eg::service::log;
@@ -45,8 +44,9 @@ constexpr std::string MONGO_GTE_OPERATOR = "$gte";
 constexpr std::string MONGO_LTE_OPERATOR = "$lte";
 
 namespace k2eg::service::storage::impl {
-    
+
 #pragma region MongoDB Program Options
+
 void fill_mongodb_program_option(boost::program_options::options_description& desc)
 {
     // Create a dedicated section for MongoDB options
@@ -66,12 +66,12 @@ void fill_mongodb_program_option(boost::program_options::options_description& de
 
 ConstStorageImplementationConfigShrdPtr get_mongodb_program_option(const boost::program_options::variables_map& vm)
 {
+    auto config = std::make_shared<MongoDBStorageImplementationConfig>();
     if (!vm.count(MONGODB_SECTION_KEY))
     {
-        throw std::runtime_error("MongoDB configuration section is missing in the program options");
+        return config;
     }
 
-    auto config = std::make_shared<MongoDBStorageImplementationConfig>();
     auto mongodb_vm = vm[MONGODB_SECTION_KEY].as<boost::program_options::variables_map>();
 
     // Extract MongoDB connection settings
@@ -116,9 +116,9 @@ ConstStorageImplementationConfigShrdPtr get_mongodb_program_option(const boost::
 } // namespace k2eg::service::storage::impl
 
 #pragma region MongoDB Storage Serrvice Implementation
+
 MongoDBStorageService::MongoDBStorageService(ConstStorageImplementationConfigShrdPtr config)
-    : logger(ServiceResolver<ILogger>::resolve())
-    , config_(std::static_pointer_cast<const MongoDBStorageImplementationConfig>(config))
+    : logger(ServiceResolver<ILogger>::resolve()), config_(std::static_pointer_cast<const MongoDBStorageImplementationConfig>(config))
 {
     this->initialize();
 }
@@ -171,10 +171,12 @@ bool MongoDBStorageService::initialize()
 void MongoDBStorageService::shutdown()
 {
     // Clean shutdown - reset pool and instance
-    if (pool_) {
+    if (pool_)
+    {
         pool_.reset();
     }
-    if (instance_) {
+    if (instance_)
+    {
         instance_.reset();
     }
     logger->logMessage("MongoDB storage service shut down", LogLevel::INFO);
@@ -213,22 +215,21 @@ void MongoDBStorageService::createIndexes()
     }
 }
 
-
 bool MongoDBStorageService::store(const ArchiveRecord& record)
 {
     try
     {
         auto client = pool_->acquire();
         auto collection = (*client)[config_->database_name][config_->collection_name];
-        
+
         auto doc = recordToBson(record);
         collection.insert_one(doc.view());
-        
+
         {
             std::lock_guard<std::mutex> lock(stats_mutex_);
             stored_records_count_++;
         }
-        
+
         return true;
     }
     catch (const mongocxx::exception& e)
@@ -244,29 +245,30 @@ bool MongoDBStorageService::store(const ArchiveRecord& record)
 
 size_t MongoDBStorageService::storeBatch(const std::vector<ArchiveRecord>& records)
 {
-    if (records.empty()) return 0;
-    
+    if (records.empty())
+        return 0;
+
     try
     {
         auto client = pool_->acquire();
         auto collection = (*client)[config_->database_name][config_->collection_name];
-        
+
         std::vector<bsoncxx::document::value> docs;
         docs.reserve(records.size());
-        
+
         for (const auto& record : records)
         {
             docs.push_back(recordToBson(record));
         }
-        
-        auto result = collection.insert_many(docs);
+
+        auto   result = collection.insert_many(docs);
         size_t inserted_count = result ? result->inserted_count() : 0;
-        
+
         {
             std::lock_guard<std::mutex> lock(stats_mutex_);
             stored_records_count_ += inserted_count;
         }
-        
+
         return inserted_count;
     }
     catch (const mongocxx::exception& e)
