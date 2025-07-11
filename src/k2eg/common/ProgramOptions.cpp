@@ -1,3 +1,4 @@
+#include "k2eg/service/storage/StorageServiceFactory.h"
 #include <k2eg/common/ProgramOptions.h>
 #include <sys/types.h>
 
@@ -80,8 +81,10 @@ ProgramOptions::ProgramOptions() {
       (METRIC_ENABLE, po::value<bool>()->default_value(false), "Enable metric management")
       (METRIC_HTTP_PORT, po::value<unsigned int>()->default_value(8080), "The port used for publish the http metric server");
 
-  // add configuration for storage factory
-  StorageServiceFactory::addConfigurations(options);
+  // add specific program options
+  fill_storage_service_program_option(options);
+  fill_storage_worker_program_option(options);
+  
 }
 
 // clang-format on
@@ -191,7 +194,8 @@ ProgramOptions::getNodeControllerConfiguration() {
                 .continuous_snapshot_configuration = RepeatingSnaptshotConfiguration{
                     .snapshot_processing_thread_count = GET_OPTION(SNAPSHOT_REPEATING_SCHEDULER_THREAD, std::size_t, 1)
                 }
-            }
+            },
+            .storage_worker_configuration = get_storage_worker_program_option(vm),
         }
     );
 }
@@ -240,9 +244,10 @@ ProgramOptions::getConfigurationServiceConfiguration() {
           .reset_on_start = GET_OPTION(CONFIGURATION_SERVICE_RESET_ON_START, bool, false)});
 }
 
+
 StorageServiceConfigurationShrdPtr        
 ProgramOptions::getStorageServiceConfiguration() {
-  return StorageServiceFactory::getConfigurations(vm);
+  return get_storage_service_program_option(vm);
 }
 
 const std::string ProgramOptions::getStoragePath() {

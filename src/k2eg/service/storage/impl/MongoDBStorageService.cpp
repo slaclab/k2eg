@@ -45,6 +45,7 @@ constexpr std::string MONGO_GTE_OPERATOR = "$gte";
 constexpr std::string MONGO_LTE_OPERATOR = "$lte";
 
 namespace k2eg::service::storage::impl {
+    
 #pragma region MongoDB Program Options
 void fill_mongodb_program_option(boost::program_options::options_description& desc)
 {

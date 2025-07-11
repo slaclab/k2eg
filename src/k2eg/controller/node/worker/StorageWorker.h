@@ -8,6 +8,8 @@
 #include <k2eg/service/pubsub/ISubscriber.h>
 #include <k2eg/service/storage/IStorageService.h>
 
+#include <boost/program_options.hpp>
+
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -30,6 +32,19 @@ struct StorageWorkerConfiguration
     std::vector<std::string>  topics_to_consume;
     std::string               consumer_group_id = "k2eg-storage-workers";
 };
+DEFINE_PTR_TYPES(StorageWorkerConfiguration);
+
+/**
+ * @brief Fill storage worker program options
+ */
+void fill_storage_worker_program_option(boost::program_options::options_description& desc);
+/**
+ * @brief Get storage worker program options from variables map
+ *
+ * This function extracts storage worker configuration from the provided variables map.
+ * It throws an exception if the required section is missing.
+ */
+ConstStorageWorkerConfigurationShrdPtr get_storage_worker_program_option(const boost::program_options::variables_map& vm);
 
 /**
  * @brief Worker responsible for consuming Kafka messages and storing them

@@ -139,8 +139,6 @@ set(COMMON_SOURCE_FILES
   src/k2eg/controller/node/worker/snapshot/SnapshotOpInfo.cpp
   src/k2eg/controller/node/worker/snapshot/SnapshotRepeatingOpInfo.cpp
   src/k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.cpp
-
-  src/k2eg/controller/node/archiver/ArchiverWorker.cpp
 )
 
 set(SOURCE_FILES

@@ -1,6 +1,7 @@
 #ifndef k2eg_CONTROLLER_NODE_NODECONTROLLER_H_
 #define k2eg_CONTROLLER_NODE_NODECONTROLLER_H_
 
+#include "k2eg/controller/node/worker/StorageWorker.h"
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/ObjectFactory.h>
 #include <k2eg/common/ProcSystemMetrics.h>
@@ -33,9 +34,10 @@ enum class NodeType
 
 struct NodeControllerConfiguration
 {
-    NodeType                                     node_type;
-    worker::monitor::MonitorCommandConfiguration monitor_command_configuration;
-    worker::SnapshotCommandConfiguration         snapshot_command_configuration;
+    NodeType                                       node_type;
+    worker::monitor::MonitorCommandConfiguration   monitor_command_configuration;
+    worker::SnapshotCommandConfiguration           snapshot_command_configuration;
+    worker::ConstStorageWorkerConfigurationShrdPtr storage_worker_configuration;
 };
 DEFINE_PTR_TYPES(NodeControllerConfiguration)
 
@@ -124,7 +126,6 @@ public:
 DEFINE_PTR_TYPES(NodeController)
 } // namespace k2eg::controller::node
 
-
 namespace boost {
 template <>
 inline std::string lexical_cast<std::string, k2eg::controller::node::NodeType>(const k2eg::controller::node::NodeType& type)
@@ -147,6 +148,5 @@ inline k2eg::controller::node::NodeType lexical_cast<k2eg::controller::node::Nod
     throw boost::bad_lexical_cast(); // fallback
 }
 } // namespace boost
-
 
 #endif // k2eg_CONTROLLER_NODE_NODECONTROLLER_H_

@@ -35,7 +35,16 @@ struct MongoDBStorageImplementationConfig : public StorageImplementationConfig {
 };
 DEFINE_PTR_TYPES(MongoDBStorageImplementationConfig);
 
+/**
+ * @brief Fill MongoDB program options
+ */
 void fill_mongodb_program_option(boost::program_options::options_description& desc);
+/**
+ * @brief Get MongoDB program options from variables map
+ * 
+ * This function extracts MongoDB configuration from the provided variables map.
+ * It throws an exception if the required section is missing.
+ */
 ConstStorageImplementationConfigShrdPtr get_mongodb_program_option(const boost::program_options::variables_map& vm);
 
 

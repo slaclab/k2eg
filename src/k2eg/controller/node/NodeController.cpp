@@ -31,8 +31,10 @@ using namespace k2eg::service::scheduler;
 #define NODE_CONTROLLER_STAT_TASK_NAME "node-controller-stat-task"
 #define NODE_CONTROLLER_STAT_TASK_CRON "* * * * * *"
 
+
 const std::map<std::string, std::string> submitted_command_labels = {{"op", "command_submitted"}};
 const std::map<std::string, std::string> submitted_command_no_workef_found_labels = {{"op", "no_worker_found"}};
+
 NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_controller_configuration, DataStorageShrdPtr data_storage)
     : node_controller_configuration(std::move(node_controller_configuration))
     , node_configuration(std::make_shared<NodeConfiguration>(data_storage))

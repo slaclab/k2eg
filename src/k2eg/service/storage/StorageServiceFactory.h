@@ -76,6 +76,22 @@ struct StorageServiceConfiguration
 DEFINE_PTR_TYPES(StorageServiceConfiguration);
 
 /**
+ * @brief Fill program options for storage service
+ * @param desc Options description to fill
+ */
+void fill_storage_service_program_option(boost::program_options::options_description& desc);
+/**
+ * @brief Get storage service program options from variables map
+ *
+ * This function extracts storage service configuration from the provided variables map.
+ * It throws an exception if the required section is missing.
+ * 
+ * @param vm Variables map containing parsed options
+ * @return Unique pointer to StorageServiceConfiguration
+ */
+StorageServiceConfigurationUPtr get_storage_service_program_option(const boost::program_options::variables_map& vm);
+
+/**
  * @brief Factory for creating storage service instances
  *
  * This factory allows creation of different storage backend implementations
@@ -91,20 +107,6 @@ public:
      * @return Shared pointer to storage service
      */
     static IStorageServiceShrdPtr create(StorageServiceConfigurationUPtr config = nullptr);
-
-    /**
-     * @brief Add program options for storage service configurations
-     * @param desc Options description to add configurations to
-     */
-    static void addConfigurations(boost::program_options::options_description& desc);
-
-    /**
-     * @brief Get storage service configurations from program options
-     * @param vm Variables map containing parsed options
-     * @return Shared pointer to StorageServiceConfiguration
-     */
-    static StorageServiceConfigurationUPtr getConfigurations(const boost::program_options::variables_map& vm);
-
 private:
 };
 

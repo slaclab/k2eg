@@ -6,6 +6,7 @@
 
 #include <k2eg/common/types.h>
 #include <k2eg/controller/command/CMDController.h>
+#include <k2eg/controller/node/worker/StorageWorker.h>
 #include <k2eg/service/configuration/configuration.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/log/ILogger.h>
@@ -90,18 +91,19 @@ namespace common {
         ~ProgramOptions() = default;
         void parse(int argc, const char* argv[]);
 
-        k2eg::service::log::ConstLogConfigurationUPtr                     getloggerConfiguration();
-        k2eg::controller::command::ConstCMDControllerConfigUPtr           getCMDControllerConfiguration();
-        k2eg::controller::node::ConstNodeControllerConfigurationUPtr      getNodeControllerConfiguration();
-        k2eg::service::pubsub::ConstPublisherConfigurationUPtr            getPublisherConfiguration();
-        k2eg::service::pubsub::ConstSubscriberConfigurationUPtr           getSubscriberConfiguration();
-        k2eg::service::metric::ConstMetricConfigurationUPtr               getMetricConfiguration();
-        k2eg::service::scheduler::ConstSchedulerConfigurationUPtr         getSchedulerConfiguration();
-        k2eg::service::epics_impl::ConstEpicsServiceManagerConfigUPtr     getEpicsManagerConfiguration();
-        k2eg::service::configuration::ConstConfigurationServceiConfigUPtr getConfigurationServiceConfiguration();
-        k2eg::service::storage::StorageServiceConfigurationShrdPtr        getStorageServiceConfiguration();
-        const std::string                                                 getStoragePath();
-        bool                                                              optionConfigure(const std::string& name);
+        k2eg::service::log::ConstLogConfigurationUPtr                          getloggerConfiguration();
+        k2eg::controller::command::ConstCMDControllerConfigUPtr                getCMDControllerConfiguration();
+        k2eg::controller::node::ConstNodeControllerConfigurationUPtr           getNodeControllerConfiguration();
+        k2eg::service::pubsub::ConstPublisherConfigurationUPtr                 getPublisherConfiguration();
+        k2eg::service::pubsub::ConstSubscriberConfigurationUPtr                getSubscriberConfiguration();
+        k2eg::service::metric::ConstMetricConfigurationUPtr                    getMetricConfiguration();
+        k2eg::service::scheduler::ConstSchedulerConfigurationUPtr              getSchedulerConfiguration();
+        k2eg::service::epics_impl::ConstEpicsServiceManagerConfigUPtr          getEpicsManagerConfiguration();
+        k2eg::service::configuration::ConstConfigurationServceiConfigUPtr      getConfigurationServiceConfiguration();
+        k2eg::controller::node::worker::ConstStorageWorkerConfigurationShrdPtr getStorageWorkerConfiguration();
+        k2eg::service::storage::StorageServiceConfigurationShrdPtr             getStorageServiceConfiguration();
+        const std::string                                                      getStoragePath();
+        bool                                                                   optionConfigure(const std::string& name);
 
         template <class T>
         const T& getOption(const std::string& name)

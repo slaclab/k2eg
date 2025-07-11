@@ -1,9 +1,7 @@
-#include <iomanip>
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/worker/StorageWorker.h>
 #include <k2eg/service/ServiceResolver.h>
-
 
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::service;
@@ -13,12 +11,118 @@ using namespace k2eg::service::log;
 using namespace k2eg::service::metric;
 using namespace k2eg::common;
 
+// Default values for StorageWorker configuration
+#define DEFAULT_BATCH_SIZE 100
+#define DEFAULT_BATCH_TIMEOUT_MS 5000
+#define DEFAULT_WORKER_THREAD_COUNT 4
+#define DEFAULT_QUEUE_MAX_SIZE 10000
+#define DEFAULT_CONSUMER_GROUP_ID "k2eg-storage-workers"
+
+// Storage Worker Program Option Keys
+#define STORAGE_WORKER_SECTION_KEY "storage-worker"
+#define BATCH_SIZE_KEY "batch-size"
+#define BATCH_TIMEOUT_KEY "batch-timeout"
+#define WORKER_THREAD_COUNT_KEY "worker-thread-count"
+#define QUEUE_MAX_SIZE_KEY "queue-max-size"
+#define TOPICS_TO_CONSUME_KEY "topics-to-consume"
+#define CONSUMER_GROUP_ID_KEY "consumer-group-id"
+
+namespace k2eg::controller::node::worker {
+
+#pragma region Program Options
+
+void fill_storage_worker_program_option(boost::program_options::options_description& desc)
+{
+    // Create a dedicated section for StorageWorkerConfiguration options
+    boost::program_options::options_description storage_worker_section(STORAGE_WORKER_SECTION_KEY);
+    // clang-format off
+    storage_worker_section.add_options()
+        (BATCH_SIZE_KEY, boost::program_options::value<size_t>()->default_value(DEFAULT_BATCH_SIZE), "Batch size for processing")
+        (BATCH_TIMEOUT_KEY, boost::program_options::value<int>()->default_value(DEFAULT_BATCH_TIMEOUT_MS), "Batch processing timeout in milliseconds")
+        (WORKER_THREAD_COUNT_KEY, boost::program_options::value<size_t>()->default_value(DEFAULT_WORKER_THREAD_COUNT), "Number of worker threads")
+        (QUEUE_MAX_SIZE_KEY, boost::program_options::value<size_t>()->default_value(DEFAULT_QUEUE_MAX_SIZE), "Maximum size of the message queue")
+        (TOPICS_TO_CONSUME_KEY, boost::program_options::value<std::vector<std::string>>()->multitoken(), "List of topics to consume messages from")
+        (CONSUMER_GROUP_ID_KEY, boost::program_options::value<std::string>()->default_value(DEFAULT_CONSUMER_GROUP_ID), "Consumer group ID for Kafka");
+    // clang-format on
+
+    // Add the MongoDB section to the main description
+    desc.add(storage_worker_section);
+}
+
+ConstStorageWorkerConfigurationShrdPtr get_storage_worker_program_option(const boost::program_options::variables_map& vm)
+{
+    auto config = std::make_shared<StorageWorkerConfiguration>();
+
+    // Extract batch size
+    if (vm.count(BATCH_SIZE_KEY))
+    {
+        config->batch_size = vm[BATCH_SIZE_KEY].as<size_t>();
+    }
+    else
+    {
+        config->batch_size = DEFAULT_BATCH_SIZE;
+    }
+
+    // Extract batch timeout
+    if (vm.count(BATCH_TIMEOUT_KEY))
+    {
+        config->batch_timeout = std::chrono::milliseconds(vm[BATCH_TIMEOUT_KEY].as<int>());
+    }
+    else
+    {
+        config->batch_timeout = std::chrono::milliseconds(DEFAULT_BATCH_TIMEOUT_MS);
+    }
+
+    // Extract worker thread count
+    if (vm.count(WORKER_THREAD_COUNT_KEY))
+    {
+        config->worker_thread_count = vm[WORKER_THREAD_COUNT_KEY].as<size_t>();
+    }
+    else
+    {
+        config->worker_thread_count = DEFAULT_WORKER_THREAD_COUNT;
+    }
+
+    // Extract queue max size
+    if (vm.count(QUEUE_MAX_SIZE_KEY))
+    {
+        config->queue_max_size = vm[QUEUE_MAX_SIZE_KEY].as<size_t>();
+    }
+    else
+    {
+        config->queue_max_size = DEFAULT_QUEUE_MAX_SIZE;
+    }
+
+    // Extract topics to consume
+    if (vm.count(TOPICS_TO_CONSUME_KEY))
+    {
+        config->topics_to_consume = vm[TOPICS_TO_CONSUME_KEY].as<std::vector<std::string>>();
+    }
+    else
+    {
+        config->topics_to_consume = std::vector<std::string>(); // Empty vector as default
+    }
+
+    // Extract consumer group ID
+    if (vm.count(CONSUMER_GROUP_ID_KEY))
+    {
+        config->consumer_group_id = vm[CONSUMER_GROUP_ID_KEY].as<std::string>();
+    }
+    else
+    {
+        config->consumer_group_id = DEFAULT_CONSUMER_GROUP_ID;
+    }
+
+    return config;
+}
+} // namespace k2eg::controller::node::worker
+
+#pragma region Implementation
 StorageWorker::StorageWorker(const StorageWorkerConfiguration& config, IStorageServiceShrdPtr storage_service)
     : logger(ServiceResolver<ILogger>::resolve()), config_(config), storage_service_(storage_service), running_(false), shutdown_requested_(false), messages_consumed_(0), records_stored_(0), storage_errors_(0), last_batch_time_(std::chrono::steady_clock::now())
 {
     // Resolve required services
     logger_ = ServiceResolver<ILogger>::resolve();
-    metric_service_ = ServiceResolver<IMetricService>::resolve();
     subscriber_ = ServiceResolver<ISubscriber>::resolve();
 
     // Initialize thread pool
