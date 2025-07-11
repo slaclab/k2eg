@@ -90,7 +90,7 @@ void PutCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool> com
 
 void PutCommandWorker::manageReply(const std::int8_t error_code, const std::string& error_message, ConstPutCommandShrdPtr cmd)
 {
-    logger->logMessage(STRING_FORMAT("%1% [pv:%2% value:%3%]", error_message % cmd->pv_name % cmd->value), (error_code == 0 ? LogLevel::INFO : LogLevel::ERROR));
+    logger->logMessage(STRING_FORMAT("%1% for %2%", error_message % cmd->pv_name), (error_code == 0 ? LogLevel::INFO : LogLevel::ERROR));
     if (cmd->reply_topic.empty() || cmd->reply_id.empty())
     {
         return;
