@@ -65,7 +65,13 @@ void MsgpackEpicsConverter::packField(msgpack::packer<msgpack::sbuffer>& pk, con
             switch (etype)
             {
                 // clang-format off
-                case pvd::pvBoolean: { PACK_TYPED_ARRAY(pvd::boolean, arr, pk); } break;
+                case pvd::pvBoolean: { 
+                    pvd::shared_vector<const pvd::boolean> data;
+                    arr->getAs(data);
+                    pk.pack_array(data.size());
+                    for (auto& e : data) pk.pack(static_cast<bool>(e));
+                    break; 
+                 };
                 case pvd::pvByte:    { PACK_TYPED_ARRAY(pvd::int8, arr, pk); } break;
                 case pvd::pvShort:   { PACK_TYPED_ARRAY(pvd::uint16, arr, pk); } break;
                 case pvd::pvInt:     { PACK_TYPED_ARRAY(pvd::int32, arr, pk); } break;
@@ -195,7 +201,15 @@ pvd::PVFieldPtr MsgpackEpicsConverter::unpackMsgpackToPVField(const msgpack::obj
                 switch (et)
                 {
                     // clang-format off
-                    case pvd::pvBoolean: { UNPACK_TYPED_ARRAY(pvd::boolean, arr, obj); break; }
+                    case pvd::pvBoolean: { 
+                        pvd::shared_vector<pvd::boolean> vals;
+                        for (uint32_t i = 0; i < obj.via.array.size; ++i)
+                        {
+                            bool b = obj.via.array.ptr[i].as<bool>();
+                            vals.push_back(static_cast<pvd::boolean>(b));
+                        }
+                        arr->putFrom(pvd::freeze(vals));
+                        break;}
                     case pvd::pvByte:    { UNPACK_TYPED_ARRAY(pvd::int8, arr, obj); break; }
                     case pvd::pvShort:   { UNPACK_TYPED_ARRAY(pvd::int16, arr, obj); break; }
                     case pvd::pvInt:     { UNPACK_TYPED_ARRAY(pvd::int32, arr, obj); break; }
