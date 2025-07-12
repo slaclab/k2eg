@@ -195,7 +195,15 @@ pvd::PVFieldPtr MsgpackEpicsConverter::unpackMsgpackToPVField(const msgpack::obj
                 switch (et)
                 {
                     // clang-format off
-                    case pvd::pvBoolean: { UNPACK_TYPED_ARRAY(pvd::boolean, arr, obj); break; }
+                    case pvd::pvBoolean: { 
+                        pvd::shared_vector<pvd::boolean> vals;
+                        for (uint32_t i = 0; i < obj.via.array.size; ++i)
+                        {
+                            bool b = obj.via.array.ptr[i].as<bool>();
+                            vals.push_back(static_cast<pvd::boolean>(b));
+                        }
+                        arr->putFrom(pvd::freeze(vals));
+                        break;}
                     case pvd::pvByte:    { UNPACK_TYPED_ARRAY(pvd::int8, arr, obj); break; }
                     case pvd::pvShort:   { UNPACK_TYPED_ARRAY(pvd::int16, arr, obj); break; }
                     case pvd::pvInt:     { UNPACK_TYPED_ARRAY(pvd::int32, arr, obj); break; }

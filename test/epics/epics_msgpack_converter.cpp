@@ -228,6 +228,24 @@ TEST_F(EpicsMsgpackConversionTest, NTTableRoundtrip)
     roundtripTest(table->getPVStructure());
 }
 
+TEST_F(EpicsMsgpackConversionTest, NTTableBooleanColumnRoundtrip)
+{
+    NTTablePtr table = NTTable::createBuilder()
+                           ->addColumn("name", pvString)
+                           ->addColumn("enabled", pvBoolean)
+                           ->create();
+    
+    shared_vector<std::string> labels = {"name", "enabled"};
+    shared_vector<std::string> names = {"item1", "item2", "item3"};
+    shared_vector<epics::pvData::boolean> enabled_values = {true, false, true};
+
+    table->getLabels()->replace(freeze(labels));
+    table->getColumn<PVStringArray>("name")->replace(freeze(names));
+    table->getColumn<PVBooleanArray>("enabled")->replace(freeze(enabled_values));
+
+    roundtripTest(table->getPVStructure());
+}
+
 TEST_F(EpicsMsgpackConversionTest, StructureArray)
 {
     auto innerStruct = getFieldCreate()->createFieldBuilder()->add("a", pvInt)->createStructure();
