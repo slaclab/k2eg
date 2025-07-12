@@ -65,7 +65,13 @@ void MsgpackEpicsConverter::packField(msgpack::packer<msgpack::sbuffer>& pk, con
             switch (etype)
             {
                 // clang-format off
-                case pvd::pvBoolean: { PACK_TYPED_ARRAY(pvd::boolean, arr, pk); } break;
+                case pvd::pvBoolean: { 
+                    pvd::shared_vector<const pvd::boolean> data;
+                    arr->getAs(data);
+                    pk.pack_array(data.size());
+                    for (auto& e : data) pk.pack(static_cast<bool>(e));
+                    break; 
+                 };
                 case pvd::pvByte:    { PACK_TYPED_ARRAY(pvd::int8, arr, pk); } break;
                 case pvd::pvShort:   { PACK_TYPED_ARRAY(pvd::uint16, arr, pk); } break;
                 case pvd::pvInt:     { PACK_TYPED_ARRAY(pvd::int32, arr, pk); } break;
