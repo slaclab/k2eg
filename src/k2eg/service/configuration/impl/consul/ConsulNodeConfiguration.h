@@ -4,6 +4,11 @@
 #include <k2eg/service/configuration/INodeConfiguration.h>
 
 #include <oatpp-consul/Client.hpp>
+#include <oatpp/core/Types.hpp>
+#include <oatpp/web/client/RequestExecutor.hpp>
+#include <oatpp/parser/json/mapping/ObjectMapper.hpp>
+
+#include <thread>
 
 namespace k2eg::service::configuration::impl::consul {
 
@@ -12,22 +17,48 @@ Consul impelmentation of the INodeConfiguration interface.
 
 It permit to read ans store node configuration in a Consul KV store.
 */
-class ConsuleNodeConfiguration : public INodeConfiguration
+class ConsulNodeConfiguration : public INodeConfiguration
 {
     // Consul client
-    std::shared_ptr<oatpp::consul::Client> client;
+    std::shared_ptr<oatpp::consul::Client>               client;
+    std::shared_ptr<oatpp::web::client::RequestExecutor> requestExecutor;
+    std::shared_ptr<oatpp::data::mapping::ObjectMapper>  objectMapper;
     // node configuration key
-    std::string node_configuration_key;
+    std::string       node_configuration_key;
+    std::string       session_id;
+    std::atomic<bool> session_active{false};
+    std::thread       session_renewal_thread;
 
     std::string getNodeKey() const;
-
+    bool        createSession();
+    void        renewSession();
+    bool        destroySession();
+    const std::vector<std::string> kvGetKeys(const std::string& prefix) const;
 public:
-    ConsuleNodeConfiguration(ConstConfigurationServceiConfigUPtr config);
-    virtual ~ConsuleNodeConfiguration();
+    ConsulNodeConfiguration(ConstConfigurationServceiConfigUPtr config);
+    virtual ~ConsulNodeConfiguration();
 
+    // Node configuration methods
     NodeConfigurationShrdPtr getNodeConfiguration() const override;
     bool                     setNodeConfiguration(NodeConfigurationShrdPtr node_configuration) override;
     std::string              getNodeName() const override;
+
+    // Snapshot configuration methods
+    const std::string                 getSnapshotKey(const std::string& snapshot_id) const override;
+    ConstSnapshotConfigurationShrdPtr getSnapshotConfiguration(const std::string& snapshot_id) const override;
+    bool                              setSnapshotConfiguration(SnapshotConfigurationShrdPtr snapshot_config) override;
+    bool                              deleteSnapshotConfiguration(const std::string& snapshot_id) override;
+    const std::vector<std::string>    getSnapshotIds() const override;
+    bool                              updateSnapshotField(const std::string& snapshot_id, const std::string& field, const std::string& value) override;
+    const std::string                 getSnapshotField(const std::string& snapshot_id, const std::string& field) const override;
+
+    // Distributed snapshot management methods
+    bool                           isSnapshotRunning(const std::string& snapshot_id) const override;
+    const std::string              getSnapshotGateway(const std::string& snapshot_id) const override;
+    bool                           tryAcquireSnapshot(const std::string& snapshot_id, const std::string& gateway_id) override;
+    bool                           releaseSnapshot(const std::string& snapshot_id, const std::string& gateway_id) override;
+    const std::vector<std::string> getRunningSnapshots() const override;
+    const std::vector<std::string> getSnapshotsByGateway(const std::string& gateway_id) const override;
 };
 } // namespace k2eg::service::configuration::impl::consul
 

@@ -47,7 +47,7 @@ initChecker(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   }
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   opt->parse(argc, argv);
-  ServiceResolver<sconf::INodeConfiguration>::registerService(std::make_shared<sconf::impl::consul::ConsuleNodeConfiguration>(opt->getConfigurationServiceConfiguration()));
+  ServiceResolver<sconf::INodeConfiguration>::registerService(std::make_shared<sconf::impl::consul::ConsulNodeConfiguration>(opt->getConfigurationServiceConfiguration()));
   ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
   ServiceResolver<IPublisher>::registerService(pub);
   DataStorageShrdPtr storage = std::make_shared<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");

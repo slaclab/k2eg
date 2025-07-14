@@ -14,7 +14,7 @@ TEST(ConsulConfiguration, Allocation) {
         .config_server_port = 8500
     }
   );
-  auto consul_config = std::make_shared<ConsuleNodeConfiguration>(std::move(config));
+  auto consul_config = std::make_shared<ConsulNodeConfiguration>(std::move(config));
   ASSERT_NE(consul_config, nullptr);
   ASSERT_NO_THROW(consul_config.reset(););
 }
@@ -27,7 +27,7 @@ TEST(ConsulConfiguration, SetAndGetNodeConfiguration) {
         .config_server_port = 8500
     }
   );
-  auto consul_config = std::make_shared<ConsuleNodeConfiguration>(std::move(config));
+  auto consul_config = std::make_shared<ConsulNodeConfiguration>(std::move(config));
   ASSERT_NE(consul_config, nullptr);
 
   ASSERT_NO_THROW(consul_config->setNodeConfiguration(std::make_shared<NodeConfiguration>(

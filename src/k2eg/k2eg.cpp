@@ -71,7 +71,7 @@ int K2EGateway::setup(int argc, const char* argv[])
         ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(po->getSchedulerConfiguration()));
         ServiceResolver<Scheduler>::resolve()->start();
         logger->logMessage("Start configuration service");
-        ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsuleNodeConfiguration>(po->getConfigurationServiceConfiguration()));
+        ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsulNodeConfiguration>(po->getConfigurationServiceConfiguration()));
         logger->logMessage("Start Metric Service");
         ServiceResolver<IMetricService>::registerService(instanceMetricService(po->getMetricConfiguration()));
         logger->logMessage("Start EPICS service");

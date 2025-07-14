@@ -707,7 +707,7 @@ inline std::unique_ptr<NodeController> initBackend(int& tcp_port, IPublisherShrd
     setenv(("EPICS_k2eg_" + std::string(METRIC_HTTP_PORT)).c_str(), std::to_string(++tcp_port).c_str(), 1);
     std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
     opt->parse(argc, argv);
-    ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsuleNodeConfiguration>(opt->getConfigurationServiceConfiguration()));
+    ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsulNodeConfiguration>(opt->getConfigurationServiceConfiguration()));
     ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(opt->getSchedulerConfiguration()));
     ServiceResolver<Scheduler>::resolve()->start();
     ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));

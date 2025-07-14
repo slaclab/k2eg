@@ -86,11 +86,11 @@ inline NodeConfigurationShrdPtr config_from_json(const boost::json::object& obj)
             {
                 if (item.is_object())
                 {
-                    const auto& itemObj = item.as_object();
-                    std::string key = boost::json::value_to<std::string>(itemObj.at("key"));
-                    std::string destTopic = boost::json::value_to<std::string>(itemObj.at("dest"));
+                    const auto&  itemObj = item.as_object();
+                    std::string  key = boost::json::value_to<std::string>(itemObj.at("key"));
+                    std::string  destTopic = boost::json::value_to<std::string>(itemObj.at("dest"));
                     std::uint8_t eventSerialization = static_cast<std::uint8_t>(boost::json::value_to<int>(itemObj.at("ser")));
-                    auto pvMonitorInfo = std::make_shared<PVMonitorInfo>(PVMonitorInfo{destTopic, eventSerialization});
+                    auto         pvMonitorInfo = std::make_shared<PVMonitorInfo>(PVMonitorInfo{destTopic, eventSerialization});
                     cfg->pv_monitor_info_map.insert(PVMonitorInfoMapPair(key, pvMonitorInfo));
                 }
             }
@@ -116,6 +116,29 @@ inline boost::json::object config_to_json(const NodeConfiguration& cfg)
     return obj;
 }
 
+// Snapshot configuration structure
+struct SnapshotConfiguration
+{
+    // Unique identifier for the snapshot
+    std::string snapshot_id;
+    // wight of the snapshot, used for prioritization
+    int weight = 0;
+    // unit of the weight, can be "eps" or "mbps"
+    std::string weight_unit;
+    // ID of the gateway that created the snapshot
+    std::string gateway_id;
+    // Running status of the snapshot
+    bool running_status = false;
+    // Archiving status of the snapshot
+    bool archiving_status = false;
+    // ID of the archiver that is responsible for this snapshot
+    std::string archiver_id;
+    // Timestamp when the snapshot was created
+    std::string timestamp;
+};
+
+DEFINE_PTR_TYPES(SnapshotConfiguration);
+
 /*
 The INodeConfiguration interface defines the base logic for node configuration services.
 */
@@ -125,12 +148,31 @@ protected:
     ConstConfigurationServceiConfigUPtr config;
 
 public:
-    INodeConfiguration(ConstConfigurationServceiConfigUPtr config) : config(std::move(config)) {};
+    INodeConfiguration(ConstConfigurationServceiConfigUPtr config)
+        : config(std::move(config)){};
     virtual ~INodeConfiguration() = default;
 
     virtual NodeConfigurationShrdPtr getNodeConfiguration() const = 0;
     virtual bool                     setNodeConfiguration(NodeConfigurationShrdPtr node_configuration) = 0;
     virtual std::string              getNodeName() const = 0;
+
+    // Snapshot configuration methods
+    virtual const std::string                 getSnapshotKey(const std::string& snapshot_id) const = 0;
+    virtual ConstSnapshotConfigurationShrdPtr getSnapshotConfiguration(const std::string& snapshot_id) const = 0;
+    virtual bool                              setSnapshotConfiguration(SnapshotConfigurationShrdPtr snapshot_config) = 0;
+    virtual bool                              deleteSnapshotConfiguration(const std::string& snapshot_id) = 0;
+    virtual const std::vector<std::string>    getSnapshotIds() const = 0;
+    virtual bool                              updateSnapshotField(const std::string& snapshot_id, const std::string& field, const std::string& value) = 0;
+    virtual const std::string                 getSnapshotField(const std::string& snapshot_id, const std::string& field) const = 0;
+
+    // Distributed snapshot management methods
+    virtual bool                              isSnapshotRunning(const std::string& snapshot_id) const = 0;
+    virtual const std::string                 getSnapshotGateway(const std::string& snapshot_id) const = 0;
+    virtual bool                              tryAcquireSnapshot(const std::string& snapshot_id, const std::string& gateway_id) = 0;
+    virtual bool                              releaseSnapshot(const std::string& snapshot_id, const std::string& gateway_id) = 0;
+    virtual const std::vector<std::string>    getRunningSnapshots() const = 0;
+    virtual const std::vector<std::string>    getSnapshotsByGateway(const std::string& gateway_id) const = 0;
+
 };
 DEFINE_PTR_TYPES(INodeConfiguration)
 } // namespace k2eg::service::configuration
