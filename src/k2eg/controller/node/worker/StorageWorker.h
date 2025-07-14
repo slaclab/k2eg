@@ -11,12 +11,7 @@
 #include <boost/program_options.hpp>
 
 #include <atomic>
-#include <condition_variable>
-#include <mutex>
-#include <queue>
-#include <string>
 #include <thread>
-#include <vector>
 
 namespace k2eg::controller::node::worker {
 
@@ -25,13 +20,11 @@ namespace k2eg::controller::node::worker {
  */
 struct StorageWorkerConfiguration
 {
-    size_t                    batch_size = 100;
-    std::chrono::milliseconds batch_timeout = std::chrono::milliseconds(5000);
-    size_t                    worker_thread_count = 4;
-    size_t                    queue_max_size = 10000;
-    std::vector<std::string>  topics_to_consume;
-    std::string               consumer_group_id = "k2eg-storage-workers";
+    size_t batch_size = 100;
+    size_t batch_timeout = 100;
+    size_t worker_thread_count = 4;
 };
+
 DEFINE_PTR_TYPES(StorageWorkerConfiguration);
 
 /**
@@ -54,84 +47,36 @@ ConstStorageWorkerConfigurationShrdPtr get_storage_worker_program_option(const b
  */
 class StorageWorker
 {
-private:
+    // Configuration for the storage worker
+    StorageWorkerConfiguration                     config;
+    // Logger for logging messages related to storage worker operations
     service::log::ILoggerShrdPtr                   logger;
-    StorageWorkerConfiguration                     config_;
-    k2eg::service::storage::IStorageServiceShrdPtr storage_service_;
-    k2eg::service::pubsub::ISubscriberShrdPtr      subscriber_;
-    k2eg::service::log::ILoggerShrdPtr             logger_;
-    k2eg::service::metric::IMetricServiceShrdPtr   metric_service_;
+    // Storage service for storing consumed data
+    k2eg::service::storage::IStorageServiceShrdPtr storage_service;
+    // Subscriber for consuming messages from Kafka topics
+    k2eg::service::pubsub::ISubscriberShrdPtr      subscriber;
+    // Metric service for reporting metrics
+    k2eg::service::metric::IMetricServiceShrdPtr   metric_service;
 
-    // Threading and queue management
-    std::unique_ptr<BS::light_thread_pool>            thread_pool_;
-    std::queue<k2eg::service::storage::ArchiveRecord> record_queue_;
-    std::mutex                                        queue_mutex_;
-    std::condition_variable                           queue_cv_;
-    std::atomic<bool>                                 running_;
-    std::atomic<bool>                                 shutdown_requested_;
+    // Thread for checking configuration changes
+    std::atomic<bool> running{false};
+    std::thread config_checker_thread;
 
-    // Batch processing
-    std::thread                                        batch_processor_thread_;
-    std::vector<k2eg::service::storage::ArchiveRecord> current_batch_;
-    std::chrono::steady_clock::time_point              last_batch_time_;
-
-    // Statistics
-    std::atomic<size_t> messages_consumed_;
-    std::atomic<size_t> records_stored_;
-    std::atomic<size_t> storage_errors_;
-
-    /**
-     * @brief Main message processing loop
-     */
-    void messageProcessingLoop();
-
-    /**
-     * @brief Batch processor thread function
-     */
-    void batchProcessorLoop();
-
-    /**
-     * @brief Flush current batch to storage
-     */
-    void flushBatch();
-
-    /**
-     * @brief Check if batch should be flushed based on size or timeout
-     */
-    bool shouldFlushBatch() const;
-
+    void configChecker();
 public:
-    StorageWorker(const StorageWorkerConfiguration& config, k2eg::service::storage::IStorageServiceShrdPtr storage_service);
+    StorageWorker(const StorageWorkerConfiguration&, k2eg::service::storage::IStorageServiceShrdPtr);
 
     ~StorageWorker();
 
     /**
      * @brief Start the storage worker
      */
-    bool start();
+    void start();
 
     /**
      * @brief Stop the storage worker
      */
     void stop();
-
-    /**
-     * @brief Check if the worker is running
-     */
-    bool isRunning() const
-    {
-        return running_.load();
-    }
-
-    /**
-     * @brief Subscribe to additional topics
-     */
-    void subscribeToTopics(const std::vector<std::string>& topics);
-
-    /**
-     * @brief Unsubscribe from topics
-     */
-    void unsubscribeFromTopics(const std::vector<std::string>& topics);
 };
 
 DEFINE_PTR_TYPES(StorageWorker)

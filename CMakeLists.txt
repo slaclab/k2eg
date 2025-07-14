@@ -134,11 +134,13 @@ set(COMMON_SOURCE_FILES
   src/k2eg/controller/node/worker/GetCommandWorker.cpp
   src/k2eg/controller/node/worker/PutCommandWorker.cpp
   src/k2eg/controller/node/worker/SnapshotCommandWorker.cpp
-  src/k2eg/controller/node/worker/StorageWorker.cpp
   src/k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.cpp
   src/k2eg/controller/node/worker/snapshot/SnapshotOpInfo.cpp
   src/k2eg/controller/node/worker/snapshot/SnapshotRepeatingOpInfo.cpp
   src/k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.cpp
+  src/k2eg/controller/node/worker/StorageWorker.cpp
+  src/k2eg/controller/node/worker/archiver/BaseArchiver.cpp
+  src/k2eg/controller/node/worker/archiver/SnapshotArchiver.cpp
 )
 
 set(SOURCE_FILES
