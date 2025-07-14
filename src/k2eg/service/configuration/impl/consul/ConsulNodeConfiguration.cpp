@@ -1,6 +1,8 @@
+#include "k2eg/service/log/ILogger.h"
 #include "oatpp/core/data/share/MemoryLabel.hpp"
 #include <k2eg/common/utility.h>
 
+#include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/configuration/INodeConfiguration.h>
 #include <k2eg/service/configuration/impl/consul/ConsulNodeConfiguration.h>
 
@@ -22,7 +24,7 @@ using namespace oatpp::network::tcp::client;
 
 using namespace oatpp::consul;
 
-ConsulNodeConfiguration::ConsulNodeConfiguration(ConstConfigurationServceiConfigUPtr _config)
+ConsulNodeConfiguration::ConsulNodeConfiguration(ConstConfigurationServiceConfigUPtr _config)
     : INodeConfiguration(std::move(_config))
 {
     // Initialize Oat++ environment.
@@ -32,7 +34,7 @@ ConsulNodeConfiguration::ConsulNodeConfiguration(ConstConfigurationServceiConfig
     v_uint16      port = config->config_server_port;
     // Create a TCP connection provider and an HTTP request executor for Consul.
     auto connectionProvider = oatpp::network::tcp::client::ConnectionProvider::createShared({hostname, port, oatpp::network::Address::Family::IP_4});
-    auto requestExecutor = oatpp::web::client::HttpRequestExecutor::createShared(connectionProvider);
+    requestExecutor = oatpp::web::client::HttpRequestExecutor::createShared(connectionProvider);
 
     // Create the Consul client instance.
     client = Client::createShared(requestExecutor);
@@ -75,7 +77,11 @@ ConsulNodeConfiguration::ConsulNodeConfiguration(ConstConfigurationServceiConfig
 ConsulNodeConfiguration::~ConsulNodeConfiguration()
 {
     // Stop session renewal
-    session_active = false;
+    {
+        std::lock_guard<std::mutex> lock(session_mutex);
+        session_active = false;
+    }
+    session_cv.notify_one();
     if (session_renewal_thread.joinable())
     {
         session_renewal_thread.join();
@@ -88,44 +94,76 @@ ConsulNodeConfiguration::~ConsulNodeConfiguration()
     oatpp::base::Environment::destroy();
 }
 
+void ConsulNodeConfiguration::registerService()
+{
+    /* get oatpp::consul::rest::Client */
+    auto restClient = client->getRestClient();
+
+    auto checkPayload = oatpp::consul::rest::AgentCheckRegisterPayload::createShared();
+    checkPayload->id = "service_check_id";
+    checkPayload->name = "service_check_name";
+    checkPayload->notes = "Check on the MyService/Health endpoint";
+    // checkPayload->http = "http://localhost:8000/check/health";
+    // checkPayload->method = "GET";
+    // checkPayload->interval = "30s";
+    // checkPayload->timeout = "15s";
+
+    auto payload = oatpp::consul::rest::AgentServiceRegisterPayload::createShared();
+    payload->id = getNodeName();
+    payload->name = "service_name";
+
+    /* make API call */
+    auto response = restClient->agentServiceRegister(payload);
+    if (response->getStatusCode() != 200)
+    {
+        // Service registration failed
+        throw std::runtime_error("Failed to register service with Consul");
+    }
+}
+
+void ConsulNodeConfiguration::deregisterService()
+{
+    auto restClient = client->getRestClient();
+    auto response = restClient->agentServiceDeregister(getNodeName());
+    if (response->getStatusCode() != 200)
+    {
+        // Service registration failed
+        throw std::runtime_error("Failed to register service with Consul");
+    }
+}
+
 bool ConsulNodeConfiguration::createSession()
 {
     try
     {
         // Create session request body as JSON string manually
+        std::string node_name = getNodeName(); // Should match a registered Consul node
         std::string sessionJson = STRING_FORMAT(
-            R"({"Name": "k2eg-gateway-%1%", "TTL": 30, "Behavior": "release"})",
-            getNodeName());
+            R"({"Name": "k2eg-gateway-%1%", "Node": "%1%", "TTL": "30s", "Behavior": "delete"})",
+            node_name);
 
         auto sessionJsonStr = oatpp::String(sessionJson);
         auto requestBody = std::make_shared<oatpp::web::protocol::http::outgoing::BufferBody>(
-            sessionJsonStr, 
-            oatpp::data::share::StringKeyLabel("application/json")
-        );
+            sessionJsonStr,
+            oatpp::data::share::StringKeyLabel("application/json"));
         // Make HTTP PUT request to create session
         auto headers = oatpp::web::protocol::http::Headers();
         headers.put("Content-Type", "application/json");
 
-        auto response = requestExecutor->execute("PUT", "/v1/session/create", headers, requestBody, nullptr);
-
-        if (response->getStatusCode() == 200)
+        auto response = requestExecutor->execute("PUT", "v1/session/create", headers, requestBody, nullptr);
+        auto statusCode = response->getStatusCode();
+        if (statusCode == 200)
         {
             auto responseBody = response->readBodyToString();
-            if (responseBody)
+            // use boost to decode json response
+            boost::json::value parsedResponse = boost::json::parse(responseBody.getValue(""));
+            if (parsedResponse.is_object())
             {
-                std::string responseStr = responseBody;
-
-                // Parse JSON response manually to extract session ID
-                size_t idStart = responseStr.find("\"ID\":\"");
-                if (idStart != std::string::npos)
+                auto obj = parsedResponse.as_object();
+                if (obj.contains("ID") && obj["ID"].is_string())
                 {
-                    idStart += 6; // Skip "ID":"
-                    size_t idEnd = responseStr.find("\"", idStart);
-                    if (idEnd != std::string::npos)
-                    {
-                        session_id = responseStr.substr(idStart, idEnd - idStart);
-                        return !session_id.empty();
-                    }
+                    session_id = obj["ID"].as_string();
+                    return !session_id.empty();
                 }
             }
         }
@@ -139,17 +177,21 @@ bool ConsulNodeConfiguration::createSession()
 
 void ConsulNodeConfiguration::renewSession()
 {
+    std::unique_lock<std::mutex> lock(session_mutex);
     while (session_active)
     {
         try
         {
-            std::this_thread::sleep_for(std::chrono::seconds(10)); // Renew every 10 seconds
+            session_cv.wait_for(lock, std::chrono::seconds(15), [this]
+                                {
+                                    return !session_active;
+                                });
 
             if (session_active && !session_id.empty())
             {
                 // Make HTTP PUT request to renew session
                 auto        headers = oatpp::web::protocol::http::Headers();
-                std::string url = STRING_FORMAT("/v1/session/renew/%1%", session_id);
+                std::string url = STRING_FORMAT("v1/session/renew/%1%", session_id);
 
                 auto response = requestExecutor->execute("PUT", url, headers, nullptr, nullptr);
 
@@ -184,7 +226,7 @@ bool ConsulNodeConfiguration::destroySession()
         {
             // Make HTTP PUT request to destroy session
             auto        headers = oatpp::web::protocol::http::Headers();
-            std::string url = STRING_FORMAT("/v1/session/destroy/%1%", session_id);
+            std::string url = STRING_FORMAT("v1/session/destroy/%1%", session_id);
 
             auto response = requestExecutor->execute("PUT", url, headers, nullptr, nullptr);
 
@@ -205,32 +247,31 @@ const std::vector<std::string> ConsulNodeConfiguration::kvGetKeys(const std::str
     try
     {
         auto        headers = oatpp::web::protocol::http::Headers();
-        std::string url = STRING_FORMAT("/v1/kv/%1%?keys", prefix);
+        std::string url = STRING_FORMAT("v1/kv/%1%?keys", prefix);
         auto        response = requestExecutor->execute("GET", url, headers, nullptr, nullptr);
-
-        if (response && response->getStatusCode() == 200)
+        int statusCode = response->getStatusCode();
+        if (statusCode == 200)
         {
             auto responseBody = response->readBodyToString();
             if (responseBody)
             {
-                // Consul returns a JSON array of strings
-                std::string bodyStr = responseBody.getValue("");
-                // Very simple JSON array parsing (no external dependency)
-                size_t pos = 0;
-                while ((pos = bodyStr.find("\"")) != std::string::npos)
-                {
-                    size_t end = bodyStr.find("\"", pos + 1);
-                    if (end == std::string::npos)
-                        break;
-                    keys.push_back(bodyStr.substr(pos + 1, end - pos - 1));
-                    bodyStr = bodyStr.substr(end + 1);
+                //convert to boost json
+                boost::json::value parsedResponse = boost::json::parse(responseBody.getValue(""));
+                if(parsedResponse.is_array()) {
+                    auto arr = parsedResponse.as_array();
+                    for (const auto& item : arr)
+                    {
+                        if (item.is_string())
+                        {
+                            keys.push_back(std::string(item.as_string()));
+                        }
+                    }
                 }
             }
         }
     }
-    catch (const std::exception&)
+    catch (const std::exception& err)
     {
-        // Ignore errors, return what we have
     }
     return keys;
 }
@@ -240,14 +281,14 @@ std::string ConsulNodeConfiguration::getNodeKey() const
     char hostname[HOST_NAME_MAX];
     if (gethostname(hostname, sizeof(hostname)) == 0)
     {
-        return STRING_FORMAT("k2eg-node/%1%/configuration", std::string(hostname));
+        return STRING_FORMAT("k2eg/nodes/%1%/configuration", std::string(hostname));
     }
     const char* envHostname = std::getenv("HOSTNAME");
     if (envHostname == nullptr)
     {
         throw std::runtime_error("Failed to get hostname");
     }
-    return STRING_FORMAT("k2eg-node/%1%/configuration", std::string(envHostname));
+    return STRING_FORMAT("k2eg/nodes/%1%/configuration", std::string(envHostname));
 }
 
 NodeConfigurationShrdPtr ConsulNodeConfiguration::getNodeConfiguration() const
@@ -331,8 +372,9 @@ ConstSnapshotConfigurationShrdPtr ConsulNodeConfiguration::getSnapshotConfigurat
             snapshot_config->timestamp = timestamp_str.getValue("");
         return snapshot_config;
     }
-    catch (const Client::Error&)
+    catch (const Client::Error& err)
     {
+        // Return nullptr if any error occurs
         return nullptr;
     }
 }
@@ -352,7 +394,7 @@ bool ConsulNodeConfiguration::setSnapshotConfiguration(SnapshotConfigurationShrd
         success &= client->kvPut(base_key + "/timestamp", snapshot_config->timestamp);
         return success;
     }
-    catch (const Client::Error&)
+    catch (const Client::Error& err)
     {
         return false;
     }
@@ -366,7 +408,7 @@ bool ConsulNodeConfiguration::deleteSnapshotConfiguration(const std::string& sna
         client->kvDelete(base_key + "/"); // true = recurse
         return true;
     }
-    catch (const Client::Error&)
+    catch (const Client::Error& err)
     {
         return false;
     }
@@ -409,7 +451,7 @@ bool ConsulNodeConfiguration::updateSnapshotField(const std::string& snapshot_id
     {
         return client->kvPut(key, value);
     }
-    catch (const Client::Error&)
+    catch (const Client::Error& err)
     {
         return false;
     }
@@ -423,7 +465,7 @@ const std::string ConsulNodeConfiguration::getSnapshotField(const std::string& s
         auto value = client->kvGet(key);
         return value ? value.getValue("") : "";
     }
-    catch (const Client::Error&)
+    catch (const Client::Error& err)
     {
         return "";
     }
@@ -438,8 +480,9 @@ bool ConsulNodeConfiguration::isSnapshotRunning(const std::string& snapshot_id) 
         auto running_status = client->kvGet(getSnapshotKey(snapshot_id) + "/running_status");
         return running_status && (running_status.getValue("false") == "true");
     }
-    catch (const Client::Error&)
+    catch (Client::Error& err)
     {
+        auto errMsg = err.getMessage();
         return false;
     }
 }
@@ -448,57 +491,51 @@ const std::string ConsulNodeConfiguration::getSnapshotGateway(const std::string&
 {
     try
     {
-        auto gateway_id = client->kvGet(getSnapshotKey(snapshot_id) + "/gateway_id");
+        std::string base_key = getSnapshotKey(snapshot_id);
+        std::string lock_key = base_key + "/lock";
+        auto        gateway_id = client->kvGet(lock_key);
         return gateway_id ? gateway_id.getValue("") : "";
     }
-    catch (const Client::Error&)
+    catch (const Client::Error& err)
     {
         return "";
     }
 }
 
-bool ConsulNodeConfiguration::tryAcquireSnapshot(const std::string& snapshot_id, const std::string& gateway_id)
+bool ConsulNodeConfiguration::tryAcquireSnapshot(const std::string& snapshot_id)
 {
     if (session_id.empty())
         return false;
 
-    std::string lock_key = getSnapshotKey(snapshot_id) + "/lock";
     std::string base_key = getSnapshotKey(snapshot_id);
+    std::string lock_key = base_key + "/lock";
 
     try
     {
         // Try to acquire lock using session - HTTP PUT with acquire parameter
-        auto headers = oatpp::web::protocol::http::Headers();
-        std::string url = STRING_FORMAT("/v1/kv/%1%?acquire=%2%", lock_key % session_id);
-        auto body = std::make_shared<oatpp::web::protocol::http::outgoing::BufferBody>(
-            gateway_id,
-            oatpp::data::share::StringKeyLabel("application/json")
-        );
+        auto        headers = oatpp::web::protocol::http::Headers();
+        std::string url = STRING_FORMAT("v1/kv/%1%?acquire=%2%", lock_key % session_id);
+        auto        body = std::make_shared<oatpp::web::protocol::http::outgoing::BufferBody>(
+            oatpp::String(getNodeName()),
+            oatpp::data::share::StringKeyLabel("application/json"));
 
         auto response = requestExecutor->execute("PUT", url, headers, body, nullptr);
-
-        if (response && response->getStatusCode() == 200)
+        auto statusCode = response->getStatusCode();
+        if (statusCode == 200)
         {
-            auto responseBody = response->readBodyToString();
-            if (responseBody && responseBody.getValue("") == "true")
-            {
-                // Lock acquired, set snapshot as running and assign gateway
-                bool success = true;
-                success &= client->kvPut(base_key + "/gateway_id", gateway_id);
-                success &= client->kvPut(base_key + "/running_status", "true");
-                // Optionally set timestamp or other fields here
-                return success;
-            }
+            auto               responseBody = response->readBodyToString();
+            boost::json::value parsedResponse = boost::json::parse(responseBody.getValue(""));
+            return parsedResponse.is_bool() && parsedResponse.get_bool();
         }
     }
-    catch (const std::exception&)
+    catch (const std::exception& err)
     {
         // Log error if needed
     }
     return false;
 }
 
-bool ConsulNodeConfiguration::releaseSnapshot(const std::string& snapshot_id, const std::string& gateway_id)
+bool ConsulNodeConfiguration::releaseSnapshot(const std::string& snapshot_id)
 {
     if (session_id.empty())
         return false;
@@ -509,20 +546,13 @@ bool ConsulNodeConfiguration::releaseSnapshot(const std::string& snapshot_id, co
     try
     {
         std::string current_gateway = getSnapshotGateway(snapshot_id);
-        if (current_gateway != gateway_id)
+        if (current_gateway != getNodeName())
             return false;
 
-        bool success = true;
-        success &= client->kvPut(base_key + "/running_status", "false");
-
-        auto        headers = oatpp::web::protocol::http::Headers();
-        std::string url = STRING_FORMAT("/v1/kv/%1%?release=%2%", lock_key % session_id);
-
-        auto response = requestExecutor->execute("PUT", url, headers, nullptr, nullptr);
-
-        return success && (response->getStatusCode() == 200);
+        client->kvDelete(lock_key); // Clear running status
+        return true;
     }
-    catch (const std::exception&)
+    catch (const std::exception& err)
     {
         return false;
     }
@@ -540,14 +570,14 @@ const std::vector<std::string> ConsulNodeConfiguration::getRunningSnapshots() co
                 running_snapshots.push_back(snapshot_id);
         }
     }
-    catch (const Client::Error&)
+    catch (const Client::Error& err)
     {
         // Return empty vector on error
     }
     return running_snapshots;
 }
 
-const std::vector<std::string> ConsulNodeConfiguration::getSnapshotsByGateway(const std::string& gateway_id) const
+const std::vector<std::string> ConsulNodeConfiguration::getSnapshots() const
 {
     std::vector<std::string> gateway_snapshots;
     try
@@ -556,13 +586,12 @@ const std::vector<std::string> ConsulNodeConfiguration::getSnapshotsByGateway(co
         for (const auto& snapshot_id : all_snapshots)
         {
             std::string snapshot_gateway = getSnapshotGateway(snapshot_id);
-            if (snapshot_gateway == gateway_id && isSnapshotRunning(snapshot_id))
+            if (snapshot_gateway == getNodeName())
                 gateway_snapshots.push_back(snapshot_id);
         }
     }
-    catch (const Client::Error&)
+    catch (const Client::Error& err)
     {
-        // Return empty vector on error
     }
     return gateway_snapshots;
 }

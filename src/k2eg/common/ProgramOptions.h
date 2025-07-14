@@ -99,7 +99,7 @@ namespace common {
         k2eg::service::metric::ConstMetricConfigurationUPtr                    getMetricConfiguration();
         k2eg::service::scheduler::ConstSchedulerConfigurationUPtr              getSchedulerConfiguration();
         k2eg::service::epics_impl::ConstEpicsServiceManagerConfigUPtr          getEpicsManagerConfiguration();
-        k2eg::service::configuration::ConstConfigurationServceiConfigUPtr      getConfigurationServiceConfiguration();
+        k2eg::service::configuration::ConstConfigurationServiceConfigUPtr      getConfigurationServiceConfiguration();
         k2eg::controller::node::worker::ConstStorageWorkerConfigurationShrdPtr getStorageWorkerConfiguration();
         k2eg::service::storage::StorageServiceConfigurationShrdPtr             getStorageServiceConfiguration();
         const std::string                                                      getStoragePath();

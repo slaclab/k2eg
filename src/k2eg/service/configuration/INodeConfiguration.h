@@ -15,14 +15,14 @@ namespace k2eg::service::configuration {
 /*
 is the configuration service config
 */
-struct ConfigurationServceiConfig
+struct ConfigurationServiceConfig
 {
     const std::string  config_server_host;
     const std::int16_t config_server_port;
     // reset the configration on the start of the node
     const bool reset_on_start;
 };
-DEFINE_PTR_TYPES(ConfigurationServceiConfig)
+DEFINE_PTR_TYPES(ConfigurationServiceConfig)
 
 /// The informazion about serialziation and destination topic for a single PV
 typedef struct
@@ -145,10 +145,10 @@ The INodeConfiguration interface defines the base logic for node configuration s
 class INodeConfiguration
 {
 protected:
-    ConstConfigurationServceiConfigUPtr config;
+    ConstConfigurationServiceConfigUPtr config;
 
 public:
-    INodeConfiguration(ConstConfigurationServceiConfigUPtr config)
+    INodeConfiguration(ConstConfigurationServiceConfigUPtr config)
         : config(std::move(config)){};
     virtual ~INodeConfiguration() = default;
 
@@ -168,10 +168,10 @@ public:
     // Distributed snapshot management methods
     virtual bool                              isSnapshotRunning(const std::string& snapshot_id) const = 0;
     virtual const std::string                 getSnapshotGateway(const std::string& snapshot_id) const = 0;
-    virtual bool                              tryAcquireSnapshot(const std::string& snapshot_id, const std::string& gateway_id) = 0;
-    virtual bool                              releaseSnapshot(const std::string& snapshot_id, const std::string& gateway_id) = 0;
+    virtual bool                              tryAcquireSnapshot(const std::string& snapshot_id) = 0;
+    virtual bool                              releaseSnapshot(const std::string& snapshot_id) = 0;
     virtual const std::vector<std::string>    getRunningSnapshots() const = 0;
-    virtual const std::vector<std::string>    getSnapshotsByGateway(const std::string& gateway_id) const = 0;
+    virtual const std::vector<std::string>    getSnapshots() const = 0;
 
 };
 DEFINE_PTR_TYPES(INodeConfiguration)

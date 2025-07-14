@@ -1,14 +1,17 @@
 #ifndef K2EG_SERVICE_CONFIGURATION_IMPL_CONSUL_ICONSULENODECONFIGURATIONS_H_
 #define K2EG_SERVICE_CONFIGURATION_IMPL_CONSUL_ICONSULENODECONFIGURATIONS_H_
 
+#include "k2eg/common/types.h"
 #include <k2eg/service/configuration/INodeConfiguration.h>
 
 #include <oatpp-consul/Client.hpp>
 #include <oatpp/core/Types.hpp>
-#include <oatpp/web/client/RequestExecutor.hpp>
 #include <oatpp/parser/json/mapping/ObjectMapper.hpp>
+#include <oatpp/web/client/RequestExecutor.hpp>
 
+#include <mutex>
 #include <thread>
+#include <condition_variable>
 
 namespace k2eg::service::configuration::impl::consul {
 
@@ -22,20 +25,24 @@ class ConsulNodeConfiguration : public INodeConfiguration
     // Consul client
     std::shared_ptr<oatpp::consul::Client>               client;
     std::shared_ptr<oatpp::web::client::RequestExecutor> requestExecutor;
-    std::shared_ptr<oatpp::data::mapping::ObjectMapper>  objectMapper;
     // node configuration key
-    std::string       node_configuration_key;
-    std::string       session_id;
-    std::atomic<bool> session_active{false};
-    std::thread       session_renewal_thread;
+    std::string             node_configuration_key;
+    std::string             session_id;
+    std::atomic<bool>       session_active{false};
+    std::thread             session_renewal_thread;
+    std::condition_variable session_cv;
+    std::mutex              session_mutex;
 
-    std::string getNodeKey() const;
-    bool        createSession();
-    void        renewSession();
-    bool        destroySession();
+    std::string                    getNodeKey() const;
+    bool                           createSession();
+    void                           renewSession();
+    bool                           destroySession();
     const std::vector<std::string> kvGetKeys(const std::string& prefix) const;
+    void                           registerService();
+    void                           deregisterService();
+
 public:
-    ConsulNodeConfiguration(ConstConfigurationServceiConfigUPtr config);
+    ConsulNodeConfiguration(ConstConfigurationServiceConfigUPtr config);
     virtual ~ConsulNodeConfiguration();
 
     // Node configuration methods
@@ -55,11 +62,12 @@ public:
     // Distributed snapshot management methods
     bool                           isSnapshotRunning(const std::string& snapshot_id) const override;
     const std::string              getSnapshotGateway(const std::string& snapshot_id) const override;
-    bool                           tryAcquireSnapshot(const std::string& snapshot_id, const std::string& gateway_id) override;
-    bool                           releaseSnapshot(const std::string& snapshot_id, const std::string& gateway_id) override;
+    bool                           tryAcquireSnapshot(const std::string& snapshot_id) override;
+    bool                           releaseSnapshot(const std::string& snapshot_id) override;
     const std::vector<std::string> getRunningSnapshots() const override;
-    const std::vector<std::string> getSnapshotsByGateway(const std::string& gateway_id) const override;
+    const std::vector<std::string> getSnapshots() const override;
 };
+DEFINE_PTR_TYPES(ConsulNodeConfiguration)
 } // namespace k2eg::service::configuration::impl::consul
 
 #endif // K2EG_SERVICE_CONFIGURATION_IMPL_CONSUL_ICONSULENODECONFIGURATIONS_H_

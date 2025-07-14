@@ -235,10 +235,10 @@ ProgramOptions::getEpicsManagerConfiguration() {
           .max_event_from_monitor_queue = GET_OPTION_NO_DEF(EPICS_MONITOR_CHANNEL_POLL_MAX, std::int32_t)});
 }
 
-ConstConfigurationServceiConfigUPtr
+ConstConfigurationServiceConfigUPtr
 ProgramOptions::getConfigurationServiceConfiguration() {
-  return std::make_unique<const ::ConfigurationServceiConfig>(
-      ConfigurationServceiConfig{
+  return std::make_unique<const ::ConfigurationServiceConfig>(
+      ConfigurationServiceConfig{
           .config_server_host = GET_OPTION(CONFIGURATION_SERVICE_HOST, std::string, "localhost"),
           .config_server_port = GET_OPTION(CONFIGURATION_SERVICE_PORT, short, static_cast<short>(8500)),
           .reset_on_start = GET_OPTION(CONFIGURATION_SERVICE_RESET_ON_START, bool, false)});
