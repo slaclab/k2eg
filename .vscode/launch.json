@@ -549,7 +549,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=ConsulConfiguration.CheckSnapshotAcquireReleaseConcurrency*"],
+            "args": ["--gtest_filter=ConsulConfiguration.SnapshotConfiguration*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

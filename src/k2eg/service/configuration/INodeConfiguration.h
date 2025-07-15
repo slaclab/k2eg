@@ -119,8 +119,6 @@ inline boost::json::object config_to_json(const NodeConfiguration& cfg)
 // Snapshot configuration structure
 struct SnapshotConfiguration
 {
-    // Unique identifier for the snapshot
-    std::string snapshot_id;
     // wight of the snapshot, used for prioritization
     int weight = 0;
     // unit of the weight, can be "eps" or "mbps"
@@ -159,7 +157,7 @@ public:
     // Snapshot configuration methods
     virtual const std::string                 getSnapshotKey(const std::string& snapshot_id) const = 0;
     virtual ConstSnapshotConfigurationShrdPtr getSnapshotConfiguration(const std::string& snapshot_id) const = 0;
-    virtual bool                              setSnapshotConfiguration(SnapshotConfigurationShrdPtr snapshot_config) = 0;
+    virtual bool                              setSnapshotConfiguration(const std::string& snapshot_id, SnapshotConfigurationShrdPtr snapshot_config) = 0;
     virtual bool                              deleteSnapshotConfiguration(const std::string& snapshot_id) = 0;
     virtual const std::vector<std::string>    getSnapshotIds() const = 0;
     virtual bool                              updateSnapshotField(const std::string& snapshot_id, const std::string& field, const std::string& value) = 0;

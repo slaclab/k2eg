@@ -53,7 +53,7 @@ public:
     // Snapshot configuration methods
     const std::string                 getSnapshotKey(const std::string& snapshot_id) const override;
     ConstSnapshotConfigurationShrdPtr getSnapshotConfiguration(const std::string& snapshot_id) const override;
-    bool                              setSnapshotConfiguration(SnapshotConfigurationShrdPtr snapshot_config) override;
+    bool                              setSnapshotConfiguration(const std::string& snapshot_id, SnapshotConfigurationShrdPtr snapshot_config) override;
     bool                              deleteSnapshotConfiguration(const std::string& snapshot_id) override;
     const std::vector<std::string>    getSnapshotIds() const override;
     bool                              updateSnapshotField(const std::string& snapshot_id, const std::string& field, const std::string& value) override;

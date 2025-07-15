@@ -67,6 +67,43 @@ TEST(ConsulConfiguration, SetAndGetNodeConfiguration)
     ASSERT_NO_THROW(consul_config.reset());
 }
 
+TEST(ConsulConfiguration, SnapshotConfiguration)
+{
+    // Setup configuration (adjust as needed for your test environment)
+    auto config = std::make_unique<ConfigurationServiceConfig>(
+        ConfigurationServiceConfig{
+            "consul", // config_server_host
+            8500,     // config_server_port
+            true      // reset_on_start
+        });
+
+    ConsulNodeConfiguration nodeConfig(std::move(config));
+
+    std::string snapshot_id = "test-snapshot";
+
+    // Clean up before test
+    SnapshotConfigurationShrdPtr snapshot_config = MakeSnapshotConfigurationShrdPtr(
+        SnapshotConfiguration{
+            .weight = 100,
+            .weight_unit = "eps",
+            .running_status = false,
+            .archiving_status = false,
+            .archiver_id = "",
+            .timestamp = "2023-10-01T00:00:00Z"});
+    ASSERT_TRUE(nodeConfig.setSnapshotConfiguration(snapshot_id, snapshot_config));
+    ASSERT_FALSE(nodeConfig.isSnapshotRunning(snapshot_id));
+
+    // retrieve the snapshot configuration
+    ConstSnapshotConfigurationShrdPtr retrieved_config = nodeConfig.getSnapshotConfiguration(snapshot_id);
+    ASSERT_NE(retrieved_config, nullptr);
+    ASSERT_EQ(retrieved_config->weight, 100);
+    ASSERT_EQ(retrieved_config->weight_unit, "eps");
+    ASSERT_EQ(retrieved_config->running_status, false);
+    ASSERT_EQ(retrieved_config->archiving_status, false);
+    ASSERT_EQ(retrieved_config->archiver_id, "");
+    ASSERT_EQ(retrieved_config->timestamp, "2023-10-01T00:00:00Z");
+}
+
 TEST(ConsulConfiguration, CheckSnapshotAcquireRelease)
 {
     // Setup configuration (adjust as needed for your test environment)
@@ -151,7 +188,7 @@ TEST(ConsulConfiguration, CheckSnapshotAcquireReleaseConcurrencyOnExpiration)
         });
     ConsulNodeConfigurationUPtr nodeConfigOne = MakeConsulNodeConfigurationUPtr(std::move(configOne));
     ConsulNodeConfigurationUPtr nodeConfigTwo = MakeConsulNodeConfigurationUPtr(std::move(configTwo));
-    std::string                      snapshot_id = "test-snapshot";
+    std::string                 snapshot_id = "test-snapshot";
 
     // Clean up before test
 

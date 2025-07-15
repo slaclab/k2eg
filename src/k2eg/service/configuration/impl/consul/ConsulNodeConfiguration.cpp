@@ -355,7 +355,6 @@ ConstSnapshotConfigurationShrdPtr ConsulNodeConfiguration::getSnapshotConfigurat
         auto timestamp_str = client->kvGet(base_key + "/timestamp");
 
         auto snapshot_config = std::make_shared<SnapshotConfiguration>();
-        snapshot_config->snapshot_id = snapshot_id;
         if (weight_str)
             snapshot_config->weight = std::stoi(weight_str);
         if (weight_unit_str)
@@ -379,20 +378,19 @@ ConstSnapshotConfigurationShrdPtr ConsulNodeConfiguration::getSnapshotConfigurat
     }
 }
 
-bool ConsulNodeConfiguration::setSnapshotConfiguration(SnapshotConfigurationShrdPtr snapshot_config)
+bool ConsulNodeConfiguration::setSnapshotConfiguration(const std::string& snapshot_id, SnapshotConfigurationShrdPtr snapshot_config)
 {
-    std::string base_key = getSnapshotKey(snapshot_config->snapshot_id);
+    std::string base_key = getSnapshotKey(snapshot_id);
     try
     {
-        bool success = true;
-        success &= client->kvPut(base_key + "/weight", std::to_string(snapshot_config->weight));
-        success &= client->kvPut(base_key + "/weight_unit", snapshot_config->weight_unit);
-        success &= client->kvPut(base_key + "/gateway_id", snapshot_config->gateway_id);
-        success &= client->kvPut(base_key + "/running_status", snapshot_config->running_status ? "true" : "false");
-        success &= client->kvPut(base_key + "/archiving_status", snapshot_config->archiving_status ? "true" : "false");
-        success &= client->kvPut(base_key + "/archiver_id", snapshot_config->archiver_id);
-        success &= client->kvPut(base_key + "/timestamp", snapshot_config->timestamp);
-        return success;
+        client->kvPut(base_key + "/weight", std::to_string(snapshot_config->weight));
+        client->kvPut(base_key + "/weight_unit", snapshot_config->weight_unit);
+        client->kvPut(base_key + "/gateway_id", snapshot_config->gateway_id);
+        client->kvPut(base_key + "/running_status", snapshot_config->running_status ? "true" : "false");
+        client->kvPut(base_key + "/archiving_status", snapshot_config->archiving_status ? "true" : "false");
+        client->kvPut(base_key + "/archiver_id", snapshot_config->archiver_id);
+        client->kvPut(base_key + "/timestamp", snapshot_config->timestamp);
+        return true;
     }
     catch (const Client::Error& err)
     {
