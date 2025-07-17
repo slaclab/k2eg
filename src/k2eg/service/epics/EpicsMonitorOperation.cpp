@@ -1,3 +1,4 @@
+#include "k2eg/service/epics/PVStructureMerger.h"
 #include <iostream>
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
@@ -14,6 +15,25 @@ namespace pvd = epics::pvData;
 MonitorOperationImpl::MonitorOperationImpl(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field)
     : channel(channel), pv_name(pv_name), field(field), received_event(std::make_shared<EventReceived>())
 {
+    size_t start = field.find("field(");
+    if (start != std::string::npos)
+    {
+        start += 6; // length of "field("
+        size_t end = field.find(')', start);
+        if (end != std::string::npos)
+        {
+            std::string       fields_substr = field.substr(start, end - start);
+            std::stringstream ss(fields_substr);
+            std::string       item;
+            while (std::getline(ss, item, ','))
+            {
+                // Remove whitespace
+                item.erase(std::remove_if(item.begin(), item.end(), ::isspace), item.end());
+                if (!item.empty())
+                    requested_fields.push_back(item);
+            }
+        }
+    }
     channel->addConnectListener(this);
 }
 
@@ -192,7 +212,8 @@ EventReceivedShrdPtr CombinedMonitorOperation::getEventData() const
         // join all the event data from the principal request, with the last from additional request
         // event from principal are more important than from additional one request
         auto merge_event_data = structure_merger->mergeStructureAndValue(
-            {a_data->channel_data.data, last_additional_evt_received->channel_data.data});
+            {PVStructureToMerge{a_data->channel_data.data, monitor_principal_request->requested_fields},
+             PVStructureToMerge{last_additional_evt_received->channel_data.data, monitor_additional_request->requested_fields}});
         joined_evt->event_data->push_back(MakeMonitorEventShrdPtr(a_data->type, "", ChannelData(a_data->channel_data.pv_name, merge_event_data)));
     }
     return joined_evt;

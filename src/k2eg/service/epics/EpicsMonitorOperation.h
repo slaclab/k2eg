@@ -45,9 +45,11 @@ public:
 };
 DEFINE_PTR_TYPES(MonitorOperation)
 
+class CombinedMonitorOperation;
 // async monitor operation ofr a single set of field
 class MonitorOperationImpl : public pvac::ClientChannel::MonitorCallback, public MonitorOperation, public pvac::ClientChannel::ConnectCallback
 {
+    friend class CombinedMonitorOperation;
     const std::string                    field;
     const std::string                    pv_name;
     mutable pvac::Monitor                mon;
@@ -55,6 +57,7 @@ class MonitorOperationImpl : public pvac::ClientChannel::MonitorCallback, public
     mutable GetOperationUPtr             get_op;
     mutable EventReceivedShrdPtr         received_event;
     mutable std::mutex                   ce_mtx;
+    std::vector<std::string>             requested_fields;
 
 public:
     MonitorOperationImpl(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field = "field()");
