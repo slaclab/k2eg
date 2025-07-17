@@ -5,10 +5,34 @@ using namespace k2eg::service::epics_impl;
 
 PVStructureMerger::PVStructureMerger() : root_builder(pvd::getFieldCreate()->createFieldBuilder()) {}
 
-epics::pvData::PVStructure::const_shared_pointer PVStructureMerger::mergeStructureAndValue(std::vector<epics::pvData::PVStructure::const_shared_pointer> struct_ptr_vec)
+epics::pvData::PVStructure::const_shared_pointer PVStructureMerger::mergeStructureAndValue(const std::vector<PVStructureToMerge>& struct_ptr_vec)
 {
-    appendFieldFromStruct(struct_ptr_vec, true);
-    return copyValue(struct_ptr_vec);
+if (struct_ptr_vec.empty())
+        return nullptr;
+    // Create a new structure using the schema of the first structure
+    auto dest = pvd::getPVDataCreate()->createPVStructure(struct_ptr_vec[0].structure->getStructure());
+
+    // Copy all values from struct_ptr_vec[0] into dest
+    copyValue(dest.get(), struct_ptr_vec[0].structure.get());
+
+    // Merge fields from each structure according to their field_names
+    for (size_t i = 0; i < struct_ptr_vec.size(); ++i)
+    {
+        auto src = struct_ptr_vec[i].structure;
+        if (!src)
+            continue;
+        for (const auto& fname : struct_ptr_vec[i].field_names)
+        {
+            auto src_field = src->getSubField(fname);
+            auto dest_field = dest->getSubField(fname);
+            if (src_field && dest_field)
+            {
+                dest_field->copyUnchecked(*src_field);
+            }
+        }
+    }
+    dest->setImmutable();
+    return dest;
 }
 
 void PVStructureMerger::appendFieldFromStruct(std::vector<pvd::PVStructure::const_shared_pointer> struct_ptr_vec, bool reset)

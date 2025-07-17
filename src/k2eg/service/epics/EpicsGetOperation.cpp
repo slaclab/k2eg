@@ -1,11 +1,12 @@
+#include "k2eg/service/epics/PVStructureMerger.h"
 #include <client.h>
+#include <iostream>
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
 
+#include <pv/createRequest.h>
 #include <pvData.h>
 #include <pvIntrospect.h>
-#include <pv/createRequest.h>
-
 
 #include <memory>
 
@@ -52,10 +53,9 @@ ConstChannelDataUPtr CombinedGetOperation::getChannelData() const
         return result;
 
     // we have data so combine it
-    auto merged_result =
-        structure_merger->mergeStructureAndValue({get_op_a->getChannelData()->data, get_op_b->getChannelData()->data});
-
-    // copy the values
+    auto merged_result = structure_merger->mergeStructureAndValue(
+        {PVStructureToMerge{get_op_a->getChannelData()->data, std::dynamic_pointer_cast<SingleGetOperation>(get_op_a)->requested_fields},
+         PVStructureToMerge{get_op_b->getChannelData()->data, std::dynamic_pointer_cast<SingleGetOperation>(get_op_b)->requested_fields}});
     return MakeChannelDataUPtr(get_op_a->getChannelData()->pv_name, merged_result);
 }
 
@@ -68,6 +68,25 @@ bool CombinedGetOperation::hasData() const
 SingleGetOperation::SingleGetOperation(std::shared_ptr<pvac::ClientChannel> channel, const std::string& pv_name, const std::string& field)
     : channel(channel), pv_name(pv_name), field(field), is_done(false)
 {
+    size_t start = field.find("field(");
+    if (start != std::string::npos)
+    {
+        start += 6; // length of "field("
+        size_t end = field.find(')', start);
+        if (end != std::string::npos)
+        {
+            std::string       fields_substr = field.substr(start, end - start);
+            std::stringstream ss(fields_substr);
+            std::string       item;
+            while (std::getline(ss, item, ','))
+            {
+                // Remove whitespace
+                item.erase(std::remove_if(item.begin(), item.end(), ::isspace), item.end());
+                if (!item.empty())
+                    requested_fields.push_back(item);
+            }
+        }
+    }
     channel->addConnectListener(this);
 }
 

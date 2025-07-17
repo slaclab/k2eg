@@ -9,6 +9,13 @@
 #include <vector>
 namespace k2eg::service::epics_impl {
 
+struct PVStructureToMerge
+{
+    epics::pvData::PVStructure::const_shared_pointer structure;
+    const std::vector<std::string>& field_names;
+
+};
+
 // Manage the merge of a structure and permit to copy value from two structure
 // searching for every field that match same name and type
 class PVStructureMerger
@@ -20,7 +27,7 @@ class PVStructureMerger
 public:
     PVStructureMerger();
     ~PVStructureMerger() = default;
-    epics::pvData::PVStructure::const_shared_pointer mergeStructureAndValue(std::vector<epics::pvData::PVStructure::const_shared_pointer> struct_ptr_vec);
+    epics::pvData::PVStructure::const_shared_pointer mergeStructureAndValue(const std::vector<PVStructureToMerge>& struct_ptr_vec);
     void appendFieldFromStruct(std::vector<epics::pvData::PVStructure::const_shared_pointer> struct_ptr_vec, bool reset = false);
     epics::pvData::PVStructure::const_shared_pointer copyValue(std::vector<epics::pvData::PVStructure::const_shared_pointer> struct_ptr_vec);
     epics::pvData::PVStructure::const_shared_pointer getStructure() const;
