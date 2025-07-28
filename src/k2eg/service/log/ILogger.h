@@ -4,8 +4,9 @@
 #include <k2eg/common/types.h>
 
 #include <memory>
-#include <string>
 #include <source_location> // C++20
+#include <string>
+
 namespace k2eg::service::log {
 // logger configuration type
 typedef struct LogConfiguration
@@ -18,6 +19,7 @@ typedef struct LogConfiguration
     bool        log_on_syslog;
     std::string log_syslog_srv;
     int         log_syslog_srv_port;
+    int         log_function_name_width = 30; // width of the function name in the log
 } LogConfiguration;
 DEFINE_PTR_TYPES(LogConfiguration)
 

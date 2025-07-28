@@ -46,7 +46,7 @@ MonitorChecker::storeMonitorData(const ChannelMonitorTypeConstVector& channel_de
 
 size_t
 MonitorChecker::scanForRestart(size_t element_to_process) {
-  logger->logMessage("[ Restart Scan ] Start scanning for monitor restart");
+  logger->logMessage("Start scanning for monitor restart");
   // scan al monitor to check what need to be
   return node_configuration_db->iterateAllChannelMonitorForAction(
       element_to_process,  // number of unprocessed element to check

@@ -30,6 +30,7 @@ static const char* const LOG_ON_FILE = "log-on-file";
 static const char* const LOG_FILE_NAME = "log-file-name";
 static const char* const LOG_FILE_MAX_SIZE = "log-file-max-size";
 static const char* const LOG_ON_SYSLOG = "log-on-syslog";
+static const char* const LOG_FUNCTION_NAME_WIDTH = "log-function-name-width";
 static const char* const SYSLOG_SERVER = "syslog-server";
 static const char* const SYSLOG_PORT = "syslog-port";
 

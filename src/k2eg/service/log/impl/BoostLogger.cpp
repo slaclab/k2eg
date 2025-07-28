@@ -11,8 +11,8 @@ namespace sinks = boost::log::sinks;
 using namespace k2eg::service::log;
 using namespace k2eg::service::log::impl;
 
-#define BASE_LOG_FORMAT     "[%TimeStamp%][%Severity%]: %_%"
-#define EXTENDED_LOG_FORMAT "[%TimeStamp%][%Severity%][%ThreadID%]: %_%"
+#define BASE_LOG_FORMAT     "[%TimeStamp%][%Severity%] %_%"
+#define EXTENDED_LOG_FORMAT "[%TimeStamp%][%Severity%][%ThreadID%] %_%"
 
 static std::unordered_map<std::string, std::string> method_name_cache;
 static std::mutex method_name_cache_mutex;
@@ -179,7 +179,7 @@ void BoostLogger::logMessage(const std::string& message, LogLevel level, const s
     if (rec)
     {
         logging::record_ostream strm(rec);
-        strm << std::format("[{}] ", getClassAndMethodEllipsisCached(location.function_name()));
+        strm << std::format("[{}] ", getClassAndMethodEllipsisCached(location.function_name(), configuration->log_function_name_width));
         strm << message;
         strm.flush();
         logger_mt.push_record(boost::move(rec));

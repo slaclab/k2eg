@@ -67,23 +67,23 @@ MonitorCommandWorker::~MonitorCommandWorker()
     // dispose the token for the event
     epics_handler_token.reset();
     monitor_checker_token.reset();
-    logger->logMessage("[ Shoutdown ] Stop metrics update thread");
+    logger->logMessage("Stop metrics update thread");
 
     // remove automated task from the scheduler
-    logger->logMessage("[ Shoutdown ] Remove periodic task from scheduler");
+    logger->logMessage("Remove periodic task from scheduler");
     bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(MAINTANACE_TASK_NAME);
     logger->logMessage(STRING_FORMAT("Remove periodic maintanance : %1%", erased));
     erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(STARTUP_MONITOR_TASK_NAME);
     logger->logMessage(STRING_FORMAT("Remove startup task: %1%", erased));
     // dipose all still live monitor
-    logger->logMessage("[ Dispose Worker ] stop all still live monitor");
+    logger->logMessage("Stop all still live monitor");
     for (auto& mon_vec_for_pv : channel_topics_map)
     {
-        logger->logMessage(STRING_FORMAT("[ Exing Worker ] Stop all monitor for pv '%1%'", mon_vec_for_pv.first));
+        logger->logMessage(STRING_FORMAT("Stop all monitor for pv '%1%'", mon_vec_for_pv.first));
         for (auto& monitor_info : mon_vec_for_pv.second.cmd_vec)
         {
             logger->logMessage(STRING_FORMAT(
-                "[ Dispose Worker ] Stop monitor for pv '%1%' with target '%2%'", monitor_info.pv_name % monitor_info.channel_destination));
+                "Stop monitor for pv '%1%' with target '%2%'", monitor_info.pv_name % monitor_info.channel_destination));
             epics_service_manager->monitorChannel(monitor_info.pv_name, false);
         }
     }
@@ -92,12 +92,12 @@ MonitorCommandWorker::~MonitorCommandWorker()
 void MonitorCommandWorker::handleRestartMonitorTask(TaskProperties& task_properties)
 {
     std::lock_guard<std::mutex> lock(periodic_task_mutex);
-    logger->logMessage("[ Startup Task ] Restart monitor requests");
+    logger->logMessage("Restart monitor requests");
     task_properties.completed = !(starting_up = monitor_checker_shrd_ptr->scanForRestart());
     task_properties.run_asap = true;
     if (!starting_up)
     {
-        logger->logMessage("[ Startup Task ] Startup completed");
+        logger->logMessage("Startup completed");
         // start checker timing
         auto task_periodic_maintanance = MakeTaskShrdPtr(MAINTANACE_TASK_NAME, monitor_command_configuration.cron_scheduler_monitor_check, std::bind(&MonitorCommandWorker::handlePeriodicTask, this, std::placeholders::_1));
         ServiceResolver<Scheduler>::resolve()->addTask(task_periodic_maintanance);
@@ -107,12 +107,12 @@ void MonitorCommandWorker::handleRestartMonitorTask(TaskProperties& task_propert
 void MonitorCommandWorker::handlePeriodicTask(TaskProperties& task_properties)
 {
     std::lock_guard<std::mutex> lock(periodic_task_mutex);
-    logger->logMessage("[ Automatic Task ] Checking active monitor");
+    logger->logMessage("Checking active monitor");
     auto processed = monitor_checker_shrd_ptr->scanForMonitorToStop();
     if (!processed)
     {
         monitor_checker_shrd_ptr->resetMonitorToProcess();
-        logger->logMessage("[ Automatic Task ] All monitor has been checked");
+        logger->logMessage("All monitor has been checked");
     }
 }
 
@@ -130,7 +130,7 @@ void MonitorCommandWorker::publishEvtCB(pubsub::EventType type, PublishMessage* 
     case OnSent: break;
     case OnError:
         {
-            logger->logMessage(STRING_FORMAT("[MonitorCommandWorker::publishEvtCB] %1%", error_message), LogLevel::ERROR);
+            logger->logMessage(error_message, LogLevel::ERROR);
             break;
         }
     }
@@ -236,8 +236,8 @@ void MonitorCommandWorker::processCommand(std::shared_ptr<BS::light_thread_pool>
 {
     if (starting_up)
     {
-        logger->logMessage("[ Starting up ] Comamnd cannot be executed", LogLevel::ERROR);
-        manageReply(-2, "Command cannot be executed, k2eg monitor worker is starting", command);
+        logger->logMessage("Command cannot be executed because k2eg monitor worker is starting up", LogLevel::ERROR);
+        manageReply(-2, "Command cannot be executed, k2eg monitor worker is starting up", command);
         return;
     }
     if (!has_serialization_for_type(command->serialization))
