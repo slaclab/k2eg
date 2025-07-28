@@ -11,8 +11,8 @@ namespace sinks = boost::log::sinks;
 using namespace k2eg::service::log;
 using namespace k2eg::service::log::impl;
 
-#define BASE_LOG_FORMAT     "[%TimeStamp%][%Severity%] %_%"
-#define EXTENDED_LOG_FORMAT "[%TimeStamp%][%Severity%][%ThreadID%] %_%"
+#define BASE_LOG_FORMAT     "[%TimeStamp%][%Severity%]%_%"
+#define EXTENDED_LOG_FORMAT "[%TimeStamp%][%Severity%][%ThreadID%]%_%"
 
 static std::unordered_map<std::string, std::string> method_name_cache;
 static std::mutex method_name_cache_mutex;

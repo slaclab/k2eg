@@ -98,6 +98,10 @@ class NodeController
      */
     void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
 
+    void startAsGateway();
+    void performGatewayPeriodicTask();
+    void startAsStorage();
+    void performStoragePeriodicTask();
 public:
     /**
      * @brief Constructs a NodeController with the given configuration and data storage.

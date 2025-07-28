@@ -74,16 +74,30 @@ int K2EGateway::setup(int argc, const char* argv[])
         ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsulNodeConfiguration>(po->getConfigurationServiceConfiguration()));
         logger->logMessage("Start Metric Service");
         ServiceResolver<IMetricService>::registerService(instanceMetricService(po->getMetricConfiguration()));
-        logger->logMessage("Start EPICS service");
-        ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>(po->getEpicsManagerConfiguration()));
-        logger->logMessage("Start publisher service");
-        ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(po->getPublisherConfiguration()));
-        logger->logMessage("Start subscriber service");
-        ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(po->getSubscriberConfiguration()));
-        logger->logMessage("Start node controller");
-        node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
-        logger->logMessage("Start command controller");
-        cmd_controller = std::make_unique<CMDController>(po->getCMDControllerConfiguration(), std::bind(&NodeController::submitCommand, &(*node_controller), std::placeholders::_1));
+        switch (po->getNodeType())
+        {
+        case NodeType::GATEWAY:
+            logger->logMessage("Start Gateway Node Controller");
+            logger->logMessage("Start EPICS service");
+            ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>(po->getEpicsManagerConfiguration()));
+            logger->logMessage("Start publisher service");
+            ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(po->getPublisherConfiguration()));
+            logger->logMessage("Start subscriber service");
+            ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(po->getSubscriberConfiguration()));
+            logger->logMessage("Start node controller");
+            node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
+            logger->logMessage("Start command controller");
+            cmd_controller = std::make_unique<CMDController>(po->getCMDControllerConfiguration(), std::bind(&NodeController::submitCommand, &(*node_controller), std::placeholders::_1));
+            break;
+        case NodeType::STORAGE:
+            logger->logMessage("Start Storage Node Controller");
+            logger->logMessage("Start node controller");
+            node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
+            break;
+        default:
+            throw std::runtime_error("Unknown node type in ProgramOptions configuration");
+        }
+
         running = true;
         // wait for termination request
         cv.wait(lk,
@@ -93,16 +107,29 @@ int K2EGateway::setup(int argc, const char* argv[])
                 });
 
         // deallocation
-        logger->logMessage("Stop command controller");
-        cmd_controller.reset();
-        logger->logMessage("Stop node controller");
-        node_controller.reset();
-        logger->logMessage("Stop subscriber service");
-        ServiceResolver<ISubscriber>::reset();
-        logger->logMessage("Stop publihser service");
-        ServiceResolver<IPublisher>::reset();
-        logger->logMessage("Stop EPICS service");
-        ServiceResolver<EpicsServiceManager>::reset();
+        switch (po->getNodeType())
+        {
+        case NodeType::GATEWAY:
+            logger->logMessage("Stop Gateway Node Controller");
+            logger->logMessage("Stop command controller");
+            cmd_controller.reset();
+            logger->logMessage("Stop node controller");
+            node_controller.reset();
+            logger->logMessage("Stop subscriber service");
+            ServiceResolver<ISubscriber>::reset();
+            logger->logMessage("Stop publisher service");
+            ServiceResolver<IPublisher>::reset();
+            logger->logMessage("Stop EPICS service");
+            ServiceResolver<EpicsServiceManager>::reset();
+            break;
+        case NodeType::STORAGE:
+            logger->logMessage("Stop Storage Node Controller");
+            logger->logMessage("Stop node controller");
+            node_controller.reset();
+            break;
+        default:
+            throw std::runtime_error("Unknown node type in ProgramOptions configuration");
+        }
         logger->logMessage("Stop Metric Service");
         ServiceResolver<IMetricService>::reset();
         logger->logMessage("Stop configuration service");
