@@ -81,14 +81,13 @@ private:
      * @brief Convert BSON document to ArchiveRecord
      */
     ArchiveRecord bsonToRecord(const bsoncxx::document::view& doc);
-
+    void initialize();
+    void shutdown();
 public:
     explicit MongoDBStorageService(ConstStorageImplementationConfigShrdPtr config);
     virtual ~MongoDBStorageService() override;
 
-    // IStorageService interface
-    bool initialize() override;
-    void shutdown() override;
+
     bool store(const ArchiveRecord& record) override;
     size_t storeBatch(const std::vector<ArchiveRecord>& records) override;
     ArchiveQueryResult query(const ArchiveQuery& query) override;

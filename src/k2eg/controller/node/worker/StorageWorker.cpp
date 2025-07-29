@@ -1,9 +1,8 @@
-#include <functional>
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
+
 #include <k2eg/controller/node/worker/StorageWorker.h>
 #include <k2eg/service/ServiceResolver.h>
-#include <thread>
 
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::service;
@@ -21,7 +20,7 @@ using namespace k2eg::common;
 #define DEFAULT_CONSUMER_GROUP_ID "k2eg-storage-workers"
 
 // Storage Worker Program Option Keys
-#define STORAGE_WORKER_SECTION_KEY "storage-worker"
+#define STORAGE_WORKER_SECTION_KEY "Storage Worker"
 #define BATCH_SIZE_KEY "batch-size"
 #define BATCH_TIMEOUT_KEY "batch-timeout"
 #define WORKER_THREAD_COUNT_KEY "worker-thread-count"
@@ -52,13 +51,12 @@ ConstStorageWorkerConfigurationShrdPtr get_storage_worker_program_option(const b
 {
     auto config = std::make_shared<StorageWorkerConfiguration>();
 
-    if (vm.count(STORAGE_WORKER_SECTION_KEY) == 0)
-    {
-        return config; // Return default configuration if section is not present
-    }
-
     // Extract batch size
     if (vm.count(BATCH_SIZE_KEY))
+    {
+        config->batch_size = vm[BATCH_SIZE_KEY].as<size_t>();
+    }
+    else if (vm.count(BATCH_SIZE_KEY)) // For backward compatibility
     {
         config->batch_size = vm[BATCH_SIZE_KEY].as<size_t>();
     }
@@ -93,37 +91,29 @@ ConstStorageWorkerConfigurationShrdPtr get_storage_worker_program_option(const b
 
 #pragma region Implementation
 
-StorageWorker::StorageWorker(const StorageWorkerConfiguration& config_, IStorageServiceShrdPtr storage_service_)
+StorageWorker::StorageWorker(const ConstStorageWorkerConfigurationShrdPtr& config_, IStorageServiceShrdPtr storage_service_)
     : logger(ServiceResolver<ILogger>::resolve()), config(config_), storage_service(storage_service_)
 {
     // Resolve required services
     logger = ServiceResolver<ILogger>::resolve();
-    subscriber = ServiceResolver<ISubscriber>::resolve();
+    if (!storage_service)
+    {
+        throw std::runtime_error("Storage service is not available");
+    }
+
+    logger->logMessage("StorageWorker initialized with configuration", LogLevel::INFO);
 }
 
 StorageWorker::~StorageWorker()
 {
-    stop();
 }
 
-void StorageWorker::start()
+void StorageWorker::executePeriodicTask()
 {
-    // Initialize thread pool
-    config_checker_thread = std::thread(std::bind(&StorageWorker::configChecker, this));
-    logger->logMessage("StorageWorker started successfully", LogLevel::INFO);
-}
-
-void StorageWorker::stop()
-{
-
-    logger->logMessage("StorageWorker stopped successfully", LogLevel::INFO);
-}
-
-void StorageWorker::configChecker()
-{
-    while (running.load())
+    if (!running.load())
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        // Check and update configuration if needed
+        logger->logMessage("Storage worker is not running", LogLevel::INFO);
+        return;
     }
+    logger->logMessage("Executing periodic task for StorageWorker", LogLevel::DEBUG);
 }

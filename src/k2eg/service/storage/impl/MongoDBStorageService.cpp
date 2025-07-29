@@ -1,8 +1,9 @@
-#include "k2eg/common/utility.h"
+#include <k2eg/common/utility.h>
 #include <bsoncxx/builder/stream/array.hpp>
 #include <bsoncxx/builder/stream/document.hpp>
 #include <bsoncxx/json.hpp>
 #include <chrono>
+
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/storage/impl/MongoDBStorageService.h>
@@ -22,7 +23,7 @@ constexpr const char* MONGODB_POOL_SIZE_KEY = "pool-size";
 constexpr const char* MONGODB_TIMEOUT_MS_KEY = "timeout-ms";
 constexpr const char* MONGODB_CREATE_INDEXES_KEY = "create-indexes";
 constexpr const char* MONGODB_BATCH_SIZE_KEY = "batch-size";
-constexpr const char* MONGODB_SECTION_KEY = "mongodb";
+constexpr const char* MONGODB_SECTION_KEY = "MongoDB";
 
 constexpr const char* DEFAULT_CONNECTION_STRING = "mongodb://localhost:27017";
 constexpr const char* DEFAULT_DATABASE = "k2eg";
@@ -50,7 +51,7 @@ namespace k2eg::service::storage::impl {
 void fill_mongodb_program_option(boost::program_options::options_description& desc)
 {
     // Create a dedicated section for MongoDB options
-    boost::program_options::options_description mongodb_section("mongodb");
+    boost::program_options::options_description mongodb_section(MONGODB_SECTION_KEY);
 
     mongodb_section.add_options()(MONGODB_CONNECTION_STRING_KEY, boost::program_options::value<std::string>()->default_value(DEFAULT_CONNECTION_STRING), "MongoDB connection string")(
         MONGODB_DATABASE_KEY, boost::program_options::value<std::string>()->default_value(DEFAULT_DATABASE), "MongoDB database name")(
@@ -67,47 +68,40 @@ void fill_mongodb_program_option(boost::program_options::options_description& de
 ConstStorageImplementationConfigShrdPtr get_mongodb_program_option(const boost::program_options::variables_map& vm)
 {
     auto config = std::make_shared<MongoDBStorageImplementationConfig>();
-    if (!vm.count(MONGODB_SECTION_KEY))
-    {
-        return config;
-    }
-
-    auto mongodb_vm = vm[MONGODB_SECTION_KEY].as<boost::program_options::variables_map>();
-
     // Extract MongoDB connection settings
-    if (mongodb_vm.count(MONGODB_CONNECTION_STRING_KEY))
+    if (vm.count( MONGODB_CONNECTION_STRING_KEY))
     {
-        config->connection_string = mongodb_vm[MONGODB_CONNECTION_STRING_KEY].as<std::string>();
+        config->connection_string = vm[MONGODB_CONNECTION_STRING_KEY].as<std::string>();
     }
 
-    if (mongodb_vm.count(MONGODB_DATABASE_KEY))
+    if (vm.count(MONGODB_DATABASE_KEY))
     {
-        config->database_name = mongodb_vm[MONGODB_DATABASE_KEY].as<std::string>();
+        config->database_name = vm[MONGODB_DATABASE_KEY].as<std::string>();
     }
 
-    if (mongodb_vm.count(MONGODB_COLLECTION_KEY))
+    if (vm.count(MONGODB_COLLECTION_KEY))
     {
-        config->collection_name = mongodb_vm[MONGODB_COLLECTION_KEY].as<std::string>();
+        config->collection_name = vm[MONGODB_COLLECTION_KEY].as<std::string>();
     }
 
-    if (mongodb_vm.count(MONGODB_POOL_SIZE_KEY))
+    if (vm.count(MONGODB_POOL_SIZE_KEY))
     {
-        config->connection_pool_size = static_cast<size_t>(mongodb_vm[MONGODB_POOL_SIZE_KEY].as<int>());
+        config->connection_pool_size = static_cast<size_t>(vm[MONGODB_POOL_SIZE_KEY].as<int>());
     }
 
-    if (mongodb_vm.count(MONGODB_BATCH_SIZE_KEY))
+    if (vm.count(MONGODB_BATCH_SIZE_KEY))
     {
-        config->batch_size = static_cast<size_t>(mongodb_vm[MONGODB_BATCH_SIZE_KEY].as<int>());
+        config->batch_size = static_cast<size_t>(vm[MONGODB_BATCH_SIZE_KEY].as<int>());
     }
 
-    if (mongodb_vm.count(MONGODB_CREATE_INDEXES_KEY))
+    if (vm.count(MONGODB_CREATE_INDEXES_KEY))
     {
-        config->create_indexes = mongodb_vm[MONGODB_CREATE_INDEXES_KEY].as<bool>();
+        config->create_indexes = vm[MONGODB_CREATE_INDEXES_KEY].as<bool>();
     }
 
-    if (mongodb_vm.count(MONGODB_TIMEOUT_MS_KEY))
+    if (vm.count(MONGODB_TIMEOUT_MS_KEY))
     {
-        config->timeout_ms = mongodb_vm[MONGODB_TIMEOUT_MS_KEY].as<int>();
+        config->timeout_ms = vm[MONGODB_TIMEOUT_MS_KEY].as<int>();
     }
 
     // Cast to base type for return
@@ -128,7 +122,7 @@ MongoDBStorageService::~MongoDBStorageService()
     this->shutdown();
 }
 
-bool MongoDBStorageService::initialize()
+void MongoDBStorageService::initialize()
 {
     try
     {
@@ -147,6 +141,8 @@ bool MongoDBStorageService::initialize()
         auto ping_cmd = bsoncxx_builder::document{} << BSON_PING_FIELD << 1 << bsoncxx_builder::finalize;
         db.run_command(ping_cmd.view());
 
+        logger->logMessage("MongoDB connection established successfully", LogLevel::INFO);
+
         // Create indexes if configured
         if (config_->create_indexes)
         {
@@ -154,17 +150,16 @@ bool MongoDBStorageService::initialize()
         }
 
         logger->logMessage("MongoDB storage service initialized successfully", LogLevel::INFO);
-        return true;
     }
     catch (const mongocxx::exception& e)
     {
         logger->logMessage(STRING_FORMAT("Failed to initialize MongoDB storage service: {%1%}", e.what()), LogLevel::ERROR);
-        return false;
+        throw std::runtime_error(STRING_FORMAT("MongoDB initialization failed: {%1%}", e.what()));
     }
     catch (const std::exception& e)
     {
         logger->logMessage(STRING_FORMAT("Failed to initialize MongoDB storage service: {%1%}", e.what()), LogLevel::ERROR);
-        return false;
+        throw std::runtime_error(STRING_FORMAT("MongoDB initialization failed: {%1%}", e.what()));
     }
 }
 

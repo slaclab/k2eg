@@ -89,17 +89,6 @@ public:
     virtual ~IStorageService() = default;
 
     /**
-     * @brief Initialize the storage service
-     * @return true if initialization was successful
-     */
-    virtual bool initialize() = 0;
-
-    /**
-     * @brief Shutdown the storage service
-     */
-    virtual void shutdown() = 0;
-
-    /**
      * @brief Store a single archive record
      * @param record The record to store
      * @return true if storage was successful

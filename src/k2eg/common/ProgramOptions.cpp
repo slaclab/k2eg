@@ -247,7 +247,7 @@ ProgramOptions::getConfigurationServiceConfiguration() {
 }
 
 
-StorageServiceConfigurationShrdPtr        
+StorageServiceConfigurationUPtr        
 ProgramOptions::getStorageServiceConfiguration() {
   return get_storage_service_program_option(vm);
 }

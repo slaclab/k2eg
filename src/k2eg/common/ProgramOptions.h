@@ -75,6 +75,12 @@ static const char* const CONFIGURATION_SERVICE_RESET_ON_START = "configuration-r
 
 namespace k2eg {
 namespace common {
+
+    inline std::string section_parameter(const char* domain, const char* parameter)
+    {
+        return std::string(domain) + "." + parameter;
+    }
+
     /**
      * Options management
      */
@@ -102,7 +108,7 @@ namespace common {
         k2eg::service::epics_impl::ConstEpicsServiceManagerConfigUPtr          getEpicsManagerConfiguration();
         k2eg::service::configuration::ConstConfigurationServiceConfigUPtr      getConfigurationServiceConfiguration();
         k2eg::controller::node::worker::ConstStorageWorkerConfigurationShrdPtr getStorageWorkerConfiguration();
-        k2eg::service::storage::StorageServiceConfigurationShrdPtr             getStorageServiceConfiguration();
+        k2eg::service::storage::StorageServiceConfigurationUPtr                getStorageServiceConfiguration();
         const std::string                                                      getStoragePath();
         bool                                                                   optionConfigure(const std::string& name);
 

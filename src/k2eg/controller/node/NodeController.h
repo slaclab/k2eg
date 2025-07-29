@@ -92,6 +92,9 @@ class NodeController
     /// Reference to the node controller system metric service.
     k2eg::service::metric::INodeControllerSystemMetric& system_metrics;
 
+    // storage worker configuration
+    worker::StorageWorkerShrdPtr storage_worker;
+
     /**
      * @brief Handles the collection and reporting of statistics for a given task.
      * @param task_properties Properties of the task to process statistics for.

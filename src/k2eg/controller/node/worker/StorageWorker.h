@@ -11,7 +11,6 @@
 #include <boost/program_options.hpp>
 
 #include <atomic>
-#include <thread>
 
 namespace k2eg::controller::node::worker {
 
@@ -48,35 +47,24 @@ ConstStorageWorkerConfigurationShrdPtr get_storage_worker_program_option(const b
 class StorageWorker
 {
     // Configuration for the storage worker
-    StorageWorkerConfiguration                     config;
+    ConstStorageWorkerConfigurationShrdPtr config;
     // Logger for logging messages related to storage worker operations
-    service::log::ILoggerShrdPtr                   logger;
+    service::log::ILoggerShrdPtr logger;
     // Storage service for storing consumed data
     k2eg::service::storage::IStorageServiceShrdPtr storage_service;
     // Subscriber for consuming messages from Kafka topics
-    k2eg::service::pubsub::ISubscriberShrdPtr      subscriber;
+    k2eg::service::pubsub::ISubscriberShrdPtr subscriber;
     // Metric service for reporting metrics
-    k2eg::service::metric::IMetricServiceShrdPtr   metric_service;
-
+    k2eg::service::metric::IMetricServiceShrdPtr metric_service;
     // Thread for checking configuration changes
     std::atomic<bool> running{false};
-    std::thread config_checker_thread;
 
-    void configChecker();
 public:
-    StorageWorker(const StorageWorkerConfiguration&, k2eg::service::storage::IStorageServiceShrdPtr);
+    StorageWorker(const ConstStorageWorkerConfigurationShrdPtr&, k2eg::service::storage::IStorageServiceShrdPtr);
 
     ~StorageWorker();
 
-    /**
-     * @brief Start the storage worker
-     */
-    void start();
-
-    /**
-     * @brief Stop the storage worker
-     */
-    void stop();
+    void executePeriodicTask();
 };
 
 DEFINE_PTR_TYPES(StorageWorker)

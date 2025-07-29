@@ -16,6 +16,8 @@
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/pubsub/pubsub.h>
 #include <k2eg/service/scheduler/Scheduler.h>
+#include <k2eg/service/storage/IStorageService.h>
+#include <k2eg/service/storage/StorageServiceFactory.h>
 
 #include <cstdlib>
 
@@ -32,6 +34,7 @@ using namespace k2eg::service::data;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
 using namespace k2eg::service::scheduler;
+using namespace k2eg::service::storage;
 using namespace k2eg::service::configuration;
 using namespace k2eg::service::configuration::impl::consul;
 
@@ -91,6 +94,8 @@ int K2EGateway::setup(int argc, const char* argv[])
             break;
         case NodeType::STORAGE:
             logger->logMessage("Start Storage Node Controller");
+            logger->logMessage("Start storage service");
+            ServiceResolver<IStorageService>::registerService(StorageServiceFactory::create(po->getStorageServiceConfiguration()));
             logger->logMessage("Start node controller");
             node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
             break;
@@ -126,6 +131,8 @@ int K2EGateway::setup(int argc, const char* argv[])
             logger->logMessage("Stop Storage Node Controller");
             logger->logMessage("Stop node controller");
             node_controller.reset();
+            logger->logMessage("Stop storage service");
+            ServiceResolver<IStorageService>::reset();
             break;
         default:
             throw std::runtime_error("Unknown node type in ProgramOptions configuration");

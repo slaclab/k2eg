@@ -1,3 +1,4 @@
+#include "k2eg/service/storage/IStorageService.h"
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/utility.h>
 
@@ -11,6 +12,7 @@
 #include <k2eg/controller/node/worker/MonitorCommandWorker.h>
 #include <k2eg/controller/node/worker/PutCommandWorker.h>
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
+#include <k2eg/controller/node/worker/StorageWorker.h>
 
 using namespace k2eg::controller::node;
 using namespace k2eg::controller::node::worker;
@@ -223,8 +225,18 @@ void NodeController::performGatewayPeriodicTask()
 
 void NodeController::startAsStorage()
 {
+    logger->logMessage("Allocating storage worker", LogLevel::INFO);
+    storage_worker = std::make_shared<StorageWorker>(this->node_controller_configuration->storage_worker_configuration, ServiceResolver<storage::IStorageService>::resolve());
 }
 
 void NodeController::performStoragePeriodicTask()
 {
+    if (storage_worker)
+    {
+        storage_worker->executePeriodicTask();
+    }
+    else
+    {
+        logger->logMessage("Storage worker is not initialized", LogLevel::ERROR);
+    }
 }
