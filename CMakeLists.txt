@@ -190,6 +190,7 @@ set(TEST_SOURCE_FILES
   test/metric/NodeControllerSystemMetric.cpp
   test/scheduler/Scheduler.cpp
   test/configuration/ConsulConfigurationTest.cpp
+  test/configuration/ConsulConfigurationSnapshotTest.cpp
   test/storage/mongodb/MsgpackToJsonConverter.cpp
   ${COMMON_SOURCE_FILES}
 )

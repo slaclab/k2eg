@@ -18,7 +18,6 @@
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/scheduler/Scheduler.h>
 
-
 using namespace k2eg::common;
 
 using namespace k2eg::service::log;
@@ -89,46 +88,57 @@ ProgramOptions::ProgramOptions() {
 }
 
 // clang-format on
-void ProgramOptions::parse(int argc, const char *argv[]) {
-  try {
-    po::store(po::command_line_parser(argc, argv)
-                  .options(options)
-                  .allow_unregistered()
-                  .run(),
-              vm);
 
-    po::store(po::parse_environment(options, "EPICS_k2eg_"), vm);
-    po::notify(vm);
+void ProgramOptions::parse(int argc, const char* argv[])
+{
+    try
+    {
+        po::store(po::command_line_parser(argc, argv)
+                      .options(options)
+                      .allow_unregistered()
+                      .run(),
+                  vm);
 
-    // check if we need to load further option from file
-    if (vm[CONF_FILE].as<bool>()) {
-      const std::string conf_file_name = vm[CONF_FILE_NAME].as<std::string>();
-      if (conf_file_name.empty()) {
-        throw std::runtime_error("configuration file has nott been specifyed");
-      }
-      // load from file
-      std::ifstream option_file_stream;
-      option_file_stream.open(conf_file_name.c_str(), std::ifstream::in);
-      if (!option_file_stream) {
-        throw std::runtime_error("Error opening configuration file");
-      }
+        po::store(po::parse_environment(options, "EPICS_k2eg_"), vm);
+        po::notify(vm);
 
-      po::store(po::parse_config_file(option_file_stream, options), vm);
-      po::notify(vm);
+        // check if we need to load further option from file
+        if (vm[CONF_FILE].as<bool>())
+        {
+            const std::string conf_file_name = vm[CONF_FILE_NAME].as<std::string>();
+            if (conf_file_name.empty())
+            {
+                throw std::runtime_error("configuration file has nott been specifyed");
+            }
+            // load from file
+            std::ifstream option_file_stream;
+            option_file_stream.open(conf_file_name.c_str(), std::ifstream::in);
+            if (!option_file_stream)
+            {
+                throw std::runtime_error("Error opening configuration file");
+            }
+
+            po::store(po::parse_config_file(option_file_stream, options), vm);
+            po::notify(vm);
+        }
     }
-  } catch (po::too_many_positional_options_error &e) {
-    // A positional argument like `opt2=option_value_2` was given
-    std::cerr << e.what() << std::endl;
-    throw std::runtime_error(e.what());
-  } catch (po::error_with_option_name &e) {
-    // Another usage error occurred
-    std::cerr << e.what() << std::endl;
-    throw std::runtime_error(e.what());
-  }
+    catch (po::too_many_positional_options_error& e)
+    {
+        // A positional argument like `opt2=option_value_2` was given
+        std::cerr << e.what() << std::endl;
+        throw std::runtime_error(e.what());
+    }
+    catch (po::error_with_option_name& e)
+    {
+        // Another usage error occurred
+        std::cerr << e.what() << std::endl;
+        throw std::runtime_error(e.what());
+    }
 }
 
-bool ProgramOptions::optionConfigure(const std::string &name) {
-  return vm.count(name) > 0;
+bool ProgramOptions::optionConfigure(const std::string& name)
+{
+    return vm.count(name) > 0;
 }
 
 #define GET_OPTION(opt, type, def)                                             \
@@ -186,6 +196,7 @@ ConstNodeControllerConfigurationUPtr
 ProgramOptions::getNodeControllerConfiguration() {
     return std::make_unique<const NodeControllerConfiguration>(
         NodeControllerConfiguration{
+            .node_type = node_type_,
             .monitor_command_configuration = MonitorCommandConfiguration{
                 .cron_scheduler_monitor_check = GET_OPTION(MONITOR_WORKER_SCHEDULE_CRON_CONFIGURATION, std::string, DEFAULT_CRON_STRING),
                 .monitor_checker_configuration = MonitorCheckerConfiguration{
@@ -257,4 +268,5 @@ const std::string ProgramOptions::getStoragePath() {
 }
 
 NodeType ProgramOptions::getNodeType() const { return node_type_; }
+
 // clang-format on

@@ -4,6 +4,7 @@
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/types.h>
 #include <k2eg/service/log/ILogger.h>
+#include <k2eg/service/scheduler/Task.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/pubsub/ISubscriber.h>
 #include <k2eg/service/storage/IStorageService.h>
@@ -22,6 +23,15 @@ struct StorageWorkerConfiguration
     size_t batch_size = 100;
     size_t batch_timeout = 100;
     size_t worker_thread_count = 4;
+    size_t queue_max_size = 10000;
+    std::string discover_task_cron = "* * * * * *"; // Every minute
+    std::string consumer_group_id = "k2eg-storage-workers"; // Default consumer group
+
+    std::string toString() const
+    {
+        return std::format("StorageWorkerConfiguration(batch_size={}, batch_timeout={}, worker_thread_count={}, queue_max_size={}, discover_task_cron={}, consumer_group_id={})",
+                             batch_size, batch_timeout, worker_thread_count, queue_max_size, discover_task_cron, consumer_group_id);
+    }
 };
 
 DEFINE_PTR_TYPES(StorageWorkerConfiguration);
@@ -56,15 +66,13 @@ class StorageWorker
     k2eg::service::pubsub::ISubscriberShrdPtr subscriber;
     // Metric service for reporting metrics
     k2eg::service::metric::IMetricServiceShrdPtr metric_service;
-    // Thread for checking configuration changes
-    std::atomic<bool> running{false};
 
 public:
     StorageWorker(const ConstStorageWorkerConfigurationShrdPtr&, k2eg::service::storage::IStorageServiceShrdPtr);
 
     ~StorageWorker();
 
-    void executePeriodicTask();
+    void executePeriodicTask(k2eg::service::scheduler::TaskProperties& task_properties);
 };
 
 DEFINE_PTR_TYPES(StorageWorker)

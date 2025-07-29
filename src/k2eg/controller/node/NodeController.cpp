@@ -231,9 +231,10 @@ void NodeController::startAsStorage()
 
 void NodeController::performStoragePeriodicTask()
 {
+    TaskProperties task_properties;
     if (storage_worker)
     {
-        storage_worker->executePeriodicTask();
+        storage_worker->executePeriodicTask(task_properties);
     }
     else
     {

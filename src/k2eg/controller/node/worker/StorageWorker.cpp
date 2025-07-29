@@ -1,32 +1,41 @@
+#include "k2eg/service/scheduler/Task.h"
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
 
-#include <k2eg/controller/node/worker/StorageWorker.h>
 #include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/scheduler/Scheduler.h>
 
-using namespace k2eg::controller::node::worker;
+#include <k2eg/controller/node/worker/StorageWorker.h>
+
+#include <functional>
+
+using namespace k2eg::common;
+
 using namespace k2eg::service;
-using namespace k2eg::service::storage;
-using namespace k2eg::service::pubsub;
 using namespace k2eg::service::log;
 using namespace k2eg::service::metric;
-using namespace k2eg::common;
+using namespace k2eg::service::pubsub;
+using namespace k2eg::service::storage;
+using namespace k2eg::service::scheduler;
+
+using namespace k2eg::controller::node::worker;
 
 // Default values for StorageWorker configuration
 #define DEFAULT_BATCH_SIZE 100
 #define DEFAULT_BATCH_TIMEOUT_MS 5000
 #define DEFAULT_WORKER_THREAD_COUNT 4
 #define DEFAULT_QUEUE_MAX_SIZE 10000
+#define DEFAULT_DISCOVER_TASK_CRON "* * * * * *" // Every minute
 #define DEFAULT_CONSUMER_GROUP_ID "k2eg-storage-workers"
 
 // Storage Worker Program Option Keys
 #define STORAGE_WORKER_SECTION_KEY "Storage Worker"
-#define BATCH_SIZE_KEY "batch-size"
-#define BATCH_TIMEOUT_KEY "batch-timeout"
-#define WORKER_THREAD_COUNT_KEY "worker-thread-count"
-#define QUEUE_MAX_SIZE_KEY "queue-max-size"
-#define TOPICS_TO_CONSUME_KEY "topics-to-consume"
-#define CONSUMER_GROUP_ID_KEY "consumer-group-id"
+#define STORAGE_WORKER_BATCH_SIZE_KEY "storage-worker-batch-size"
+#define STORAGE_WORKER_BATCH_TIMEOUT_KEY "storage-worker-batch-timeout"
+#define STORAGE_WORKER_THREAD_COUNT_KEY "storage-worker-thread-count"
+#define STORAGE_WORKER_QUEUE_MAX_SIZE_KEY "storage-worker-queue-max-size"
+#define STORAGE_WORKER_DISCOVER_TASK_CRON "storage-worker-discover-task-cron"
+#define STORAGE_WORKER_CONSUMER_GROUP_ID_KEY "storage-worker-consumer-group-id"
 
 namespace k2eg::controller::node::worker {
 
@@ -38,9 +47,12 @@ void fill_storage_worker_program_option(boost::program_options::options_descript
     boost::program_options::options_description storage_worker_section(STORAGE_WORKER_SECTION_KEY);
     // clang-format off
     storage_worker_section.add_options()
-        (BATCH_SIZE_KEY, boost::program_options::value<size_t>()->default_value(DEFAULT_BATCH_SIZE), "Batch size for processing")
-        (BATCH_TIMEOUT_KEY, boost::program_options::value<size_t>()->default_value(DEFAULT_BATCH_TIMEOUT_MS), "Batch processing timeout in milliseconds")
-        (WORKER_THREAD_COUNT_KEY, boost::program_options::value<size_t>()->default_value(DEFAULT_WORKER_THREAD_COUNT), "Number of worker threads");
+        (STORAGE_WORKER_BATCH_SIZE_KEY, boost::program_options::value<int>()->default_value(DEFAULT_BATCH_SIZE), "Batch size for processing")
+        (STORAGE_WORKER_BATCH_TIMEOUT_KEY, boost::program_options::value<int>()->default_value(DEFAULT_BATCH_TIMEOUT_MS), "Batch processing timeout in milliseconds")
+        (STORAGE_WORKER_THREAD_COUNT_KEY, boost::program_options::value<int>()->default_value(DEFAULT_WORKER_THREAD_COUNT), "Number of worker threads")
+        (STORAGE_WORKER_QUEUE_MAX_SIZE_KEY, boost::program_options::value<int>()->default_value(DEFAULT_QUEUE_MAX_SIZE), "Maximum size of the processing queue")
+        (STORAGE_WORKER_DISCOVER_TASK_CRON, boost::program_options::value<std::string>()->default_value(DEFAULT_DISCOVER_TASK_CRON), "Cron schedule for the discovery task")
+        (STORAGE_WORKER_CONSUMER_GROUP_ID_KEY, boost::program_options::value<std::string>()->default_value(DEFAULT_CONSUMER_GROUP_ID), "Consumer group ID for the storage worker");
     // clang-format on
 
     // Add the MongoDB section to the main description
@@ -52,13 +64,9 @@ ConstStorageWorkerConfigurationShrdPtr get_storage_worker_program_option(const b
     auto config = std::make_shared<StorageWorkerConfiguration>();
 
     // Extract batch size
-    if (vm.count(BATCH_SIZE_KEY))
+    if (vm.count(STORAGE_WORKER_BATCH_SIZE_KEY))
     {
-        config->batch_size = vm[BATCH_SIZE_KEY].as<size_t>();
-    }
-    else if (vm.count(BATCH_SIZE_KEY)) // For backward compatibility
-    {
-        config->batch_size = vm[BATCH_SIZE_KEY].as<size_t>();
+        config->batch_size = vm[STORAGE_WORKER_BATCH_SIZE_KEY].as<int>();
     }
     else
     {
@@ -66,9 +74,9 @@ ConstStorageWorkerConfigurationShrdPtr get_storage_worker_program_option(const b
     }
 
     // Extract batch timeout
-    if (vm.count(BATCH_TIMEOUT_KEY))
+    if (vm.count(STORAGE_WORKER_BATCH_TIMEOUT_KEY))
     {
-        config->batch_timeout = vm[BATCH_TIMEOUT_KEY].as<size_t>();
+        config->batch_timeout = vm[STORAGE_WORKER_BATCH_TIMEOUT_KEY].as<int>();
     }
     else
     {
@@ -76,13 +84,40 @@ ConstStorageWorkerConfigurationShrdPtr get_storage_worker_program_option(const b
     }
 
     // Extract worker thread count
-    if (vm.count(WORKER_THREAD_COUNT_KEY))
+    if (vm.count(STORAGE_WORKER_THREAD_COUNT_KEY))
     {
-        config->worker_thread_count = vm[WORKER_THREAD_COUNT_KEY].as<size_t>();
+        config->worker_thread_count = vm[STORAGE_WORKER_THREAD_COUNT_KEY].as<int>();
     }
     else
     {
         config->worker_thread_count = DEFAULT_WORKER_THREAD_COUNT;
+    }
+    // Extract queue max size
+    if (vm.count(STORAGE_WORKER_QUEUE_MAX_SIZE_KEY))
+    {
+        config->queue_max_size = vm[STORAGE_WORKER_QUEUE_MAX_SIZE_KEY].as<int>();
+    }
+    else
+    {
+        config->queue_max_size = DEFAULT_QUEUE_MAX_SIZE;
+    }
+    // Extract discover task cron
+    if (vm.count(STORAGE_WORKER_DISCOVER_TASK_CRON))
+    {
+        config->discover_task_cron = vm[STORAGE_WORKER_DISCOVER_TASK_CRON].as<std::string>();
+    }
+    else
+    {
+        config->discover_task_cron = DEFAULT_DISCOVER_TASK_CRON;
+    }
+    // Extract consumer group ID
+    if (vm.count(STORAGE_WORKER_CONSUMER_GROUP_ID_KEY))
+    {
+        config->consumer_group_id = vm[STORAGE_WORKER_CONSUMER_GROUP_ID_KEY].as<std::string>();
+    }
+    else
+    {
+        config->consumer_group_id = DEFAULT_CONSUMER_GROUP_ID;
     }
 
     return config;
@@ -90,6 +125,9 @@ ConstStorageWorkerConfigurationShrdPtr get_storage_worker_program_option(const b
 } // namespace k2eg::controller::node::worker
 
 #pragma region Implementation
+
+#define DISCOVER_TASK_NAME                  "maintenance-task"
+#define DISCOVER_TASK_NAME_DEFAULT_CRON     "* * * * * *"
 
 StorageWorker::StorageWorker(const ConstStorageWorkerConfigurationShrdPtr& config_, IStorageServiceShrdPtr storage_service_)
     : logger(ServiceResolver<ILogger>::resolve()), config(config_), storage_service(storage_service_)
@@ -101,19 +139,23 @@ StorageWorker::StorageWorker(const ConstStorageWorkerConfigurationShrdPtr& confi
         throw std::runtime_error("Storage service is not available");
     }
 
-    logger->logMessage("StorageWorker initialized with configuration", LogLevel::INFO);
+    auto task_restart_monitor = MakeTaskShrdPtr(DISCOVER_TASK_NAME, DISCOVER_TASK_NAME_DEFAULT_CRON, std::bind(&StorageWorker::executePeriodicTask, this, std::placeholders::_1),
+                                                -1 // start at application boot time
+    );
+    ServiceResolver<Scheduler>::resolve()->addTask(task_restart_monitor);
+
+    // print the configuration
+    logger->logMessage(STRING_FORMAT("StorageWorker initialized with configuration: %1%", config->toString()), LogLevel::INFO);
 }
 
 StorageWorker::~StorageWorker()
 {
+    logger->logMessage("Remove periodic task from scheduler");
+    bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(DISCOVER_TASK_NAME);
+    logger->logMessage(STRING_FORMAT("Removed periodic discover task result: %1%", erased), LogLevel::DEBUG);
 }
 
-void StorageWorker::executePeriodicTask()
+void StorageWorker::executePeriodicTask(TaskProperties& task_properties)
 {
-    if (!running.load())
-    {
-        logger->logMessage("Storage worker is not running", LogLevel::INFO);
-        return;
-    }
     logger->logMessage("Executing periodic task for StorageWorker", LogLevel::DEBUG);
 }
