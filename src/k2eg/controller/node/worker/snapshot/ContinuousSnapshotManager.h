@@ -1,17 +1,16 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 
-#include <k2eg/service/epics/EpicsData.h>
-#include <k2eg/service/metric/INodeControllerMetric.h>
-
 #include <k2eg/common/BS_thread_pool.hpp>
+#include <k2eg/common/LockFreeBuffer.h>
 #include <k2eg/common/ThrottlingManager.h>
 #include <k2eg/common/types.h>
 
-#include <k2eg/common/LockFreeBuffer.h>
-
+#include <k2eg/service/configuration/INodeConfiguration.h>
+#include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/metric/INodeControllerMetric.h>
 #include <k2eg/service/scheduler/Scheduler.h>
 
 #include <k2eg/controller/command/cmd/Command.h>
@@ -35,6 +34,11 @@ struct RepeatingSnaptshotConfiguration
 {
     // the cron stirng for schedule the monitor
     size_t snapshot_processing_thread_count = 1;
+
+    const std::string toString() const
+    {
+        return std::format("RepeatingSnaptshotConfiguration(snapshot_processing_thread_count={})", snapshot_processing_thread_count);
+    }
 };
 DEFINE_PTR_TYPES(RepeatingSnaptshotConfiguration)
 
@@ -251,10 +255,10 @@ struct IterationState
 class SnapshotIterationSynchronizer
 {
 private:
-    mutable std::shared_mutex                                                     iteration_mutex_;
-    std::unordered_map<std::string, uint64_t>                                     current_iteration_;
-    std::unordered_map<std::string, std::atomic<bool>>                            iteration_in_progress_;
-    std::unordered_map<std::string, std::unique_ptr<std::condition_variable_any>> iteration_cv_;
+    mutable std::shared_mutex                                                                      iteration_mutex_;
+    std::unordered_map<std::string, uint64_t>                                                      current_iteration_;
+    std::unordered_map<std::string, std::atomic<bool>>                                             iteration_in_progress_;
+    std::unordered_map<std::string, std::unique_ptr<std::condition_variable_any>>                  iteration_cv_;
     std::unordered_map<std::string, std::unordered_map<uint64_t, std::shared_ptr<IterationState>>> iteration_states_;
 
     // Private helper to release the lock and notify the next waiting iteration.
@@ -308,7 +312,7 @@ private:
 class SnapshotSubmissionTask
 {
     bool                                     last_submition = false; // flag to indicate if the task should close
-    std::shared_ptr<SnapshotOpInfo>          snapshot_command_info; // shared pointer to the snapshot operation info
+    std::shared_ptr<SnapshotOpInfo>          snapshot_command_info;  // shared pointer to the snapshot operation info
     SnapshotSubmissionShrdPtr                submission_shrd_ptr;
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
     k2eg::service::log::ILoggerShrdPtr       logger;
@@ -340,6 +344,9 @@ class ContinuousSnapshotManager
 
     // Shared pointer to the logger instance
     k2eg::service::log::ILoggerShrdPtr logger;
+
+    // Node cofiguration for accessing snapshot specific settings
+    service::configuration::INodeConfigurationShrdPtr node_configuration;
 
     // Shared pointer to the publisher instance for publishing snapshot data
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
@@ -422,7 +429,25 @@ class ContinuousSnapshotManager
      * @param task_properties Properties of the scheduled statistics task.
      */
     void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
+
+    /**
+     * @brief Loop to check for expired snapshots and clean them up.
+     */
     void expirationCheckerLoop();
+
+    /**
+     * @brief Try to configure the start of a snapshot.
+     * @param snapshot_ops_info Shared pointer to the snapshot operation info.
+     * @return True if the configuration was successful and snapshot can start, false otherwise.
+     */
+    bool tryToConfigureSnapshotStart(SnapshotOpInfo& snapshot_ops_info);
+
+    /**
+     * @brief Set the snapshot as running in the configuration.
+     * @param snapshot_ops_info Shared pointer to the snapshot operation info.
+     * @return True if the snapshot was successfully set as running, false otherwise.
+     */
+    bool releaseSnapshotForStop(SnapshotOpInfo& snapshot_ops_info);
 
 public:
     /**

@@ -119,20 +119,29 @@ inline boost::json::object config_to_json(const NodeConfiguration& cfg)
 // Snapshot configuration structure
 struct SnapshotConfiguration
 {
-    // wight of the snapshot, used for prioritization
+    // Priority weight of the snapshot, used for scheduling
     int weight = 0;
-    // unit of the weight, can be "eps" or "mbps"
+
+    // Unit of the weight, e.g., "eps" (events/sec) or "mbps" (megabits/sec)
     std::string weight_unit;
-    // ID of the gateway that created the snapshot
+
+    // ID of the gateway that created and is managing the snapshot
     std::string gateway_id;
-    // Running status of the snapshot
+
+    // True if the snapshot is currently active on the gateway (session-bound)
     bool running_status = false;
-    // Archiving status of the snapshot
+
+    // True if archiving is enabled for this snapshot
     bool archiving_status = false;
-    // ID of the archiver that is responsible for this snapshot
+
+    // ID of the archiver currently responsible for storing this snapshot
     std::string archiver_id;
-    // Timestamp when the snapshot was created
-    std::string timestamp;
+
+    // ISO 8601 UTC timestamp (e.g., "2025-07-29T10:15:30Z") of snapshot update
+    std::string update_timestamp;
+
+    // JSON-encoded configuration for snapshot execution (e.g., PV list, interval)
+    std::string config_json;
 };
 
 DEFINE_PTR_TYPES(SnapshotConfiguration);
@@ -149,28 +158,107 @@ public:
     INodeConfiguration(ConstConfigurationServiceConfigUPtr config)
         : config(std::move(config)){};
     virtual ~INodeConfiguration() = default;
-
+    /**
+     * @brief Get the node configuration.
+     * @return Shared pointer to the node configuration.
+     */
     virtual NodeConfigurationShrdPtr getNodeConfiguration() const = 0;
-    virtual bool                     setNodeConfiguration(NodeConfigurationShrdPtr node_configuration) = 0;
-    virtual std::string              getNodeName() const = 0;
+    /**
+     * @brief Set the node configuration.
+     * @param node_configuration Shared pointer to the node configuration to set.
+     * @return True if the configuration was successfully set, false otherwise.
+     */
+    virtual bool setNodeConfiguration(NodeConfigurationShrdPtr node_configuration) = 0;
+    /**
+     * @brief Get the name of the node.
+     * @return The name of the node as a string.
+     */
+    virtual std::string getNodeName() const = 0;
 
-    // Snapshot configuration methods
-    virtual const std::string                 getSnapshotKey(const std::string& snapshot_id) const = 0;
+    /**
+     * @brief Get the key for a specific snapshot by its ID.
+     * @param snapshot_id ID of the snapshot to retrieve the key for.
+     * @return The key string for the snapshot.
+     */
+    virtual const std::string getSnapshotKey(const std::string& snapshot_id) const = 0;
+    /**
+     * @brief Get the configuration for a specific snapshot by its ID.
+     * @param snapshot_id ID of the snapshot to retrieve.
+     * @return Shared pointer to the snapshot configuration, or nullptr if not found.
+     */
     virtual ConstSnapshotConfigurationShrdPtr getSnapshotConfiguration(const std::string& snapshot_id) const = 0;
-    virtual bool                              setSnapshotConfiguration(const std::string& snapshot_id, SnapshotConfigurationShrdPtr snapshot_config) = 0;
-    virtual bool                              deleteSnapshotConfiguration(const std::string& snapshot_id) = 0;
-    virtual const std::vector<std::string>    getSnapshotIds() const = 0;
-    virtual bool                              updateSnapshotField(const std::string& snapshot_id, const std::string& field, const std::string& value) = 0;
-    virtual const std::string                 getSnapshotField(const std::string& snapshot_id, const std::string& field) const = 0;
+    /**
+     * @brief Set the configuration for a specific snapshot.
+     * @param snapshot_id ID of the snapshot to configure.
+     * @param snapshot_config Configuration object containing snapshot settings.
+     * @return True if the configuration was successfully set, false otherwise.
+     */
+    virtual bool setSnapshotConfiguration(const std::string& snapshot_id, SnapshotConfigurationShrdPtr snapshot_config) = 0;
+    /**
+     * @brief Delete a snapshot configuration by its ID.
+     * @param snapshot_id ID of the snapshot to delete.
+     * @return True if the deletion was successful, false otherwise.
+     */
+    virtual bool deleteSnapshotConfiguration(const std::string& snapshot_id) = 0;
+    /**
+     * @brief Get the list of snapshot IDs managed by the node.
+     * @return Vector of snapshot IDs.
+     */
+    virtual const std::vector<std::string> getSnapshotIds() const = 0;
+
+    /**
+     * @brief Get the value of a specific field in a snapshot configuration.
+     * @param snapshot_id ID of the snapshot to query.
+     * @param field Name of the field to retrieve.
+     * @return The value of the specified field, or an empty string if not found.
+     */
+    virtual const std::string getSnapshotField(const std::string& snapshot_id, const std::string& field) const = 0;
 
     // Distributed snapshot management methods
-    virtual bool                              isSnapshotRunning(const std::string& snapshot_id) const = 0;
-    virtual const std::string                 getSnapshotGateway(const std::string& snapshot_id) const = 0;
-    virtual bool                              tryAcquireSnapshot(const std::string& snapshot_id) = 0;
-    virtual bool                              releaseSnapshot(const std::string& snapshot_id) = 0;
-    virtual const std::vector<std::string>    getRunningSnapshots() const = 0;
-    virtual const std::vector<std::string>    getSnapshots() const = 0;
+    /**
+     * @brief Check if a snapshot is currently running on the node.
+     * @param snapshot_id ID of the snapshot to check.
+     * @return True if the snapshot is running, false otherwise.
+     */
+    virtual bool isSnapshotRunning(const std::string& snapshot_id) const = 0;
 
+    /**
+     * @brief Set the running status of a snapshot.
+     * @param snapshot_id ID of the snapshot to update.
+     * @param running True if the snapshot is running, false otherwise.
+     */
+    virtual void setSnapshotRunning(const std::string& snapshot_id, bool running) = 0;
+
+    /**
+     * @brief Get the gateway ID that is currently managing a snapshot.
+     * @param snapshot_id ID of the snapshot to check.
+     * @return Gateway ID if the snapshot is running, empty string otherwise.
+     */
+    virtual const std::string getSnapshotGateway(const std::string& snapshot_id) const = 0;
+    /**
+     * @brief Try to acquire a snapshot for the current node.
+     * @param snapshot_id ID of the snapshot to acquire.
+     * @param for_gateway True if the acquisition is for a gateway, false otherwise.
+     * @return True if the snapshot was successfully acquired, false otherwise.
+     */
+    virtual bool tryAcquireSnapshot(const std::string& snapshot_id, bool for_gateway) = 0;
+    /**
+     * @brief Release a snapshot that was acquired by the current node.
+     * @param snapshot_id ID of the snapshot to release.
+     * @param for_gateway True if the release is for a gateway, false otherwise.
+     * @return True if the snapshot was successfully released, false otherwise.
+     */
+    virtual bool releaseSnapshot(const std::string& snapshot_id, bool for_gateway) = 0;
+    /**
+     * @brief Get the list of currently running snapshots on the node.
+     * @return Vector of snapshot IDs that are currently running.
+     */
+    virtual const std::vector<std::string> getRunningSnapshots() const = 0;
+    /**
+     * @brief Get the list of all snapshots managed by the node.
+     * @return Vector of snapshot IDs that are managed by the node.
+     */
+    virtual const std::vector<std::string> getSnapshots() const = 0;
 };
 DEFINE_PTR_TYPES(INodeConfiguration)
 } // namespace k2eg::service::configuration

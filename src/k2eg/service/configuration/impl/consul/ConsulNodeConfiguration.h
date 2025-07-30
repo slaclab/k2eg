@@ -9,9 +9,9 @@
 #include <oatpp/parser/json/mapping/ObjectMapper.hpp>
 #include <oatpp/web/client/RequestExecutor.hpp>
 
+#include <condition_variable>
 #include <mutex>
 #include <thread>
-#include <condition_variable>
 
 namespace k2eg::service::configuration::impl::consul {
 
@@ -56,14 +56,14 @@ public:
     bool                              setSnapshotConfiguration(const std::string& snapshot_id, SnapshotConfigurationShrdPtr snapshot_config) override;
     bool                              deleteSnapshotConfiguration(const std::string& snapshot_id) override;
     const std::vector<std::string>    getSnapshotIds() const override;
-    bool                              updateSnapshotField(const std::string& snapshot_id, const std::string& field, const std::string& value) override;
     const std::string                 getSnapshotField(const std::string& snapshot_id, const std::string& field) const override;
 
     // Distributed snapshot management methods
     bool                           isSnapshotRunning(const std::string& snapshot_id) const override;
+    void                           setSnapshotRunning(const std::string& snapshot_id, bool running) override;
     const std::string              getSnapshotGateway(const std::string& snapshot_id) const override;
-    bool                           tryAcquireSnapshot(const std::string& snapshot_id) override;
-    bool                           releaseSnapshot(const std::string& snapshot_id) override;
+    bool                           tryAcquireSnapshot(const std::string& snapshot_id, bool for_gateway) override;
+    bool                           releaseSnapshot(const std::string& snapshot_id, bool for_gateway) override;
     const std::vector<std::string> getRunningSnapshots() const override;
     const std::vector<std::string> getSnapshots() const override;
 };

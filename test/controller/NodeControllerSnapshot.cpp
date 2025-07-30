@@ -204,6 +204,80 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStop)
     deinitBackend(std::move(node_controller));
 }
 
+TEST(NodeControllerSnapshot, RepeatingSnapshtotStartStopVerifyConfiguration)
+{
+    typedef std::map<std::string, msgpack::object> Map;
+    boost::json::object                            reply_msg;
+    std::unique_ptr<NodeController>                node_controller;
+
+    auto publisher = std::make_shared<TopicCountedTargetPublisher>();
+    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
+    auto node_configuration_service = ServiceResolver<INodeConfiguration>::resolve();
+    ASSERT_TRUE(node_configuration_service != nullptr);
+
+    node_configuration_service->deleteSnapshotConfiguration("snapshot_name");
+
+    // add the number of reader from topic
+    dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
+    while (!node_controller->isWorkerReady(CommandType::repeating_snapshot))
+    {
+        sleep(1);
+    }
+
+    // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
+    // givin a new event, only for that
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false})}););
+
+    // // wait for the activation on the ocnfiguration
+    bool condition = true;
+    int retry_count = 0;
+    while (condition && retry_count < 60)
+    {
+        retry_count++;
+        sleep(1);
+        auto snapshot_config = node_configuration_service->getSnapshotConfiguration("snapshot_name");
+        if (snapshot_config != nullptr && snapshot_config->running_status)
+        {
+            condition = false;
+        }
+    }
+    auto snapshot_config = node_configuration_service->getSnapshotConfiguration("snapshot_name");
+    ASSERT_TRUE(snapshot_config != nullptr);
+    EXPECT_EQ(snapshot_config->weight, 0);
+    EXPECT_EQ(snapshot_config->weight_unit, "eps");
+    EXPECT_EQ(snapshot_config->running_status, true);
+    EXPECT_EQ(snapshot_config->archiving_status, false);
+    EXPECT_EQ(snapshot_config->archiver_id, "");
+    EXPECT_STRNE(snapshot_config->update_timestamp.c_str(), "");
+    EXPECT_EQ(snapshot_config->config_json, "{\"serialization\":\"Msgpack\",\"reply_id\":\"rep-id\",\"reply_topic\":\"app_reply_topic\",\"snapshot_name\":\"Snapshot Name\",\"pv_name_list\":[\"pva://variable:b\",\"pva://variable:a\"],\"repeat_delay_msec\":0,\"time_window_msec\":1000,\"sub_push_delay_msec\":0,\"pv_field_filter_list\":[],\"triggered\":false,\"type\":\"Normal\"}");
+    // stop the snapshot
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    // wait for the stop message succeed
+    while (node_controller->getTaskRunning(CommandType::repeating_snapshot))
+    {
+        sleep(1);
+    }
+
+    condition = true;
+    retry_count = 0;
+    while (condition && retry_count < 60)
+    {
+        retry_count++;
+        sleep(1);
+        auto snapshot_config = node_configuration_service->getSnapshotConfiguration("snapshot_name");
+        if (snapshot_config != nullptr && !snapshot_config->running_status)
+        {
+            condition = false;
+        }
+    }
+    snapshot_config = node_configuration_service->getSnapshotConfiguration("snapshot_name");
+    ASSERT_TRUE(snapshot_config != nullptr);
+    EXPECT_EQ(snapshot_config->running_status, false);
+
+    // dispose all
+    deinitBackend(std::move(node_controller));
+}
+
 TEST(NodeControllerSnapshot, RepeatingSnapshotStartStopTwice)
 {
     typedef std::map<std::string, msgpack::object> Map;
@@ -587,7 +661,6 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsWit
     deinitBackend(std::move(node_controller));
 }
 
-
 #include <malloc.h>
 
 TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHighRate)
@@ -703,17 +776,18 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeStartAndStopLoop)
 
         EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(
             RepeatingSnapshotCommand{
-                CommandType::repeating_snapshot, 
-                SerializationType::Msgpack, 
-                "app_reply_topic", 
-                "rep-id", 
-                "Snapshot Name", 
-                {"pva://variable:a", "pva://channel:random:fast"}, 
-                0, 
-                1000, 
-                0, 
-                false, 
-                SnapshotType::TIMED_BUFFERED, {"value"}})}););
+                CommandType::repeating_snapshot,
+                SerializationType::Msgpack,
+                "app_reply_topic",
+                "rep-id",
+                "Snapshot Name",
+                {"pva://variable:a", "pva://channel:random:fast"},
+                0,
+                1000,
+                0,
+                false,
+                SnapshotType::TIMED_BUFFERED,
+                {"value"}})}););
 
         sleep(2);
         // print statisdtics

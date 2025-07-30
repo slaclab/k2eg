@@ -1,12 +1,15 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_SNAPSHOT_SNAPSHOTOPINFO_H_
 #define K2EG_CONTROLLER_NODE_WORKER_SNAPSHOT_SNAPSHOTOPINFO_H_
 
-#include "k2eg/common/types.h"
-#include "k2eg/service/epics/EpicsServiceManager.h"
-#include <atomic>
+#include <k2eg/common/types.h>
+
 #include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/service/configuration/INodeConfiguration.h>
 
 #include <k2eg/controller/node/worker/CommandWorker.h>
+
+#include <atomic>
 
 namespace k2eg::controller::node::worker::snapshot {
 
@@ -107,6 +110,8 @@ public:
 
     // Indicates if the operation is currently running
     bool is_running = true;
+
+    k2eg::service::configuration::SnapshotConfigurationShrdPtr snapshot_configuration;
 
     // Constructor: initializes with queue name and command pointer
     SnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd);

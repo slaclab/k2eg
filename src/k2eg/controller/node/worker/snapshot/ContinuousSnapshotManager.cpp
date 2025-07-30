@@ -2,17 +2,19 @@
 
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
-#include <k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.h>
-#include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
-#include <k2eg/service/metric/INodeControllerMetric.h>
 
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/metric/INodeControllerMetric.h>
 
 #include <k2eg/controller/command/cmd/SnapshotCommand.h>
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
+#include <k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.h>
 #include <k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.h>
+#include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
 #include <k2eg/controller/node/worker/snapshot/SnapshotRepeatingOpInfo.h>
+
+#include <boost/json.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -24,6 +26,7 @@
 #include <unistd.h>
 #include <utility>
 
+using namespace k2eg::controller::command;
 using namespace k2eg::controller::command::cmd;
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::node::worker::snapshot;
@@ -34,12 +37,22 @@ using namespace k2eg::service::pubsub;
 using namespace k2eg::service::metric;
 using namespace k2eg::service::scheduler;
 using namespace k2eg::service::epics_impl;
+using namespace k2eg::service::configuration;
 
+#pragma region Utility
 #define GET_QUEUE_FROM_SNAPSHOT_NAME(snapshot_name) ([](const std::string& name) { \
     std::string norm = std::regex_replace(name, std::regex(R"([^A-Za-z0-9\-])"), "_"); \
     std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower); \
     return norm; \
 })(snapshot_name)
+
+const std::string now_in_gmt() {
+    auto now = std::chrono::system_clock::now();
+        std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+        char timestamp_buf[32];
+        std::strftime(timestamp_buf, sizeof(timestamp_buf), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now_time_t));
+    return timestamp_buf;
+}
 
 void set_snapshot_thread_name(const std::size_t idx)
 {
@@ -69,15 +82,19 @@ inline auto thread_namer = [](unsigned long idx)
     set_snapshot_thread_name(idx);
 };
 
+#pragma region Implementation
+
 ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnaptshotConfiguration& repeating_snapshot_configuration, k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager)
     : repeating_snapshot_configuration(repeating_snapshot_configuration)
     , logger(ServiceResolver<ILogger>::resolve())
+    , node_configuration(ServiceResolver<service::configuration::INodeConfiguration>::resolve())
     , publisher(ServiceResolver<IPublisher>::resolve())
     , epics_service_manager(epics_service_manager)
     , thread_pool(std::make_shared<BS::light_thread_pool>(repeating_snapshot_configuration.snapshot_processing_thread_count, thread_namer))
     , metrics(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric())
     , iteration_sync_(std::make_unique<SnapshotIterationSynchronizer>())
 {
+    logger->logMessage("Initializing continuous snapshot manager", LogLevel::INFO);
     // add epics manager monitor handler
     epics_handler_token = epics_service_manager->addHandler(std::bind(&ContinuousSnapshotManager::epicsMonitorEvent, this, std::placeholders::_1));
     // set the publisher callback
@@ -89,11 +106,12 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnaptshotCon
     expiration_thread_running = true;
     expiration_thread = std::thread(&ContinuousSnapshotManager::expirationCheckerLoop, this);
     pthread_setname_np(expiration_thread.native_handle(), "SnapshotExpirationChecker");
+    logger->logMessage(STRING_FORMAT("Continuous snapshot manager initialized with: %1%", repeating_snapshot_configuration.toString()), LogLevel::INFO);
 }
 
 ContinuousSnapshotManager::~ContinuousSnapshotManager()
 {
-    logger->logMessage("[ContinuousSnapshotManager] Stopping continuous snapshot manager");
+    logger->logMessage("Stopping continuous snapshot manager");
     expiration_thread_running = false;
     if (expiration_thread.joinable())
     {
@@ -105,7 +123,7 @@ ContinuousSnapshotManager::~ContinuousSnapshotManager()
     epics_handler_token.reset();
     // stop all the thread
     thread_pool->wait();
-    logger->logMessage("[ContinuousSnapshotManager] Continuous snapshot manager stopped");
+    logger->logMessage("Continuous snapshot manager stopped");
 }
 
 std::size_t ContinuousSnapshotManager::getRunningSnapshotCount() const
@@ -163,12 +181,11 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
 {
     bool                                        faulty = false;
     std::vector<service::epics_impl::PVShrdPtr> sanitized_pv_name_list;
-    logger->logMessage(STRING_FORMAT("Perepare continuous(triggered %4%) snapshot ops for '%1%' on topic %2% with " "se" "rt" "yp" "e:" " %" "3" "%",
+    logger->logMessage(STRING_FORMAT("Perepare continuous(triggered %4%) snapshot ops for '%1%' on topic %2% with serialization type: %3%",
                                      snapsthot_command->snapshot_name % snapsthot_command->reply_topic %
                                          serialization_to_string(snapsthot_command->serialization) % snapsthot_command->triggered),
                        LogLevel::DEBUG);
     // create the commmand operation info structure
-
     SnapshotOpInfoShrdPtr s_op_ptr = nullptr;
     switch (snapsthot_command->type)
     {
@@ -223,6 +240,15 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
         manageReply(-5, STRING_FORMAT("The snapshot name is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
         return;
     }
+
+    // try to gain the ownership of the snapshot
+    if (!tryToConfigureSnapshotStart(*s_op_ptr))
+    {
+        auto snap_conf = node_configuration->getSnapshotConfiguration(s_op_ptr->queue_name);
+        manageReply(-8, STRING_FORMAT("The snapshot %1% is already running by %2%", s_op_ptr->cmd->snapshot_name % snap_conf->gateway_id), snapsthot_command);
+        return;
+    }
+
 
     for (const auto& pv_uri : s_op_ptr->cmd->pv_name_list)
     {
@@ -360,7 +386,10 @@ void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapsho
         removal_future.wait();
         logger->logMessage(STRING_FORMAT("Snapshot '%1%' has been fully decommissioned.", snapsthot_stop_command->snapshot_name), LogLevel::DEBUG);
     }
+    // Now we can safely remove the snapshot from the running list
+    releaseSnapshotForStop(*s_to_stop);
     s_to_stop.reset(); // Clear the pointer to ensure no dangling references.
+
     // send reply to app for submitted command
     manageReply(0, STRING_FORMAT("Snapshot '%1%' has been stopped", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
 }
@@ -492,6 +521,79 @@ void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const 
             publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "repeating-snapshot-events", "repeating-snapshot-events", serialized_message), {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
         }
     }
+}
+
+#pragma region Configuration
+
+bool ContinuousSnapshotManager::tryToConfigureSnapshotStart(SnapshotOpInfo& snapshot_ops_info)
+{
+    // This method should attempt to configure the snapshot start using the node configuration.
+    // Return true if configuration was successful, false otherwise.
+    bool result = false;
+    try
+    {
+        logger->logMessage(STRING_FORMAT("Attempting to acquire ownership of snapshot '%1%'", snapshot_ops_info.queue_name), LogLevel::INFO);
+        // Attempt to configure using the node_configuration interface.
+        // The actual implementation depends on your INodeConfiguration interface.
+        // Here, we assume it returns a bool indicating success.
+        if (!node_configuration)
+        {
+            logger->logMessage("Node configuration service not available", LogLevel::ERROR);
+            return result;
+        }
+
+        result = node_configuration->tryAcquireSnapshot(snapshot_ops_info.queue_name, true);
+        if (!result)
+        {
+            // acquistion has not been successful
+            logger->logMessage(STRING_FORMAT("Snapshot '%1%' cannot be acquired by '%2%'", snapshot_ops_info.queue_name % node_configuration->getNodeName()), LogLevel::INFO);
+            return result;
+        }
+
+        // If the snapshot is acquired, we can proceed to configure it.
+        logger->logMessage(STRING_FORMAT("Snapshot '%1%' acquired by '%2%'", snapshot_ops_info.queue_name % node_configuration->getNodeName()), LogLevel::INFO);
+
+        // create json description for ConstRepeatingSnapshotCommandShrdPtr
+       snapshot_ops_info.snapshot_configuration = MakeSnapshotConfigurationShrdPtr(
+            SnapshotConfiguration{
+                .weight = 0,
+                .weight_unit = "eps",
+                .gateway_id = node_configuration->getNodeName(),
+                .running_status = true,
+                .archiving_status = false,
+                .archiver_id = "",
+                .update_timestamp = now_in_gmt(),
+                .config_json = to_json_string_cmd_ptr(snapshot_ops_info.cmd)
+            });
+        result = node_configuration->setSnapshotConfiguration(snapshot_ops_info.queue_name , snapshot_ops_info.snapshot_configuration);
+    }
+    catch (const std::exception& ex)
+    {
+        logger->logMessage(
+            STRING_FORMAT("Exception during tryToConfigureSnapshotStart for '%1%': %2%", snapshot_ops_info.queue_name % ex.what()),
+            LogLevel::ERROR);
+    }
+    return result;
+}
+
+bool ContinuousSnapshotManager::releaseSnapshotForStop(SnapshotOpInfo& snapshot_ops_info) {
+    if (!node_configuration)
+    {
+        logger->logMessage("Node configuration service not available", LogLevel::ERROR);
+        return false;
+    }
+    logger->logMessage(STRING_FORMAT("Setting snapshot '%1%' running status to %2%", snapshot_ops_info.queue_name % false), LogLevel::INFO);
+    // Update the snapshot's running status in the node configuration.
+    snapshot_ops_info.snapshot_configuration->running_status = false;
+    snapshot_ops_info.snapshot_configuration->update_timestamp = now_in_gmt();
+    node_configuration->setSnapshotConfiguration(snapshot_ops_info.queue_name , snapshot_ops_info.snapshot_configuration);
+
+    // release the snapshot ownership
+    if (!node_configuration->releaseSnapshot(snapshot_ops_info.queue_name, true))
+    {
+        logger->logMessage(STRING_FORMAT("Failed to release snapshot '%1%'", snapshot_ops_info.queue_name), LogLevel::ERROR);
+    }
+    return true;
 }
 
 #pragma region Submission Task

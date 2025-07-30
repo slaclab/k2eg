@@ -6,7 +6,7 @@
 using namespace k2eg::service::configuration;
 using namespace k2eg::service::configuration::impl::consul;
 
-TEST(ConsulConfigurationSnapshotTest, SnapshotConfiguration)
+TEST(ConsulConfigurationSnapshotGatewayTest, SnapshotConfiguration)
 {
     // Setup configuration (adjust as needed for your test environment)
     auto config = std::make_unique<ConfigurationServiceConfig>(
@@ -28,7 +28,7 @@ TEST(ConsulConfigurationSnapshotTest, SnapshotConfiguration)
             .running_status = false,
             .archiving_status = false,
             .archiver_id = "",
-            .timestamp = "2023-10-01T00:00:00Z"});
+            .update_timestamp = "2023-10-01T00:00:00Z"});
     ASSERT_TRUE(nodeConfig.setSnapshotConfiguration(snapshot_id, snapshot_config));
     ASSERT_FALSE(nodeConfig.isSnapshotRunning(snapshot_id));
 
@@ -40,10 +40,10 @@ TEST(ConsulConfigurationSnapshotTest, SnapshotConfiguration)
     ASSERT_EQ(retrieved_config->running_status, false);
     ASSERT_EQ(retrieved_config->archiving_status, false);
     ASSERT_EQ(retrieved_config->archiver_id, "");
-    ASSERT_EQ(retrieved_config->timestamp, "2023-10-01T00:00:00Z");
+    ASSERT_STREQ(retrieved_config->update_timestamp.c_str(), "2023-10-01T00:00:00Z");
 }
 
-TEST(ConsulConfigurationSnapshotTest, CheckSnapshotAcquireRelease)
+TEST(ConsulConfigurationSnapshotGatewayTest, CheckSnapshotAcquireRelease)
 {
     // Setup configuration (adjust as needed for your test environment)
     auto config = std::make_unique<ConfigurationServiceConfig>(
@@ -61,7 +61,7 @@ TEST(ConsulConfigurationSnapshotTest, CheckSnapshotAcquireRelease)
     nodeConfig.deleteSnapshotConfiguration(snapshot_id);
 
     // Try to acquire snapshot lock
-    ASSERT_TRUE(nodeConfig.tryAcquireSnapshot(snapshot_id));
+    ASSERT_TRUE(nodeConfig.tryAcquireSnapshot(snapshot_id, true));
 
     // Gateway should match
     ASSERT_STREQ(nodeConfig.getSnapshotGateway(snapshot_id).c_str(), nodeConfig.getNodeName().c_str());
@@ -71,13 +71,13 @@ TEST(ConsulConfigurationSnapshotTest, CheckSnapshotAcquireRelease)
     ASSERT_NE(std::find(by_gateway.begin(), by_gateway.end(), snapshot_id), by_gateway.end());
 
     // Release the snapshot
-    ASSERT_TRUE(nodeConfig.releaseSnapshot(snapshot_id));
+    ASSERT_TRUE(nodeConfig.releaseSnapshot(snapshot_id, true));
 
     // Clean up after test
     nodeConfig.deleteSnapshotConfiguration(snapshot_id);
 }
 
-TEST(ConsulConfigurationSnapshotTest, CheckSnapshotAcquireReleaseConcurrency)
+TEST(ConsulConfigurationSnapshotGatewayTest, CheckSnapshotAcquireReleaseConcurrency)
 {
     // Setup configuration (adjust as needed for your test environment)
     auto configOne = std::make_unique<ConfigurationServiceConfig>(
@@ -100,17 +100,17 @@ TEST(ConsulConfigurationSnapshotTest, CheckSnapshotAcquireReleaseConcurrency)
     // Clean up before test
 
     // Try to acquire snapshot lock
-    ASSERT_TRUE(nodeConfigOne.tryAcquireSnapshot(snapshot_id));
-    ASSERT_FALSE(nodeConfigTwo.tryAcquireSnapshot(snapshot_id)); // Should fail since already acquired
+    ASSERT_TRUE(nodeConfigOne.tryAcquireSnapshot(snapshot_id, true));
+    ASSERT_FALSE(nodeConfigTwo.tryAcquireSnapshot(snapshot_id, true)); // Should fail since already acquired
 
     // Release the snapshot
-    ASSERT_TRUE(nodeConfigOne.releaseSnapshot(snapshot_id));
-    ASSERT_TRUE(nodeConfigTwo.tryAcquireSnapshot(snapshot_id)); // Now should succeed
+    ASSERT_TRUE(nodeConfigOne.releaseSnapshot(snapshot_id, true));
+    ASSERT_TRUE(nodeConfigTwo.tryAcquireSnapshot(snapshot_id, true)); // Now should succeed
     // Clean up after test
-    ASSERT_TRUE(nodeConfigOne.releaseSnapshot(snapshot_id));
+    ASSERT_TRUE(nodeConfigOne.releaseSnapshot(snapshot_id, true));
 }
 
-TEST(ConsulConfigurationSnapshotTest, CheckSnapshotAcquireReleaseConcurrencyOnExpiration)
+TEST(ConsulConfigurationSnapshotGatewayTest, CheckSnapshotAcquireReleaseConcurrencyOnExpiration)
 {
     // Setup configuration (adjust as needed for your test environment)
     auto configOne = std::make_unique<ConfigurationServiceConfig>(
@@ -132,15 +132,15 @@ TEST(ConsulConfigurationSnapshotTest, CheckSnapshotAcquireReleaseConcurrencyOnEx
     // Clean up before test
 
     // Try to acquire snapshot lock
-    ASSERT_TRUE(nodeConfigOne->tryAcquireSnapshot(snapshot_id));
-    ASSERT_FALSE(nodeConfigTwo->tryAcquireSnapshot(snapshot_id)); // Should fail since already acquired
+    ASSERT_TRUE(nodeConfigOne->tryAcquireSnapshot(snapshot_id, true));
+    ASSERT_FALSE(nodeConfigTwo->tryAcquireSnapshot(snapshot_id, true)); // Should fail since already acquired
 
-    // Now delete the con fig one to simualte the session expiration
+    // Now delete the config one to simulate the session expiration
     nodeConfigOne.reset();
     // wait 30 seconds to ensure the session is expired
     std::this_thread::sleep_for(std::chrono::seconds(30));
     // Now the second node should be able to acquire the snapshot
-    ASSERT_TRUE(nodeConfigTwo->tryAcquireSnapshot(snapshot_id));
+    ASSERT_TRUE(nodeConfigTwo->tryAcquireSnapshot(snapshot_id, true));
     // Clean up after test
-    ASSERT_TRUE(nodeConfigTwo->releaseSnapshot(snapshot_id));
+    ASSERT_TRUE(nodeConfigTwo->releaseSnapshot(snapshot_id, true));
 }

@@ -1,8 +1,9 @@
 #ifndef K2EG_CONTROLLER_COMMAND_CMD_COMMAND_H_
 #define K2EG_CONTROLLER_COMMAND_CMD_COMMAND_H_
 
-#include <k2eg/common/serialization.h>
+
 #include <k2eg/common/types.h>
+#include <k2eg/common/serialization.h>
 
 #include <k2eg/controller/command/cmd/Command.h>
 

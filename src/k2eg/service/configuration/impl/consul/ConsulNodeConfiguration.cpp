@@ -13,6 +13,7 @@
 #include <oatpp/web/protocol/http/outgoing/Request.hpp>
 
 #include <memory>
+#include <stdexcept>
 
 using namespace k2eg::service::configuration;
 using namespace k2eg::service::configuration::impl::consul;
@@ -249,15 +250,16 @@ const std::vector<std::string> ConsulNodeConfiguration::kvGetKeys(const std::str
         auto        headers = oatpp::web::protocol::http::Headers();
         std::string url = STRING_FORMAT("v1/kv/%1%?keys", prefix);
         auto        response = requestExecutor->execute("GET", url, headers, nullptr, nullptr);
-        int statusCode = response->getStatusCode();
+        int         statusCode = response->getStatusCode();
         if (statusCode == 200)
         {
             auto responseBody = response->readBodyToString();
             if (responseBody)
             {
-                //convert to boost json
+                // convert to boost json
                 boost::json::value parsedResponse = boost::json::parse(responseBody.getValue(""));
-                if(parsedResponse.is_array()) {
+                if (parsedResponse.is_array())
+                {
                     auto arr = parsedResponse.as_array();
                     for (const auto& item : arr)
                     {
@@ -352,7 +354,8 @@ ConstSnapshotConfigurationShrdPtr ConsulNodeConfiguration::getSnapshotConfigurat
         auto running_status_str = client->kvGet(base_key + "/running_status");
         auto archiving_status_str = client->kvGet(base_key + "/archiving_status");
         auto archiver_id_str = client->kvGet(base_key + "/archiver_id");
-        auto timestamp_str = client->kvGet(base_key + "/timestamp");
+        auto update_timestamp_str = client->kvGet(base_key + "/update_timestamp");
+        auto config_json_str = client->kvGet(base_key + "/config_json");
 
         auto snapshot_config = std::make_shared<SnapshotConfiguration>();
         if (weight_str)
@@ -367,8 +370,10 @@ ConstSnapshotConfigurationShrdPtr ConsulNodeConfiguration::getSnapshotConfigurat
             snapshot_config->archiving_status = (archiving_status_str.getValue("false") == "true");
         if (archiver_id_str)
             snapshot_config->archiver_id = archiver_id_str.getValue("");
-        if (timestamp_str)
-            snapshot_config->timestamp = timestamp_str.getValue("");
+        if (update_timestamp_str)
+            snapshot_config->update_timestamp = update_timestamp_str.getValue("");
+        if (config_json_str)
+            snapshot_config->config_json = config_json_str.getValue("");
         return snapshot_config;
     }
     catch (const Client::Error& err)
@@ -389,25 +394,35 @@ bool ConsulNodeConfiguration::setSnapshotConfiguration(const std::string& snapsh
         client->kvPut(base_key + "/running_status", snapshot_config->running_status ? "true" : "false");
         client->kvPut(base_key + "/archiving_status", snapshot_config->archiving_status ? "true" : "false");
         client->kvPut(base_key + "/archiver_id", snapshot_config->archiver_id);
-        client->kvPut(base_key + "/timestamp", snapshot_config->timestamp);
-        return true;
+        client->kvPut(base_key + "/update_timestamp", snapshot_config->update_timestamp);
+        client->kvPut(base_key + "/config_json", snapshot_config->config_json);
     }
     catch (const Client::Error& err)
     {
         return false;
     }
+    return true;
 }
 
 bool ConsulNodeConfiguration::deleteSnapshotConfiguration(const std::string& snapshot_id)
 {
-    std::string base_key = getSnapshotKey(snapshot_id);
+    std::string snapshot_key = getSnapshotKey(snapshot_id) + "/";
     try
     {
-        client->kvDelete(base_key + "/"); // true = recurse
-        return true;
+        // Compose the URL for Consul's HTTP API with ?recurse to delete all keys under the prefix
+        std::string url = STRING_FORMAT("v1/kv/%1%?recurse=true", snapshot_key);
+
+        auto headers = oatpp::web::protocol::http::Headers();
+        // No body needed for DELETE
+        auto response = requestExecutor->execute("DELETE", url, headers, nullptr, nullptr);
+
+        // Consul returns 200 OK if successful, 404 if nothing to delete
+        int statusCode = response->getStatusCode();
+        return statusCode == 200 || statusCode == 404;
     }
-    catch (const Client::Error& err)
+    catch (const std::exception& err)
     {
+        // Optionally log error
         return false;
     }
 }
@@ -442,19 +457,6 @@ const std::vector<std::string> ConsulNodeConfiguration::getSnapshotIds() const
     return snapshot_ids;
 }
 
-bool ConsulNodeConfiguration::updateSnapshotField(const std::string& snapshot_id, const std::string& field, const std::string& value)
-{
-    std::string key = getSnapshotKey(snapshot_id) + "/" + field;
-    try
-    {
-        return client->kvPut(key, value);
-    }
-    catch (const Client::Error& err)
-    {
-        return false;
-    }
-}
-
 const std::string ConsulNodeConfiguration::getSnapshotField(const std::string& snapshot_id, const std::string& field) const
 {
     std::string key = getSnapshotKey(snapshot_id) + "/" + field;
@@ -485,6 +487,19 @@ bool ConsulNodeConfiguration::isSnapshotRunning(const std::string& snapshot_id) 
     }
 }
 
+void ConsulNodeConfiguration::setSnapshotRunning(const std::string& snapshot_id, bool running)
+{
+    try
+    {
+        client->kvPut(getSnapshotKey(snapshot_id) + "/running_status", running ? "true" : "false");
+    }
+    catch (Client::Error& err)
+    {
+        // Handle error
+        throw std::runtime_error(err.getMessage());
+    }
+}
+
 const std::string ConsulNodeConfiguration::getSnapshotGateway(const std::string& snapshot_id) const
 {
     try
@@ -500,13 +515,13 @@ const std::string ConsulNodeConfiguration::getSnapshotGateway(const std::string&
     }
 }
 
-bool ConsulNodeConfiguration::tryAcquireSnapshot(const std::string& snapshot_id)
+bool ConsulNodeConfiguration::tryAcquireSnapshot(const std::string& snapshot_id, bool for_gateway)
 {
     if (session_id.empty())
         return false;
 
     std::string base_key = getSnapshotKey(snapshot_id);
-    std::string lock_key = base_key + "/lock";
+    std::string lock_key = base_key + "/lock_" + (for_gateway ? "gateway" : "storage");
 
     try
     {
@@ -533,13 +548,13 @@ bool ConsulNodeConfiguration::tryAcquireSnapshot(const std::string& snapshot_id)
     return false;
 }
 
-bool ConsulNodeConfiguration::releaseSnapshot(const std::string& snapshot_id)
+bool ConsulNodeConfiguration::releaseSnapshot(const std::string& snapshot_id, bool for_gateway)
 {
     if (session_id.empty())
         return false;
 
-    std::string lock_key = getSnapshotKey(snapshot_id) + "/lock";
     std::string base_key = getSnapshotKey(snapshot_id);
+    std::string lock_key = base_key + "/lock_" + (for_gateway ? "gateway" : "storage");
 
     try
     {
