@@ -121,6 +121,7 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/scheduler/Scheduler.cpp
   src/k2eg/service/scheduler/Task.cpp
 
+  src/k2eg/service/configuration/INodeConfiguration.cpp
   src/k2eg/service/configuration/impl/consul/ConsulNodeConfiguration.cpp
 
   src/k2eg/controller/command/CMDController.cpp

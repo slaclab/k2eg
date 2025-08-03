@@ -304,10 +304,7 @@ NodeConfigurationShrdPtr ConsulNodeConfiguration::getNodeConfiguration() const
     auto json_str = json_value.getValue("");
     try
     {
-        // Parse the JSON string using Boost.JSON.
-        boost::json::value  parsed = boost::json::parse(json_str);
-        boost::json::object obj = parsed.as_object();
-        return config_from_json(obj);
+        return std::make_shared<NodeConfiguration>(NodeConfiguration::fromJson(json_str));
     }
     catch (const std::exception& ex)
     {
@@ -318,7 +315,7 @@ NodeConfigurationShrdPtr ConsulNodeConfiguration::getNodeConfiguration() const
 bool ConsulNodeConfiguration::setNodeConfiguration(NodeConfigurationShrdPtr node_configuration)
 {
     // store configuration in Consul KV store
-    auto json_obj = config_to_json(*node_configuration);
+    auto json_obj = NodeConfiguration::toJson(*node_configuration);
     auto json_str = boost::json::serialize(json_obj);
     auto res = client->kvPut(node_configuration_key, json_str);
     return res;
@@ -506,7 +503,7 @@ const std::string ConsulNodeConfiguration::getSnapshotGateway(const std::string&
     try
     {
         std::string base_key = getSnapshotKey(snapshot_id);
-        std::string lock_key = base_key + "/lock";
+        std::string lock_key = base_key + "/lock_gateway";
         auto        gateway_id = client->kvGet(lock_key);
         return gateway_id ? gateway_id.getValue("") : "";
     }

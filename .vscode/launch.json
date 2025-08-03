@@ -637,7 +637,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=ConsulConfigurationSnapshotTest.*"],
+            "args": ["--gtest_filter=ConsulConfigurationSnapshotGatewayTest.*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
