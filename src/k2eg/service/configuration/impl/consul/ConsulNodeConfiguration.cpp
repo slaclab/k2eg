@@ -1,11 +1,12 @@
-#include "k2eg/service/log/ILogger.h"
-#include "oatpp/core/data/share/MemoryLabel.hpp"
+
 #include <k2eg/common/utility.h>
 
+#include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/configuration/INodeConfiguration.h>
 #include <k2eg/service/configuration/impl/consul/ConsulNodeConfiguration.h>
 
+#include <oatpp/core/data/share/MemoryLabel.hpp>
 #include <oatpp/core/base/Environment.hpp>
 #include <oatpp/network/tcp/client/ConnectionProvider.hpp>
 #include <oatpp/parser/json/mapping/ObjectMapper.hpp>

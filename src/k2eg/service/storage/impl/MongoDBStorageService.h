@@ -59,7 +59,6 @@ private:
     log::ILoggerShrdPtr logger;    
 
     ConstMongoDBStorageImplementationConfigShrdPtr config_;
-    std::unique_ptr<mongocxx::instance> instance_;
     std::unique_ptr<mongocxx::pool> pool_;
     mutable std::mutex stats_mutex_;
     
