@@ -251,7 +251,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshtotStartStopVerifyConfiguration)
     EXPECT_EQ(snapshot_config->weight_unit, "eps");
     EXPECT_EQ(snapshot_config->archiver_id, "");
     EXPECT_STRNE(snapshot_config->update_timestamp.c_str(), "");
-    EXPECT_EQ(snapshot_config->config_json, "{\"serialization\":\"Msgpack\",\"reply_id\":\"rep-id\",\"reply_topic\":\"app_reply_topic\",\"snapshot_name\":\"Snapshot Name\",\"pv_name_list\":[\"pva://variable:b\",\"pva://variable:a\"],\"repeat_delay_msec\":0,\"time_window_msec\":1000,\"sub_push_delay_msec\":0,\"pv_field_filter_list\":[],\"triggered\":false,\"type\":\"Normal\"}");
+    EXPECT_EQ(snapshot_config->config_json, "{\"type\":\"repeating_snapshot\",\"serialization\":\"Msgpack\",\"reply_id\":\"rep-id\",\"reply_topic\":\"app_reply_topic\",\"snapshot_name\":\"Snapshot Name\",\"pv_name_list\":[\"pva://variable:b\",\"pva://variable:a\"],\"repeat_delay_msec\":0,\"time_window_msec\":1000,\"sub_push_delay_msec\":0,\"pv_field_filter_list\":[],\"triggered\":false,\"type\":\"Normal\"}");
     // stop the snapshot
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
     // wait for the stop message succeed
@@ -281,7 +281,6 @@ TEST(NodeControllerSnapshot, RepeatingSnapshtotStartStopVerifyConfiguration)
 
 TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
 {
-    auto                                           snapshot_json_description = "{\"serialization\":\"Msgpack\",\"reply_id\":\"rep-id\",\"reply_topic\":\"app_reply_topic\",\"snapshot_name\":\"Snapshot Name\",\"pv_name_list\":[\"pva://variable:b\",\"pva://variable:a\"],\"repeat_delay_msec\":0,\"time_window_msec\":1000,\"sub_push_delay_msec\":0,\"pv_field_filter_list\":[],\"triggered\":false,\"type\":\"Normal\"}";
     typedef std::map<std::string, msgpack::object> Map;
     boost::json::object                            reply_msg;
     std::unique_ptr<NodeController>                node_controller;
@@ -290,16 +289,11 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
     node_controller = initBackend(ncs_tcp_port, publisher, true, true);
     auto node_configuration_service = ServiceResolver<INodeConfiguration>::resolve();
     ASSERT_TRUE(node_configuration_service != nullptr);
-
+    // delete old snapshot configuration if exists
     node_configuration_service->deleteSnapshotConfiguration("snapshot_name");
-    auto snapshot_configuration = MakeSnapshotConfigurationShrdPtr(
-        SnapshotConfiguration{
-            .weight = 0,
-            .weight_unit = "eps",
-            .archiver_id = "",
-            .update_timestamp = "now",
-            .config_json = snapshot_json_description});
-    auto result = node_configuration_service->setSnapshotConfiguration("snapshot_name", snapshot_configuration);
+    // start a new snapshot
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false})}););
+
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
     while (!node_controller->isWorkerReady(CommandType::repeating_snapshot))
@@ -307,23 +301,35 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
         sleep(1);
     }
 
-    // // wait for the activation on the ocnfiguration
-    bool condition = true;
-    int  retry_count = 0;
-    while (condition && retry_count < 60)
+    // wait for the activation on the configuration
+    int retry_count = 0;
+    while (!node_configuration_service->isSnapshotRunning("snapshot_name") && retry_count < 60)
     {
         retry_count++;
         sleep(1);
-        auto snapshot_config = node_configuration_service->getSnapshotConfiguration("snapshot_name");
-        if (snapshot_config != nullptr && node_configuration_service->isSnapshotRunning("snapshot_name"))
-        {
-            condition = false;
-        }
     }
 
+    // check if the snapshot is running
     auto running_snapshots = node_configuration_service->getRunningSnapshots();
     EXPECT_EQ(running_snapshots.size(), 1) << "Running snapshots size is not 1, it is: " << running_snapshots.size();
     ASSERT_NE(std::find(running_snapshots.begin(), running_snapshots.end(), "snapshot_name"), running_snapshots.end()) << "Running snapshot 'snapshot_name' not found in the list of running snapshots";
+
+    // we need to simulate the shutdown of the node controller
+    deinitBackend(std::move(node_controller));
+
+    // restart the node controller
+    publisher = std::make_shared<TopicCountedTargetPublisher>();
+    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
+    node_configuration_service = ServiceResolver<INodeConfiguration>::resolve();
+
+    // wait until snapshot is restarted
+    retry_count = 0;
+    while (!node_configuration_service->isSnapshotRunning("snapshot_name") && retry_count < 60)
+    {
+        retry_count++;
+        sleep(1);
+    }
+
 
     auto snapshot_config = node_configuration_service->getSnapshotConfiguration("snapshot_name");
     ASSERT_TRUE(snapshot_config != nullptr);
@@ -331,7 +337,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
     EXPECT_EQ(snapshot_config->weight_unit, "eps");
     EXPECT_EQ(snapshot_config->archiver_id, "");
     EXPECT_STRNE(snapshot_config->update_timestamp.c_str(), "");
-    EXPECT_EQ(snapshot_config->config_json, "{\"serialization\":\"Msgpack\",\"reply_id\":\"rep-id\",\"reply_topic\":\"app_reply_topic\",\"snapshot_name\":\"Snapshot Name\",\"pv_name_list\":[\"pva://variable:b\",\"pva://variable:a\"],\"repeat_delay_msec\":0,\"time_window_msec\":1000,\"sub_push_delay_msec\":0,\"pv_field_filter_list\":[],\"triggered\":false,\"type\":\"Normal\"}");
+    EXPECT_EQ(snapshot_config->config_json, "{\"type\":\"repeating_snapshot\",\"serialization\":\"Msgpack\",\"reply_id\":\"rep-id\",\"reply_topic\":\"app_reply_topic\",\"snapshot_name\":\"Snapshot Name\",\"pv_name_list\":[\"pva://variable:b\",\"pva://variable:a\"],\"repeat_delay_msec\":0,\"time_window_msec\":1000,\"sub_push_delay_msec\":0,\"pv_field_filter_list\":[],\"triggered\":false,\"type\":\"Normal\"}");
     // stop the snapshot
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
     // wait for the stop message succeed
@@ -340,17 +346,11 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
         sleep(1);
     }
 
-    condition = true;
     retry_count = 0;
-    while (condition && retry_count < 60)
+    while (node_configuration_service->isSnapshotRunning("snapshot_name") && retry_count < 60)
     {
         retry_count++;
         sleep(1);
-        auto snapshot_config = node_configuration_service->getSnapshotConfiguration("snapshot_name");
-        if (snapshot_config != nullptr && !node_configuration_service->isSnapshotRunning("snapshot_name"))
-        {
-            condition = false;
-        }
     }
     snapshot_config = node_configuration_service->getSnapshotConfiguration("snapshot_name");
     ASSERT_TRUE(snapshot_config != nullptr);

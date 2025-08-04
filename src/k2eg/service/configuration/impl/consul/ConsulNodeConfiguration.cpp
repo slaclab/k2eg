@@ -616,7 +616,9 @@ const std::vector<std::string>  ConsulNodeConfiguration::getAvailableSnapshot() 
     for (const auto& snapshot_id : all_snapshots)
     {
         // If not running and not locked, it's available
-        if (!isSnapshotRunning(snapshot_id) && getSnapshotGateway(snapshot_id).empty())
+        auto is_running = isSnapshotRunning(snapshot_id);
+        auto gateway = getSnapshotGateway(snapshot_id);
+        if (!is_running && gateway.empty())
         {
             available_snapshots.push_back(snapshot_id);
         }

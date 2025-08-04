@@ -304,7 +304,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 const int time_window_msec = check_json_field<int32_t>(obj, KEY_TIME_WINDOW_MSEC, logger, "The time window key should be a integer", 1000);
                 const std::string snapshot_name = check_json_field<std::string>(obj, KEY_SNAPSHOT_NAME, logger, "The snapshot name key should be a string", "");
                 const bool triggered = check_json_field<bool>(obj, KEY_TRIGGERED, logger, "The triggered key should be a boolean", false);
-                const SnapshotType type = snapshot_type_from_string(check_json_field<std::string>(obj, KEY_TYPE, logger, "The snapshot type key should be a string", "normal").c_str());
+                const SnapshotType snapshot_type = snapshot_type_from_string(check_json_field<std::string>(obj, KEY_SNAPSHOT_TYPE, logger, "The snapshot type key should be a string", "normal").c_str());
                 const std::int32_t sub_push_delay_msec = check_json_field<int32_t>(obj, KEY_SUB_PUSH_DELAY_MSEC, logger, "The sub push delay key should be a integer", 0);
                 auto json_array = std::any_cast<boost::json::array>(fields->find(KEY_PV_NAME_LIST)->second);
                 auto json_array_field_filter =  check_json_field<boost::json::array>(obj, KEY_PV_FIELD_FILTER_LIST, logger, "The field filter key should be an array", boost::json::array());
@@ -335,7 +335,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                         time_window_msec,
                         sub_push_delay_msec,
                         triggered,
-                        type,
+                        snapshot_type,
                         pv_field_filter_list});
                 }
                 else
@@ -381,7 +381,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 const std::string        reply_id = check_for_reply_id(obj, logger);
                 const std::string        reply_topic = check_reply_topic(obj, logger);
                 const std::string snapshot_name = check_json_field<std::string>(obj, KEY_SNAPSHOT_NAME, logger, "The snapshot name key should be a string", "");
-                const std::map<std::string, std::string> trigger_tag = check_json_field_for_map(obj, KET_TAGS, logger, "The triggered key should be a map");
+                const std::map<std::string, std::string> trigger_tag = check_json_field_for_map(obj, KEY_TAGS, logger, "The triggered key should be a map");
                 result = std::make_shared<RepeatingSnapshotTriggerCommand>(RepeatingSnapshotTriggerCommand{
                     CommandType::repeating_snapshot_trigger, 
                     ser_type, 

@@ -1,7 +1,9 @@
 #ifndef K2EG_CONTROLLER_COMMAND_CMD_SNAPSHOTCOMMAND_H_
 #define K2EG_CONTROLLER_COMMAND_CMD_SNAPSHOTCOMMAND_H_
 
+#include "k2eg/common/BaseSerialization.h"
 #include <k2eg/controller/command/cmd/Command.h>
+#include <unordered_set>
 
 namespace k2eg::controller::command::cmd {
 
@@ -114,11 +116,53 @@ struct RepeatingSnapshotCommand : public Command
     // the default is false
     bool triggered;
     // define the type of snapshot
-    SnapshotType type = SnapshotType::NORMAL;
+    SnapshotType snapshot_type = SnapshotType::NORMAL;
     // the fields to include in the snapshot for each pv data
     std::unordered_set<std::string> pv_field_filter_list = {};
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotCommand)
+
+static void from_json(const std::string& json_string, RepeatingSnapshotCommand& cmd)
+{
+    boost::json::value json_value = boost::json::parse(json_string);
+    if (!json_value.is_object())
+        return;
+
+    const auto& obj = json_value.as_object();
+    cmd.reply_id = obj.contains(KEY_REPLY_ID) ? obj.at(KEY_REPLY_ID).as_string() : "";
+    cmd.reply_topic = obj.contains(KEY_REPLY_TOPIC) ? obj.at(KEY_REPLY_TOPIC).as_string() : "";
+    cmd.serialization = common::serialization_from_string((obj.contains(KEY_SERIALIZATION) ? std::string(obj.at(KEY_SERIALIZATION).as_string()) : std::string("unknown")));
+    cmd.pv_name_list = std::unordered_set<std::string>{};
+    if (obj.contains(KEY_PV_NAME_LIST))
+    {
+        const auto& pv_list = obj.at(KEY_PV_NAME_LIST).as_array();
+        for (const auto& pv : pv_list)
+        {
+            if (pv.is_string())
+                cmd.pv_name_list.insert(std::string(pv.as_string()));
+        }
+    }
+    cmd.repeat_delay_msec = obj.contains(KEY_REPEAT_DELAY_MSEC) ? obj.at(KEY_REPEAT_DELAY_MSEC).as_int64() : 0;
+    cmd.time_window_msec = obj.contains(KEY_TIME_WINDOW_MSEC) ? obj.at(KEY_TIME_WINDOW_MSEC).as_int64() : 0;
+    cmd.snapshot_name = obj.contains(KEY_SNAPSHOT_NAME) ? std::string(obj.at(KEY_SNAPSHOT_NAME).as_string()) : "";
+    cmd.sub_push_delay_msec = obj.contains(KEY_SUB_PUSH_DELAY_MSEC) ? obj.at(KEY_SUB_PUSH_DELAY_MSEC).as_int64() : 0;
+    cmd.triggered = obj.contains(KEY_TRIGGERED) ? obj.at(KEY_TRIGGERED).as_bool() : false;
+    cmd.pv_field_filter_list = std::unordered_set<std::string>{};
+    if (obj.contains(KEY_PV_FIELD_FILTER_LIST))
+    {
+        const auto& field_list = obj.at(KEY_PV_FIELD_FILTER_LIST).as_array();
+        for (const auto& field : field_list)
+        {
+            if (field.is_string())
+                cmd.pv_field_filter_list.insert(std::string(field.as_string()));
+        }
+    }
+    cmd.snapshot_type = SnapshotType::NORMAL; // Default type if not specified
+    if (obj.contains(KEY_SNAPSHOT_TYPE))
+    {
+        cmd.snapshot_type = snapshot_type_from_string(obj.at(KEY_SNAPSHOT_TYPE).as_string().c_str());
+    }
+}
 
 /*
 @brief RepeatingSnapshotStopCommand is a command to stop the repeating snapshot
@@ -184,6 +228,7 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Repe
         pv_array.emplace_back(name);
     }
     jv = {
+      {"type", command_type_to_string(CommandType::repeating_snapshot)},
       {"serialization", serialization_to_string(c.serialization)}, 
       {"reply_id", c.reply_id}, 
       {"reply_topic", c.reply_topic}, 
@@ -194,7 +239,7 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Repe
       {"sub_push_delay_msec", c.sub_push_delay_msec},
       {"pv_field_filter_list", boost::json::array(c.pv_field_filter_list.begin(), c.pv_field_filter_list.end())},
       {"triggered", c.triggered},
-      {"type", snapshot_type_to_string(c.type)},
+      {"snapshot_type", snapshot_type_to_string(c.snapshot_type)},
     };
 }
 

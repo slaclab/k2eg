@@ -1,5 +1,6 @@
 
 
+#include "boost/json/parse.hpp"
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
 
@@ -40,7 +41,7 @@ using namespace k2eg::service::epics_impl;
 using namespace k2eg::service::configuration;
 
 #define CSM_RECURRING_CHECK_TASK_NAME       "csm-recurring-check-task"
-#define CSM_RECURRING_CHECK_TASK_CRON       "* * * * * *"
+#define CSM_RECURRING_CHECK_TASK_CRON       "1 * * * * *"
 
 #pragma region Utility
 #define GET_QUEUE_FROM_SNAPSHOT_NAME(snapshot_name) ([](const std::string& name) { \
@@ -205,7 +206,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
                        LogLevel::DEBUG);
     // create the commmand operation info structure
     SnapshotOpInfoShrdPtr s_op_ptr = nullptr;
-    switch (snapsthot_command->type)
+    switch (snapsthot_command->snapshot_type)
     {
     case SnapshotType::unknown:
         {
@@ -441,8 +442,6 @@ void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerPara
             }
         }
     }
-    // logger->logMessage(STRING_FORMAT("EPICS forwarded %1% data events for PVs: %2%",
-    // event_received->event_data->size() % get_pv_names(pv_names)), LogLevel::DEBUG);
 }
 
 void ContinuousSnapshotManager::expirationCheckerLoop()
@@ -525,8 +524,41 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
 
 void ContinuousSnapshotManager::handlePeriodicTask(TaskProperties& task_properties)
 {
-
     logger->logMessage("Handle periodic task for recurring snapshot management", LogLevel::DEBUG);
+    // check for snapshot to reboot using configuration service
+    if (!node_configuration)
+    {
+        logger->logMessage("Node configuration service not available", LogLevel::ERROR);
+        return;
+    }
+    // get the list of snapshots to be restarted
+    auto snapshots_to_restart = node_configuration->getAvailableSnapshot(); 
+    if (snapshots_to_restart.empty())
+    {
+        logger->logMessage("No snapshots available for restart", LogLevel::DEBUG);
+        return;
+    }
+
+    logger->logMessage(STRING_FORMAT("Restart first of %1% snapshots to restart", snapshots_to_restart.size()), LogLevel::DEBUG);
+    auto snapshot_id = snapshots_to_restart.front();
+    auto snapshot_config = node_configuration->getSnapshotConfiguration(snapshot_id);
+    if (!snapshot_config)
+    {
+        logger->logMessage(STRING_FORMAT("Snapshot configuration for '%1%' not found", snapshot_id), LogLevel::ERROR);
+        return;
+    }
+    // Submit the command to start the snapshot
+    logger->logMessage(STRING_FORMAT("Submitting repeating snapshot command for '%1%' with cmd: %2%", snapshot_id%snapshot_config->config_json), LogLevel::DEBUG);
+    // create empty command
+    auto snapshot_command = MakeRepeatingSnapshotCommandShrdPtr(RepeatingSnapshotCommand{});
+    // create boost json object from snapshot configuration
+    from_json(snapshot_config->config_json, *snapshot_command);
+    // on auto-restart we need to remove away the reply id and topic
+    snapshot_command->reply_id = "";
+    snapshot_command->reply_topic = "";
+    snapshot_command->type = CommandType::repeating_snapshot;
+    // ok we can submit the command
+    submitSnapshot(snapshot_command);
 }
 
 void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstCommandShrdPtr cmd, const std::string& publishing_topic)
