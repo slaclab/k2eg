@@ -1,9 +1,8 @@
-#include <k2eg/service/configuration/INodeConfiguration.h>
 #include <boost/json.hpp>
+#include <k2eg/service/configuration/INodeConfiguration.h>
 
 using namespace k2eg::service::configuration;
 
-// NodeConfiguration implementation
 bool NodeConfiguration::isPresent(const std::string& pv_nam, const PVMonitorInfo& info) const
 {
     auto range = pv_monitor_info_map.equal_range(pv_nam);
@@ -30,7 +29,8 @@ void NodeConfiguration::removeFromKey(const std::string& key, const PVMonitorInf
     }
 }
 
-std::string NodeConfiguration::toJson(const NodeConfiguration& config) {
+std::string NodeConfiguration::toJson(const NodeConfiguration& config)
+{
     boost::json::object obj;
     boost::json::array  arr;
     for (const auto& entry : config.pv_monitor_info_map)
@@ -45,10 +45,14 @@ std::string NodeConfiguration::toJson(const NodeConfiguration& config) {
     return boost::json::serialize(obj);
 }
 
-NodeConfiguration NodeConfiguration::fromJson(const std::string& json_str) {
+NodeConfiguration NodeConfiguration::fromJson(const std::string& json_str)
+{
     NodeConfiguration config;
-    if(json_str.empty()){ return config; }
-    boost::json::value jv = boost::json::parse(json_str);
+    if (json_str.empty())
+    {
+        return config;
+    }
+    boost::json::value  jv = boost::json::parse(json_str);
     boost::json::object obj = jv.as_object();
     if (auto it = obj.if_contains("pv_monitor_map"))
     {
@@ -72,30 +76,36 @@ NodeConfiguration NodeConfiguration::fromJson(const std::string& json_str) {
     return config;
 }
 
+// Provide out-of-line definition for INodeConfiguration destructor to emit vtable
+
+INodeConfiguration::INodeConfiguration(ConstConfigurationServiceConfigUPtr config)
+    : config(std::move(config)){};
+
+INodeConfiguration::~INodeConfiguration() {}
+
 // SnapshotConfiguration implementation
-std::string SnapshotConfiguration::toJson(const SnapshotConfiguration& config) {
+std::string SnapshotConfiguration::toJson(const SnapshotConfiguration& config)
+{
     boost::json::object obj;
     obj["weight"] = config.weight;
     obj["weight_unit"] = config.weight_unit;
-    obj["gateway_id"] = config.gateway_id;
-    obj["running_status"] = config.running_status;
-    obj["archiving_status"] = config.archiving_status;
     obj["archiver_id"] = config.archiver_id;
     obj["update_timestamp"] = config.update_timestamp;
     obj["config_json"] = boost::json::value(config.config_json.empty() ? boost::json::array() : boost::json::parse(config.config_json));
     return boost::json::serialize(obj);
 }
 
-SnapshotConfiguration SnapshotConfiguration::fromJson(const std::string& json_str) {
+SnapshotConfiguration SnapshotConfiguration::fromJson(const std::string& json_str)
+{
     SnapshotConfiguration config;
-    if(json_str.empty()){ return config; }
-    boost::json::value jv = boost::json::parse(json_str);
+    if (json_str.empty())
+    {
+        return config;
+    }
+    boost::json::value  jv = boost::json::parse(json_str);
     boost::json::object obj = jv.as_object();
     config.weight = boost::json::value_to<int>(obj.at("weight"));
     config.weight_unit = boost::json::value_to<std::string>(obj.at("weight_unit"));
-    config.gateway_id = boost::json::value_to<std::string>(obj.at("gateway_id"));
-    config.running_status = boost::json::value_to<bool>(obj.at("running_status"));
-    config.archiving_status = boost::json::value_to<bool>(obj.at("archiving_status"));
     config.archiver_id = boost::json::value_to<std::string>(obj.at("archiver_id"));
     config.update_timestamp = boost::json::value_to<std::string>(obj.at("update_timestamp"));
     config.config_json = boost::json::value_to<std::string>(obj.at("config_json"));

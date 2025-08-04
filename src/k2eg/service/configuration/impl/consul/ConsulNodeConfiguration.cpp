@@ -1,13 +1,14 @@
 
+#include <iostream>
 #include <k2eg/common/utility.h>
 
-#include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/configuration/INodeConfiguration.h>
 #include <k2eg/service/configuration/impl/consul/ConsulNodeConfiguration.h>
+#include <k2eg/service/log/ILogger.h>
 
-#include <oatpp/core/data/share/MemoryLabel.hpp>
 #include <oatpp/core/base/Environment.hpp>
+#include <oatpp/core/data/share/MemoryLabel.hpp>
 #include <oatpp/network/tcp/client/ConnectionProvider.hpp>
 #include <oatpp/parser/json/mapping/ObjectMapper.hpp>
 #include <oatpp/web/client/HttpRequestExecutor.hpp>
@@ -315,9 +316,7 @@ NodeConfigurationShrdPtr ConsulNodeConfiguration::getNodeConfiguration() const
 bool ConsulNodeConfiguration::setNodeConfiguration(NodeConfigurationShrdPtr node_configuration)
 {
     // store configuration in Consul KV store
-    auto json_obj = NodeConfiguration::toJson(*node_configuration);
-    auto json_str = boost::json::serialize(json_obj);
-    auto res = client->kvPut(node_configuration_key, json_str);
+    auto res = client->kvPut(node_configuration_key, NodeConfiguration::toJson(*node_configuration));
     return res;
 }
 
@@ -348,9 +347,6 @@ ConstSnapshotConfigurationShrdPtr ConsulNodeConfiguration::getSnapshotConfigurat
     {
         auto weight_str = client->kvGet(base_key + "/weight");
         auto weight_unit_str = client->kvGet(base_key + "/weight_unit");
-        auto gateway_id_str = client->kvGet(base_key + "/gateway_id");
-        auto running_status_str = client->kvGet(base_key + "/running_status");
-        auto archiving_status_str = client->kvGet(base_key + "/archiving_status");
         auto archiver_id_str = client->kvGet(base_key + "/archiver_id");
         auto update_timestamp_str = client->kvGet(base_key + "/update_timestamp");
         auto config_json_str = client->kvGet(base_key + "/config_json");
@@ -360,12 +356,6 @@ ConstSnapshotConfigurationShrdPtr ConsulNodeConfiguration::getSnapshotConfigurat
             snapshot_config->weight = std::stoi(weight_str);
         if (weight_unit_str)
             snapshot_config->weight_unit = weight_unit_str.getValue("");
-        if (gateway_id_str)
-            snapshot_config->gateway_id = gateway_id_str.getValue("");
-        if (running_status_str)
-            snapshot_config->running_status = (running_status_str.getValue("false") == "true");
-        if (archiving_status_str)
-            snapshot_config->archiving_status = (archiving_status_str.getValue("false") == "true");
         if (archiver_id_str)
             snapshot_config->archiver_id = archiver_id_str.getValue("");
         if (update_timestamp_str)
@@ -388,9 +378,6 @@ bool ConsulNodeConfiguration::setSnapshotConfiguration(const std::string& snapsh
     {
         client->kvPut(base_key + "/weight", std::to_string(snapshot_config->weight));
         client->kvPut(base_key + "/weight_unit", snapshot_config->weight_unit);
-        client->kvPut(base_key + "/gateway_id", snapshot_config->gateway_id);
-        client->kvPut(base_key + "/running_status", snapshot_config->running_status ? "true" : "false");
-        client->kvPut(base_key + "/archiving_status", snapshot_config->archiving_status ? "true" : "false");
         client->kvPut(base_key + "/archiver_id", snapshot_config->archiver_id);
         client->kvPut(base_key + "/update_timestamp", snapshot_config->update_timestamp);
         client->kvPut(base_key + "/config_json", snapshot_config->config_json);
@@ -455,20 +442,6 @@ const std::vector<std::string> ConsulNodeConfiguration::getSnapshotIds() const
     return snapshot_ids;
 }
 
-const std::string ConsulNodeConfiguration::getSnapshotField(const std::string& snapshot_id, const std::string& field) const
-{
-    std::string key = getSnapshotKey(snapshot_id) + "/" + field;
-    try
-    {
-        auto value = client->kvGet(key);
-        return value ? value.getValue("") : "";
-    }
-    catch (const Client::Error& err)
-    {
-        return "";
-    }
-}
-
 // Distributed snapshot management methods
 
 bool ConsulNodeConfiguration::isSnapshotRunning(const std::string& snapshot_id) const
@@ -480,21 +453,49 @@ bool ConsulNodeConfiguration::isSnapshotRunning(const std::string& snapshot_id) 
     }
     catch (Client::Error& err)
     {
-        auto errMsg = err.getMessage();
         return false;
     }
 }
 
 void ConsulNodeConfiguration::setSnapshotRunning(const std::string& snapshot_id, bool running)
 {
+    if (session_id.empty())
+        throw std::runtime_error("Session ID is empty, cannot set snapshot running status");
+
+    std::string base_key = getSnapshotKey(snapshot_id);
+    std::string running_key = base_key + "/running_status";
+
     try
     {
-        client->kvPut(getSnapshotKey(snapshot_id) + "/running_status", running ? "true" : "false");
+        auto        headers = oatpp::web::protocol::http::Headers();
+        std::string url = STRING_FORMAT("v1/kv/%1%", running_key);
+
+        if (running)
+        {
+            // Set running_status to "true" and acquire lock with session
+            url += STRING_FORMAT("?acquire=%1%", session_id);
+            auto body = std::make_shared<oatpp::web::protocol::http::outgoing::BufferBody>(
+                oatpp::String("true"),
+                oatpp::data::share::StringKeyLabel("application/json"));
+            auto response = requestExecutor->execute("PUT", url, headers, body, nullptr);
+            if (response->getStatusCode() != 200)
+                throw std::runtime_error("Failed to set running_status to true");
+        }
+        else
+        {
+            // Release the lock and set running_status to "false"
+            url += STRING_FORMAT("?release=%1%", session_id);
+            auto body = std::make_shared<oatpp::web::protocol::http::outgoing::BufferBody>(
+                oatpp::String("false"),
+                oatpp::data::share::StringKeyLabel("application/json"));
+            auto response = requestExecutor->execute("PUT", url, headers, body, nullptr);
+            if (response->getStatusCode() != 200)
+                throw std::runtime_error("Failed to set running_status to false");
+        }
     }
-    catch (Client::Error& err)
+    catch (const std::exception& err)
     {
-        // Handle error
-        throw std::runtime_error(err.getMessage());
+        throw std::runtime_error(STRING_FORMAT("Failed to set snapshot running status: %1%", err.what()));
     }
 }
 
@@ -577,7 +578,7 @@ const std::vector<std::string> ConsulNodeConfiguration::getRunningSnapshots() co
         auto all_snapshots = getSnapshotIds();
         for (const auto& snapshot_id : all_snapshots)
         {
-            if (isSnapshotRunning(snapshot_id))
+            if (isSnapshotRunning(snapshot_id) && getSnapshotGateway(snapshot_id) == getNodeName())
                 running_snapshots.push_back(snapshot_id);
         }
     }
@@ -605,4 +606,20 @@ const std::vector<std::string> ConsulNodeConfiguration::getSnapshots() const
     {
     }
     return gateway_snapshots;
+}
+
+const std::vector<std::string>  ConsulNodeConfiguration::getAvailableSnapshot() const
+{
+    std::vector<std::string> available_snapshots;
+    // Find the first snapshot that is not running and not locked by any node
+    auto all_snapshots = getSnapshotIds();
+    for (const auto& snapshot_id : all_snapshots)
+    {
+        // If not running and not locked, it's available
+        if (!isSnapshotRunning(snapshot_id) && getSnapshotGateway(snapshot_id).empty())
+        {
+            available_snapshots.push_back(snapshot_id);
+        }
+    }
+    return available_snapshots;
 }

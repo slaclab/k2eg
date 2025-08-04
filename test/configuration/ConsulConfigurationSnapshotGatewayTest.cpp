@@ -25,8 +25,6 @@ TEST(ConsulConfigurationSnapshotGatewayTest, SnapshotConfiguration)
         SnapshotConfiguration{
             .weight = 100,
             .weight_unit = "eps",
-            .running_status = false,
-            .archiving_status = false,
             .archiver_id = "",
             .update_timestamp = "2023-10-01T00:00:00Z"});
     ASSERT_TRUE(nodeConfig.setSnapshotConfiguration(snapshot_id, snapshot_config));
@@ -37,8 +35,6 @@ TEST(ConsulConfigurationSnapshotGatewayTest, SnapshotConfiguration)
     ASSERT_NE(retrieved_config, nullptr);
     ASSERT_EQ(retrieved_config->weight, 100);
     ASSERT_EQ(retrieved_config->weight_unit, "eps");
-    ASSERT_EQ(retrieved_config->running_status, false);
-    ASSERT_EQ(retrieved_config->archiving_status, false);
     ASSERT_EQ(retrieved_config->archiver_id, "");
     ASSERT_STREQ(retrieved_config->update_timestamp.c_str(), "2023-10-01T00:00:00Z");
 }

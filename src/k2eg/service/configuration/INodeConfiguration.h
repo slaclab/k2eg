@@ -51,7 +51,7 @@ struct NodeConfiguration
 
     void removeFromKey(const std::string& key, const PVMonitorInfo& info);
 
-    static std::string toJson(const NodeConfiguration& config);
+    static std::string       toJson(const NodeConfiguration& config);
     static NodeConfiguration fromJson(const std::string& json_str);
 };
 
@@ -64,15 +64,6 @@ struct SnapshotConfiguration
     // Unit of the weight, e.g., "eps" (events/sec) or "mbps" (megabits/sec)
     std::string weight_unit;
 
-    // ID of the gateway that created and is managing the snapshot
-    std::string gateway_id;
-
-    // True if the snapshot is currently active on the gateway (session-bound)
-    bool running_status = false;
-
-    // True if archiving is enabled for this snapshot
-    bool archiving_status = false;
-
     // ID of the archiver currently responsible for storing this snapshot
     std::string archiver_id;
 
@@ -80,8 +71,8 @@ struct SnapshotConfiguration
     std::string update_timestamp;
 
     // JSON-encoded configuration for snapshot execution (e.g., PV list, interval)
-    std::string config_json;
-    static std::string toJson(const SnapshotConfiguration& config);
+    std::string                  config_json;
+    static std::string           toJson(const SnapshotConfiguration& config);
     static SnapshotConfiguration fromJson(const std::string& json_str);
 };
 
@@ -96,9 +87,8 @@ protected:
     ConstConfigurationServiceConfigUPtr config;
 
 public:
-    INodeConfiguration(ConstConfigurationServiceConfigUPtr config)
-        : config(std::move(config)){};
-    virtual ~INodeConfiguration() = default;
+    INodeConfiguration(ConstConfigurationServiceConfigUPtr config);
+    virtual ~INodeConfiguration();
     /**
      * @brief Get the node configuration.
      * @return Shared pointer to the node configuration.
@@ -147,14 +137,6 @@ public:
      */
     virtual const std::vector<std::string> getSnapshotIds() const = 0;
 
-    /**
-     * @brief Get the value of a specific field in a snapshot configuration.
-     * @param snapshot_id ID of the snapshot to query.
-     * @param field Name of the field to retrieve.
-     * @return The value of the specified field, or an empty string if not found.
-     */
-    virtual const std::string getSnapshotField(const std::string& snapshot_id, const std::string& field) const = 0;
-
     // Distributed snapshot management methods
     /**
      * @brief Check if a snapshot is currently running on the node.
@@ -200,6 +182,18 @@ public:
      * @return Vector of snapshot IDs that are managed by the node.
      */
     virtual const std::vector<std::string> getSnapshots() const = 0;
+
+    /**
+     * @brief Get the ID of a snapshot that is available for execution.
+     * @details This method checks for a snapshot configuration that is eligible to be started or resumed.
+     * It is typically used to detect snapshots that remain in a "running" state due to an unexpected node shutdown,
+     * crash, or reboot, where the snapshot was not explicitly stopped and its distributed lock/session has expired.
+     * Implementations should return the ID of a snapshot that is not currently locked or managed by another node,
+     * allowing recovery or continuation of unfinished snapshot tasks.
+     * If no such snapshot exists, an empty string is returned.
+     * @return The ID of the available snapshot as a string, or an empty string if none are available.
+     */
+    virtual const std::vector<std::string> getAvailableSnapshot() const = 0;
 };
 DEFINE_PTR_TYPES(INodeConfiguration)
 } // namespace k2eg::service::configuration

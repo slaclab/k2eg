@@ -56,7 +56,6 @@ public:
     bool                              setSnapshotConfiguration(const std::string& snapshot_id, SnapshotConfigurationShrdPtr snapshot_config) override;
     bool                              deleteSnapshotConfiguration(const std::string& snapshot_id) override;
     const std::vector<std::string>    getSnapshotIds() const override;
-    const std::string                 getSnapshotField(const std::string& snapshot_id, const std::string& field) const override;
 
     // Distributed snapshot management methods
     bool                           isSnapshotRunning(const std::string& snapshot_id) const override;
@@ -66,6 +65,7 @@ public:
     bool                           releaseSnapshot(const std::string& snapshot_id, bool for_gateway) override;
     const std::vector<std::string> getRunningSnapshots() const override;
     const std::vector<std::string> getSnapshots() const override;
+    const std::vector<std::string> getAvailableSnapshot() const override;
 };
 DEFINE_PTR_TYPES(ConsulNodeConfiguration)
 } // namespace k2eg::service::configuration::impl::consul

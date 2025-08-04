@@ -449,6 +449,12 @@ class ContinuousSnapshotManager
      */
     bool releaseSnapshotForStop(SnapshotOpInfo& snapshot_ops_info);
 
+    /**
+     * @brief Handle the periodic task for snapshot management.
+     * @param task_properties Properties of the scheduled periodic task.
+     */
+    void handlePeriodicTask(k2eg::service::scheduler::TaskProperties& task_properties);
+
 public:
     /**
      * @brief Construct a ContinuousSnapshotManager.
