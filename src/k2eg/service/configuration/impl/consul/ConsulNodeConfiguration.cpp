@@ -465,29 +465,7 @@ void ConsulNodeConfiguration::setSnapshotRunning(const std::string& snapshot_id,
     {
         auto        headers = oatpp::web::protocol::http::Headers();
         std::string url = STRING_FORMAT("v1/kv/%1%", running_key);
-
-        if (running)
-        {
-            // Set running_status to "true" and acquire lock with session
-            url += STRING_FORMAT("?acquire=%1%", session_id);
-            auto body = std::make_shared<oatpp::web::protocol::http::outgoing::BufferBody>(
-                oatpp::String("true"),
-                oatpp::data::share::StringKeyLabel("application/json"));
-            auto response = requestExecutor->execute("PUT", url, headers, body, nullptr);
-            if (response->getStatusCode() != 200)
-                throw std::runtime_error("Failed to set running_status to true");
-        }
-        else
-        {
-            // Release the lock and set running_status to "false"
-            url += STRING_FORMAT("?release=%1%", session_id);
-            auto body = std::make_shared<oatpp::web::protocol::http::outgoing::BufferBody>(
-                oatpp::String("false"),
-                oatpp::data::share::StringKeyLabel("application/json"));
-            auto response = requestExecutor->execute("PUT", url, headers, body, nullptr);
-            if (response->getStatusCode() != 200)
-                throw std::runtime_error("Failed to set running_status to false");
-        }
+        client->kvPut(running_key, running ? "true" : "false");
     }
     catch (const std::exception& err)
     {
@@ -612,8 +590,10 @@ const std::vector<std::string> ConsulNodeConfiguration::getAvailableSnapshot() c
     for (const auto& snapshot_id : all_snapshots)
     {
         // return all snapshots that have not been locked by gateway
+        // and was in running state == true
+        auto is_running = isSnapshotRunning(snapshot_id);
         auto gateway = getSnapshotGateway(snapshot_id);
-        if (gateway.empty())
+        if (is_running && gateway.empty())
         {
             available_snapshots.push_back(snapshot_id);
         }

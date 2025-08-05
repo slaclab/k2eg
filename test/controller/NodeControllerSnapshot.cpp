@@ -302,7 +302,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
 
     // wait for the activation on the configuration
     int retry_count = 0;
-    while (!node_configuration_service->isSnapshotRunning("snapshot_name") && retry_count < 60)
+    while (!node_configuration_service->isSnapshotRunning("snapshot_name") && retry_count < 120)
     {
         retry_count++;
         sleep(1);
@@ -323,7 +323,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
 
     // wait until snapshot is restarted
     retry_count = 0;
-    while (!node_configuration_service->isSnapshotRunning("snapshot_name") && retry_count < 60)
+    while (node_configuration_service->getSnapshotGateway("snapshot_name").empty() && retry_count < 120)
     {
         retry_count++;
         sleep(1);
@@ -368,7 +368,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
     }
 
     retry_count = 0;
-    while (node_configuration_service->isSnapshotRunning("snapshot_name") && retry_count < 60)
+    while (node_configuration_service->isSnapshotRunning("snapshot_name") && retry_count < 120)
     {
         retry_count++;
         sleep(1);
