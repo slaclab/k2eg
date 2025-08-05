@@ -89,7 +89,6 @@ std::string SnapshotConfiguration::toJson(const SnapshotConfiguration& config)
     boost::json::object obj;
     obj["weight"] = config.weight;
     obj["weight_unit"] = config.weight_unit;
-    obj["archiver_id"] = config.archiver_id;
     obj["update_timestamp"] = config.update_timestamp;
     obj["config_json"] = boost::json::value(config.config_json.empty() ? boost::json::array() : boost::json::parse(config.config_json));
     return boost::json::serialize(obj);
@@ -106,7 +105,6 @@ SnapshotConfiguration SnapshotConfiguration::fromJson(const std::string& json_st
     boost::json::object obj = jv.as_object();
     config.weight = boost::json::value_to<int>(obj.at("weight"));
     config.weight_unit = boost::json::value_to<std::string>(obj.at("weight_unit"));
-    config.archiver_id = boost::json::value_to<std::string>(obj.at("archiver_id"));
     config.update_timestamp = boost::json::value_to<std::string>(obj.at("update_timestamp"));
     config.config_json = boost::json::value_to<std::string>(obj.at("config_json"));
     return config;

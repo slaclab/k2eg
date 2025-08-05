@@ -123,7 +123,7 @@ ContinuousSnapshotManager::~ContinuousSnapshotManager()
 {
     logger->logMessage("Stopping continuous snapshot manager");
 
-    // remove the periodic task 
+    // remove the periodic task
     logger->logMessage("Remove periodic task from scheduler");
     bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(CSM_RECURRING_CHECK_TASK_NAME);
     logger->logMessage(STRING_FORMAT("Removed periodic maintanance : %1%", erased));
@@ -532,7 +532,7 @@ void ContinuousSnapshotManager::handlePeriodicTask(TaskProperties& task_properti
         return;
     }
     // get the list of snapshots to be restarted
-    auto snapshots_to_restart = node_configuration->getAvailableSnapshot(); 
+    auto snapshots_to_restart = node_configuration->getAvailableSnapshot();
     if (snapshots_to_restart.empty())
     {
         logger->logMessage("No snapshots available for restart", LogLevel::DEBUG);
@@ -548,15 +548,12 @@ void ContinuousSnapshotManager::handlePeriodicTask(TaskProperties& task_properti
         return;
     }
     // Submit the command to start the snapshot
-    logger->logMessage(STRING_FORMAT("Submitting repeating snapshot command for '%1%' with cmd: %2%", snapshot_id%snapshot_config->config_json), LogLevel::DEBUG);
+    logger->logMessage(STRING_FORMAT("Submitting repeating snapshot command for '%1%' with cmd: %2%", snapshot_id % snapshot_config->config_json), LogLevel::DEBUG);
     // create empty command
     auto snapshot_command = MakeRepeatingSnapshotCommandShrdPtr(RepeatingSnapshotCommand{});
     // create boost json object from snapshot configuration
     from_json(snapshot_config->config_json, *snapshot_command);
     // on auto-restart we need to remove away the reply id and topic
-    snapshot_command->reply_id = "";
-    snapshot_command->reply_topic = "";
-    snapshot_command->type = CommandType::repeating_snapshot;
     // ok we can submit the command
     submitSnapshot(snapshot_command);
 }
@@ -615,8 +612,7 @@ bool ContinuousSnapshotManager::tryToConfigureSnapshotStart(SnapshotOpInfo& snap
                 .update_timestamp = now_in_gmt(),
                 .config_json = to_json_string_cmd_ptr(snapshot_ops_info.cmd)});
         result = node_configuration->setSnapshotConfiguration(snapshot_ops_info.queue_name, snapshot_ops_info.snapshot_configuration);
-
-        // now set it as running using sessions
+        // set the snapshot as running
         node_configuration->setSnapshotRunning(snapshot_ops_info.queue_name, true);
     }
     catch (const std::exception& ex)

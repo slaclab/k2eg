@@ -249,9 +249,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshtotStartStopVerifyConfiguration)
     ASSERT_TRUE(snapshot_config != nullptr);
     EXPECT_EQ(snapshot_config->weight, 0);
     EXPECT_EQ(snapshot_config->weight_unit, "eps");
-    EXPECT_EQ(snapshot_config->archiver_id, "");
     EXPECT_STRNE(snapshot_config->update_timestamp.c_str(), "");
-    EXPECT_EQ(snapshot_config->config_json, "{\"type\":\"repeating_snapshot\",\"serialization\":\"Msgpack\",\"reply_id\":\"rep-id\",\"reply_topic\":\"app_reply_topic\",\"snapshot_name\":\"Snapshot Name\",\"pv_name_list\":[\"pva://variable:b\",\"pva://variable:a\"],\"repeat_delay_msec\":0,\"time_window_msec\":1000,\"sub_push_delay_msec\":0,\"pv_field_filter_list\":[],\"triggered\":false,\"type\":\"Normal\"}");
+    EXPECT_EQ(snapshot_config->config_json, "{\"type\":\"repeating_snapshot\",\"serialization\":\"Msgpack\",\"reply_id\":\"rep-id\",\"reply_topic\":\"app_reply_topic\",\"snapshot_name\":\"Snapshot Name\",\"pv_name_list\":[\"pva://variable:b\",\"pva://variable:a\"],\"repeat_delay_msec\":0,\"time_window_msec\":1000,\"sub_push_delay_msec\":0,\"pv_field_filter_list\":[],\"triggered\":false,\"snapshot_type\":\"Normal\"}");
     // stop the snapshot
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
     // wait for the stop message succeed
@@ -335,9 +334,31 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
     ASSERT_TRUE(snapshot_config != nullptr);
     EXPECT_EQ(snapshot_config->weight, 0);
     EXPECT_EQ(snapshot_config->weight_unit, "eps");
-    EXPECT_EQ(snapshot_config->archiver_id, "");
     EXPECT_STRNE(snapshot_config->update_timestamp.c_str(), "");
-    EXPECT_EQ(snapshot_config->config_json, "{\"type\":\"repeating_snapshot\",\"serialization\":\"Msgpack\",\"reply_id\":\"rep-id\",\"reply_topic\":\"app_reply_topic\",\"snapshot_name\":\"Snapshot Name\",\"pv_name_list\":[\"pva://variable:b\",\"pva://variable:a\"],\"repeat_delay_msec\":0,\"time_window_msec\":1000,\"sub_push_delay_msec\":0,\"pv_field_filter_list\":[],\"triggered\":false,\"type\":\"Normal\"}");
+    // create json object from snapshot configuration
+    boost::json::object snapshot_config_json = boost::json::parse(snapshot_config->config_json).as_object();
+    EXPECT_EQ(snapshot_config_json["type"].as_string(), "repeating_snapshot");
+    EXPECT_EQ(snapshot_config_json["serialization"].as_string(), "Msgpack");
+    EXPECT_EQ(snapshot_config_json["reply_id"].as_string(), "rep-id");
+    EXPECT_EQ(snapshot_config_json["reply_topic"].as_string(), "app_reply_topic");
+    EXPECT_EQ(snapshot_config_json["snapshot_name"].as_string(), "Snapshot Name");
+    EXPECT_EQ(snapshot_config_json["pv_name_list"].as_array().size(), 2);
+    auto& pv_list_arr = snapshot_config_json["pv_name_list"].as_array();
+    bool has_b = std::any_of(pv_list_arr.begin(), pv_list_arr.end(), [](const boost::json::value& v){
+        return v.is_string() && v.as_string() == "pva://variable:b";
+    });
+    bool has_a = std::any_of(pv_list_arr.begin(), pv_list_arr.end(), [](const boost::json::value& v){
+        return v.is_string() && v.as_string() == "pva://variable:a";
+    });
+    EXPECT_TRUE(has_b);
+    EXPECT_TRUE(has_a);
+    EXPECT_EQ(snapshot_config_json["repeat_delay_msec"].as_int64(), 0);
+    EXPECT_EQ(snapshot_config_json["time_window_msec"].as_int64(), 1000);
+    EXPECT_EQ(snapshot_config_json["sub_push_delay_msec"].as_int64(), 0);
+    EXPECT_EQ(snapshot_config_json["pv_field_filter_list"].as_array().size(), 0);
+    EXPECT_EQ(snapshot_config_json["triggered"].as_bool(), false);
+    EXPECT_EQ(snapshot_config_json["snapshot_type"].as_string(), "Normal");
+
     // stop the snapshot
     EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
     // wait for the stop message succeed

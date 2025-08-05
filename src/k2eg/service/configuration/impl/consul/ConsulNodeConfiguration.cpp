@@ -347,7 +347,6 @@ ConstSnapshotConfigurationShrdPtr ConsulNodeConfiguration::getSnapshotConfigurat
     {
         auto weight_str = client->kvGet(base_key + "/weight");
         auto weight_unit_str = client->kvGet(base_key + "/weight_unit");
-        auto archiver_id_str = client->kvGet(base_key + "/archiver_id");
         auto update_timestamp_str = client->kvGet(base_key + "/update_timestamp");
         auto config_json_str = client->kvGet(base_key + "/config_json");
 
@@ -356,8 +355,6 @@ ConstSnapshotConfigurationShrdPtr ConsulNodeConfiguration::getSnapshotConfigurat
             snapshot_config->weight = std::stoi(weight_str);
         if (weight_unit_str)
             snapshot_config->weight_unit = weight_unit_str.getValue("");
-        if (archiver_id_str)
-            snapshot_config->archiver_id = archiver_id_str.getValue("");
         if (update_timestamp_str)
             snapshot_config->update_timestamp = update_timestamp_str.getValue("");
         if (config_json_str)
@@ -378,7 +375,6 @@ bool ConsulNodeConfiguration::setSnapshotConfiguration(const std::string& snapsh
     {
         client->kvPut(base_key + "/weight", std::to_string(snapshot_config->weight));
         client->kvPut(base_key + "/weight_unit", snapshot_config->weight_unit);
-        client->kvPut(base_key + "/archiver_id", snapshot_config->archiver_id);
         client->kvPut(base_key + "/update_timestamp", snapshot_config->update_timestamp);
         client->kvPut(base_key + "/config_json", snapshot_config->config_json);
     }
@@ -537,7 +533,7 @@ bool ConsulNodeConfiguration::tryAcquireSnapshot(const std::string& snapshot_id,
         {
             auto               responseBody = response->readBodyToString();
             boost::json::value parsedResponse = boost::json::parse(responseBody.getValue(""));
-            return parsedResponse.is_bool() && parsedResponse.get_bool();
+            return (parsedResponse.is_bool() && parsedResponse.get_bool());
         }
     }
     catch (const std::exception& err)
@@ -608,17 +604,16 @@ const std::vector<std::string> ConsulNodeConfiguration::getSnapshots() const
     return gateway_snapshots;
 }
 
-const std::vector<std::string>  ConsulNodeConfiguration::getAvailableSnapshot() const
+const std::vector<std::string> ConsulNodeConfiguration::getAvailableSnapshot() const
 {
     std::vector<std::string> available_snapshots;
     // Find the first snapshot that is not running and not locked by any node
     auto all_snapshots = getSnapshotIds();
     for (const auto& snapshot_id : all_snapshots)
     {
-        // If not running and not locked, it's available
-        auto is_running = isSnapshotRunning(snapshot_id);
+        // return all snapshots that have not been locked by gateway
         auto gateway = getSnapshotGateway(snapshot_id);
-        if (!is_running && gateway.empty())
+        if (gateway.empty())
         {
             available_snapshots.push_back(snapshot_id);
         }

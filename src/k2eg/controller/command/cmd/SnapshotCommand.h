@@ -122,6 +122,14 @@ struct RepeatingSnapshotCommand : public Command
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotCommand)
 
+/*
+@brief Convert a JSON string to a RepeatingSnapshotCommand object
+@param json_string The JSON string to convert.
+@param cmd The RepeatingSnapshotCommand object to populate.
+This function parses the JSON string and fills the cmd object with the corresponding values.
+If the JSON string is not valid or does not contain the expected fields, the cmd object will
+remain unchanged.
+*/
 static void from_json(const std::string& json_string, RepeatingSnapshotCommand& cmd)
 {
     boost::json::value json_value = boost::json::parse(json_string);
@@ -129,6 +137,7 @@ static void from_json(const std::string& json_string, RepeatingSnapshotCommand& 
         return;
 
     const auto& obj = json_value.as_object();
+    cmd.type = CommandType::repeating_snapshot;
     cmd.reply_id = obj.contains(KEY_REPLY_ID) ? obj.at(KEY_REPLY_ID).as_string() : "";
     cmd.reply_topic = obj.contains(KEY_REPLY_TOPIC) ? obj.at(KEY_REPLY_TOPIC).as_string() : "";
     cmd.serialization = common::serialization_from_string((obj.contains(KEY_SERIALIZATION) ? std::string(obj.at(KEY_SERIALIZATION).as_string()) : std::string("unknown")));

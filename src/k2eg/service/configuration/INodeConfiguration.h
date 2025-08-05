@@ -64,9 +64,6 @@ struct SnapshotConfiguration
     // Unit of the weight, e.g., "eps" (events/sec) or "mbps" (megabits/sec)
     std::string weight_unit;
 
-    // ID of the archiver currently responsible for storing this snapshot
-    std::string archiver_id;
-
     // ISO 8601 UTC timestamp (e.g., "2025-07-29T10:15:30Z") of snapshot update
     std::string update_timestamp;
 
@@ -162,6 +159,8 @@ public:
      * @brief Try to acquire a snapshot for the current node.
      * @param snapshot_id ID of the snapshot to acquire.
      * @param for_gateway True if the acquisition is for a gateway, false otherwise.
+     * @details This method attempts to acquire a snapshot for the current node, allowing it to manage the snapshot.
+     * if the acquire is for gateway in the same time it set the running status to true
      * @return True if the snapshot was successfully acquired, false otherwise.
      */
     virtual bool tryAcquireSnapshot(const std::string& snapshot_id, bool for_gateway) = 0;
