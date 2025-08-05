@@ -381,6 +381,68 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
     deinitBackend(std::move(node_controller));
 }
 
+TEST(NodeControllerSnapshot, RepeatingSnapshotStoppedSnapshotsAreNotRestarted)
+{
+    typedef std::map<std::string, msgpack::object> Map;
+    boost::json::object                            reply_msg;
+    std::unique_ptr<NodeController>                node_controller;
+
+    auto publisher = std::make_shared<TopicCountedTargetPublisher>();
+    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
+    auto node_configuration_service = ServiceResolver<INodeConfiguration>::resolve();
+    ASSERT_TRUE(node_configuration_service != nullptr);
+    // delete old snapshot configuration if exists
+    node_configuration_service->deleteSnapshotConfiguration("snapshot_name");
+    // start a new snapshot
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false})}););
+
+    // add the number of reader from topic
+    dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
+    while (!node_controller->isWorkerReady(CommandType::repeating_snapshot))
+    {
+        sleep(1);
+    }
+
+    // wait for the activation on the configuration
+    int retry_count = 0;
+    while (!node_configuration_service->isSnapshotRunning("snapshot_name") && retry_count < 120)
+    {
+        retry_count++;
+        sleep(1);
+    }
+    // stop the snapshot
+    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    // wait for the stop message succeed
+    while (node_controller->getTaskRunning(CommandType::repeating_snapshot))
+    {
+        sleep(1);
+    }
+
+    retry_count = 0;
+    while (node_configuration_service->isSnapshotRunning("snapshot_name") && retry_count < 120)
+    {
+        retry_count++;
+        sleep(1);
+    }
+
+    // dispose all
+    deinitBackend(std::move(node_controller));
+
+    // restart the node controller
+    publisher = std::make_shared<TopicCountedTargetPublisher>();
+    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
+
+    retry_count = 0;
+    while (!node_configuration_service->isSnapshotRunning("snapshot_name") && retry_count < 60)
+    {
+        retry_count++;
+        sleep(1);
+    }
+    // snapshot should not be running now
+    EXPECT_FALSE(node_configuration_service->isSnapshotRunning("snapshot_name"));
+
+}
+
 TEST(NodeControllerSnapshot, RepeatingSnapshotStartStopTwice)
 {
     typedef std::map<std::string, msgpack::object> Map;
