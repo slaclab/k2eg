@@ -24,10 +24,11 @@ class K2EGateway
     k2eg::controller::command::CMDControllerUPtr cmd_controller;
     k2eg::controller::node::NodeControllerUPtr   node_controller;
     std::shared_ptr<k2eg::service::log::ILogger> logger;
-    int                                          setup(int argc, const char* argv[]);
     k2eg::service::metric::IMetricServiceShrdPtr instanceMetricService(k2eg::service::metric::ConstMetricConfigurationUPtr metric_conf);
     const std::string getTextVersion(bool short_version = false);
 
+    void init();
+    void deinit();
 public:
     K2EGateway();
     ~K2EGateway();

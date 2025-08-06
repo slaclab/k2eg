@@ -50,118 +50,84 @@ K2EGateway::~K2EGateway()
 {
 }
 
-int K2EGateway::setup(int argc, const char* argv[])
+void K2EGateway::init()
 {
-    int              err = 0;
-    std::unique_lock lk(m);
-    try
+    ServiceResolver<ILogger>::registerService(logger = std::make_shared<BoostLogger>(po->getloggerConfiguration()));
+    // setup services
+    logger->logMessage(getTextVersion(true));
+    logger->logMessage("Start Scheduler Service");
+    ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(po->getSchedulerConfiguration()));
+    ServiceResolver<Scheduler>::resolve()->start();
+    logger->logMessage("Start configuration service");
+    ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsulNodeConfiguration>(po->getConfigurationServiceConfiguration()));
+    logger->logMessage("Start Metric Service");
+    ServiceResolver<IMetricService>::registerService(instanceMetricService(po->getMetricConfiguration()));
+    switch (po->getNodeType())
     {
-        po->parse(argc, argv);
-        if (po->hasOption(HELP))
-        {
-            std::cout << po->getHelpDescription() << std::endl;
-            return err;
-        }
-        if (po->hasOption(VERSION))
-        {
-            std::cout << getTextVersion(false) << std::endl;
-            return err;
-        }
-        ServiceResolver<ILogger>::registerService(logger = std::make_shared<BoostLogger>(po->getloggerConfiguration()));
-        // setup services
-        logger->logMessage(getTextVersion(true));
-        logger->logMessage("Start Scheduler Service");
-        ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(po->getSchedulerConfiguration()));
-        ServiceResolver<Scheduler>::resolve()->start();
-        logger->logMessage("Start configuration service");
-        ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsulNodeConfiguration>(po->getConfigurationServiceConfiguration()));
-        logger->logMessage("Start Metric Service");
-        ServiceResolver<IMetricService>::registerService(instanceMetricService(po->getMetricConfiguration()));
-        switch (po->getNodeType())
-        {
-        case NodeType::GATEWAY:
-            logger->logMessage("Start Gateway Node Controller");
-            logger->logMessage("Start EPICS service");
-            ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>(po->getEpicsManagerConfiguration()));
-            logger->logMessage("Start publisher service");
-            ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(po->getPublisherConfiguration()));
-            logger->logMessage("Start subscriber service");
-            ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(po->getSubscriberConfiguration()));
-            logger->logMessage("Start node controller");
-            node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
-            logger->logMessage("Start command controller");
-            cmd_controller = std::make_unique<CMDController>(po->getCMDControllerConfiguration(), std::bind(&NodeController::submitCommand, &(*node_controller), std::placeholders::_1));
-            break;
-        case NodeType::STORAGE:
-            logger->logMessage("Start Storage Node Controller");
-            logger->logMessage("Start storage service");
-            ServiceResolver<IStorageService>::registerService(StorageServiceFactory::create(po->getStorageServiceConfiguration()));
-            logger->logMessage("Start node controller");
-            node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
-            break;
-        default:
-            throw std::runtime_error("Unknown node type in ProgramOptions configuration");
-        }
-
-        running = true;
-        // wait for termination request
-        cv.wait(lk,
-                [this]
-                {
-                    return this->quit;
-                });
-
-        // deallocation
-        switch (po->getNodeType())
-        {
-        case NodeType::GATEWAY:
-            logger->logMessage("Stop Gateway Node Controller");
-            logger->logMessage("Stop command controller");
-            cmd_controller.reset();
-            logger->logMessage("Stop node controller");
-            node_controller.reset();
-            logger->logMessage("Stop subscriber service");
-            ServiceResolver<ISubscriber>::reset();
-            logger->logMessage("Stop publisher service");
-            ServiceResolver<IPublisher>::reset();
-            logger->logMessage("Stop EPICS service");
-            ServiceResolver<EpicsServiceManager>::reset();
-            break;
-        case NodeType::STORAGE:
-            logger->logMessage("Stop Storage Node Controller");
-            logger->logMessage("Stop node controller");
-            node_controller.reset();
-            logger->logMessage("Stop storage service");
-            ServiceResolver<IStorageService>::reset();
-            break;
-        default:
-            throw std::runtime_error("Unknown node type in ProgramOptions configuration");
-        }
-        logger->logMessage("Stop Metric Service");
-        ServiceResolver<IMetricService>::reset();
-        logger->logMessage("Stop configuration service");
-        ServiceResolver<INodeConfiguration>::reset();
-        logger->logMessage("Stop scheduler service");
-        ServiceResolver<Scheduler>::resolve()->stop();
-        ServiceResolver<Scheduler>::reset();
-        logger->logMessage("Shutdown completed");
-        running = false;
-        terminated = true;
+    case NodeType::GATEWAY:
+        logger->logMessage("Start Gateway Node Controller");
+        logger->logMessage("Start EPICS service");
+        ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>(po->getEpicsManagerConfiguration()));
+        logger->logMessage("Start publisher service");
+        ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(po->getPublisherConfiguration()));
+        logger->logMessage("Start subscriber service");
+        ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(po->getSubscriberConfiguration()));
+        logger->logMessage("Start node controller");
+        node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
+        logger->logMessage("Start command controller");
+        cmd_controller = std::make_unique<CMDController>(po->getCMDControllerConfiguration(), std::bind(&NodeController::submitCommand, &(*node_controller), std::placeholders::_1));
+        break;
+    case NodeType::STORAGE:
+        logger->logMessage("Start Storage Node Controller");
+        logger->logMessage("Start storage service");
+        ServiceResolver<IStorageService>::registerService(StorageServiceFactory::create(po->getStorageServiceConfiguration()));
+        logger->logMessage("Start node controller");
+        node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
+        break;
+    default:
+        throw std::runtime_error("Unknown node type in ProgramOptions configuration");
     }
-    catch (std::runtime_error re)
+    running = true;
+}
+
+void K2EGateway::deinit()
+{
+    // deallocation
+    switch (po->getNodeType())
     {
-        err = 1;
-        if (logger)
-            logger->logMessage(re.what(), LogLevel::FATAL);
+    case NodeType::GATEWAY:
+        logger->logMessage("Stop Gateway Node Controller");
+        logger->logMessage("Stop command controller");
+        cmd_controller.reset();
+        logger->logMessage("Stop node controller");
+        node_controller.reset();
+        logger->logMessage("Stop subscriber service");
+        ServiceResolver<ISubscriber>::reset();
+        logger->logMessage("Stop publisher service");
+        ServiceResolver<IPublisher>::reset();
+        logger->logMessage("Stop EPICS service");
+        ServiceResolver<EpicsServiceManager>::reset();
+        break;
+    case NodeType::STORAGE:
+        logger->logMessage("Stop Storage Node Controller");
+        logger->logMessage("Stop node controller");
+        node_controller.reset();
+        logger->logMessage("Stop storage service");
+        ServiceResolver<IStorageService>::reset();
+        break;
+    default:
+        throw std::runtime_error("Unknown node type in ProgramOptions configuration");
     }
-    catch (...)
-    {
-        err = 1;
-        if (logger)
-            logger->logMessage("Undeterminated error", LogLevel::FATAL);
-    }
-
-    return err;
+    logger->logMessage("Stop Metric Service");
+    ServiceResolver<IMetricService>::reset();
+    logger->logMessage("Stop configuration service");
+    ServiceResolver<INodeConfiguration>::reset();
+    logger->logMessage("Stop scheduler service");
+    ServiceResolver<Scheduler>::resolve()->stop();
+    ServiceResolver<Scheduler>::reset();
+    logger->logMessage("Shutdown completed");
+    running = false;
+    terminated = true;
 }
 
 IMetricServiceShrdPtr K2EGateway::instanceMetricService(ConstMetricConfigurationUPtr metric_conf)
@@ -178,11 +144,44 @@ IMetricServiceShrdPtr K2EGateway::instanceMetricService(ConstMetricConfiguration
 
 int K2EGateway::run(int argc, const char* argv[])
 {
-    if (setup(argc, argv))
+    std::unique_lock lk(m);
+    int              err = EXIT_SUCCESS;
+    try
     {
-        return EXIT_FAILURE;
+        po->parse(argc, argv);
+        if (po->hasOption(HELP))
+        {
+            std::cout << po->getHelpDescription() << std::endl;
+            return err;
+        }
+        if (po->hasOption(VERSION))
+        {
+            std::cout << getTextVersion(false) << std::endl;
+            return err;
+        }
+
+        init();
+        cv.wait(lk,
+                [this]
+                {
+                    return this->quit;
+                });
+        deinit();
     }
-    return EXIT_SUCCESS;
+    catch (std::runtime_error re)
+    {
+        err = EXIT_FAILURE;
+        if (logger)
+            logger->logMessage(re.what(), LogLevel::FATAL);
+    }
+    catch (...)
+    {
+        err = EXIT_FAILURE;
+        if (logger)
+            logger->logMessage("Undeterminated error", LogLevel::FATAL);
+    }
+
+    return err;
 }
 
 void K2EGateway::stop()

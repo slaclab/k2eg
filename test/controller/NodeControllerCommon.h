@@ -6,15 +6,17 @@
 
 #include <latch>
 #include <map>
+#include <memory>
 #include <string>
 
-#include "boost/json/object.hpp"
-#include "k2eg/common/base64.h"
-#include "k2eg/common/ProgramOptions.h"
-#include "k2eg/service/ServiceResolver.h"
-#include "k2eg/service/log/ILogger.h"
-#include "k2eg/service/log/impl/BoostLogger.h"
-#include "k2eg/service/pubsub/IPublisher.h"
+#include <boost/json/object.hpp>
+#include <k2eg/k2eg.h>
+#include <k2eg/common/base64.h>
+#include <k2eg/common/ProgramOptions.h>
+#include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/log/ILogger.h>
+#include <k2eg/service/log/impl/BoostLogger.h>
+#include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/NodeController.h>
 #include <k2eg/service/ServiceResolver.h>
@@ -29,6 +31,7 @@
 
 #include <filesystem>
 
+using namespace k2eg;
 using namespace k2eg::common;
 
 using namespace k2eg::controller::node::configuration;
@@ -732,4 +735,46 @@ inline void deinitBackend(std::unique_ptr<NodeController> node_controller)
     EXPECT_NO_THROW(ServiceResolver<Scheduler>::resolve().reset(););
     EXPECT_NO_THROW(ServiceResolver<INodeConfiguration>::resolve().reset(););
 }
+
+inline std::shared_ptr<K2EGateway> startK2EG(int& tcp_port, bool as_gateway, bool enable_debug_log = false, bool reset_conf = true)
+{
+    int         argc = 1;
+    const char* argv[1] = {"epics-k2eg-test"};
+    clearenv();
+    if (enable_debug_log)
+    {
+        setenv("EPICS_k2eg_log-on-console", "true", 1);
+        setenv("EPICS_k2eg_log-level", "trace", 1);
+    }
+    else
+    {
+        setenv("EPICS_k2eg_log-on-console", "false", 1);
+    }
+
+    if (reset_conf)
+    {
+        setenv("EPICS_k2eg_configuration-reset-on-start", "true", 1);
+    }
+
+    setenv(("EPICS_k2eg_" + std::string(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS)).c_str(), "1", 1);
+    // set monitor expiration time out at minimum
+    setenv(("EPICS_k2eg_" + std::string(NC_MONITOR_EXPIRATION_TIMEOUT)).c_str(), "1", 1);
+    setenv(("EPICS_k2eg_" + std::string(CONFIGURATION_SERVICE_HOST)).c_str(), "consul", 1);
+    setenv(("EPICS_k2eg_" + std::string(METRIC_ENABLE)).c_str(), "true", 1);
+    setenv(("EPICS_k2eg_" + std::string(METRIC_HTTP_PORT)).c_str(), std::to_string(++tcp_port).c_str(), 1);
+
+    std::shared_ptr<K2EGateway> k2eg = std::make_shared<K2EGateway>();
+    k2eg->run(argc, argv);
+    return k2eg;
+}
+
+inline void stopK2EG(std::shared_ptr<K2EGateway> k2eg)
+{
+    if(!k2eg)
+    {
+        return;
+    }
+    k2eg->stop();
+}
+
 #endif
