@@ -74,7 +74,7 @@ TEST(NodeControllerSnapshot, SnapshotCommandMsgPackSer)
     boost::json::object                            reply_msg;
     std::unique_ptr<NodeController>                node_controller;
     auto                                           publisher = std::make_shared<DummyPublisher>(work_done);
-    node_controller = initBackend(ncs_tcp_port, publisher);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher);
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -132,7 +132,7 @@ TEST(NodeControllerSnapshot, SnapshotCommandWithMonitorMsgPackSer)
     boost::json::object             reply_msg;
     std::unique_ptr<NodeController> node_controller;
     auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-    node_controller = initBackend(ncs_tcp_port, publisher, false, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, false, true);
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -169,7 +169,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStop)
     std::unique_ptr<NodeController>                node_controller;
 
     auto publisher = std::make_shared<TopicCountedTargetPublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, false, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, false, true);
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -211,7 +211,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshtotStartStopVerifyConfiguration)
     std::unique_ptr<NodeController>                node_controller;
 
     auto publisher = std::make_shared<TopicCountedTargetPublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, true, true);
     auto node_configuration_service = ServiceResolver<INodeConfiguration>::resolve();
     ASSERT_TRUE(node_configuration_service != nullptr);
 
@@ -285,7 +285,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
     std::unique_ptr<NodeController>                node_controller;
 
     auto publisher = std::make_shared<TopicCountedTargetPublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, true, true);
     auto node_configuration_service = ServiceResolver<INodeConfiguration>::resolve();
     ASSERT_TRUE(node_configuration_service != nullptr);
     // delete old snapshot configuration if exists
@@ -318,7 +318,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
 
     // restart the node controller
     publisher = std::make_shared<TopicCountedTargetPublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, true, true);
     node_configuration_service = ServiceResolver<INodeConfiguration>::resolve();
 
     // wait until snapshot is restarted
@@ -388,7 +388,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStoppedSnapshotsAreNotRestarted)
     std::unique_ptr<NodeController>                node_controller;
 
     auto publisher = std::make_shared<TopicCountedTargetPublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, true, true);
     auto node_configuration_service = ServiceResolver<INodeConfiguration>::resolve();
     ASSERT_TRUE(node_configuration_service != nullptr);
     // delete old snapshot configuration if exists
@@ -430,7 +430,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStoppedSnapshotsAreNotRestarted)
 
     // restart the node controller
     publisher = std::make_shared<TopicCountedTargetPublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, true, true);
 
     retry_count = 0;
     while (!node_configuration_service->isSnapshotRunning("snapshot_name") && retry_count < 60)
@@ -450,7 +450,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStopTwice)
     std::unique_ptr<NodeController>                node_controller;
 
     auto publisher = std::make_shared<TopicCountedTargetPublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, true, true);
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -511,7 +511,7 @@ TEST(NodeControllerSnapshot, RepeatingTriggeredSnapshotStartTriggerStop)
     std::unique_ptr<NodeController> node_controller;
 
     auto publisher = std::make_shared<TopicCountedTargetPublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, false, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, false, true);
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -604,7 +604,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedType)
     std::unique_ptr<NodeController>                node_controller;
 
     auto publisher = std::make_shared<TopicCountedTargetPublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, true, true);
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -658,7 +658,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFields)
     std::unique_ptr<NodeController>                node_controller;
 
     auto publisher = std::make_shared<TopicCountedTargetPublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, true, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, true, true);
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -713,7 +713,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsWit
     std::unique_ptr<NodeController>                node_controller;
 
     auto publisher = std::make_shared<TopicCountedTargetPublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, false, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, false, true);
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -835,7 +835,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
     std::unique_ptr<NodeController>                node_controller;
 
     auto publisher = std::make_shared<DischargePublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, false, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, false, true);
 
     // add the number of reader from topic
     dynamic_cast<DischargePublisher*>(publisher.get())->setConsumerNumber(1);
@@ -918,7 +918,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeStartAndStopLoop)
     std::unique_ptr<NodeController>                node_controller;
 
     auto publisher = std::make_shared<DischargePublisher>();
-    node_controller = initBackend(ncs_tcp_port, publisher, false, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, false, true);
 
     // add the number of reader from topic
     dynamic_cast<DischargePublisher*>(publisher.get())->setConsumerNumber(1);

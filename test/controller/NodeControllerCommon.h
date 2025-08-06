@@ -679,7 +679,7 @@ inline std::size_t countMessageOnTopic(std::vector<PublishMessageSharedPtr>& mes
     return counter;
 }
 
-inline std::unique_ptr<NodeController> initBackend(int& tcp_port, IPublisherShrdPtr pub, bool enable_debug_log = false, bool reset_conf = true)
+inline std::unique_ptr<NodeController> initGatewayBackend(int& tcp_port, IPublisherShrdPtr pub, bool enable_debug_log = false, bool reset_conf = true)
 {
     int         argc = 1;
     const char* argv[1] = {"epics-k2eg-test"};
