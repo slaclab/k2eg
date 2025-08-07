@@ -77,14 +77,6 @@ public:
 
             decoded.resize(decoded_size);
             auto result = base64::decode(decoded.data(), encoded.data(), encoded.size());
-
-            // Check if decoding was successful
-            if (result.second != 0)
-            {
-                decoded.clear(); // Clear and return empty on decode error
-                return decoded;
-            }
-
             decoded.resize(result.first);
             return decoded;
         }
