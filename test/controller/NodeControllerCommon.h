@@ -1,33 +1,34 @@
 #ifndef NODECONTROLLERCOMMON_H_
 #define NODECONTROLLERCOMMON_H_
 
-#include <gtest/gtest.h>
 #include "../epics/epics.h"
+#include <gtest/gtest.h>
 
+#include <condition_variable>
 #include <latch>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include <boost/json/object.hpp>
-#include <k2eg/k2eg.h>
-#include <k2eg/common/base64.h>
+#include <k2eg/common/MsgpackSerialization.h>
 #include <k2eg/common/ProgramOptions.h>
-#include <k2eg/service/ServiceResolver.h>
-#include <k2eg/service/log/ILogger.h>
-#include <k2eg/service/log/impl/BoostLogger.h>
-#include <k2eg/service/pubsub/IPublisher.h>
+#include <k2eg/common/base64.h>
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/NodeController.h>
+#include <k2eg/k2eg.h>
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/configuration/configuration.h>
 #include <k2eg/service/data/DataStorage.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/service/log/ILogger.h>
+#include <k2eg/service/log/impl/BoostLogger.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
+#include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/pubsub/pubsub.h>
 #include <k2eg/service/scheduler/Scheduler.h>
-#include <k2eg/common/MsgpackSerialization.h>
 
 #include <filesystem>
 
@@ -70,7 +71,6 @@ inline std::string msgpack_to_base64(const std::string& key, const Type& value)
     return Base64::encode(msgpack_object->toBuffer());
 }
 
-
 class DummyPublisherCounter : public IPublisher
 {
     std::uint64_t counter;
@@ -78,7 +78,7 @@ class DummyPublisherCounter : public IPublisher
 public:
     std::latch l;
     DummyPublisherCounter(unsigned int latch_counter)
-        : IPublisher(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "fake_" "a" "d" "d" "r" "e" "s" "s"})), l(latch_counter), counter(0) {};
+        : IPublisher(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "fake_" "a" "d" "d" "r" "e" "s" "s"})), l(latch_counter), counter(0){};
     ~DummyPublisherCounter() = default;
 
     void setAutoPoll(bool autopoll) {}
@@ -135,7 +135,7 @@ class ControllerConsumerDummyPublisher : public IPublisher
 public:
     std::vector<PublishMessageSharedPtr> sent_messages;
     ControllerConsumerDummyPublisher()
-        : IPublisher(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "fake_" "a" "d" "d" "r" "e" "s" "s"})) {};
+        : IPublisher(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "fake_" "a" "d" "d" "r" "e" "s" "s"})){};
     ~ControllerConsumerDummyPublisher() = default;
 
     void setAutoPoll(bool autopoll) {}
@@ -210,7 +210,8 @@ class DummyPublisher : public ControllerConsumerDummyPublisher
     std::latch& lref;
 
 public:
-    DummyPublisher(std::latch& lref) : ControllerConsumerDummyPublisher(), lref(lref) {};
+    DummyPublisher(std::latch& lref)
+        : ControllerConsumerDummyPublisher(), lref(lref){};
     ~DummyPublisher() = default;
 
     int pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& header = PublisherHeaders())
@@ -242,7 +243,7 @@ class TopicTargetPublisher : public ControllerConsumerDummyPublisher
 public:
     bool enable_log = false;
     TopicTargetPublisher(std::vector<std::string>& tvec)
-        : ControllerConsumerDummyPublisher(), lref(tvec.size()), topics(tvec) {};
+        : ControllerConsumerDummyPublisher(), lref(tvec.size()), topics(tvec){};
     ~TopicTargetPublisher() = default;
 
     std::latch& getLatch()
@@ -446,7 +447,7 @@ class DummyPublisherNoSignal : public IPublisher
 public:
     std::vector<PublishMessageSharedPtr> sent_messages;
     DummyPublisherNoSignal()
-        : IPublisher(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "fake_" "a" "d" "d" "r" "e" "s" "s"})) {};
+        : IPublisher(std::make_unique<const PublisherConfiguration>(PublisherConfiguration{.server_address = "fake_" "a" "d" "d" "r" "e" "s" "s"})){};
     ~DummyPublisherNoSignal() = default;
 
     void setAutoPoll(bool autopoll) {}
@@ -516,7 +517,7 @@ public:
     {
         return 0;
     }
-    
+
     int pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& header = PublisherHeaders())
     {
         return 0;
@@ -552,10 +553,10 @@ inline msgpack::unpacked getMsgPackObject(PublishMessage& published_message)
 
 inline void wait_forPublished_message_size(DummyPublisherNoSignal& publisher, unsigned int requested_size, unsigned int timeout_ms)
 {
-    auto start_time = std::chrono::steady_clock::now();
-    auto end_time = std::chrono::steady_clock::now();
+    auto                                    start_time = std::chrono::steady_clock::now();
+    auto                                    end_time = std::chrono::steady_clock::now();
     std::chrono::duration<long, std::milli> tout = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    bool waiting = true;
+    bool                                    waiting = true;
     while (waiting)
     {
         waiting = publisher.getQueueMessageSize() < requested_size;
@@ -617,22 +618,22 @@ inline msgpack::unpacked exstractMsgpackObjectThatContainsKey(std::vector<Publis
 }
 
 inline msgpack::unpacked exstractMsgpackObjectAtIndex(
-    std::vector<PublishMessageSharedPtr>& messages, 
-    const std::string& published_on_topic, 
-    const int message_idx,
-    bool log = false)
+    std::vector<PublishMessageSharedPtr>& messages,
+    const std::string&                    published_on_topic,
+    const int                             message_idx,
+    bool                                  log = false)
 {
-    int curerent_idx = 0;
+    int                                            curerent_idx = 0;
     typedef std::map<std::string, msgpack::object> Map;
     typedef std::vector<msgpack::object>           Vec;
-    if(message_idx < 0 || message_idx >= messages.size())
+    if (message_idx < 0 || message_idx >= messages.size())
     {
         throw std::out_of_range("message index out of range");
     }
-     msgpack::unpacked result = msgpack::unpacked();
+    msgpack::unpacked result = msgpack::unpacked();
     for (int idx = 0; idx < messages.size(); idx++)
     {
-        if(messages[idx] == nullptr)
+        if (messages[idx] == nullptr)
         {
             continue;
         }
@@ -649,21 +650,27 @@ inline msgpack::unpacked exstractMsgpackObjectAtIndex(
     return result;
 }
 
-inline msgpack::object getMSGPackObjectForKey(const msgpack::object& o, const std::string& key){
-    if (o.type != msgpack::type::MAP) return msgpack::object();
+inline msgpack::object getMSGPackObjectForKey(const msgpack::object& o, const std::string& key)
+{
+    if (o.type != msgpack::type::MAP)
+        return msgpack::object();
 
     auto map_reply = o.as<std::map<std::string, msgpack::object>>();
     auto it = map_reply.find(key);
     if (it != map_reply.end())
     {
         return it->second;
-    } else {
+    }
+    else
+    {
         return msgpack::object();
     }
 }
 
-inline bool checkMSGPackObjectContains(const msgpack::object& o, const std::string& key){
-    if (o.type != msgpack::type::MAP) return false;
+inline bool checkMSGPackObjectContains(const msgpack::object& o, const std::string& key)
+{
+    if (o.type != msgpack::type::MAP)
+        return false;
 
     auto map_reply = o.as<std::map<std::string, msgpack::object>>();
     auto it = map_reply.find(key);
@@ -734,47 +741,6 @@ inline void deinitBackend(std::unique_ptr<NodeController> node_controller)
     EXPECT_NO_THROW(ServiceResolver<Scheduler>::resolve()->stop(););
     EXPECT_NO_THROW(ServiceResolver<Scheduler>::resolve().reset(););
     EXPECT_NO_THROW(ServiceResolver<INodeConfiguration>::resolve().reset(););
-}
-
-inline std::shared_ptr<K2EG> startK2EG(int& tcp_port, bool as_gateway, bool enable_debug_log = false, bool reset_conf = true)
-{
-    int         argc = 1;
-    const char* argv[1] = {"epics-k2eg-test"};
-    clearenv();
-    if (enable_debug_log)
-    {
-        setenv("EPICS_k2eg_log-on-console", "true", 1);
-        setenv("EPICS_k2eg_log-level", "trace", 1);
-    }
-    else
-    {
-        setenv("EPICS_k2eg_log-on-console", "false", 1);
-    }
-
-    if (reset_conf)
-    {
-        setenv("EPICS_k2eg_configuration-reset-on-start", "true", 1);
-    }
-
-    setenv(("EPICS_k2eg_" + std::string(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS)).c_str(), "1", 1);
-    // set monitor expiration time out at minimum
-    setenv(("EPICS_k2eg_" + std::string(NC_MONITOR_EXPIRATION_TIMEOUT)).c_str(), "1", 1);
-    setenv(("EPICS_k2eg_" + std::string(CONFIGURATION_SERVICE_HOST)).c_str(), "consul", 1);
-    setenv(("EPICS_k2eg_" + std::string(METRIC_ENABLE)).c_str(), "true", 1);
-    setenv(("EPICS_k2eg_" + std::string(METRIC_HTTP_PORT)).c_str(), std::to_string(++tcp_port).c_str(), 1);
-
-    std::shared_ptr<K2EG> k2eg = std::make_shared<K2EG>();
-    k2eg->run(argc, argv);
-    return k2eg;
-}
-
-inline void stopK2EG(std::shared_ptr<K2EG> k2eg)
-{
-    if(!k2eg)
-    {
-        return;
-    }
-    k2eg->stop();
 }
 
 #endif

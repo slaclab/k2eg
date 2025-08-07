@@ -17,15 +17,6 @@ using namespace k2eg::service;
 
 namespace bsoncxx_builder = bsoncxx::builder::stream;
 
-constexpr const char* MONGODB_CONNECTION_STRING_KEY = "connection-string";
-constexpr const char* MONGODB_DATABASE_KEY = "database";
-constexpr const char* MONGODB_COLLECTION_KEY = "collection";
-constexpr const char* MONGODB_POOL_SIZE_KEY = "pool-size";
-constexpr const char* MONGODB_TIMEOUT_MS_KEY = "timeout-ms";
-constexpr const char* MONGODB_CREATE_INDEXES_KEY = "create-indexes";
-constexpr const char* MONGODB_BATCH_SIZE_KEY = "batch-size";
-constexpr const char* MONGODB_SECTION_KEY = "MongoDB";
-
 constexpr const char* DEFAULT_CONNECTION_STRING = "mongodb://localhost:27017";
 constexpr const char* DEFAULT_DATABASE = "k2eg";
 constexpr const char* DEFAULT_COLLECTION = "data";
