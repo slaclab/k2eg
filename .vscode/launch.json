@@ -217,6 +217,34 @@
                 }
             ]
         },{
+            "name": "Test K2EGNode",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/k2eg-test",
+            "args": ["--gtest_filter=K2EGNode.*"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "$LD_LIBRARY_PATH:${workspaceFolder}/build/local/lib"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },{
             "name": "Test Kafka",
             "type": "cppdbg",
             "request": "launch",

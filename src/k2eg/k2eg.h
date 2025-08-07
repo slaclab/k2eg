@@ -49,6 +49,15 @@ class K2EG
      */
     std::string getTextVersion(bool long_version = false) const;
 
+protected:
+    /**
+     * @brief Set up the K2EG orchestrator program option.
+     * @param argc Argument count from main().
+     * @param argv Argument vector from main().
+     * @details This will parse command line options and configuration files.
+     * @return True if the app should continue running, false otherwise (has been requested to show help or information).
+     */
+    bool setup(int argc, const char* argv[]);
     /**
      * @brief Initialize the K2EG orchestrator.
      *

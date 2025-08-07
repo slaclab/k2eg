@@ -50,6 +50,24 @@ K2EG::~K2EG()
 {
 }
 
+bool K2EG::setup(int argc, const char* argv[])
+{
+    // parse expects const char*[], so convert argv
+    std::vector<const char*> cargv(argv, argv + argc);
+    po->parse(argc, cargv.data());
+    if (po->hasOption(HELP))
+    {
+        std::cout << po->getHelpDescription() << std::endl;
+        return false;
+    }
+    if (po->hasOption(VERSION))
+    {
+        std::cout << getTextVersion(false) << std::endl;
+        return false;
+    }
+    return true;
+}
+
 void K2EG::init()
 {
     ServiceResolver<ILogger>::registerService(logger = std::make_shared<BoostLogger>(po->getloggerConfiguration()));
@@ -147,24 +165,18 @@ int K2EG::run(int argc, const char* argv[])
     int err = EXIT_SUCCESS;
     try
     {
-        // parse expects const char*[], so convert argv
-        std::vector<const char*> cargv(argv, argv + argc);
-        po->parse(argc, cargv.data());
-        if (po->hasOption(HELP))
+        if (!setup(argc, argv))
         {
-            std::cout << po->getHelpDescription() << std::endl;
-            return err;
-        }
-        if (po->hasOption(VERSION))
-        {
-            std::cout << getTextVersion(false) << std::endl;
-            return err;
+            return EXIT_SUCCESS;
         }
 
         init();
         {
             std::unique_lock lk(m);
-            cv.wait(lk, [this] { return this->quit; });
+            cv.wait(lk, [this]
+                    {
+                        return this->quit;
+                    });
         }
         deinit();
     }
