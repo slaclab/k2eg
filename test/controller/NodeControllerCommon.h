@@ -736,7 +736,7 @@ inline void deinitBackend(std::unique_ptr<NodeController> node_controller)
     EXPECT_NO_THROW(ServiceResolver<INodeConfiguration>::resolve().reset(););
 }
 
-inline std::shared_ptr<K2EGateway> startK2EG(int& tcp_port, bool as_gateway, bool enable_debug_log = false, bool reset_conf = true)
+inline std::shared_ptr<K2EG> startK2EG(int& tcp_port, bool as_gateway, bool enable_debug_log = false, bool reset_conf = true)
 {
     int         argc = 1;
     const char* argv[1] = {"epics-k2eg-test"};
@@ -763,12 +763,12 @@ inline std::shared_ptr<K2EGateway> startK2EG(int& tcp_port, bool as_gateway, boo
     setenv(("EPICS_k2eg_" + std::string(METRIC_ENABLE)).c_str(), "true", 1);
     setenv(("EPICS_k2eg_" + std::string(METRIC_HTTP_PORT)).c_str(), std::to_string(++tcp_port).c_str(), 1);
 
-    std::shared_ptr<K2EGateway> k2eg = std::make_shared<K2EGateway>();
+    std::shared_ptr<K2EG> k2eg = std::make_shared<K2EG>();
     k2eg->run(argc, argv);
     return k2eg;
 }
 
-inline void stopK2EG(std::shared_ptr<K2EGateway> k2eg)
+inline void stopK2EG(std::shared_ptr<K2EG> k2eg)
 {
     if(!k2eg)
     {

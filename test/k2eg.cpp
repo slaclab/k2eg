@@ -25,7 +25,7 @@ TEST(k2egateway, NoParam)
     int argc = 1;
     const char *argv[1] = {"epics-k2eg-test"};
     setenv(std::string("EPICS_k2eg_").append(LOG_ON_CONSOLE).c_str(), "false", 1);
-    auto k2eg = std::make_unique<K2EGateway>();
+    auto k2eg = std::make_unique<K2EG>();
      std::thread t([&k2eg = k2eg, &argc = argc, &argv = argv](){
          int exit_code = k2eg->run(argc, argv);
          EXPECT_EQ(exit_code, 1);
@@ -58,7 +58,7 @@ TEST(k2egateway, Default)
     setenv(std::string("EPICS_k2eg_").append(CONFIGURATION_SERVICE_HOST).c_str(), "consul", 1);
     // remove possible old file
     std::filesystem::remove(log_file_path);
-    auto k2eg = std::make_unique<K2EGateway>();
+    auto k2eg = std::make_unique<K2EG>();
     std::thread t([&k2eg = k2eg, &argc = argc, &argv = argv](){
          int exit_code = k2eg->run(argc, argv);
          EXPECT_EQ(k2eg->isStopRequested(), true);
@@ -113,7 +113,7 @@ TEST(k2egateway, CommandSubmission)
     setenv(std::string("EPICS_k2eg_").append(CONFIGURATION_SERVICE_HOST).c_str(), "consul", 1);
     // remove possible old file
     std::filesystem::remove(log_file_path);
-    auto k2eg = std::make_unique<K2EGateway>();
+    auto k2eg = std::make_unique<K2EG>();
     std::thread t([&k2eg = k2eg, &argc = argc, &argv = argv](){
          int exit_code = k2eg->run(argc, argv);
          EXPECT_EQ(k2eg->isStopRequested(), true);

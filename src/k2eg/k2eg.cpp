@@ -41,16 +41,16 @@ using namespace k2eg::service::configuration::impl::consul;
 using namespace k2eg::controller::node;
 using namespace k2eg::controller::command;
 
-K2EGateway::K2EGateway()
+K2EG::K2EG()
     : po(std::make_unique<k2eg::common::ProgramOptions>()), quit(false), terminated(false), running(false)
 {
 }
 
-K2EGateway::~K2EGateway()
+K2EG::~K2EG()
 {
 }
 
-void K2EGateway::init()
+void K2EG::init()
 {
     ServiceResolver<ILogger>::registerService(logger = std::make_shared<BoostLogger>(po->getloggerConfiguration()));
     // setup services
@@ -90,7 +90,7 @@ void K2EGateway::init()
     running = true;
 }
 
-void K2EGateway::deinit()
+void K2EG::deinit()
 {
     // deallocation
     switch (po->getNodeType())
@@ -130,7 +130,7 @@ void K2EGateway::deinit()
     terminated = true;
 }
 
-IMetricServiceShrdPtr K2EGateway::instanceMetricService(ConstMetricConfigurationUPtr metric_conf)
+IMetricServiceShrdPtr K2EG::instanceMetricService(ConstMetricConfigurationUPtr metric_conf)
 {
     if (metric_conf->enable)
     {
@@ -142,13 +142,14 @@ IMetricServiceShrdPtr K2EGateway::instanceMetricService(ConstMetricConfiguration
     }
 }
 
-int K2EGateway::run(int argc, const char* argv[])
+int K2EG::run(int argc, const char* argv[])
 {
-    std::unique_lock lk(m);
-    int              err = EXIT_SUCCESS;
+    int err = EXIT_SUCCESS;
     try
     {
-        po->parse(argc, argv);
+        // parse expects const char*[], so convert argv
+        std::vector<const char*> cargv(argv, argv + argc);
+        po->parse(argc, cargv.data());
         if (po->hasOption(HELP))
         {
             std::cout << po->getHelpDescription() << std::endl;
@@ -161,11 +162,10 @@ int K2EGateway::run(int argc, const char* argv[])
         }
 
         init();
-        cv.wait(lk,
-                [this]
-                {
-                    return this->quit;
-                });
+        {
+            std::unique_lock lk(m);
+            cv.wait(lk, [this] { return this->quit; });
+        }
         deinit();
     }
     catch (std::runtime_error re)
@@ -184,14 +184,14 @@ int K2EGateway::run(int argc, const char* argv[])
     return err;
 }
 
-void K2EGateway::stop()
+void K2EG::stop()
 {
     std::lock_guard lk(m);
     quit = true;
     cv.notify_one();
 }
 
-const std::string K2EGateway::getTextVersion(bool long_version)
+std::string K2EG::getTextVersion(bool long_version) const
 {
     return long_version ? STRING_FORMAT(R"VERSION(k2eg Epics Kafka Gateway %1%)VERSION", k2eg_VERSION)
                         : STRING_FORMAT(R"VERSION(k2eg Epics Kafka Gateway %1%
