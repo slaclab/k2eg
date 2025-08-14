@@ -5,7 +5,7 @@ int k2eg_node_tests_tcp_port = 10000;
 
 TEST(K2EGNode, StartStopGateway)
 {
-    // start the gateway
+    // start the node as gateway
     auto k2eg = startK2EG(
         k2eg_node_tests_tcp_port,
         true,
@@ -18,7 +18,7 @@ TEST(K2EGNode, StartStopGateway)
 
 TEST(K2EGNode, StartStopStorage)
 {
-    // start the storage
+    // start the node as storage
     auto k2eg = startK2EG(
         k2eg_node_tests_tcp_port,
         false,

@@ -38,6 +38,21 @@ DEFINE_MMAP_FOR_TYPE(std::string, PVMonitorInfoShrdPtr, PVMonitorInfoMap)
 struct NodeConfiguration;
 DEFINE_PTR_TYPES(NodeConfiguration)
 
+enum class ArchiveStatus
+{
+    STOPPED = 0,
+    ARCHIVING = 1,
+    ERROR = 2
+};
+
+struct ArchiveStatusInfo
+{
+    ArchiveStatus status = ArchiveStatus::STOPPED;
+    std::string   started_at; // ISO8601 UTC
+    std::string   updated_at; // ISO8601 UTC (heartbeat)
+    std::string   error_message;
+};
+
 /*
 Is the cluster node configuration
 */
@@ -102,7 +117,6 @@ public:
      * @return The name of the node as a string.
      */
     virtual std::string getNodeName() const = 0;
-
     /**
      * @brief Get the key for a specific snapshot by its ID.
      * @param snapshot_id ID of the snapshot to retrieve the key for.
@@ -133,22 +147,42 @@ public:
      * @return Vector of snapshot IDs.
      */
     virtual const std::vector<std::string> getSnapshotIds() const = 0;
-
-    // Distributed snapshot management methods
     /**
      * @brief Check if a snapshot is currently running on the node.
      * @param snapshot_id ID of the snapshot to check.
      * @return True if the snapshot is running, false otherwise.
      */
     virtual bool isSnapshotRunning(const std::string& snapshot_id) const = 0;
-
     /**
      * @brief Set the running status of a snapshot.
      * @param snapshot_id ID of the snapshot to update.
      * @param running True if the snapshot is running, false otherwise.
      */
     virtual void setSnapshotRunning(const std::string& snapshot_id, bool running) = 0;
-
+    /**
+     * @brief Check if a snapshot is marked for archiving.
+     * @param snapshot_id ID of the snapshot to check.
+     * @return True if the snapshot is marked for archiving, false otherwise.
+     */
+    virtual bool isSnapshotArchiveRequested(const std::string& snapshot_id) const = 0;
+    /**
+     * @brief Set the archiving status of a snapshot.
+     * @param snapshot_id ID of the snapshot to update.
+     * @param archived True if the snapshot is marked for archiving, false otherwise.
+     */
+    virtual void setSnapshotArchiveRequested(const std::string& snapshot_id, bool archived) = 0;
+    /**
+     * @brief Set the archiving status of a snapshot.
+     * @param snapshot_id ID of the snapshot to update.
+     * @param status New archiving status information.
+     */
+    virtual void setSnapshotArchiveStatus(const std::string& snapshot_id, ArchiveStatusInfo status) = 0;
+    /**
+     * @brief Get the archiving status of a snapshot.
+     * @param snapshot_id ID of the snapshot to check.
+     * @return Archiving status information.
+     */
+    virtual ArchiveStatusInfo getSnapshotArchiveStatus(const std::string& snapshot_id) const = 0;
     /**
      * @brief Get the gateway ID that is currently managing a snapshot.
      * @param snapshot_id ID of the snapshot to check.
@@ -158,7 +192,7 @@ public:
     /**
      * @brief Try to acquire a snapshot for the current node.
      * @param snapshot_id ID of the snapshot to acquire.
-     * @param for_gateway True if the acquisition is for a gateway, false otherwise.
+     * @param for_gateway True if the acquisition is for a gateway, for storage otherwise.
      * @details This method attempts to acquire a snapshot for the current node, allowing it to manage the snapshot.
      * if the acquire is for gateway in the same time it set the running status to true
      * @return True if the snapshot was successfully acquired, false otherwise.
@@ -181,7 +215,6 @@ public:
      * @return Vector of snapshot IDs that are managed by the node.
      */
     virtual const std::vector<std::string> getSnapshots() const = 0;
-
     /**
      * @brief Get the ID of a snapshot that is available for execution.
      * @details This method checks for a snapshot configuration that is eligible to be started or resumed.

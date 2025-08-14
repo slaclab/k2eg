@@ -175,25 +175,26 @@ set(TEST_SOURCE_FILES
   test/test.cpp
   test/k2eg.cpp
   test/k2eg_nodes.cpp
-  test/data/DataStorage.cpp
-  test/epics/epics.cpp
-  test/epics/epics_msgpack_converter.cpp
-  test/epics/epics_data_serialization.cpp
-  test/pubsub/kafka.cpp
   test/common/ProgramOptions.cpp
   test/controller/CMDController.cpp
   test/controller/NodeController.cpp
   test/controller/NodeControllerSnapshot.cpp
   test/controller/NodeControllerMonitorChecker.cpp
   test/controller/NodeControllerReplyMessages.cpp
-  test/metric/EpicsMetric.cpp
-  test/metric/CMDMetric.cpp
-  test/metric/NodeControllerMetric.cpp
-  test/metric/NodeControllerSystemMetric.cpp
-  test/scheduler/Scheduler.cpp
-  test/configuration/ConsulConfigurationTest.cpp
-  test/configuration/ConsulConfigurationSnapshotGatewayTest.cpp
-  test/storage/mongodb/MsgpackToJsonConverter.cpp
+  test/service/data/DataStorage.cpp
+  test/service/epics/epics.cpp
+  test/service/epics/epics_msgpack_converter.cpp
+  test/service/epics/epics_data_serialization.cpp
+  test/service/pubsub/kafka.cpp
+  test/service/metric/EpicsMetric.cpp
+  test/service/metric/CMDMetric.cpp
+  test/service/metric/NodeControllerMetric.cpp
+  test/service/metric/NodeControllerSystemMetric.cpp
+  test/service/scheduler/Scheduler.cpp
+  test/service/configuration/ConsulConfigurationTest.cpp
+  test/service/configuration/ConsulConfigurationSnapshotStorageTest.cpp
+  test/service/configuration/ConsulConfigurationSnapshotGatewayTest.cpp
+  test/service/storage/mongodb/MsgpackToJsonConverter.cpp
   ${COMMON_SOURCE_FILES}
 )
 

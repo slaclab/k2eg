@@ -32,7 +32,7 @@
 
 #include "NodeControllerCommon.h"
 
-#include "../metric/metric.h"
+#include "../service/metric/metric.h"
 #include "k2eg/controller/command/cmd/MonitorCommand.h"
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
 #include "k2eg/service/metric/IMetricService.h"

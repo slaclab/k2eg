@@ -11,7 +11,7 @@
 #include <string>
 #include <unistd.h>
 
-#include "pubsub/common.h"
+#include "service/pubsub/common.h"
 
 using namespace k2eg;
 namespace fs = std::filesystem;

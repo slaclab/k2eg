@@ -1,7 +1,7 @@
 #ifndef NODECONTROLLERCOMMON_H_
 #define NODECONTROLLERCOMMON_H_
 
-#include "../epics/epics.h"
+#include "../service/epics/epics.h"
 #include <gtest/gtest.h>
 
 #include <condition_variable>

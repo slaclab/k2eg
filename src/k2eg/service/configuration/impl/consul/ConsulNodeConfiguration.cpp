@@ -1,6 +1,6 @@
 
-#include <iostream>
 #include <k2eg/common/utility.h>
+#include <k2eg/common/Base64.h>
 
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/configuration/INodeConfiguration.h>
@@ -16,6 +16,8 @@
 
 #include <memory>
 #include <stdexcept>
+#include <ctime>
+
 
 using namespace k2eg::service::configuration;
 using namespace k2eg::service::configuration::impl::consul;
@@ -455,9 +457,6 @@ bool ConsulNodeConfiguration::isSnapshotRunning(const std::string& snapshot_id) 
 
 void ConsulNodeConfiguration::setSnapshotRunning(const std::string& snapshot_id, bool running)
 {
-    if (session_id.empty())
-        throw std::runtime_error("Session ID is empty, cannot set snapshot running status");
-
     std::string base_key = getSnapshotKey(snapshot_id);
     std::string running_key = base_key + "/running_status";
 
@@ -471,6 +470,50 @@ void ConsulNodeConfiguration::setSnapshotRunning(const std::string& snapshot_id,
     {
         throw std::runtime_error(STRING_FORMAT("Failed to set snapshot running status: %1%", err.what()));
     }
+}
+
+bool ConsulNodeConfiguration::isSnapshotArchiveRequested(const std::string& snapshot_id) const
+{
+    try
+    {
+        auto archiving_status = client->kvGet(getSnapshotKey(snapshot_id) + "/archive/requested");
+        return archiving_status && (archiving_status.getValue("false") == "true");
+    }
+    catch (Client::Error& err)
+    {
+        return false;
+    }
+}
+
+void ConsulNodeConfiguration::setSnapshotArchiveRequested(const std::string& snapshot_id, bool archived)
+{
+    if (session_id.empty())
+        throw std::runtime_error("Session ID is empty, cannot set snapshot archiving status");
+
+    std::string base_key = getSnapshotKey(snapshot_id);
+    std::string archive_requested_key = base_key + "/archive/requested";
+
+    try
+    {
+        client->kvPut(archive_requested_key, archived ? "true" : "false");
+    }
+    catch (const std::exception& err)
+    {
+        throw std::runtime_error(STRING_FORMAT("Failed to set snapshot archiving status: %1%", err.what()));
+    }
+}
+
+void ConsulNodeConfiguration::setSnapshotArchiveStatus(const std::string& snapshot_id, ArchiveStatusInfo status)
+{
+    std::string base_key = getSnapshotKey(snapshot_id);
+    std::string archive_status_key = base_key + "/archive/status";
+}
+
+ArchiveStatusInfo ConsulNodeConfiguration::getSnapshotArchiveStatus(const std::string& snapshot_id) const
+{
+    std::string base_key = getSnapshotKey(snapshot_id);
+    std::string archive_status_key = base_key + "/archive/status";
+    return ArchiveStatusInfo();
 }
 
 const std::string ConsulNodeConfiguration::getSnapshotGateway(const std::string& snapshot_id) const
@@ -498,25 +541,108 @@ bool ConsulNodeConfiguration::tryAcquireSnapshot(const std::string& snapshot_id,
 
     try
     {
-        // Try to acquire lock using session - HTTP PUT with acquire parameter
-        auto        headers = oatpp::web::protocol::http::Headers();
-        std::string url = STRING_FORMAT("v1/kv/%1%?acquire=%2%", lock_key % session_id);
-        auto        body = std::make_shared<oatpp::web::protocol::http::outgoing::BufferBody>(
-            oatpp::String(getNodeName()),
+        // Gateway path: keep existing simple acquire behavior
+        if (for_gateway)
+        {
+            auto headers = oatpp::web::protocol::http::Headers();
+            std::string url = STRING_FORMAT("v1/kv/%1%?acquire=%2%", lock_key % session_id);
+            auto body = std::make_shared<oatpp::web::protocol::http::outgoing::BufferBody>(
+                oatpp::String(getNodeName()),
+                oatpp::data::share::StringKeyLabel("application/json"));
+
+            auto response = requestExecutor->execute("PUT", url, headers, body, nullptr);
+            if (response->getStatusCode() == 200)
+            {
+                auto responseBody = response->readBodyToString();
+                boost::json::value parsedResponse = boost::json::parse(responseBody.getValue(""));
+                return (parsedResponse.is_bool() && parsedResponse.get_bool());
+            }
+            return false;
+        }
+
+        // Storage path: build a Consul txn that atomically locks lock_storage (session-bound)
+        // and writes durable archive/status/* subkeys.
+        // Build ISO8601 UTC timestamp
+        std::time_t t = std::time(nullptr);
+        std::tm tm_utc{};
+#if defined(_MSC_VER)
+        gmtime_s(&tm_utc, &t);
+#else
+        gmtime_r(&t, &tm_utc);
+#endif
+        char tsbuf[64];
+        std::strftime(tsbuf, sizeof(tsbuf), "%Y-%m-%dT%H:%M:%SZ", &tm_utc);
+        std::string now_iso(tsbuf);
+
+        // durable fields initial values
+        const std::string owner = getNodeName();
+        const std::string state = "ARCHIVING";
+        const std::string started_at = now_iso;
+        const std::string updated_at = now_iso;
+        const std::string progress = std::to_string(-1);
+        const std::string generation = std::to_string(1);
+        const std::string archive_id = std::string();
+        const std::string error_message = std::string();
+
+        boost::json::array txn_ops;
+
+        // 1) lock op on lock_storage (session-bound)
+        {
+            boost::json::object kv;
+            boost::json::object meta;
+            meta["Verb"] = "lock";
+            meta["Key"] = lock_key;
+            meta["Value"] = k2eg::common::Base64::encode(owner);
+            meta["Session"] = session_id;
+            kv["KV"] = meta;
+            txn_ops.push_back(kv);
+        }
+
+        // helper to push a set (durable) op for status subkeys
+        auto pushSet = [&](const std::string &subkey, const std::string &val) {
+            boost::json::object kv;
+            boost::json::object meta;
+            meta["Verb"] = "set";
+            meta["Key"] = STRING_FORMAT("%1%/archive/status/%2%", base_key % subkey);
+            meta["Value"] = k2eg::common::Base64::encode(val);
+            kv["KV"] = meta;
+            txn_ops.push_back(kv);
+        };
+
+        pushSet("owner", owner);
+        pushSet("state", state);
+        pushSet("started_at", started_at);
+        pushSet("updated_at", updated_at);
+        pushSet("progress", progress);
+        pushSet("generation", generation);
+        pushSet("archive_id", archive_id);
+        pushSet("error_message", error_message);
+
+        // serialize txn payload
+        boost::json::value txn_val = txn_ops;
+        std::string txn_body = boost::json::serialize(txn_val);
+
+        auto requestBody = std::make_shared<oatpp::web::protocol::http::outgoing::BufferBody>(
+            oatpp::String(txn_body.c_str(), (v_buff_size)txn_body.size()),
             oatpp::data::share::StringKeyLabel("application/json"));
 
-        auto response = requestExecutor->execute("PUT", url, headers, body, nullptr);
-        auto statusCode = response->getStatusCode();
-        if (statusCode == 200)
+        auto headers = oatpp::web::protocol::http::Headers();
+        headers.put("Content-Type", "application/json");
+
+        auto response = requestExecutor->execute("PUT", "v1/txn", headers, requestBody, nullptr);
+        if (response->getStatusCode() == 200)
         {
-            auto               responseBody = response->readBodyToString();
-            boost::json::value parsedResponse = boost::json::parse(responseBody.getValue(""));
-            return (parsedResponse.is_bool() && parsedResponse.get_bool());
+            // Transaction applied: we hold the lock and durable status fields were written.
+            return true;
         }
     }
     catch (const std::exception& err)
     {
-        // Log error if needed
+        // Optional: emit logger if available
+        try {
+            auto logger = ServiceResolver<k2eg::service::log::ILogger>::resolve();
+            if (logger) logger->logMessage(STRING_FORMAT("tryAcquireSnapshot error: %1%", err.what()), log::LogLevel::ERROR);
+        } catch (...) {}
     }
     return false;
 }
