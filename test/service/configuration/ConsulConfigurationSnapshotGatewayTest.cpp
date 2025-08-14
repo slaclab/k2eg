@@ -101,7 +101,7 @@ TEST(ConsulConfigurationSnapshotGatewayTest, CheckSnapshotAcquireReleaseConcurre
     ASSERT_TRUE(nodeConfigOne.releaseSnapshot(snapshot_id, true));
     ASSERT_TRUE(nodeConfigTwo.tryAcquireSnapshot(snapshot_id, true)); // Now should succeed
     // Clean up after test
-    ASSERT_TRUE(nodeConfigOne.releaseSnapshot(snapshot_id, true));
+    ASSERT_TRUE(nodeConfigTwo.releaseSnapshot(snapshot_id, true));
 }
 
 TEST(ConsulConfigurationSnapshotGatewayTest, CheckSnapshotAcquireReleaseConcurrencyOnExpiration)

@@ -1,7 +1,6 @@
 #ifndef K2EG_SERVICE_CONFIGURATION_IMPL_CONSUL_ICONSULENODECONFIGURATIONS_H_
 #define K2EG_SERVICE_CONFIGURATION_IMPL_CONSUL_ICONSULENODECONFIGURATIONS_H_
 
-#include "k2eg/common/types.h"
 #include <k2eg/service/configuration/INodeConfiguration.h>
 
 #include <oatpp-consul/Client.hpp>
@@ -32,6 +31,8 @@ class ConsulNodeConfiguration : public INodeConfiguration
     std::thread             session_renewal_thread;
     std::condition_variable session_cv;
     std::mutex              session_mutex;
+    // Execute a Consul transaction with provided operations
+    bool executeTxn(const boost::json::array& ops) const;
 
     std::string                    getNodeKey() const;
     bool                           createSession();
