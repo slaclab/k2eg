@@ -176,7 +176,7 @@ public:
      * @param snapshot_id ID of the snapshot to update.
      * @param status New archiving status information.
      */
-    virtual void setSnapshotArchiveStatus(const std::string& snapshot_id, ArchiveStatusInfo status) = 0;
+    virtual void setSnapshotArchiveStatus(const std::string& snapshot_id, const ArchiveStatusInfo& status) = 0;
     /**
      * @brief Get the archiving status of a snapshot.
      * @param snapshot_id ID of the snapshot to check.
@@ -189,6 +189,12 @@ public:
      * @return Gateway ID if the snapshot is running, empty string otherwise.
      */
     virtual const std::string getSnapshotGateway(const std::string& snapshot_id) const = 0;
+    /**
+     * @brief Get the ID of the archiver node for a snapshot.
+     * @param snapshot_id ID of the snapshot to check.
+     * @return Archiver node ID if the snapshot is archived, empty string otherwise.
+     */
+    virtual const std::string getSnapshotArchiver(const std::string& snapshot_id) const = 0;
     /**
      * @brief Try to acquire a snapshot for the current node.
      * @param snapshot_id ID of the snapshot to acquire.

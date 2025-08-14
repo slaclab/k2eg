@@ -63,9 +63,10 @@ public:
     void                           setSnapshotRunning(const std::string& snapshot_id, bool running) override;
     bool                           isSnapshotArchiveRequested(const std::string& snapshot_id) const override;
     void                           setSnapshotArchiveRequested(const std::string& snapshot_id, bool archived) override;
-    void                           setSnapshotArchiveStatus(const std::string& snapshot_id, ArchiveStatusInfo status) override;
+    void                           setSnapshotArchiveStatus(const std::string& snapshot_id, const ArchiveStatusInfo& status) override;
     ArchiveStatusInfo              getSnapshotArchiveStatus(const std::string& snapshot_id) const override;
     const std::string              getSnapshotGateway(const std::string& snapshot_id) const override;
+    const std::string              getSnapshotArchiver(const std::string& snapshot_id) const override;
     bool                           tryAcquireSnapshot(const std::string& snapshot_id, bool for_gateway) override;
     bool                           releaseSnapshot(const std::string& snapshot_id, bool for_gateway) override;
     const std::vector<std::string> getRunningSnapshots() const override;

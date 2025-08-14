@@ -84,6 +84,26 @@ inline std::string nowIsoUtc()
     const auto now_sec = floor<seconds>(system_clock::now());
     return std::format("{:%Y-%m-%dT%H:%M:%SZ}", now_sec);
 }
+
+inline std::string toStateString(k2eg::service::configuration::ArchiveStatus s)
+{
+    using k2eg::service::configuration::ArchiveStatus;
+    switch (s)
+    {
+    case ArchiveStatus::ARCHIVING: return "ARCHIVING";
+    case ArchiveStatus::ERROR: return "ERROR";
+    case ArchiveStatus::STOPPED:
+    default: return "STOPPED";
+    }
+}
+
+inline k2eg::service::configuration::ArchiveStatus fromStateString(const std::string& s)
+{
+    using k2eg::service::configuration::ArchiveStatus;
+    if (s == "ARCHIVING") return ArchiveStatus::ARCHIVING;
+    if (s == "ERROR") return ArchiveStatus::ERROR;
+    return ArchiveStatus::STOPPED;
+}
 } // unnamed namespace
 
 #pragma region Implementation
@@ -562,17 +582,49 @@ void ConsulNodeConfiguration::setSnapshotArchiveRequested(const std::string& sna
         throw std::runtime_error("Failed to set snapshot archiving status via transaction");
 }
 
-void ConsulNodeConfiguration::setSnapshotArchiveStatus(const std::string& snapshot_id, ArchiveStatusInfo status)
+void ConsulNodeConfiguration::setSnapshotArchiveStatus(const std::string& snapshot_id, const ArchiveStatusInfo& status)
 {
     std::string base_key = getSnapshotKey(snapshot_id);
-    std::string archive_status_key = base_key + "/archive/status";
+    std::string status_base = base_key + "/archive/status";
+
+    boost::json::array ops;
+    ops.reserve(4);
+    addSetOp(ops, status_base + "/state", toStateString(status.status));
+    if (!status.started_at.empty()) addSetOp(ops, status_base + "/started_at", status.started_at);
+    if (!status.updated_at.empty()) addSetOp(ops, status_base + "/updated_at", status.updated_at);
+    // Always set error_message (empty clears it)
+    addSetOp(ops, status_base + "/error_message", status.error_message);
+
+    if (!executeTxn(ops))
+        throw std::runtime_error("Failed to set snapshot archive status via transaction");
 }
 
 ArchiveStatusInfo ConsulNodeConfiguration::getSnapshotArchiveStatus(const std::string& snapshot_id) const
 {
-    std::string base_key = getSnapshotKey(snapshot_id);
-    std::string archive_status_key = base_key + "/archive/status";
-    return ArchiveStatusInfo();
+    using k2eg::service::configuration::ArchiveStatusInfo;
+    ArchiveStatusInfo out;
+
+    const std::string base_key = getSnapshotKey(snapshot_id);
+    const std::string status_base = base_key + "/archive/status";
+    try
+    {
+        auto state_s = client->kvGet(status_base + "/state");
+        if (state_s) out.status = fromStateString(state_s.getValue(""));
+
+        auto started = client->kvGet(status_base + "/started_at");
+        if (started) out.started_at = started.getValue("");
+
+        auto updated = client->kvGet(status_base + "/updated_at");
+        if (updated) out.updated_at = updated.getValue("");
+
+        auto err = client->kvGet(status_base + "/error_message");
+        if (err) out.error_message = err.getValue("");
+    }
+    catch (const Client::Error&)
+    {
+        // return default-initialized ArchiveStatusInfo
+    }
+    return out;
 }
 
 const std::string ConsulNodeConfiguration::getSnapshotGateway(const std::string& snapshot_id) const
@@ -583,6 +635,20 @@ const std::string ConsulNodeConfiguration::getSnapshotGateway(const std::string&
         std::string lock_key = base_key + "/lock_gateway";
         auto        gateway_id = client->kvGet(lock_key);
         return gateway_id ? gateway_id.getValue("") : "";
+    }
+    catch (const Client::Error& err)
+    {
+        return "";
+    }
+}
+
+const std::string ConsulNodeConfiguration::getSnapshotArchiver(const std::string& snapshot_id) const {
+    try
+    {
+        std::string base_key = getSnapshotKey(snapshot_id);
+        std::string lock_key = base_key + "/lock_storage";
+        auto        archiver_id = client->kvGet(lock_key);
+        return archiver_id ? archiver_id.getValue("") : "";
     }
     catch (const Client::Error& err)
     {
@@ -611,14 +677,9 @@ bool ConsulNodeConfiguration::tryAcquireSnapshot(const std::string& snapshot_id,
         if (!for_gateway)
         {
             const std::string now_iso = nowIsoUtc();
-
-            const std::string owner = getNodeName();
-            const std::string state = "ARCHIVING";
+            const ArchiveStatus state = ArchiveStatus::ARCHIVING;
             const std::string started_at = now_iso;
             const std::string updated_at = now_iso;
-            const std::string progress = std::to_string(-1);
-            const std::string generation = std::to_string(1);
-            const std::string archive_id;
             const std::string error_message;
 
             auto pushSet = [&](const std::string& subkey, const std::string& val)
@@ -626,13 +687,9 @@ bool ConsulNodeConfiguration::tryAcquireSnapshot(const std::string& snapshot_id,
                 addSetOp(txn_ops, STRING_FORMAT("%1%/archive/status/%2%", base_key % subkey), val);
             };
 
-            pushSet("owner", owner);
-            pushSet("state", state);
+            pushSet("state", toStateString(state));
             pushSet("started_at", started_at);
             pushSet("updated_at", updated_at);
-            pushSet("progress", progress);
-            pushSet("generation", generation);
-            pushSet("archive_id", archive_id);
             pushSet("error_message", error_message);
         }
 
