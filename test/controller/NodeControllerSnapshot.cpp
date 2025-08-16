@@ -30,8 +30,6 @@
 #include <thread>
 #include <unistd.h>
 
-#include "NodeControllerCommon.h"
-
 #include "../service/metric/metric.h"
 #include "k2eg/controller/command/cmd/MonitorCommand.h"
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"

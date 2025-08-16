@@ -29,7 +29,8 @@ namespace k2eg::controller::node {
 enum class NodeType
 {
     GATEWAY,
-    STORAGE
+    STORAGE,
+    FULL
 };
 
 /**
@@ -44,7 +45,8 @@ inline std::ostream& operator<<(std::ostream& os, const NodeType& type)
     {
     case NodeType::GATEWAY: return os << "Gateway";
     case NodeType::STORAGE: return os << "Storage";
-    default: return os << "Unknown";
+    case NodeType::FULL:    return os << "Full";
+    default:                return os << "Unknown";
     }
 }
 
@@ -164,8 +166,9 @@ inline std::string lexical_cast<std::string, k2eg::controller::node::NodeType>(c
     {
     case k2eg::controller::node::NodeType::GATEWAY: return "gateway";
     case k2eg::controller::node::NodeType::STORAGE: return "storage";
+    case k2eg::controller::node::NodeType::FULL:    return "full";
     }
-    throw boost::bad_lexical_cast(); // fallback
+    throw boost::bad_lexical_cast();
 }
 
 template <>
@@ -175,7 +178,9 @@ inline k2eg::controller::node::NodeType lexical_cast<k2eg::controller::node::Nod
         return k2eg::controller::node::NodeType::GATEWAY;
     if (str == "storage")
         return k2eg::controller::node::NodeType::STORAGE;
-    throw boost::bad_lexical_cast(); // fallback
+    if (str == "full")
+        return k2eg::controller::node::NodeType::FULL;
+    throw boost::bad_lexical_cast();
 }
 } // namespace boost
 

@@ -1,3 +1,4 @@
+#include "k2eg/controller/node/NodeController.h"
 #include <k2eg/config.h>
 #include <k2eg/k2eg.h>
 #include <k2eg/version.h>
@@ -80,16 +81,16 @@ void K2EG::init()
     ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsulNodeConfiguration>(po->getConfigurationServiceConfiguration()));
     logger->logMessage("Start Metric Service");
     ServiceResolver<IMetricService>::registerService(instanceMetricService(po->getMetricConfiguration()));
+    logger->logMessage("Start publisher service");
+    ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(po->getPublisherConfiguration()));
+    logger->logMessage("Start subscriber service");
+    ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(po->getSubscriberConfiguration()));
     switch (po->getNodeType())
     {
     case NodeType::GATEWAY:
         logger->logMessage("Start Gateway Node Controller");
         logger->logMessage("Start EPICS service");
         ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>(po->getEpicsManagerConfiguration()));
-        logger->logMessage("Start publisher service");
-        ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(po->getPublisherConfiguration()));
-        logger->logMessage("Start subscriber service");
-        ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(po->getSubscriberConfiguration()));
         logger->logMessage("Start node controller");
         node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
         logger->logMessage("Start command controller");
@@ -101,6 +102,17 @@ void K2EG::init()
         ServiceResolver<IStorageService>::registerService(StorageServiceFactory::create(po->getStorageServiceConfiguration()));
         logger->logMessage("Start node controller");
         node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
+        break;
+    case NodeType::FULL:
+        logger->logMessage("Start Gateway + Storage Node Controller");
+        logger->logMessage("Start EPICS service");
+        ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>(po->getEpicsManagerConfiguration()));
+        logger->logMessage("Start storage service");
+        ServiceResolver<IStorageService>::registerService(StorageServiceFactory::create(po->getStorageServiceConfiguration()));
+        logger->logMessage("Start node controller");
+        node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
+        logger->logMessage("Start command controller");
+        cmd_controller = std::make_unique<CMDController>(po->getCMDControllerConfiguration(), std::bind(&NodeController::submitCommand, &(*node_controller), std::placeholders::_1));
         break;
     default:
         throw std::runtime_error("Unknown node type in ProgramOptions configuration");

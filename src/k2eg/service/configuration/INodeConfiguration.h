@@ -6,8 +6,6 @@
 #include <boost/json.hpp>
 
 #include <cstdint>
-#include <map>
-#include <memory>
 #include <stdint.h>
 
 namespace k2eg::service::configuration {

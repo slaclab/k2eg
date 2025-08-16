@@ -181,6 +181,7 @@ set(TEST_SOURCE_FILES
   test/controller/NodeControllerSnapshot.cpp
   test/controller/NodeControllerMonitorChecker.cpp
   test/controller/NodeControllerReplyMessages.cpp
+  test/controller/NodeControllerStorageSnapshotTest.cpp
   test/service/data/DataStorage.cpp
   test/service/epics/epics.cpp
   test/service/epics/epics_msgpack_converter.cpp
@@ -371,7 +372,7 @@ ExternalProject_Add(
   GIT_TAG ${SQLITE_VERSION}
   GIT_REPOSITORY https://github.com/sqlite/sqlite.git
   BUILD_IN_SOURCE 1
-  CONFIGURE_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/sqlite/src/sqlite_dist/configure --enable-tempstore=yes --prefix=${CMAKE_INSTALL_PREFIX}
+  CONFIGURE_COMMAND /bin/sh -c "mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/sqlite/tmp && TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/sqlite/tmp ${CMAKE_CURRENT_BINARY_DIR}/sqlite/src/sqlite_dist/configure --enable-tempstore=yes --prefix=${CMAKE_INSTALL_PREFIX} --build=${CMAKE_SYSTEM_PROCESSOR}-pc-linux-gnu --host=${CMAKE_SYSTEM_PROCESSOR}-pc-linux-gnu"
   INSTALL_COMMAND make install
 )
 

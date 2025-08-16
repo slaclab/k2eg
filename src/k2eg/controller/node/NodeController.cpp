@@ -59,16 +59,20 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
     case NodeType::STORAGE:
         startAsStorage();
         break;
+    case NodeType::FULL:
+        startAsGateway();
+        startAsStorage();
+        break;
     default:
         throw std::runtime_error("Unknown node type in NodeController configuration");
     }
 
     // Add periodic statistics management task to the scheduler.
     // This task is responsible for collecting and reporting system metrics.
-    auto statistic_task = MakeTaskShrdPtr(NODE_CONTROLLER_STAT_TASK_NAME,                                           // name of the task
-                                          NODE_CONTROLLER_STAT_TASK_CRON,                                           // cron expression
-                                          std::bind(&NodeController::handleStatistic, this, std::placeholders::_1), // task handler
-                                          -1                                                                        // start at application boot time
+    auto statistic_task = MakeTaskShrdPtr(NODE_CONTROLLER_STAT_TASK_NAME,                                       // name of the task
+                                          NODE_CONTROLLER_STAT_TASK_CRON,                                                   // cron expression
+                                          std::bind(&NodeController::handleStatistic, this, std::placeholders::_1),     // task handler
+                                          -1                                                                             // start at application boot time
     );
     ServiceResolver<Scheduler>::resolve()->addTask(statistic_task);
 }
@@ -94,6 +98,10 @@ void NodeController::performManagementTask()
         performGatewayPeriodicTask();
         break;
     case NodeType::STORAGE:
+        performStoragePeriodicTask();
+        break;
+    case NodeType::FULL:
+        performGatewayPeriodicTask();
         performStoragePeriodicTask();
         break;
     default:
