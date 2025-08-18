@@ -145,6 +145,21 @@ void K2EG::deinit()
         logger->logMessage("Stop storage service");
         ServiceResolver<IStorageService>::reset();
         break;
+    case NodeType::FULL:
+        logger->logMessage("Stop Gateway + Storage Controller");
+        logger->logMessage("Stop command controller");
+        cmd_controller.reset();
+        logger->logMessage("Stop node controller");
+        node_controller.reset();
+        logger->logMessage("Stop subscriber service");
+        ServiceResolver<ISubscriber>::reset();
+        logger->logMessage("Stop publisher service");
+        ServiceResolver<IPublisher>::reset();
+        logger->logMessage("Stop storage service");
+        ServiceResolver<IStorageService>::reset();
+        logger->logMessage("Stop EPICS service");
+        ServiceResolver<EpicsServiceManager>::reset();
+        break;
     default:
         throw std::runtime_error("Unknown node type in ProgramOptions configuration");
     }
