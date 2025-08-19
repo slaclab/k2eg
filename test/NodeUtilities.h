@@ -1,13 +1,16 @@
 #include "k2eg/controller/node/NodeController.h"
+#include "k2eg/service/pubsub/IPublisher.h"
+#include "k2eg/service/pubsub/ISubscriber.h"
 #include <cstdlib>
 #include <k2eg/common/ProgramOptions.h>
 #include <k2eg/k2eg.h>
+#include <k2eg/service/pubsub/impl/kafka/RDKafkaPublisher.h>
+#include <k2eg/service/pubsub/impl/kafka/RDKafkaSubscriber.h>
 #include <k2eg/service/storage/StorageServiceFactory.h>
 #include <k2eg/service/storage/impl/MongoDBStorageService.h>
 
 #include <memory>
 #include <string>
-
 
 /**
  * Test environment for K2EG
@@ -28,6 +31,30 @@ public:
     ~K2EGTestEnv()
     {
         deinit();
+    }
+
+    /*
+        Return the publisher instance
+    */
+    k2eg::service::pubsub::IPublisherShrdPtr getPublisherInstance()
+    {
+        return k2eg::service::pubsub::impl::kafka::MakeRDKafkaPublisherShrdPtr(po->getPublisherConfiguration());
+    }
+
+    /**
+        Return the subscriber instance
+    */
+    k2eg::service::pubsub::ISubscriberShrdPtr getSubscriberInstance()
+    {
+        return k2eg::service::pubsub::impl::kafka::MakeRDKafkaSubscriberShrdPtr(po->getSubscriberConfiguration());
+    }
+
+    /**
+        Return the gateway command topic
+    */
+    const std::string& getGatewayCMDTopic()
+    {
+        return po->getOption<std::string>(CMD_INPUT_TOPIC);
     }
 };
 

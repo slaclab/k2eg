@@ -1,6 +1,7 @@
 #ifndef RDKKAFKAPUBLISHER_H
 #define RDKKAFKAPUBLISHER_H
 
+#include "k2eg/common/types.h"
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/pubsub/impl/kafka/RDKafkaBase.h>
@@ -52,7 +53,8 @@ struct RdKafkaDeleteTopicArrayDeleter
 {
     const size_t count;
 
-    RdKafkaDeleteTopicArrayDeleter(size_t count) : count(count) {}
+    RdKafkaDeleteTopicArrayDeleter(size_t count)
+        : count(count) {}
 
     void operator()(rd_kafka_DeleteTopic_t** delete_topic_array)
     {
@@ -74,7 +76,8 @@ struct RdKafkaNewTopicArrayDeleter
 {
     const size_t count;
 
-    RdKafkaNewTopicArrayDeleter(size_t count) : count(count) {}
+    RdKafkaNewTopicArrayDeleter(size_t count)
+        : count(count) {}
 
     void operator()(rd_kafka_NewTopic_t** new_topic_array)
     {
@@ -101,7 +104,7 @@ class RDKafkaPublisher : public IPublisher, RDKafkaBase, RdKafka::DeliveryReport
     std::unique_ptr<RdKafka::Producer>           producer;
     std::shared_ptr<k2eg::service::log::ILogger> logger;
 
-    int scan_groups(const rd_kafka_ListConsumerGroups_result_t* list, QueueMetadata& q_desc_ref);
+    int                          scan_groups(const rd_kafka_ListConsumerGroups_result_t* list, QueueMetadata& q_desc_ref);
     QueueSubscriberGroupInfoUPtr get_group_info(const char* group);
 
 protected:
@@ -118,10 +121,12 @@ public:
     virtual QueueMetadataUPtr getQueueMetadata(const std::string& queue_name);
     virtual void              setAutoPoll(bool autopoll);
     virtual int               flush(const int timeo = 10000);
-    virtual int    pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& headers = PublisherHeaders());
-    virtual int    pushMessages(PublisherMessageVector& messages, const PublisherHeaders& headers = PublisherHeaders());
-    virtual size_t getQueueMessageSize();
+    virtual int               pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& headers = PublisherHeaders());
+    virtual int               pushMessages(PublisherMessageVector& messages, const PublisherHeaders& headers = PublisherHeaders());
+    virtual size_t            getQueueMessageSize();
 };
+
+DEFINE_PTR_TYPES(RDKafkaPublisher)
 } // namespace k2eg::service::pubsub::impl::kafka
 
 #endif

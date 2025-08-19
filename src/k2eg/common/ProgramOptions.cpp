@@ -1,6 +1,14 @@
-#include "k2eg/service/storage/StorageServiceFactory.h"
+
 #include <k2eg/common/ProgramOptions.h>
-#include <sys/types.h>
+
+#include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/scheduler/Scheduler.h>
+#include <k2eg/service/storage/StorageServiceFactory.h>
+
+#include <k2eg/controller/node/NodeController.h>
+#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
+#include <k2eg/controller/node/worker/monitor/MonitorChecker.h>
 
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
@@ -10,13 +18,7 @@
 #include <iostream>
 #include <ostream>
 #include <string>
-
-#include <k2eg/controller/node/NodeController.h>
-#include <k2eg/controller/node/worker/MonitorCommandWorker.h>
-#include <k2eg/controller/node/worker/monitor/MonitorChecker.h>
-#include <k2eg/service/epics/EpicsServiceManager.h>
-#include <k2eg/service/metric/IMetricService.h>
-#include <k2eg/service/scheduler/Scheduler.h>
+#include <sys/types.h>
 
 using namespace k2eg::common;
 

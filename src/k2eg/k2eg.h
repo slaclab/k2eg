@@ -30,7 +30,6 @@ class K2EG
     std::mutex              m;
     std::condition_variable cv;
 
-    k2eg::common::ProgramOptionsUPtr             po;
     k2eg::controller::command::CMDControllerUPtr cmd_controller;
     k2eg::controller::node::NodeControllerUPtr   node_controller;
     std::shared_ptr<k2eg::service::log::ILogger> logger;
@@ -50,6 +49,7 @@ class K2EG
     std::string getTextVersion(bool long_version = false) const;
 
 protected:
+    k2eg::common::ProgramOptionsUPtr po;
     /**
      * @brief Set up the K2EG orchestrator program option.
      * @param argc Argument count from main().
