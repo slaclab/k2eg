@@ -1,7 +1,7 @@
 #ifndef SERVICE_LOG_IMPL_BOOSTLOGGER_H_
 #define SERVICE_LOG_IMPL_BOOSTLOGGER_H_
 
-#include "k2eg/common/types.h"
+#include <k2eg/common/types.h>
 #include <k2eg/service/log/ILogger.h>
 
 #include <boost/log/attributes.hpp>
