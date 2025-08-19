@@ -53,7 +53,7 @@ ProgramOptions::ProgramOptions() {
       (LOG_FILE_NAME, po::value<std::string>(), "Specify the log file path")
       (LOG_FILE_MAX_SIZE, po::value<int>()->default_value(1), "Specify the maximum log file size in mbyte")
       (LOG_ON_SYSLOG, po::value<bool>()->default_value(false)->zero_tokens(), "Specify when the logger print in syslog server")
-      (LOG_FUNCTION_NAME_WIDTH, po::value<int>()->default_value(30), "Specify the width of the function name in the log")
+      (LOG_DEBUG_INFO, po::value<bool>()->default_value(false)->zero_tokens(), "Specify when to include debug info in the log")
       (SYSLOG_SERVER, po::value<std::string>(), "Specify syslog hotsname")
       (SYSLOG_PORT, po::value<int>()->default_value(514), "Specify syslog server port")
       (CMD_INPUT_TOPIC, po::value<std::string>(), "Specify the messages bus queue where the k2eg receive the configuration command")
@@ -156,7 +156,7 @@ ConstLogConfigurationUPtr ProgramOptions::getloggerConfiguration() {
       .log_on_syslog = GET_OPTION(LOG_ON_SYSLOG, bool, false),
       .log_syslog_srv = GET_OPTION(SYSLOG_SERVER, std::string, ""),
       .log_syslog_srv_port = GET_OPTION(SYSLOG_PORT, int, 514),
-      .log_function_name_width = GET_OPTION(LOG_FUNCTION_NAME_WIDTH, int, 30)});
+      .debug_info_in_log = GET_OPTION(LOG_DEBUG_INFO, bool, true)});
 }
 
 MapStrKV

@@ -19,7 +19,7 @@ typedef struct LogConfiguration
     bool        log_on_syslog;
     std::string log_syslog_srv;
     int         log_syslog_srv_port;
-    int         log_function_name_width = 30; // width of the function name in the log
+    bool        debug_info_in_log = true; // include debug info in the log
 } LogConfiguration;
 DEFINE_PTR_TYPES(LogConfiguration)
 

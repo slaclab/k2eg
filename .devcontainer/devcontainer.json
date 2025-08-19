@@ -5,13 +5,14 @@
 	"dockerComposeFile": "docker-compose.yml",
 	"service": "app",
 	"workspaceFolder": "/workspace",
-
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
-
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	"forwardPorts": [9092,9093,8500],
-
+	"forwardPorts": [
+		9092,
+		9093,
+		8500
+	],
 	// Use 'postCreateCommand' to run commands after the container is created.
 	// "postCreateCommand": "gcc -v",
 	"postStartCommand": "git config --global --add safe.directory /workspace/build",
@@ -37,7 +38,7 @@
 				"Phytolizer.header-guard-generator",
 				"ms-vscode.hexeditor"
 			]
-		  }
+		}
 	},
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	"remoteUser": "developer"

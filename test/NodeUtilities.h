@@ -34,6 +34,7 @@ inline std::shared_ptr<K2EGTestEnv> startK2EG(int& tcp_port, k2eg::controller::n
     {
         setenv("EPICS_k2eg_log-on-console", "true", 1);
         setenv("EPICS_k2eg_log-level", "debug", 1);
+        setenv(("EPICS_k2eg_" + std::string(LOG_DEBUG_INFO)).c_str(), "true", 1);
     }
     else
     {

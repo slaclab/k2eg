@@ -227,23 +227,28 @@ void BoostLogger::logMessage(const std::string& message, LogLevel level, const s
     logging::record rec = logger_mt.open_record(keywords::severity = getLevel(level));
     if (rec)
     {
-        // thread id as hex (stable-ish)
-        auto        tid_hash = std::hash<std::thread::id>{}(std::this_thread::get_id());
-        std::string tid_hex = std::format("0x{:016x}", static_cast<unsigned long long>(tid_hash));
+        std::string final_msg;
+        if (configuration->debug_info_in_log)
+        {
+            // thread id as hex (stable-ish)
+            auto        tid_hash = std::hash<std::thread::id>{}(std::this_thread::get_id());
+            std::string tid_hex = std::format("0x{:016x}", static_cast<unsigned long long>(tid_hash));
 
-        std::string file = std::string(shortenPath(location.file_name()));
-        std::string func = getClassAndMethod(location.function_name());
+            std::string file = std::string(shortenPath(location.file_name()));
+            std::string func = getClassAndMethod(location.function_name());
 
-        // Pad the inner content of [file-line] column to a fixed width so messages align
-        constexpr std::size_t FILELINE_COL_WIDTH = 30;
-        // Reserve 2 chars for the surrounding brackets
-        constexpr std::size_t INNER_WIDTH = (FILELINE_COL_WIDTH > 2) ? (FILELINE_COL_WIDTH - 2) : FILELINE_COL_WIDTH;
-        std::string           fileline_inner = std::format("{}-{}", file, location.line());
-        std::string           fileline_inner_ellided = ellide_middle(fileline_inner, INNER_WIDTH);
-        std::string           fileline_inner_padded = std::format("{:<{}}", fileline_inner_ellided, INNER_WIDTH);
-        std::string           fileline_padded = std::format("[{}]", fileline_inner_padded);
-
-        std::string final_msg = std::format("{} {}", fileline_padded, message);
+            // Pad the inner content of [file-line] column to a fixed width so messages align
+            constexpr std::size_t FILELINE_COL_WIDTH = 30;
+            // Reserve 2 chars for the surrounding brackets
+            constexpr std::size_t INNER_WIDTH = (FILELINE_COL_WIDTH > 2) ? (FILELINE_COL_WIDTH - 2) : FILELINE_COL_WIDTH;
+            std::string           fileline_inner = std::format("{}-{}", file, location.line());
+            std::string           fileline_inner_ellided = ellide_middle(fileline_inner, INNER_WIDTH);
+            std::string           fileline_inner_padded = std::format("{:<{}}", fileline_inner_ellided, INNER_WIDTH);
+            std::string           fileline_padded = std::format("[tid:{}][{}]", tid_hex, fileline_inner_padded);
+            final_msg = std::format("{} {}", fileline_padded, message);
+        } else {
+            final_msg = message;
+        }
 
         logging::record_ostream strm(rec);
         strm << final_msg;
