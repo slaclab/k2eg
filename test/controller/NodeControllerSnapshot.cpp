@@ -181,7 +181,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStop)
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
     EXPECT_NO_THROW(node_controller->submitCommand(
-        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false, std::unordered_set<std::string>{})}));
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false, SnapshotType::NORMAL, std::unordered_set<std::string>{})}));
 
     // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
     // completaion) messages
@@ -229,7 +229,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshtotStartStopVerifyConfiguration)
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
     EXPECT_NO_THROW(node_controller->submitCommand(
-        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false)}));
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false, SnapshotType::NORMAL, std::unordered_set<std::string>{})}));
 
     // // wait for the activation on the ocnfiguration
     bool condition = true;
@@ -296,7 +296,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
     node_configuration_service->deleteSnapshotConfiguration("snapshot_name");
     // start a new snapshot
     EXPECT_NO_THROW(node_controller->submitCommand(
-        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false)}));
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false, SnapshotType::NORMAL, std::unordered_set<std::string>{})}));
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
