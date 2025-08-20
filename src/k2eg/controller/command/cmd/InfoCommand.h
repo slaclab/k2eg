@@ -13,21 +13,31 @@ namespace k2eg::controller::command::cmd {
         }
 */
 
-struct InfoCommand : public Command{
-  std::string pv_name;
+struct InfoCommand : public Command
+{
+    std::string pv_name;
+    InfoCommand()
+        : Command(CommandType::info){};
+
+    InfoCommand(k2eg::common::SerializationType serialization, std::string reply_topic, std::string reply_id, const std::string& pv_name)
+        : Command(CommandType::info, serialization, reply_topic, reply_id)
+        , pv_name(pv_name)
+    {
+    }
 };
 DEFINE_PTR_TYPES(InfoCommand)
 
 static void
-tag_invoke(boost::json::value_from_tag, boost::json::value &jv, InfoCommand const &c) {
-  jv = {
-      {"serialization", serialization_to_string(c.serialization)},
-      {"pv_name", c.pv_name},
-      // {"protocol", c.protocol},
-      {"reply_topic", c.reply_topic},
-      {"reply_id", c.reply_id},
-  };
+tag_invoke(boost::json::value_from_tag, boost::json::value& jv, InfoCommand const& c)
+{
+    jv = {
+        {"serialization", serialization_to_string(c.serialization)},
+        {"pv_name", c.pv_name},
+        // {"protocol", c.protocol},
+        {"reply_topic", c.reply_topic},
+        {"reply_id", c.reply_id},
+    };
 }
-}  // namespace k2eg::controller::command::cmd
+} // namespace k2eg::controller::command::cmd
 
-#endif  // K2EG_CONTROLLER_COMMAND_CMD_INFOCOMMAND_H_
+#endif // K2EG_CONTROLLER_COMMAND_CMD_INFOCOMMAND_H_

@@ -24,6 +24,17 @@ struct SnapshotCommand : public Command
     std::unordered_set<std::string> pv_name_list;
     // the time window to collect data
     std::int32_t time_window_msec;
+
+    SnapshotCommand()
+        : Command(CommandType::snapshot)
+        , time_window_msec(0) {}
+
+    SnapshotCommand(k2eg::common::SerializationType serialization, const std::string& reply_topic, const std::string& reply_id, const std::unordered_set<std::string>& pv_name_list, std::int32_t time_window_msec)
+        : Command(CommandType::snapshot, serialization, reply_topic, reply_id)
+        , pv_name_list(pv_name_list)
+        , time_window_msec(time_window_msec)
+    {
+    }
 };
 DEFINE_PTR_TYPES(SnapshotCommand)
 
@@ -119,6 +130,36 @@ struct RepeatingSnapshotCommand : public Command
     SnapshotType snapshot_type = SnapshotType::NORMAL;
     // the fields to include in the snapshot for each pv data
     std::unordered_set<std::string> pv_field_filter_list = {};
+
+    RepeatingSnapshotCommand()
+        : Command(CommandType::repeating_snapshot)
+        , repeat_delay_msec(0)
+        , time_window_msec(0)
+        , triggered(false) {}
+
+    RepeatingSnapshotCommand(
+        k2eg::common::SerializationType serialization, 
+        const std::string& reply_topic, 
+        const std::string& reply_id, 
+        const std::string& snapshot_name, 
+        const std::unordered_set<std::string>& pv_name_list, 
+        std::int32_t repeat_delay_msec, 
+        std::int32_t time_window_msec, 
+        std::int32_t sub_push_delay_msec, 
+        bool triggered, 
+        SnapshotType snapshot_type, 
+        const std::unordered_set<std::string>& pv_field_filter_list = {})
+        : Command(CommandType::repeating_snapshot, serialization, reply_topic, reply_id)
+        , snapshot_name(snapshot_name)
+        , pv_name_list(pv_name_list)
+        , repeat_delay_msec(repeat_delay_msec)
+        , time_window_msec(time_window_msec)
+        , sub_push_delay_msec(sub_push_delay_msec)
+        , triggered(triggered)
+        , snapshot_type(snapshot_type)
+        , pv_field_filter_list(pv_field_filter_list)
+    {
+    }
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotCommand)
 
@@ -184,6 +225,15 @@ struct RepeatingSnapshotStopCommand : public Command
 {
     // the name of the snapshot
     std::string snapshot_name;
+
+    RepeatingSnapshotStopCommand()
+        : Command(CommandType::repeating_snapshot_stop) {}
+
+    RepeatingSnapshotStopCommand(k2eg::common::SerializationType serialization, std::string reply_topic, std::string reply_id, const std::string& snapshot_name)
+        : Command(CommandType::repeating_snapshot_stop, serialization, reply_topic, reply_id)
+        , snapshot_name(snapshot_name)
+    {
+    }
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotStopCommand)
 
@@ -200,6 +250,16 @@ struct RepeatingSnapshotTriggerCommand : public Command
     std::string snapshot_name;
     // the tag to associate to the trigger
     std::map<std::string, std::string> tags = {};
+
+    RepeatingSnapshotTriggerCommand()
+        : Command(CommandType::repeating_snapshot_trigger) {}
+
+    RepeatingSnapshotTriggerCommand(k2eg::common::SerializationType serialization, std::string reply_topic, std::string reply_id, const std::string& snapshot_name, const std::map<std::string, std::string>& tags)
+        : Command(CommandType::repeating_snapshot_trigger, serialization, reply_topic, reply_id)
+        , snapshot_name(snapshot_name)
+        , tags(tags)
+    {
+    }
 };
 DEFINE_PTR_TYPES(RepeatingSnapshotTriggerCommand)
 

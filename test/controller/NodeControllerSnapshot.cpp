@@ -29,6 +29,7 @@
 #include <string>
 #include <thread>
 #include <unistd.h>
+#include <unordered_set>
 
 #include "../service/metric/metric.h"
 #include "k2eg/controller/command/cmd/MonitorCommand.h"
@@ -81,8 +82,8 @@ TEST(NodeControllerSnapshot, SnapshotCommandMsgPackSer)
         sleep(1);
     }
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const SnapshotCommand>(SnapshotCommand{CommandType::snapshot, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", {"pva://variable:a", "pva://variable:b"}, 1000})}););
-
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeSnapshotCommandShrdPtr(SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 1000)}));
     work_done.wait();
 
     // we need to have publish some message
@@ -141,14 +142,15 @@ TEST(NodeControllerSnapshot, SnapshotCommandWithMonitorMsgPackSer)
 
     // start monitor on pva://variable:a that is not going to fire event at specific time so monitor only receive one
     // message
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id-monitor", "pva://variable:a", KAFKA_TOPIC_ACQUIRE_IN})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeMonitorCommandShrdPtr(SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id-monitor", "pva://variable:a", KAFKA_TOPIC_ACQUIRE_IN)}););
 
     // wait some time
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const SnapshotCommand>(SnapshotCommand{CommandType::snapshot, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", {"pva://variable:a", "pva://variable:b"}, 1000})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeSnapshotCommandShrdPtr(SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 1000)}));
 
     work_done.wait();
 
@@ -178,7 +180,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStop)
 
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false)}));
 
     // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
     // completaion) messages
@@ -191,7 +194,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStop)
     EXPECT_EQ(topic_counts["app_reply_topic"], 1);
 
     // stop the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotStopCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
     // wait for the stop message succeed
     while (node_controller->getTaskRunning(CommandType::repeating_snapshot))
     {
@@ -224,7 +228,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshtotStartStopVerifyConfiguration)
 
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false)}));
 
     // // wait for the activation on the ocnfiguration
     bool condition = true;
@@ -250,7 +255,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshtotStartStopVerifyConfiguration)
     EXPECT_STRNE(snapshot_config->update_timestamp.c_str(), "");
     EXPECT_EQ(snapshot_config->config_json, "{\"type\":\"repeating_snapshot\",\"serialization\":\"Msgpack\",\"reply_id\":\"rep-id\",\"reply_topic\":\"app_reply_topic\",\"snapshot_name\":\"Snapshot Name\",\"pv_name_list\":[\"pva://variable:b\",\"pva://variable:a\"],\"repeat_delay_msec\":0,\"time_window_msec\":1000,\"sub_push_delay_msec\":0,\"pv_field_filter_list\":[],\"triggered\":false,\"snapshot_type\":\"Normal\"}");
     // stop the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotStopCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
     // wait for the stop message succeed
     while (node_controller->getTaskRunning(CommandType::repeating_snapshot))
     {
@@ -289,7 +295,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
     // delete old snapshot configuration if exists
     node_configuration_service->deleteSnapshotConfiguration("snapshot_name");
     // start a new snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false)}));
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -327,7 +334,6 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
         sleep(1);
     }
 
-
     auto snapshot_config = node_configuration_service->getSnapshotConfiguration("snapshot_name");
     ASSERT_TRUE(snapshot_config != nullptr);
     EXPECT_EQ(snapshot_config->weight, 0);
@@ -342,12 +348,14 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
     EXPECT_EQ(snapshot_config_json["snapshot_name"].as_string(), "Snapshot Name");
     EXPECT_EQ(snapshot_config_json["pv_name_list"].as_array().size(), 2);
     auto& pv_list_arr = snapshot_config_json["pv_name_list"].as_array();
-    bool has_b = std::any_of(pv_list_arr.begin(), pv_list_arr.end(), [](const boost::json::value& v){
-        return v.is_string() && v.as_string() == "pva://variable:b";
-    });
-    bool has_a = std::any_of(pv_list_arr.begin(), pv_list_arr.end(), [](const boost::json::value& v){
-        return v.is_string() && v.as_string() == "pva://variable:a";
-    });
+    bool  has_b = std::any_of(pv_list_arr.begin(), pv_list_arr.end(), [](const boost::json::value& v)
+                              {
+                                 return v.is_string() && v.as_string() == "pva://variable:b";
+                             });
+    bool  has_a = std::any_of(pv_list_arr.begin(), pv_list_arr.end(), [](const boost::json::value& v)
+                              {
+                                 return v.is_string() && v.as_string() == "pva://variable:a";
+                             });
     EXPECT_TRUE(has_b);
     EXPECT_TRUE(has_a);
     EXPECT_EQ(snapshot_config_json["repeat_delay_msec"].as_int64(), 0);
@@ -358,7 +366,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
     EXPECT_EQ(snapshot_config_json["snapshot_type"].as_string(), "Normal");
 
     // stop the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotStopCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
     // wait for the stop message succeed
     while (node_controller->getTaskRunning(CommandType::repeating_snapshot))
     {
@@ -392,7 +401,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStoppedSnapshotsAreNotRestarted)
     // delete old snapshot configuration if exists
     node_configuration_service->deleteSnapshotConfiguration("snapshot_name");
     // start a new snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false)}));
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -409,7 +419,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStoppedSnapshotsAreNotRestarted)
         sleep(1);
     }
     // stop the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotStopCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
     // wait for the stop message succeed
     while (node_controller->getTaskRunning(CommandType::repeating_snapshot))
     {
@@ -438,7 +449,6 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStoppedSnapshotsAreNotRestarted)
     }
     // snapshot should not be running now
     EXPECT_FALSE(node_configuration_service->isSnapshotRunning("snapshot_name"));
-
 }
 
 TEST(NodeControllerSnapshot, RepeatingSnapshotStartStopTwice)
@@ -459,7 +469,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStopTwice)
 
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false)}));
 
     // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
     // completaion) messages
@@ -472,12 +483,14 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStopTwice)
     EXPECT_EQ(topic_counts["app_reply_topic"], 1);
 
     // stop the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotStopCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
     // wait for ack command
     sleep(5);
 
     // redo the test again
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false)}));
 
     // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
     // completaion) messages
@@ -488,7 +501,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStopTwice)
     EXPECT_EQ(topic_counts["app_reply_topic"], 1);
 
     // stop the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotStopCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
 
     // wait for the stop message succeed
     while (node_controller->getTaskRunning(CommandType::repeating_snapshot))
@@ -520,7 +534,8 @@ TEST(NodeControllerSnapshot, RepeatingTriggeredSnapshotStartTriggerStop)
 
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, true})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, true)}));
 
     // try to listen on snapshot_name but it will not redceive anything so the wait will exipres on the specific timeout
     auto topic_counts = publisher->wait_for({{"snapshot_name", 4}, {"app_reply_topic", 1}}, std::chrono::milliseconds(4000));
@@ -538,7 +553,8 @@ TEST(NodeControllerSnapshot, RepeatingTriggeredSnapshotStartTriggerStop)
     EXPECT_STREQ(getMSGPackObjectForKey(msgpack_object, "publishing_topic").as<std::string>().c_str(), "snapshot_name");
 
     // now perform the trigger to let receive the snapshto values
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotTriggerCommand>(RepeatingSnapshotTriggerCommand{CommandType::repeating_snapshot_trigger, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotTriggerCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
 
     auto topic_counts_trigger = publisher->wait_for({{"snapshot_name", 4}, {"app_reply_topic", 1}}, std::chrono::milliseconds(60000));
     EXPECT_EQ(topic_counts_trigger["snapshot_name"], 4);
@@ -584,7 +600,8 @@ TEST(NodeControllerSnapshot, RepeatingTriggeredSnapshotStartTriggerStop)
     EXPECT_STREQ(getMSGPackObjectForKey(msgpack_object, "snapshot_name").as<std::string>().c_str(), "Snapshot Name");
 
     // stop the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotStopCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
     // wait for the stop message succeed
     while (node_controller->getTaskRunning(CommandType::repeating_snapshot))
     {
@@ -613,7 +630,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedType)
 
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://channel:ramp:ramp"}, 0, 4000, 0, false, SnapshotType::TIMED_BUFFERED})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://channel:ramp:ramp"}, 0, 4000, 0, false, SnapshotType::TIMED_BUFFERED)}));
 
     // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
     // completaion) messages
@@ -635,7 +653,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedType)
     }
 
     // stop the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotStopCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
     // wait for ack command
     sleep(1);
 
@@ -667,7 +686,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFields)
 
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://channel:ramp:ramp"}, 0, 4000, 0, false, SnapshotType::TIMED_BUFFERED, {"value"}})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://channel:ramp:ramp"}, 0, 4000, 0, false, SnapshotType::TIMED_BUFFERED, std::unordered_set<std::string>{"value"})}));
 
     // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
     // completaion) messages
@@ -689,7 +709,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFields)
     }
 
     // stop the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotStopCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
     // wait for ack command
     sleep(1);
 
@@ -722,7 +743,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsWit
 
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://channel:ramp:ramp"}, 0, 4000, 0, true, SnapshotType::TIMED_BUFFERED, {"value"}})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://channel:ramp:ramp"}, 0, 4000, 0, true, SnapshotType::TIMED_BUFFERED, std::unordered_set<std::string>{"value"})}));
 
     // wait only ack
     auto topic_counts = publisher->wait_for({{"app_reply_topic", 1}}, std::chrono::milliseconds(10000));
@@ -735,7 +757,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsWit
     std::this_thread::sleep_for(std::chrono::milliseconds(5000));
 
     // trigger the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotTriggerCommand>(RepeatingSnapshotTriggerCommand{CommandType::repeating_snapshot_trigger, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotTriggerCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
     topic_counts = publisher->wait_for({{"snapshot_name", 6}}, std::chrono::milliseconds(10000));
 
     EXPECT_GE(topic_counts["snapshot_name"], 6);
@@ -774,7 +797,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsWit
     std::this_thread::sleep_for(std::chrono::milliseconds(5000));
 
     // trigger the snapshot again
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotTriggerCommand>(RepeatingSnapshotTriggerCommand{CommandType::repeating_snapshot_trigger, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotTriggerCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
     topic_counts = publisher->wait_for({{"snapshot_name", 6}}, std::chrono::milliseconds(10000));
 
     EXPECT_GE(topic_counts["snapshot_name"], 6);
@@ -810,7 +834,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsWit
     }
 
     // stop the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotStopCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
     // wait for ack command
     sleep(1);
 
@@ -845,7 +870,15 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
 
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://channel:random:fast"}, 0, 4000, 0, false, SnapshotType::TIMED_BUFFERED, {"value"}})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotCommandShrdPtr(
+            SerializationType::Msgpack,
+            "app_reply_topic",
+            "rep-id",
+            "Snapshot Name",
+            std::unordered_set<std::string>{"pva://variable:a", "pva://channel:random:fast"},
+            0, 4000, 0, false,
+            SnapshotType::TIMED_BUFFERED, std::unordered_set<std::string>{"value"})}));
 
     // wait 60 seconds to let the snapshot start and acquire data overflowing the timewindow
     //  get now
@@ -866,7 +899,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
     }
 
     // stop the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotStopCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
     // wait for ack command
     sleep(1);
 
@@ -876,9 +910,20 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
         sleep(1);
     }
 
-    // restart the snapshto
-    // givin a new event, only for that
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(RepeatingSnapshotCommand{CommandType::repeating_snapshot, SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", {"pva://variable:a", "pva://channel:random:fast"}, 0, 4000, 0, false, SnapshotType::TIMED_BUFFERED, {"value"}})}););
+    // restart the snapshot
+    // giving a new event, only for that
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeRepeatingSnapshotCommandShrdPtr(
+        SerializationType::Msgpack,
+        "app_reply_topic",
+        "rep-id",
+        "Snapshot Name",
+        std::unordered_set<std::string>{"pva://variable:a", "pva://channel:random:fast"},
+        0,
+        4000,
+        0,
+        false,
+        SnapshotType::TIMED_BUFFERED,
+        std::unordered_set<std::string>{"value"})}));
     start_time = std::chrono::steady_clock::now();
     while (true)
     {
@@ -887,14 +932,15 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeFilteringFieldsHig
         {
             break;
         }
-        // print statisdtics
+        // print statistics
         auto metrics_string = getUrl(METRIC_URL_FROM_PORT(ncs_tcp_port));
         printSystemMetricsTable(metrics_string, idx++ == 0);
         sleep(1);
     }
 
     // stop the snapshot
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeRepeatingSnapshotStopCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
     while (node_controller->getTaskRunning(CommandType::repeating_snapshot))
     {
         sleep(1);
@@ -937,27 +983,32 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeStartAndStopLoop)
             break;
         }
 
-        EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotCommand>(
-            RepeatingSnapshotCommand{
-                CommandType::repeating_snapshot,
+        EXPECT_NO_THROW(node_controller->submitCommand(
+            {MakeRepeatingSnapshotCommandShrdPtr(
                 SerializationType::Msgpack,
                 "app_reply_topic",
                 "rep-id",
                 "Snapshot Name",
-                {"pva://variable:a", "pva://channel:random:fast"},
+                std::unordered_set<std::string>{"pva://variable:a", "pva://channel:random:fast"},
                 0,
                 1000,
                 0,
                 false,
                 SnapshotType::TIMED_BUFFERED,
-                {"value"}})}););
+                std::unordered_set<std::string>{"value"})}
+        ););
 
         sleep(2);
-        // print statisdtics
+        // print statistics
         auto metrics_string = getUrl(METRIC_URL_FROM_PORT(ncs_tcp_port));
         printSystemMetricsTable(metrics_string, idx++ == 0);
         // stop the snapshot
-        EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{CommandType::repeating_snapshot_stop, SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name"})}););
+        EXPECT_NO_THROW(node_controller->submitCommand(
+            {MakeRepeatingSnapshotStopCommandShrdPtr(
+                SerializationType::Msgpack,
+                "app_reply_topic",
+                "rep-id",
+                "snapshot_name")}));
         // wait for ack command
         sleep(1);
     }
