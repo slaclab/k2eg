@@ -31,28 +31,39 @@ bool ichar_equals(char a, char b)
 
 CommandType MapToCommand::getCMDType(const object& obj)
 {
-    if (auto v = obj.if_contains(KEY_COMMAND))
+    std::string cmd_type;
+    if (!obj.contains(KEY_TYPE) && !obj.contains(KEY_COMMAND))
     {
-        const auto cmd = v->as_string();
-        if (cmd.compare("monitor") == 0)
-            return CommandType::monitor;
-        else if (cmd.compare("multi-monitor") == 0)
-            return CommandType::multi_monitor;
-        else if (cmd.compare("get") == 0)
-            return CommandType::get;
-        else if (cmd.compare("put") == 0)
-            return CommandType::put;
-        else if (cmd.compare("info") == 0)
-            return CommandType::info;
-        else if (cmd.compare("snapshot") == 0)
-            return CommandType::snapshot;
-        else if (cmd.compare("repeating_snapshot") == 0)
-            return CommandType::repeating_snapshot;
-        else if (cmd.compare("repeating_snapshot_stop") == 0)
-            return CommandType::repeating_snapshot_stop;
-        else if (cmd.compare("repeating_snapshot_trigger") == 0)
-            return CommandType::repeating_snapshot_trigger;
+        return CommandType::unknown;
     }
+    else if (obj.contains(KEY_TYPE))
+    {
+        cmd_type = obj.if_contains(KEY_TYPE)->as_string();
+    }
+    else
+    {
+        cmd_type = obj.if_contains(KEY_COMMAND)->as_string();
+    }
+
+    if (cmd_type.compare("monitor") == 0)
+        return CommandType::monitor;
+    else if (cmd_type.compare("multi-monitor") == 0)
+        return CommandType::multi_monitor;
+    else if (cmd_type.compare("get") == 0)
+        return CommandType::get;
+    else if (cmd_type.compare("put") == 0)
+        return CommandType::put;
+    else if (cmd_type.compare("info") == 0)
+        return CommandType::info;
+    else if (cmd_type.compare("snapshot") == 0)
+        return CommandType::snapshot;
+    else if (cmd_type.compare("repeating_snapshot") == 0)
+        return CommandType::repeating_snapshot;
+    else if (cmd_type.compare("repeating_snapshot_stop") == 0)
+        return CommandType::repeating_snapshot_stop;
+    else if (cmd_type.compare("repeating_snapshot_trigger") == 0)
+        return CommandType::repeating_snapshot_trigger;
+
     return CommandType::unknown;
 }
 

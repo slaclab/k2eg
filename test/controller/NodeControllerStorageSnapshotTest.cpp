@@ -1,4 +1,3 @@
-
 #include "../NodeUtilities.h"
 #include "k2eg/common/BaseSerialization.h"
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
@@ -14,6 +13,17 @@ using namespace k2eg::controller::command::cmd;
 
 #define REPLY_TOPIC "app_reply_topic"
 #define SNAPSHOT_NAME "snapshot_name"
+
+inline void validate_snapshot_started(const boost::json::object& json_obj) {
+    ASSERT_FALSE(json_obj.empty()) << "Failed to get JSON object";
+    ASSERT_TRUE(json_obj.contains("error")) << "JSON object does not contain 'error' key";
+    ASSERT_EQ(json_obj["error"].as_int64(), 0) << "JSON object 'error' is not 0";
+    ASSERT_TRUE(json_obj.contains("reply_id")) << "JSON object does not contain 'reply_id' key";
+    ASSERT_EQ(json_obj["reply_id"].as_string(), "rep-id") << "JSON object 'reply_id' is not 'rep-id'";
+    ASSERT_TRUE(json_obj.contains("publishing_topic")) << "JSON object does not contain 'publishing_topic' key";
+    ASSERT_EQ(json_obj["publishing_topic"].as_string(), SNAPSHOT_NAME) << "JSON object 'publishing_topic' is not 'snapshot_name'";
+}
+
 TEST(NodeControllerStorageSnapshotTest, StartRecording)
 {
     SubscriberInterfaceElementVector received_msg;
@@ -50,10 +60,13 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     k2eg->sendCommand(publisher, std::make_unique<CMDMessage<RepeatingSnapshotCommandShrdPtr>>(k2eg->getGatewayCMDTopic(), snapshot_cmd));
 
     // wait for ack
-    auto msg_vec = k2eg->getMessages(subscriber, 1);
+    auto msg_vec = k2eg->getMessages(subscriber, 1, 100000);
     ASSERT_EQ(msg_vec.size(), 1);
     // get json object
     auto json_obj = k2eg->getJsonObject(*msg_vec[0]);
+    // check that the snapshot has been started
+    validate_snapshot_started(json_obj);
 
     ASSERT_NO_THROW(k2eg.reset();) << "Failed to reset K2EG instance";
 }
+
