@@ -138,16 +138,16 @@ struct RepeatingSnapshotCommand : public Command
         , triggered(false) {}
 
     RepeatingSnapshotCommand(
-        k2eg::common::SerializationType serialization, 
-        const std::string& reply_topic, 
-        const std::string& reply_id, 
-        const std::string& snapshot_name, 
-        const std::unordered_set<std::string>& pv_name_list, 
-        std::int32_t repeat_delay_msec, 
-        std::int32_t time_window_msec, 
-        std::int32_t sub_push_delay_msec, 
-        bool triggered, 
-        SnapshotType snapshot_type = SnapshotType::NORMAL, 
+        k2eg::common::SerializationType        serialization,
+        const std::string&                     reply_topic,
+        const std::string&                     reply_id,
+        const std::string&                     snapshot_name,
+        const std::unordered_set<std::string>& pv_name_list,
+        std::int32_t                           repeat_delay_msec,
+        std::int32_t                           time_window_msec,
+        std::int32_t                           sub_push_delay_msec,
+        bool                                   triggered,
+        SnapshotType                           snapshot_type = SnapshotType::NORMAL,
         const std::unordered_set<std::string>& pv_field_filter_list = {})
         : Command(CommandType::repeating_snapshot, serialization, reply_topic, reply_id)
         , snapshot_name(snapshot_name)
@@ -281,6 +281,7 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Snap
     }
 
     jv = {
+        {"type", command_type_to_string(c.type)},
         {"serialization", serialization_to_string(c.serialization)},
         {"reply_id", c.reply_id},
         {"reply_topic", c.reply_topic},
@@ -297,7 +298,7 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Repe
         pv_array.emplace_back(name);
     }
     jv = {
-      {"type", command_type_to_string(CommandType::repeating_snapshot)},
+      {"type", command_type_to_string(c.type)},
       {"serialization", serialization_to_string(c.serialization)}, 
       {"reply_id", c.reply_id}, 
       {"reply_topic", c.reply_topic}, 
@@ -315,6 +316,7 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Repe
 static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, RepeatingSnapshotStopCommand const& c)
 {
     jv = {
+        {"type", command_type_to_string(c.type)},
         {"serialization", serialization_to_string(c.serialization)},
         {"reply_id", c.reply_id},
         {"reply_topic", c.reply_topic},
@@ -325,6 +327,7 @@ static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, Repe
 static void tag_invoke(boost::json::value_from_tag, boost::json::value& jv, RepeatingSnapshotTriggerCommand const& c)
 {
     jv = {
+        {"type", command_type_to_string(c.type)},
         {"serialization", serialization_to_string(c.serialization)},
         {"reply_id", c.reply_id},
         {"reply_topic", c.reply_topic},

@@ -17,7 +17,7 @@ struct PutCommand : public Command
     std::string pv_name;
     std::string value;
     PutCommand()
-        : Command(CommandType::put){};
+        : Command(CommandType::put) {};
 
     PutCommand(k2eg::common::SerializationType serialization, std::string reply_topic, std::string reply_id, const std::string& pv_name, const std::string& value)
         : Command(CommandType::put, serialization, reply_topic, reply_id)
@@ -32,7 +32,8 @@ DEFINE_PTR_TYPES(PutCommand)
 static void
 tag_invoke(boost::json::value_from_tag, boost::json::value& jv, PutCommand const& c)
 {
-    jv = {{"serialization", serialization_to_string(c.serialization)},
+    jv = {{"type", command_type_to_string(c.type)},
+          {"serialization", serialization_to_string(c.serialization)},
           {"pv_name", c.pv_name},
           // {"protocol", c.protocol},
           {"reply_topic", c.reply_topic},

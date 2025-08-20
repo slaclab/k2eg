@@ -3,6 +3,7 @@
 
 #include "boost/json/object.hpp"
 #include "k2eg/common/types.h"
+#include <cstddef>
 #include <gtest/gtest.h>
 #include <k2eg/k2eg.h>
 
@@ -112,9 +113,12 @@ public:
     /**
         Return the subscriber instance
     */
-    k2eg::service::pubsub::ISubscriberShrdPtr getSubscriberInstance()
+    k2eg::service::pubsub::ISubscriberShrdPtr getSubscriberInstance(const std::string& queue = "")
     {
-        return k2eg::service::pubsub::impl::kafka::MakeRDKafkaSubscriberShrdPtr(po->getSubscriberConfiguration());
+        auto subscriber = k2eg::service::pubsub::impl::kafka::MakeRDKafkaSubscriberShrdPtr(po->getSubscriberConfiguration());
+        if (!queue.empty())
+            subscriber->setQueue({queue});
+        return subscriber;
     }
 
     /**
@@ -184,13 +188,54 @@ public:
     boost::json::object getJsonObject(const k2eg::service::pubsub::SubscriberInterfaceElement& message)
     {
         boost::json::object result;
-        try {
+        try
+        {
             result = boost::json::parse(std::string(message.data.get(), message.data_len)).as_object();
         }
-        catch (const std::exception& ex) {
+        catch (const std::exception& ex)
+        {
             ADD_FAILURE() << "JSON parse failed: " << ex.what();
         }
         return result;
+    }
+
+    std::shared_ptr<const k2eg::service::pubsub::SubscriberInterfaceElement> waitForReplyID(k2eg::service::pubsub::ISubscriberShrdPtr subscriber, const std::string& reply_id, int timeout_ms = 1000)
+    {
+        if (!subscriber)
+        {
+            ADD_FAILURE() << "Subscriber is null";
+            return nullptr;
+        }
+
+        auto start = std::chrono::steady_clock::now();
+        while (true)
+        {
+            k2eg::service::pubsub::SubscriberInterfaceElementVector messages;
+            subscriber->getMsg(messages, 1);
+
+            for (const auto& msg : messages)
+            {
+                auto json_obj = getJsonObject(*msg);
+                if (json_obj.at("reply_id").get_string() == reply_id)
+                {
+                    return msg;
+                }
+            }
+
+            if (timeout_ms > 0)
+            {
+                auto elapsed_ms =
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - start)
+                        .count();
+                if (elapsed_ms >= timeout_ms)
+                    break;
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
+        return nullptr;
     }
 };
 

@@ -17,7 +17,7 @@ struct InfoCommand : public Command
 {
     std::string pv_name;
     InfoCommand()
-        : Command(CommandType::info){};
+        : Command(CommandType::info) {};
 
     InfoCommand(k2eg::common::SerializationType serialization, std::string reply_topic, std::string reply_id, const std::string& pv_name)
         : Command(CommandType::info, serialization, reply_topic, reply_id)
@@ -31,6 +31,7 @@ static void
 tag_invoke(boost::json::value_from_tag, boost::json::value& jv, InfoCommand const& c)
 {
     jv = {
+        {"type", command_type_to_string(c.type)},
         {"serialization", serialization_to_string(c.serialization)},
         {"pv_name", c.pv_name},
         // {"protocol", c.protocol},

@@ -64,7 +64,8 @@ tag_invoke(boost::json::value_from_tag, boost::json::value& jv, MultiMonitorComm
         pv_array.emplace_back(name);
     }
 
-    jv = {{"serialization", serialization_to_string(c.serialization)},
+    jv = {{"type", command_type_to_string(c.type)},
+          {"serialization", serialization_to_string(c.serialization)},
           {"pv_name_list", std::move(pv_array)},
           {"reply_id", c.reply_id},
           {"reply_topic", c.reply_topic}};

@@ -14,20 +14,10 @@ using namespace k2eg::controller::command::cmd;
 #define REPLY_TOPIC "app_reply_topic"
 #define SNAPSHOT_NAME "snapshot_name"
 
-inline void validate_snapshot_started(const boost::json::object& json_obj) {
-    ASSERT_FALSE(json_obj.empty()) << "Failed to get JSON object";
-    ASSERT_TRUE(json_obj.contains("error")) << "JSON object does not contain 'error' key";
-    ASSERT_EQ(json_obj["error"].as_int64(), 0) << "JSON object 'error' is not 0";
-    ASSERT_TRUE(json_obj.contains("reply_id")) << "JSON object does not contain 'reply_id' key";
-    ASSERT_EQ(json_obj["reply_id"].as_string(), "rep-id") << "JSON object 'reply_id' is not 'rep-id'";
-    ASSERT_TRUE(json_obj.contains("publishing_topic")) << "JSON object does not contain 'publishing_topic' key";
-    ASSERT_EQ(json_obj["publishing_topic"].as_string(), SNAPSHOT_NAME) << "JSON object 'publishing_topic' is not 'snapshot_name'";
-}
-
 TEST(NodeControllerStorageSnapshotTest, StartRecording)
 {
     SubscriberInterfaceElementVector received_msg;
-    auto k2eg = startK2EG(
+    auto                             k2eg = startK2EG(
         k2eg_controller_storage_snapshot_test_port,
         NodeType::FULL,
         true,
@@ -35,38 +25,59 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     ASSERT_NE(k2eg, nullptr) << "Failed to create K2EG instance";
     ASSERT_TRUE(k2eg->isRunning()) << "K2EG instance is not started";
 
+    sleep(2);
+
     auto publisher = k2eg->getPublisherInstance();
     ASSERT_NE(publisher, nullptr) << "Failed to get publisher instance";
 
-    auto subscriber = k2eg->getSubscriberInstance();
-    subscriber->setQueue({REPLY_TOPIC, SNAPSHOT_NAME});
-    ASSERT_NE(subscriber, nullptr) << "Failed to get subscriber instance";
+    auto subscriber_reply = k2eg->getSubscriberInstance(REPLY_TOPIC);
+    ASSERT_NE(subscriber_reply, nullptr) << "Failed to get subscriber instance for reply";
+
+    auto subscriber_snapshot = k2eg->getSubscriberInstance(SNAPSHOT_NAME);
+    ASSERT_NE(subscriber_snapshot, nullptr) << "Failed to get subscriber instance for snapshot";
 
     // start a snapshot
-    auto snapshot_cmd = MakeRepeatingSnapshotCommandShrdPtr(
-        SerializationType::JSON, 
-        REPLY_TOPIC, 
-        "rep-id", 
-        SNAPSHOT_NAME, 
-        std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 
-        0, 
-        1000, 
-        0, 
-        false, 
-        SnapshotType::NORMAL, 
+    auto start_snapshot_cmd = MakeRepeatingSnapshotCommandShrdPtr(
+        SerializationType::JSON,
+        REPLY_TOPIC,
+        "rep-id",
+        SNAPSHOT_NAME,
+        std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"},
+        0,
+        1000,
+        0,
+        false,
+        SnapshotType::NORMAL,
         std::unordered_set<std::string>{});
 
     // send snapshot request
-    k2eg->sendCommand(publisher, std::make_unique<CMDMessage<RepeatingSnapshotCommandShrdPtr>>(k2eg->getGatewayCMDTopic(), snapshot_cmd));
+    k2eg->sendCommand(publisher, std::make_unique<CMDMessage<RepeatingSnapshotCommandShrdPtr>>(k2eg->getGatewayCMDTopic(), start_snapshot_cmd));
 
     // wait for ack
-    auto msg_vec = k2eg->getMessages(subscriber, 1, 100000);
-    ASSERT_EQ(msg_vec.size(), 1);
+    auto reply_msg_start_snapshot = k2eg->waitForReplyID(subscriber_reply, "rep-id", 60000);
+    ASSERT_NE(reply_msg_start_snapshot, nullptr) << "Failed to get reply message";
     // get json object
-    auto json_obj = k2eg->getJsonObject(*msg_vec[0]);
+    auto json_obj_start_snapshot = k2eg->getJsonObject(*reply_msg_start_snapshot);
     // check that the snapshot has been started
-    validate_snapshot_started(json_obj);
+    ASSERT_EQ(json_obj_start_snapshot["error"].as_int64(), 0) << "JSON object 'error' is not 0";
+    ASSERT_EQ(json_obj_start_snapshot["publishing_topic"].as_string(), SNAPSHOT_NAME) << "JSON object 'publishing_topic' is not 'snapshot_name'";
+
+    // wait for acquire some snapshot
+    auto snapshot_msg = k2eg->getMessages(subscriber_snapshot, 2, 10000);
+    ASSERT_EQ(snapshot_msg.size(), 2) << "Unexpected number of snapshot messages";
+
+    // stop the snapshot
+    auto stop_snapshot_cmd = MakeRepeatingSnapshotStopCommandShrdPtr(
+        SerializationType::JSON,
+        REPLY_TOPIC,
+        "rep-id-1",
+        SNAPSHOT_NAME);
+    // send stop snapshot request
+    k2eg->sendCommand(publisher, std::make_unique<CMDMessage<RepeatingSnapshotStopCommandShrdPtr>>(k2eg->getGatewayCMDTopic(), stop_snapshot_cmd));
+
+    // wait for ack
+    auto reply_msg_stop_snapshot = k2eg->waitForReplyID(subscriber_reply, "rep-id-1", 60000);
+    ASSERT_NE(reply_msg_stop_snapshot, nullptr) << "Failed to get reply message";
 
     ASSERT_NO_THROW(k2eg.reset();) << "Failed to reset K2EG instance";
 }
-

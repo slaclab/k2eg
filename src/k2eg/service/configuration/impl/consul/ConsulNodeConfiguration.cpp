@@ -14,11 +14,11 @@
 #include <oatpp/web/client/HttpRequestExecutor.hpp>
 #include <oatpp/web/protocol/http/outgoing/Request.hpp>
 
+#include <chrono>
 #include <ctime>
+#include <format>
 #include <memory>
 #include <stdexcept>
-#include <chrono>
-#include <format>
 // TU-local helpers for composing KV transaction ops
 #include <optional>
 
@@ -33,6 +33,7 @@ using namespace oatpp::network::tcp::client;
 using namespace oatpp::consul;
 
 #pragma region Helper
+
 namespace {
 inline void addKvOp(
     boost::json::array&               ops,
@@ -100,13 +101,16 @@ inline std::string toStateString(k2eg::service::configuration::ArchiveStatus s)
 inline k2eg::service::configuration::ArchiveStatus fromStateString(const std::string& s)
 {
     using k2eg::service::configuration::ArchiveStatus;
-    if (s == "ARCHIVING") return ArchiveStatus::ARCHIVING;
-    if (s == "ERROR") return ArchiveStatus::ERROR;
+    if (s == "ARCHIVING")
+        return ArchiveStatus::ARCHIVING;
+    if (s == "ERROR")
+        return ArchiveStatus::ERROR;
     return ArchiveStatus::STOPPED;
 }
 } // unnamed namespace
 
 #pragma region Implementation
+
 ConsulNodeConfiguration::ConsulNodeConfiguration(ConstConfigurationServiceConfigUPtr _config)
     : INodeConfiguration(std::move(_config))
 {
@@ -142,7 +146,11 @@ ConsulNodeConfiguration::ConsulNodeConfiguration(ConstConfigurationServiceConfig
     if (config->reset_on_start)
     {
         // remove the old configuration
-        client->kvDelete(node_configuration_key);
+        boost::json::array ops;
+        ops.reserve(2);
+        addDeleteTreeOp(ops, node_configuration_key);
+        addDeleteTreeOp(ops, "k2eg/snapshots");
+        executeTxn(ops);
     }
     // in case this is the first time we are running check if we have a configuration
     // and if not create a new one
@@ -421,6 +429,7 @@ NodeConfigurationShrdPtr ConsulNodeConfiguration::getNodeConfiguration() const
 }
 
 #pragma region Node Configuration
+
 bool ConsulNodeConfiguration::setNodeConfiguration(NodeConfigurationShrdPtr node_configuration)
 {
     // store configuration in Consul KV store
@@ -449,6 +458,7 @@ const std::string ConsulNodeConfiguration::getSnapshotKey(const std::string& sna
 }
 
 #pragma region Snapshot Configuration
+
 ConstSnapshotConfigurationShrdPtr ConsulNodeConfiguration::getSnapshotConfiguration(const std::string& snapshot_id) const
 {
     std::string base_key = getSnapshotKey(snapshot_id);
@@ -590,8 +600,10 @@ void ConsulNodeConfiguration::setSnapshotArchiveStatus(const std::string& snapsh
     boost::json::array ops;
     ops.reserve(4);
     addSetOp(ops, status_base + "/state", toStateString(status.status));
-    if (!status.started_at.empty()) addSetOp(ops, status_base + "/started_at", status.started_at);
-    if (!status.updated_at.empty()) addSetOp(ops, status_base + "/updated_at", status.updated_at);
+    if (!status.started_at.empty())
+        addSetOp(ops, status_base + "/started_at", status.started_at);
+    if (!status.updated_at.empty())
+        addSetOp(ops, status_base + "/updated_at", status.updated_at);
     // Always set error_message (empty clears it)
     addSetOp(ops, status_base + "/error_message", status.error_message);
 
@@ -609,16 +621,20 @@ ArchiveStatusInfo ConsulNodeConfiguration::getSnapshotArchiveStatus(const std::s
     try
     {
         auto state_s = client->kvGet(status_base + "/state");
-        if (state_s) out.status = fromStateString(state_s.getValue(""));
+        if (state_s)
+            out.status = fromStateString(state_s.getValue(""));
 
         auto started = client->kvGet(status_base + "/started_at");
-        if (started) out.started_at = started.getValue("");
+        if (started)
+            out.started_at = started.getValue("");
 
         auto updated = client->kvGet(status_base + "/updated_at");
-        if (updated) out.updated_at = updated.getValue("");
+        if (updated)
+            out.updated_at = updated.getValue("");
 
         auto err = client->kvGet(status_base + "/error_message");
-        if (err) out.error_message = err.getValue("");
+        if (err)
+            out.error_message = err.getValue("");
     }
     catch (const Client::Error&)
     {
@@ -642,7 +658,8 @@ const std::string ConsulNodeConfiguration::getSnapshotGateway(const std::string&
     }
 }
 
-const std::string ConsulNodeConfiguration::getSnapshotArchiver(const std::string& snapshot_id) const {
+const std::string ConsulNodeConfiguration::getSnapshotArchiver(const std::string& snapshot_id) const
+{
     try
     {
         std::string base_key = getSnapshotKey(snapshot_id);
@@ -676,11 +693,11 @@ bool ConsulNodeConfiguration::tryAcquireSnapshot(const std::string& snapshot_id,
         // If storage, also write initial archive/status/* fields in the same transaction
         if (!for_gateway)
         {
-            const std::string now_iso = nowIsoUtc();
+            const std::string   now_iso = nowIsoUtc();
             const ArchiveStatus state = ArchiveStatus::ARCHIVING;
-            const std::string started_at = now_iso;
-            const std::string updated_at = now_iso;
-            const std::string error_message;
+            const std::string   started_at = now_iso;
+            const std::string   updated_at = now_iso;
+            const std::string   error_message;
 
             auto pushSet = [&](const std::string& subkey, const std::string& val)
             {
