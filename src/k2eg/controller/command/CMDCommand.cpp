@@ -1,3 +1,5 @@
+#include <k2eg/controller/command/cmd/GetCommand.h>
+#include <k2eg/controller/command/cmd/InfoCommand.h>
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/pubsub/IPublisher.h>
@@ -132,13 +134,12 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
             {
                 if (auto fields = checkFields(obj, {{KEY_PV_NAME, kind::string}}); fields != nullptr)
                 {
-                    result = std::make_shared<MonitorCommand>(MonitorCommand{
-                        CommandType::monitor, 
-                        ser_type, 
-                        reply_topic, 
+                    result = MakeMonitorCommandShrdPtr(
+                        ser_type,
+                        reply_topic,
                         reply_id,
                         std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second), 
-                        event_destination_topic});
+                        event_destination_topic);
                 }
                 else
                 {
@@ -171,13 +172,12 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 if (pv_name_list.size())
                 {
                     // we can create the command
-                    result = std::make_shared<MultiMonitorCommand>(MultiMonitorCommand{
-                        CommandType::multi_monitor, 
-                        ser_type, 
-                        reply_topic, 
-                        reply_id, 
+                    result = MakeMultiMonitorCommandShrdPtr(
+                        ser_type,
+                        reply_topic,
+                        reply_id,
                         pv_name_list
-                    });
+                    );
                 }
                 else
                 {
@@ -198,8 +198,11 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 std::string       reply_id = check_for_reply_id(obj, logger);
                 SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
                 const std::string reply_topic = check_reply_topic(obj, logger);
-                result = std::make_shared<GetCommand>(GetCommand{CommandType::get, ser_type, reply_topic, reply_id,
-                                                                 std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second)});
+                result = MakeGetCommandShrdPtr(
+                    ser_type, 
+                    reply_topic, 
+                    reply_id,
+                    std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second));
             }
             else
             {
@@ -214,13 +217,13 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 std::string       reply_id = check_for_reply_id(obj, logger);
                 SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
                 const std::string reply_topic = check_reply_topic(obj, logger);
-                result = std::make_shared<PutCommand>(PutCommand{
-                    CommandType::put, 
-                    ser_type, 
-                    reply_topic, 
+                result = MakePutCommandShrdPtr(
+                    ser_type,
+                    reply_topic,
                     reply_id,
                     std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second),
-                    std::any_cast<std::string>(fields->find(KEY_VALUE)->second)});
+                    std::any_cast<std::string>(fields->find(KEY_VALUE)->second)
+                );
             }
             else
             {
@@ -235,13 +238,12 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 std::string       reply_id = check_for_reply_id(obj, logger);
                 SerializationType ser_type = check_for_serialization(obj, SerializationType::Msgpack, logger);
                 const std::string reply_topic = check_reply_topic(obj, logger);
-                result = std::make_shared<InfoCommand>(InfoCommand{
-                    CommandType::info, 
-                    ser_type, 
-                    reply_topic, 
+                result = MakeInfoCommandShrdPtr(
+                    ser_type,
+                    reply_topic,
                     reply_id,
                     std::any_cast<std::string>(fields->find(KEY_PV_NAME)->second)
-                });
+                );
             }
             else
             {
@@ -272,13 +274,13 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 if (pv_name_list.size())
                 {
                     // we can create the command
-                    result = std::make_shared<SnapshotCommand>(SnapshotCommand{
-                        CommandType::snapshot, 
-                        ser_type, 
-                        reply_topic, 
-                        reply_id, pv_name_list,
+                    result = MakeSnapshotCommandShrdPtr(
+                        ser_type,
+                        reply_topic,
+                        reply_id,
+                        pv_name_list,
                         time_window_msec
-                    });
+                    );
                 }
                 else
                 {
@@ -324,8 +326,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 if (pv_name_list.size())
                 {
                     // we can create the command
-                    result = std::make_shared<RepeatingSnapshotCommand>(RepeatingSnapshotCommand{
-                        CommandType::repeating_snapshot,
+                    result = MakeRepeatingSnapshotCommandShrdPtr(
                         ser_type,
                         reply_topic,
                         reply_id,
@@ -336,7 +337,8 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                         sub_push_delay_msec,
                         triggered,
                         snapshot_type,
-                        pv_field_filter_list});
+                        pv_field_filter_list
+                    );
                 }
                 else
                 {
@@ -358,13 +360,12 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 const std::string        reply_id = check_for_reply_id(obj, logger);
                 const std::string        reply_topic = check_reply_topic(obj, logger);
                 const std::string snapshot_name = check_json_field<std::string>(obj, KEY_SNAPSHOT_NAME, logger, "The snapshot name key should be a string", "");
-                result = std::make_shared<RepeatingSnapshotStopCommand>(RepeatingSnapshotStopCommand{
-                    CommandType::repeating_snapshot_stop, 
+                result = MakeRepeatingSnapshotStopCommandShrdPtr(
                     ser_type, 
                     reply_topic, 
                     reply_id, 
                     snapshot_name
-                });
+                );
             }
             else
             {
@@ -382,14 +383,13 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 const std::string        reply_topic = check_reply_topic(obj, logger);
                 const std::string snapshot_name = check_json_field<std::string>(obj, KEY_SNAPSHOT_NAME, logger, "The snapshot name key should be a string", "");
                 const std::map<std::string, std::string> trigger_tag = check_json_field_for_map(obj, KEY_TAGS, logger, "The triggered key should be a map");
-                result = std::make_shared<RepeatingSnapshotTriggerCommand>(RepeatingSnapshotTriggerCommand{
-                    CommandType::repeating_snapshot_trigger, 
-                    ser_type, 
-                    reply_topic, 
-                    reply_id, 
+                result = MakeRepeatingSnapshotTriggerCommandShrdPtr(
+                    ser_type,
+                    reply_topic,
+                    reply_id,
                     snapshot_name,
                     trigger_tag
-                });
+                );
             }
             else
             {

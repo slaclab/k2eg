@@ -4,8 +4,6 @@
 #include <k2eg/common/serialization.h>
 #include <k2eg/common/types.h>
 
-#include <k2eg/controller/command/cmd/Command.h>
-
 #include <boost/json.hpp>
 
 #include <string>
@@ -75,6 +73,17 @@ struct Command
     k2eg::common::SerializationType serialization;
     std::string                     reply_topic;
     std::string                     reply_id;
+    Command() = default;
+
+    Command(CommandType type)
+        : type(type)
+    {
+    }
+
+    Command(CommandType type, k2eg::common::SerializationType serialization, std::string reply_topic, std::string reply_id)
+        : type(type), serialization(serialization), reply_topic(std::move(reply_topic)), reply_id(std::move(reply_id))
+    {
+    }
 };
 
 DEFINE_PTR_TYPES(Command)
