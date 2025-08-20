@@ -137,7 +137,7 @@ static void from_json(const std::string& json_string, RepeatingSnapshotCommand& 
         return;
 
     const auto& obj = json_value.as_object();
-    cmd.type = CommandType::repeating_snapshot;
+    // cmd.type = CommandType::repeating_snapshot;
     cmd.reply_id = obj.contains(KEY_REPLY_ID) ? obj.at(KEY_REPLY_ID).as_string() : "";
     cmd.reply_topic = obj.contains(KEY_REPLY_TOPIC) ? obj.at(KEY_REPLY_TOPIC).as_string() : "";
     cmd.serialization = common::serialization_from_string((obj.contains(KEY_SERIALIZATION) ? std::string(obj.at(KEY_SERIALIZATION).as_string()) : std::string("unknown")));

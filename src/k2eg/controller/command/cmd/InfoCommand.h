@@ -13,7 +13,7 @@ namespace k2eg::controller::command::cmd {
         }
 */
 
-struct InfoCommand : public Command {
+struct InfoCommand : public Command{
   std::string pv_name;
 };
 DEFINE_PTR_TYPES(InfoCommand)

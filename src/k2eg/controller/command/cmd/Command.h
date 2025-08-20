@@ -1,9 +1,8 @@
 #ifndef K2EG_CONTROLLER_COMMAND_CMD_COMMAND_H_
 #define K2EG_CONTROLLER_COMMAND_CMD_COMMAND_H_
 
-
-#include <k2eg/common/types.h>
 #include <k2eg/common/serialization.h>
+#include <k2eg/common/types.h>
 
 #include <k2eg/controller/command/cmd/Command.h>
 
@@ -70,9 +69,6 @@ inline std::ostream& operator<<(std::ostream& os, const k2eg::controller::comman
     return os << command_type_to_string(type);
 }
 
-/**
-Base command structure
-*/
 struct Command
 {
     CommandType                     type;
@@ -80,6 +76,7 @@ struct Command
     std::string                     reply_topic;
     std::string                     reply_id;
 };
+
 DEFINE_PTR_TYPES(Command)
 
 typedef std::vector<ConstCommandShrdPtr> ConstCommandShrdPtrVec;

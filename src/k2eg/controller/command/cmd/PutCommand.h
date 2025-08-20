@@ -12,7 +12,7 @@ namespace k2eg::controller::command::cmd {
         "value", value"
         }
 */
-struct PutCommand : public Command {
+struct PutCommand: public Command {
   std::string pv_name;
   std::string value;
 };

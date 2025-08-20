@@ -12,7 +12,7 @@ namespace k2eg::controller::command::cmd {
         "reply_topic", "reply_topic"
         }
 */
-struct GetCommand : public Command {
+struct GetCommand: public Command {
   std::string pv_name;
 };
 DEFINE_PTR_TYPES(GetCommand)

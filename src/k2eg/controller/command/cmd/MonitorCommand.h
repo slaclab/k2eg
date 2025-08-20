@@ -12,7 +12,7 @@ namespace k2eg::controller::command::cmd {
         "reply_topic", "reply_topic"
         }
 */
-struct MonitorCommand : public Command {
+struct MonitorCommand: public Command {
   std::string pv_name;
   std::string monitor_destination_topic;
 };
@@ -28,7 +28,7 @@ tag_invoke(boost::json::value_from_tag, boost::json::value& jv, MonitorCommand c
 }
 
 // automatic start monitor for multiple pv
-struct MultiMonitorCommand : public Command {
+struct MultiMonitorCommand: public Command {
   std::unordered_set<std::string> pv_name_list;
 };
 DEFINE_PTR_TYPES(MultiMonitorCommand)

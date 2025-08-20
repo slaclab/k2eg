@@ -1,16 +1,76 @@
-#include "k2eg/controller/node/NodeController.h"
-#include "k2eg/service/pubsub/IPublisher.h"
-#include "k2eg/service/pubsub/ISubscriber.h"
-#include <cstdlib>
-#include <k2eg/common/ProgramOptions.h>
+#ifndef NODEUTILITIES_H_
+#define NODEUTILITIES_H_
+
+#include <gtest/gtest.h>
 #include <k2eg/k2eg.h>
+
+#include <k2eg/common/ProgramOptions.h>
+#include <k2eg/common/uuid.h>
+
+#include <k2eg/controller/command/CMDCommand.h>
+#include <k2eg/controller/command/cmd/SnapshotCommand.h>
+#include <k2eg/controller/node/NodeController.h>
+
+#include <k2eg/service/pubsub/IPublisher.h>
+#include <k2eg/service/pubsub/ISubscriber.h>
 #include <k2eg/service/pubsub/impl/kafka/RDKafkaPublisher.h>
 #include <k2eg/service/pubsub/impl/kafka/RDKafkaSubscriber.h>
 #include <k2eg/service/storage/StorageServiceFactory.h>
 #include <k2eg/service/storage/impl/MongoDBStorageService.h>
 
+#include <cstdlib>
 #include <memory>
 #include <string>
+
+template <typename T>
+class CMDMessage : public k2eg::service::pubsub::PublishMessage
+{
+    const std::string request_type;
+    const std::string distribution_key;
+    const std::string queue;
+    std::string json_nmessage;
+    //! the message data
+    T cmd;
+
+public:
+    CMDMessage(const std::string& queue, T cmd)
+        : request_type("test"), distribution_key(k2eg::common::UUID::generateUUIDLite()), queue(queue), cmd(cmd)
+    {
+        json_nmessage = k2eg::controller::command::to_json_string_cmd_ptr(cmd);
+    }
+
+    virtual ~CMDMessage() {}
+
+    char*
+    getBufferPtr()
+    {
+        return const_cast<char*>(json_nmessage.c_str());
+    }
+
+    const size_t
+    getBufferSize()
+    {
+        return json_nmessage.size();
+    }
+
+    const std::string&
+    getQueue()
+    {
+        return queue;
+    }
+
+    const std::string&
+    getDistributionKey()
+    {
+        return distribution_key;
+    }
+
+    const std::string&
+    getReqType()
+    {
+        return request_type;
+    }
+};
 
 /**
  * Test environment for K2EG
@@ -55,6 +115,16 @@ public:
     const std::string& getGatewayCMDTopic()
     {
         return po->getOption<std::string>(CMD_INPUT_TOPIC);
+    }
+
+    void sendCommand(k2eg::service::pubsub::IPublisherShrdPtr publisher, k2eg::service::pubsub::PublishMessageUniquePtr command)
+    {
+        ASSERT_NE(publisher, nullptr);
+        ASSERT_NE(command, nullptr);
+        if (publisher && command)
+        {
+            publisher->pushMessage(std::move(command));
+        }
     }
 };
 
@@ -160,3 +230,5 @@ inline std::shared_ptr<K2EGTestEnv> startK2EG(int& tcp_port, k2eg::controller::n
     setenv(("EPICS_k2eg_" + std::string(SUB_SERVER_ADDRESS)).c_str(), "kafka:9092", 1);
     return std::make_shared<K2EGTestEnv>();
 }
+
+#endif // NODEUTILITIES_H_
