@@ -1,6 +1,8 @@
 #ifndef NODEUTILITIES_H_
 #define NODEUTILITIES_H_
 
+#include "boost/json/object.hpp"
+#include "k2eg/common/types.h"
 #include <gtest/gtest.h>
 #include <k2eg/k2eg.h>
 
@@ -18,17 +20,23 @@
 #include <k2eg/service/storage/StorageServiceFactory.h>
 #include <k2eg/service/storage/impl/MongoDBStorageService.h>
 
+#include <chrono>
 #include <cstdlib>
+#include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 
+/**
+ * Command message wrapper for publishing commands
+ */
 template <typename T>
 class CMDMessage : public k2eg::service::pubsub::PublishMessage
 {
     const std::string request_type;
     const std::string distribution_key;
     const std::string queue;
-    std::string json_nmessage;
+    std::string       json_nmessage;
     //! the message data
     T cmd;
 
@@ -119,12 +127,70 @@ public:
 
     void sendCommand(k2eg::service::pubsub::IPublisherShrdPtr publisher, k2eg::service::pubsub::PublishMessageUniquePtr command)
     {
-        ASSERT_NE(publisher, nullptr);
-        ASSERT_NE(command, nullptr);
-        if (publisher && command)
+        if (!publisher)
         {
-            publisher->pushMessage(std::move(command));
+            ADD_FAILURE() << "publisher is null";
+            return;
         }
+        if (!command)
+        {
+            ADD_FAILURE() << "command is null";
+            return;
+        }
+
+        publisher->pushMessage(std::move(command));
+    }
+
+    k2eg::service::pubsub::SubscriberInterfaceElementVector getMessages(k2eg::service::pubsub::ISubscriberShrdPtr subscriber, int num_of_msg, int timeout_ms = 10000)
+    {
+        if (!subscriber)
+        {
+            ADD_FAILURE() << "Subscriber is null";
+            return {};
+        }
+        k2eg::service::pubsub::SubscriberInterfaceElementVector mesg_received;
+        auto                                                    start = std::chrono::steady_clock::now();
+
+        while (mesg_received.size() < static_cast<size_t>(num_of_msg))
+        {
+            subscriber->getMsg(mesg_received, num_of_msg);
+
+            if (timeout_ms > 0)
+            {
+                auto elapsed_ms =
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - start)
+                        .count();
+                if (elapsed_ms >= timeout_ms)
+                    break;
+            }
+
+            if (mesg_received.size() < static_cast<size_t>(num_of_msg))
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+
+        if (mesg_received.size() < static_cast<size_t>(num_of_msg) && timeout_ms > 0)
+        {
+            std::cout << "[WARN] getJsonMessage timeout: expected "
+                      << num_of_msg << " got " << mesg_received.size()
+                      << " within " << timeout_ms << " ms\n";
+        }
+
+        return mesg_received;
+    }
+
+    boost::json::object getJsonObject(const k2eg::service::pubsub::SubscriberInterfaceElement& message)
+    {
+        boost::json::object result;
+        try {
+            result = boost::json::parse(std::string(message.data.get(), message.data_len)).as_object();
+        }
+        catch (const std::exception& ex) {
+            ADD_FAILURE() << "JSON parse failed: " << ex.what();
+        }
+        return result;
     }
 };
 

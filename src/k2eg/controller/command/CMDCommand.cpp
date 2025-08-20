@@ -274,7 +274,7 @@ ConstCommandShrdPtr MapToCommand::parse(const object& obj)
                 if (pv_name_list.size())
                 {
                     // we can create the command
-                    result = MakeGetCommandShrdPtr(
+                    result = MakeSnapshotCommandShrdPtr(
                         ser_type,
                         reply_topic,
                         reply_id,

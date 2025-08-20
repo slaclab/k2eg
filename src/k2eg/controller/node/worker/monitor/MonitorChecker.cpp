@@ -78,7 +78,7 @@ MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
           std::lock_guard guard(op_mux);
           int  filtered_out   = 0;
           std::string consumer_group_name;
-          logger->logMessage(STRING_FORMAT("[%2% - %3%] check metadata", monitor_info.pv_name % monitor_info.channel_destination));
+          logger->logMessage(STRING_FORMAT("[%1% - %2%] check metadata", monitor_info.pv_name % monitor_info.channel_destination));
           auto queue_metadata = publisher->getQueueMetadata(monitor_info.channel_destination);
           // take in consideration only the consuemr that are not filter ot from the regex
           for (auto& cg : queue_metadata->subscriber_groups) {
@@ -92,8 +92,8 @@ MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
           }
           if (queue_metadata && (queue_metadata->subscriber_groups.size() - filtered_out)) {
             logger->logMessage(STRING_FORMAT(
-                "[%2% - %3% ] counting subscriber founds %4% [%5%]",
-                monitor_info.pv_name % 
+                "[%1% - %2%] counting subscriber founds %3% [%4%]",
+                monitor_info.pv_name %
                 monitor_info.channel_destination % (queue_metadata->subscriber_groups.size() - filtered_out) %
                 consumer_group_name.substr(0, consumer_group_name.size() - 1)));
 
@@ -102,40 +102,40 @@ MonitorChecker::scanForMonitorToStop(size_t element_to_process) {
             if (monitor_info.start_purge_ts == -1) {
               // set the purge timestamp
               purge_ts_set_flag = 1;
-              logger->logMessage(STRING_FORMAT("[%2% - %3% ] no subscriber found, set timestamp for purge timeout",
+              logger->logMessage(STRING_FORMAT("[%1% - %2%] no subscriber found, set timestamp for purge timeout",
                                               monitor_info.pv_name % monitor_info.channel_destination));
             } else {
               // we have to check if the timeout is expired
-              logger->logMessage(STRING_FORMAT("[%2% - %3% ] Check if we need to delete the monitor queue",
+              logger->logMessage(STRING_FORMAT("[%1% - %2%] Check if we need to delete the monitor queue",
                                               monitor_info.pv_name % monitor_info.channel_destination));
               if (isTimeoutExperid(monitor_info)) {
                 try {
                   logger->logMessage(
-                      STRING_FORMAT("[%2% - %3% ] Stop monitor", monitor_info.pv_name % monitor_info.channel_destination));
+                      STRING_FORMAT("[%1% - %2%] Stop monitor", monitor_info.pv_name % monitor_info.channel_destination));
                   handler_broadcaster.broadcast(MonitorHandlerData{MonitorHandlerAction::Stop, monitor_info});
 
                   // check if we need to delete the also the topic of the monitor
                   if (monitor_checker_configuration.purge_queue_on_monitor_timeout) {
                     logger->logMessage(
-                        STRING_FORMAT("[%2% - %3% ] delete queue", monitor_info.pv_name % monitor_info.channel_destination));
+                        STRING_FORMAT("[%1% - %2%] delete queue", monitor_info.pv_name % monitor_info.channel_destination));
                     publisher->deleteQueue(monitor_info.channel_destination);
                   }
 
                   // remove the channel monitor form the database
                   node_configuration_db->removeChannelMonitor({monitor_info});
                 } catch (...) {
-                  logger->logMessage(STRING_FORMAT("[%2% - %3% ] Error during the stop of the monitor",
+                  logger->logMessage(STRING_FORMAT("[%1% - %2%] Error during the stop of the monitor",
                                                   monitor_info.pv_name % monitor_info.channel_destination),
                                     LogLevel::ERROR);
                 }
               } else {
-                logger->logMessage(STRING_FORMAT("[%2% - %3% ] waiting for timeout exceed",
+                logger->logMessage(STRING_FORMAT("[%1% - %2%] waiting for timeout exceed",
                                                 monitor_info.pv_name % monitor_info.channel_destination));
               }
             }
           }
         } catch (std::runtime_error& e) {
-          logger->logMessage(STRING_FORMAT("[%2% - %3% ] Error during the stop of the monitor", monitor_info.pv_name % monitor_info.channel_destination),
+          logger->logMessage(STRING_FORMAT("[%1% - %2%] Error during the stop of the monitor", monitor_info.pv_name % monitor_info.channel_destination),
                              LogLevel::ERROR);
         }
       });
