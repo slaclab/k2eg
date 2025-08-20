@@ -32,6 +32,7 @@
 
 #include "NodeControllerCommon.h"
 #include "boost/json/object.hpp"
+#include "k2eg/controller/command/cmd/GetCommand.h"
 #include "k2eg/controller/command/cmd/MonitorCommand.h"
 #include "msgpack/v3/object_fwd_decl.hpp"
 
@@ -68,7 +69,6 @@ int tcp_port = 9000;
 
 #ifdef __linux__
 
-
 TEST(NodeController, MonitorCommandJsonSerByDefault)
 {
     std::latch                      work_done{2};
@@ -83,7 +83,8 @@ TEST(NodeController, MonitorCommandJsonSerByDefault)
     {
         sleep(1);
     }
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
+    EXPECT_NO_THROW(node_controller->submitCommand(
+        {MakeMonitorCommandShrdPtr(SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN)}););
 
     work_done.wait();
     // reduce the number of consumer
@@ -130,9 +131,9 @@ TEST(NodeController, MonitorCommandJsonSerStalePV)
     {
         sleep(1);
     }
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://variable:a", "variable_a"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeMonitorCommandShrdPtr(SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://variable:a", "variable_a")}));
     sleep(2);
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://variable:a", "variable_a"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeMonitorCommandShrdPtr(SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://variable:a", "variable_a")}));
     sleep(2);
     work_done.wait();
     EXPECT_EQ(countMessageOnTopic(publisher->sent_messages, "variable_a"), 2);
@@ -156,13 +157,13 @@ TEST(NodeController, MonitorCommandSpecifySpecificMonitorEventTopic)
     boost::json::object             reply_msg;
     std::unique_ptr<NodeController> node_controller;
     auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-    node_controller = initGatewayBackend(tcp_port,publisher);
+    node_controller = initGatewayBackend(tcp_port, publisher);
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
     while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor))
     {
         sleep(1);
     }
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", "alternate_topic"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeMonitorCommandShrdPtr(SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", "alternate_topic")}));
 
     work_done.wait();
 
@@ -202,13 +203,13 @@ TEST(NodeController, MonitorCommandMsgPackSer)
     msgpack::unpacked               reply_msg;
     std::unique_ptr<NodeController> node_controller;
     auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-    node_controller = initGatewayBackend(tcp_port,publisher);
+    node_controller = initGatewayBackend(tcp_port, publisher);
     while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor))
     {
         sleep(1);
     }
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeMonitorCommandShrdPtr(SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN)}););
 
     work_done.wait();
     // reduce the number of consumer
@@ -247,13 +248,13 @@ TEST(NodeController, MonitorCommandMsgPackCompactSer)
     std::latch                      work_done{2};
     std::unique_ptr<NodeController> node_controller;
     auto                            publisher = std::make_shared<DummyPublisher>(work_done);
-    node_controller = initGatewayBackend(tcp_port,publisher);
+    node_controller = initGatewayBackend(tcp_port, publisher);
     while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor))
     {
         sleep(1);
     }
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeMonitorCommandShrdPtr(SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN)}));
 
     work_done.wait();
     // stop acquire
@@ -291,7 +292,7 @@ TEST(NodeController, MonitorCommandAfterReboot)
     std::latch work_done{2};
     std::latch work_done_2{5};
     auto       publisher = std::make_shared<DummyPublisher>(work_done);
-    auto       node_controller = initGatewayBackend(tcp_port,publisher);
+    auto       node_controller = initGatewayBackend(tcp_port, publisher);
 
     while (!node_controller->isWorkerReady(k2eg::controller::command::cmd::CommandType::monitor))
     {
@@ -299,7 +300,7 @@ TEST(NodeController, MonitorCommandAfterReboot)
     }
 
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeMonitorCommandShrdPtr(SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", "pva://channel:ramp:ramp", KAFKA_TOPIC_ACQUIRE_IN)}));
 
     work_done.wait();
     // we need to have publish some message
@@ -336,13 +337,7 @@ TEST(NodeController, MonitorCommandMultiPV)
     {
         sleep(1);
     }
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MultiMonitorCommand>(MultiMonitorCommand{
-        CommandType::multi_monitor,
-        SerializationType::JSON,
-        KAFKA_TOPIC_ACQUIRE_IN,
-        "rep-id",
-        {"pva://variable:a", "pva://variable:b"},
-    })}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeMultiMonitorCommandShrdPtr(SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "rep-id", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"})}));
 
     work_done.wait();
     // reduce the number of consumer
@@ -384,15 +379,14 @@ TEST(NodeController, MonitorCommandMultiPVStress)
     {
         sleep(1);
     }
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MultiMonitorCommand>(MultiMonitorCommand{
-        CommandType::multi_monitor,
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeMultiMonitorCommandShrdPtr(
         SerializationType::JSON,
         KAFKA_TOPIC_ACQUIRE_IN,
         "rep-id",
-        {"pva://channel:ramp:ramp",    "pva://channel:ramp:ramp_1",  "pva://channel:ramp:ramp_2",
-         "pva://channel:ramp:ramp_3",  "pva://channel:ramp:ramp_4",  "pva://channel:ramp:ramp_5",
-         "pva://channel:ramp:ramp_6",  "pva://channel:ramp:ramp_7",  "pva://channel:ramp:ramp_8",
-         "pva://channel:ramp:ramp_9",  "pva://channel:ramp:ramp_10", "pva://channel:ramp:ramp_11",
+        std::unordered_set<std::string>{"pva://channel:ramp:ramp", "pva://channel:ramp:ramp_1", "pva://channel:ramp:ramp_2",
+         "pva://channel:ramp:ramp_3", "pva://channel:ramp:ramp_4", "pva://channel:ramp:ramp_5",
+         "pva://channel:ramp:ramp_6", "pva://channel:ramp:ramp_7", "pva://channel:ramp:ramp_8",
+         "pva://channel:ramp:ramp_9", "pva://channel:ramp:ramp_10", "pva://channel:ramp:ramp_11",
          "pva://channel:ramp:ramp_12", "pva://channel:ramp:ramp_13", "pva://channel:ramp:ramp_14",
          "pva://channel:ramp:ramp_15", "pva://channel:ramp:ramp_16", "pva://channel:ramp:ramp_17",
          "pva://channel:ramp:ramp_18", "pva://channel:ramp:ramp_19", "pva://channel:ramp:ramp_20",
@@ -402,8 +396,7 @@ TEST(NodeController, MonitorCommandMultiPVStress)
          "pva://channel:ramp:ramp_30", "pva://channel:ramp:ramp_31", "pva://channel:ramp:ramp_32",
          "pva://channel:ramp:ramp_33", "pva://channel:ramp:ramp_34", "pva://channel:ramp:ramp_35",
          "pva://channel:ramp:ramp_36", "pva://channel:ramp:ramp_37", "pva://channel:ramp:ramp_38",
-         "pva://channel:ramp:ramp_39"},
-    })}););
+         "pva://channel:ramp:ramp_39"})}));
 
     publisher->getLatch().wait();
     // reduce the number of consumer
@@ -435,7 +428,7 @@ TEST(NodeController, GetCommandJson)
     // set environment variable for test
     auto node_controller = initGatewayBackend(tcp_port, publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://channel:ramp:ramp"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://channel:ramp:ramp")}););
 
     work_done.wait();
     // we need to have publish some message
@@ -458,7 +451,7 @@ TEST(NodeController, GetCommandJsonWithReplyID)
     // set environment variable for test
     auto node_controller = initGatewayBackend(tcp_port, publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "REP_ID_JSON", "pva://channel:ramp:ramp"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "REP_ID_JSON", "pva://channel:ramp:ramp")}););
 
     work_done.wait();
     // we need to have publish some message
@@ -482,7 +475,7 @@ TEST(NodeController, GetFaultyCommandJsonWithReplyID)
     // set environment variable for test
     auto node_controller = initGatewayBackend(tcp_port, publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "REP_ID_JSON", "pva://bad:channel"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "REP_ID_JSON", "pva://bad:channel")}););
 
     work_done.wait();
     // we need to have publish some message
@@ -505,9 +498,9 @@ TEST(NodeController, GetCommandMsgPack)
     std::latch                                     work_done{1};
     std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,publisher);
+    auto node_controller = initGatewayBackend(tcp_port, publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://channel:ramp:ramp"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://channel:ramp:ramp")}));
 
     work_done.wait();
     // we need to have publish some message
@@ -533,9 +526,9 @@ TEST(NodeController, GetFaultyCommandMsgPack)
     std::latch                                     work_done{1};
     std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,publisher);
+    auto node_controller = initGatewayBackend(tcp_port, publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://bad:pv:name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::Msgpack, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://bad:pv:name")}));
 
     work_done.wait();
     // we need to have publish some message
@@ -562,9 +555,9 @@ TEST(NodeController, GetCommandMsgPackReplyID)
     std::latch                                     work_done{1};
     std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,publisher);
+    auto node_controller = initGatewayBackend(tcp_port, publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "REPLY_ID_MSGPACK", "pva://channel:ramp:ramp"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "REPLY_ID_MSGPACK", "pva://channel:ramp:ramp")}));
 
     work_done.wait();
     // we need to have publish some message
@@ -592,9 +585,9 @@ TEST(NodeController, GetCommandMsgPackCompack)
     std::latch                                     work_done{1};
     std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,publisher);
+    auto node_controller = initGatewayBackend(tcp_port, publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://channel:ramp:ramp"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://channel:ramp:ramp")}));
 
     work_done.wait();
     // we need to have publish some message
@@ -621,9 +614,9 @@ TEST(NodeController, GetFaultyCommandMsgPackCompack)
     std::latch                                     work_done{1};
     std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,publisher);
+    auto node_controller = initGatewayBackend(tcp_port, publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://bad:pv:name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://bad:pv:name")}));
 
     work_done.wait();
     // we need to have publish some message
@@ -651,9 +644,9 @@ TEST(NodeController, GetCommandMsgPackCompackWithReplyID)
     std::latch                                     work_done{1};
     std::shared_ptr<DummyPublisher>                publisher = std::make_shared<DummyPublisher>(work_done);
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,publisher);
+    auto node_controller = initGatewayBackend(tcp_port, publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "REPLY_ID_MSGPACK_COMPACT", "pva://channel:ramp:ramp"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "REPLY_ID_MSGPACK_COMPACT", "pva://channel:ramp:ramp")}));
 
     work_done.wait();
     // we need to have publish some message
@@ -697,9 +690,9 @@ TEST(NodeController, GetCommandCAChannel)
 {
     auto publisher = std::make_shared<DummyPublisherCounter>(1);
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,publisher);
+    auto node_controller = initGatewayBackend(tcp_port, publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "id", "ca://variable:sum"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "id", "ca://variable:sum")}));
     // give some time for the timeout
     wait_latch(publisher->l);
     // we need to have publish some message
@@ -714,9 +707,9 @@ TEST(NodeController, GetCommandBadChannel)
 {
     std::latch work_done{1};
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,std::make_shared<DummyPublisher>(work_done));
+    auto node_controller = initGatewayBackend(tcp_port, std::make_shared<DummyPublisher>(work_done));
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://bad:channel:name"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://bad:channel:name")}));
     // give some time for the timeout
     sleep(5);
     // we need to have publish some message
@@ -731,9 +724,9 @@ TEST(NodeController, PutCommandBadChannel)
 {
     std::latch work_done{1};
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,std::make_shared<DummyPublisher>(work_done));
+    auto node_controller = initGatewayBackend(tcp_port, std::make_shared<DummyPublisher>(work_done));
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::Unknown, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://bad:channel:name", "1"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakePutCommandShrdPtr(SerializationType::Unknown, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://bad:channel:name", "1")}));
 
     // this should give the timeout of the put command so the node controller will exit without problem
 
@@ -757,7 +750,7 @@ TEST(NodeController, PutCommandScalar)
     auto random_scalar = uniform_dist(e1);
 
     auto random_scalar_b64 = msgpack_to_base64("value", random_scalar);
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::Msgpack, "reply-topic", "PUT_REPLY_ID", "pva://variable:b", random_scalar_b64})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakePutCommandShrdPtr(SerializationType::Msgpack, "reply-topic", "PUT_REPLY_ID", "pva://variable:b", random_scalar_b64)}));
     // give some time for the timeout
     wait_forPublished_message_size(*publisher, 1, 2000);
 
@@ -772,7 +765,7 @@ TEST(NodeController, PutCommandScalar)
     EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
     EXPECT_STREQ(map_reply[KEY_REPLY_ID].as<std::string>().c_str(), "PUT_REPLY_ID");
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://variable:b"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "id", "pva://variable:b")}));
     wait_forPublished_message_size(*publisher, 2, 2000);
     EXPECT_EQ(publisher->sent_messages.size(), 2);
 
@@ -799,12 +792,12 @@ TEST(NodeController, PutCommandScalarArray)
     ConstChannelDataUPtr                           value_readout;
     auto                                           publisher = std::make_shared<DummyPublisherNoSignal>();
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,publisher);
+    auto node_controller = initGatewayBackend(tcp_port, publisher);
 
     std::vector<int> vector_values = {8, 0, 0, 0, 0, 0, 0, 0, 0};
-    auto vector_values_b64 = msgpack_to_base64("value", vector_values);
+    auto             vector_values_b64 = msgpack_to_base64("value", vector_values);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID", "pva://channel:waveform", vector_values_b64})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakePutCommandShrdPtr(SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID", "pva://channel:waveform", vector_values_b64)}));
     // give some time for the timeout
     wait_forPublished_message_size(*publisher, 1, 2000);
     EXPECT_EQ(publisher->sent_messages.size(), 1);
@@ -817,7 +810,7 @@ TEST(NodeController, PutCommandScalarArray)
     EXPECT_EQ(map_reply.contains(KEY_REPLY_ID), true);
     EXPECT_STREQ(map_reply[KEY_REPLY_ID].as<std::string>().c_str(), "PUT_REPLY_ID");
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "", "pva://channel:waveform"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::MsgpackCompact, KAFKA_TOPIC_ACQUIRE_IN, "", "pva://channel:waveform")}));
     wait_forPublished_message_size(*publisher, 2, 2000);
     EXPECT_EQ(publisher->sent_messages.size(), 2);
     // wait for the result of get command
@@ -843,9 +836,9 @@ TEST(NodeController, PutCommandEmptyValue)
     ConstChannelDataUPtr                           value_readout;
     auto                                           publisher = std::make_shared<DummyPublisherNoSignal>();
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,publisher);
+    auto node_controller = initGatewayBackend(tcp_port, publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID", "pva://channel:waveform", ""})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakePutCommandShrdPtr(SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID", "pva://channel:waveform", "")}));
     // give some time for the timeout
     wait_forPublished_message_size(*publisher, 1, 2000);
     EXPECT_EQ(publisher->sent_messages.size(), 1);
@@ -871,9 +864,9 @@ TEST(NodeController, PutCommandOnWrongPVCheckReply)
     ConstChannelDataUPtr                           value_readout;
     auto                                           publisher = std::make_shared<DummyPublisherNoSignal>();
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,publisher);
+    auto node_controller = initGatewayBackend(tcp_port, publisher);
 
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID", "pva://channel:wrong_pv_name", "8 0 0 0 0 0 0 0 0"})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakePutCommandShrdPtr(SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID", "pva://channel:wrong_pv_name", "8 0 0 0 0 0 0 0 0")}));
     // give some time for the timeout
     wait_forPublished_message_size(*publisher, 1, 10000);
     EXPECT_EQ(publisher->sent_messages.size(), 1);
@@ -900,17 +893,17 @@ TEST(NodeController, PutCommandMultithreadCheck)
     ConstChannelDataUPtr                           value_readout;
     auto                                           publisher = std::make_shared<DummyPublisherNoSignal>();
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,publisher);
+    auto node_controller = initGatewayBackend(tcp_port, publisher);
 
     std::vector<int> vector_values = {8, 0, 0, 0, 0, 0, 0, 0, 0};
-    auto vector_values_b64 = msgpack_to_base64("value", vector_values);
+    auto             vector_values_b64 = msgpack_to_base64("value", vector_values);
 
     auto int_value_b64 = msgpack_to_base64("value", 1);
 
     // this should wait the tiemout
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID_1", "pva://channel:wrong_pv_name", vector_values_b64})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakePutCommandShrdPtr(SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID_1", "pva://channel:wrong_pv_name", vector_values_b64)}));
     // this should coplete first
-    EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID_2", "pva://variable:b", int_value_b64})}););
+    EXPECT_NO_THROW(node_controller->submitCommand({MakePutCommandShrdPtr(SerializationType::MsgpackCompact, "DESTINATION_TOPIC", "PUT_REPLY_ID_2", "pva://variable:b", int_value_b64)}));
     // give some time for the timeout
     wait_forPublished_message_size(*publisher, 2, 100000);
     EXPECT_EQ(publisher->sent_messages.size(), 2);
@@ -944,7 +937,7 @@ TEST(NodeController, RandomCommand)
     std::uniform_int_distribution<int> uniform_dist(0, 2);
     std::uniform_int_distribution<int> uniform_dist_sleep(500, 1000);
     // set environment variable for test
-    auto node_controller = initGatewayBackend(tcp_port,std::make_shared<DummyPublisherNoSignal>());
+    auto node_controller = initGatewayBackend(tcp_port, std::make_shared<DummyPublisherNoSignal>());
 
     // send 100 random commands equence iteration
     for (int idx = 0; idx < 100; idx++)
@@ -956,13 +949,13 @@ TEST(NodeController, RandomCommand)
         case 0:
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(uniform_dist_sleep(e1)));
-                EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const MonitorCommand>(MonitorCommand{CommandType::monitor, SerializationType::JSON, "", "", "pva://channel:ramp:ramp"})}););
+                EXPECT_NO_THROW(node_controller->submitCommand({MakeMonitorCommandShrdPtr(SerializationType::JSON, "", "", "pva://channel:ramp:ramp", "")}););
                 break;
             }
         case 1:
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(uniform_dist_sleep(e1)));
-                EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const GetCommand>(GetCommand{CommandType::get, SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "", "pva://variable:b"})}););
+                EXPECT_NO_THROW(node_controller->submitCommand({MakeGetCommandShrdPtr(SerializationType::JSON, KAFKA_TOPIC_ACQUIRE_IN, "", "pva://variable:b")}));
                 break;
             }
 
@@ -970,7 +963,7 @@ TEST(NodeController, RandomCommand)
             {
                 auto random_scalar = uniform_dist(e1);
                 std::this_thread::sleep_for(std::chrono::milliseconds(uniform_dist_sleep(e1)));
-                EXPECT_NO_THROW(node_controller->submitCommand({std::make_shared<const PutCommand>(PutCommand{CommandType::put, SerializationType::Unknown, "", "", "pva://variable:b", std::to_string(random_scalar)})}););
+                EXPECT_NO_THROW(node_controller->submitCommand({MakePutCommandShrdPtr(SerializationType::Unknown, "", "", "pva://variable:b", std::to_string(random_scalar))}));
             }
         }
     }

@@ -147,7 +147,7 @@ struct RepeatingSnapshotCommand : public Command
         std::int32_t time_window_msec, 
         std::int32_t sub_push_delay_msec, 
         bool triggered, 
-        SnapshotType snapshot_type, 
+        SnapshotType snapshot_type = SnapshotType::NORMAL, 
         const std::unordered_set<std::string>& pv_field_filter_list = {})
         : Command(CommandType::repeating_snapshot, serialization, reply_topic, reply_id)
         , snapshot_name(snapshot_name)
@@ -254,7 +254,7 @@ struct RepeatingSnapshotTriggerCommand : public Command
     RepeatingSnapshotTriggerCommand()
         : Command(CommandType::repeating_snapshot_trigger) {}
 
-    RepeatingSnapshotTriggerCommand(k2eg::common::SerializationType serialization, std::string reply_topic, std::string reply_id, const std::string& snapshot_name, const std::map<std::string, std::string>& tags)
+    RepeatingSnapshotTriggerCommand(k2eg::common::SerializationType serialization, std::string reply_topic, std::string reply_id, const std::string& snapshot_name, const std::map<std::string, std::string>& tags = {})
         : Command(CommandType::repeating_snapshot_trigger, serialization, reply_topic, reply_id)
         , snapshot_name(snapshot_name)
         , tags(tags)

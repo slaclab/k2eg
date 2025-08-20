@@ -4,8 +4,6 @@
 #include <k2eg/common/serialization.h>
 #include <k2eg/common/types.h>
 
-#include <k2eg/controller/command/cmd/Command.h>
-
 #include <boost/json.hpp>
 
 #include <string>

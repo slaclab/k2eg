@@ -181,7 +181,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStop)
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
     EXPECT_NO_THROW(node_controller->submitCommand(
-        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false)}));
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false, std::unordered_set<std::string>{})}));
 
     // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
     // completaion) messages
@@ -402,7 +402,8 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStoppedSnapshotsAreNotRestarted)
     node_configuration_service->deleteSnapshotConfiguration("snapshot_name");
     // start a new snapshot
     EXPECT_NO_THROW(node_controller->submitCommand(
-        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false)}));
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false, SnapshotType::NORMAL, std::unordered_set<std::string>{})}
+    ));
 
     // add the number of reader from topic
     dynamic_cast<ControllerConsumerDummyPublisher*>(publisher.get())->setConsumerNumber(1);
@@ -470,7 +471,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStopTwice)
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
     EXPECT_NO_THROW(node_controller->submitCommand(
-        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false)}));
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false, SnapshotType::NORMAL, std::unordered_set<std::string>())}));
 
     // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
     // completaion) messages
@@ -490,7 +491,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotStartStopTwice)
 
     // redo the test again
     EXPECT_NO_THROW(node_controller->submitCommand(
-        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false)}));
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, false, SnapshotType::NORMAL, std::unordered_set<std::string>())}));
 
     // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
     // completaion) messages
@@ -535,7 +536,7 @@ TEST(NodeControllerSnapshot, RepeatingTriggeredSnapshotStartTriggerStop)
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
     EXPECT_NO_THROW(node_controller->submitCommand(
-        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, true)}));
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"}, 0, 1000, 0, true, SnapshotType::NORMAL, std::unordered_set<std::string>())}));
 
     // try to listen on snapshot_name but it will not redceive anything so the wait will exipres on the specific timeout
     auto topic_counts = publisher->wait_for({{"snapshot_name", 4}, {"app_reply_topic", 1}}, std::chrono::milliseconds(4000));
@@ -554,7 +555,7 @@ TEST(NodeControllerSnapshot, RepeatingTriggeredSnapshotStartTriggerStop)
 
     // now perform the trigger to let receive the snapshto values
     EXPECT_NO_THROW(node_controller->submitCommand(
-        {MakeRepeatingSnapshotTriggerCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name")}));
+        {MakeRepeatingSnapshotTriggerCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "snapshot_name", std::map<std::string, std::string>{})}));
 
     auto topic_counts_trigger = publisher->wait_for({{"snapshot_name", 4}, {"app_reply_topic", 1}}, std::chrono::milliseconds(60000));
     EXPECT_EQ(topic_counts_trigger["snapshot_name"], 4);
@@ -631,7 +632,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedType)
     // snapshot is going to create a nother monitor watcher on the same pva://variable:a variable and it should work
     // givin a new event, only for that
     EXPECT_NO_THROW(node_controller->submitCommand(
-        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://channel:ramp:ramp"}, 0, 4000, 0, false, SnapshotType::TIMED_BUFFERED)}));
+        {MakeRepeatingSnapshotCommandShrdPtr(SerializationType::Msgpack, "app_reply_topic", "rep-id", "Snapshot Name", std::unordered_set<std::string>{"pva://variable:a", "pva://channel:ramp:ramp"}, 0, 4000, 0, false, SnapshotType::TIMED_BUFFERED, std::unordered_set<std::string>())}));
 
     // wait for activating 1 ack message on app topic and wait for first snapshot 4 (header + 2 data event +
     // completaion) messages
@@ -995,8 +996,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotTimeBufferedTypeStartAndStopLoop)
                 0,
                 false,
                 SnapshotType::TIMED_BUFFERED,
-                std::unordered_set<std::string>{"value"})}
-        ););
+                std::unordered_set<std::string>{"value"})}););
 
         sleep(2);
         // print statistics
