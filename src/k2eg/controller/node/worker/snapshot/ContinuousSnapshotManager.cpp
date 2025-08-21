@@ -659,8 +659,10 @@ void SnapshotSubmissionTask::operator()()
     const auto thread_index = BS::this_thread::get_index();
     if (!thread_index.has_value())
         return;
-    auto    snap_ts = CHRONO_TO_UNIX_INT64(submission_shrd_ptr->snap_time);
+
     int64_t current_iteration = 0;
+    auto    snap_ts = CHRONO_TO_UNIX_INT64(submission_shrd_ptr->snap_time);
+    auto    statistic_counter = snapshot_command_info->getStatisticCounter();
 
     // HEADER: This is the start of a new logical iteration.
     if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
@@ -702,9 +704,13 @@ void SnapshotSubmissionTask::operator()()
                           snapshot_command_info->cmd->serialization);
             if (serialized_message)
             {
-                publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
-                                                                    snapshot_command_info->cmd->snapshot_name, serialized_message),
+                publisher->pushMessage(MakeReplyPushableMessageUPtr(
+                                           snapshot_command_info->queue_name, "repeating-snapshot-events",
+                                           snapshot_command_info->cmd->snapshot_name, serialized_message),
                                        {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
+                // update statistic
+                statistic_counter->incrementEventCount();
+                statistic_counter->incrementEventSize(serialized_message->data()->size());
             }
             else
             {

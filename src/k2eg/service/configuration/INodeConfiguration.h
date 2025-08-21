@@ -8,26 +8,37 @@
 #include <cstdint>
 #include <stdint.h>
 
+
+/**
+ * @namespace k2eg::service::configuration
+ * @brief Contains types and interfaces for node configuration management in K2EG.
+ */
 namespace k2eg::service::configuration {
 
-/*
-is the configuration service config
-*/
+/**
+ * @brief Configuration for the configuration service.
+ *
+ * Holds connection and startup options for the configuration server.
+ */
 struct ConfigurationServiceConfig
 {
+    /** Hostname or IP address of the configuration server. */
     const std::string  config_server_host;
+    /** Port number of the configuration server. */
     const std::int16_t config_server_port;
-    // reset the configration on the start of the node
+    /** If true, resets the configuration on node startup. */
     const bool reset_on_start;
 };
 DEFINE_PTR_TYPES(ConfigurationServiceConfig)
 
-/// The informazion about serialziation and destination topic for a single PV
+/**
+ * @brief Information about serialization and destination topic for a single PV.
+ */
 typedef struct
 {
-    // serialization type
+    /** Destination topic for the PV. */
     const std::string pv_destination_topic;
-    // destination topic
+    /** Serialization type for PV events. */
     const std::uint8_t event_serialization;
 } PVMonitorInfo;
 DEFINE_PTR_TYPES(PVMonitorInfo)
@@ -36,53 +47,93 @@ DEFINE_MMAP_FOR_TYPE(std::string, PVMonitorInfoShrdPtr, PVMonitorInfoMap)
 struct NodeConfiguration;
 DEFINE_PTR_TYPES(NodeConfiguration)
 
+/**
+ * @brief Status of a snapshot archiving process.
+ */
 enum class ArchiveStatus
 {
-    STOPPED = 0,
-    ARCHIVING = 1,
-    ERROR = 2
+    STOPPED = 0,   /**< Archiving is stopped. */
+    ARCHIVING = 1, /**< Archiving is in progress. */
+    ERROR = 2      /**< Archiving encountered an error. */
 };
 
+/**
+ * @brief Information about the archiving status of a node.
+ *
+ * Includes status, timestamps, and error messages for archiving operations.
+ */
 struct ArchiveStatusInfo
 {
-    ArchiveStatus status = ArchiveStatus::STOPPED;
-    std::string   started_at; // ISO8601 UTC
-    std::string   updated_at; // ISO8601 UTC (heartbeat)
-    std::string   error_message;
+    ArchiveStatus status = ArchiveStatus::STOPPED; /**< Current archiving status. */
+    std::string   started_at; /**< ISO8601 UTC timestamp when archiving started. */
+    std::string   updated_at; /**< ISO8601 UTC timestamp of last heartbeat/update. */
+    std::string   error_message; /**< Error message if status is ERROR. */
 };
 
-/*
-Is the cluster node configuration
-*/
+/**
+ * @brief Cluster node configuration.
+ *
+ * Stores monitored PVs and provides methods for configuration management and serialization.
+ */
 struct NodeConfiguration
 {
-    // the list of monitored PV names for the single node
+    /** Map of monitored PV names to their info for this node. */
     PVMonitorInfoMap pv_monitor_info_map;
 
-    // check if the new PV name is already present for the specific configuration
+    /**
+     * @brief Check if a PV name is present in the configuration.
+     * @param pv_nam PV name to check.
+     * @param info PVMonitorInfo to compare.
+     * @return True if present, false otherwise.
+     */
     bool isPresent(const std::string& pv_nam, const PVMonitorInfo& info) const;
 
+    /**
+     * @brief Remove a PV from the configuration by key.
+     * @param key Key to remove.
+     * @param info PVMonitorInfo to match.
+     */
     void removeFromKey(const std::string& key, const PVMonitorInfo& info);
 
-    static std::string       toJson(const NodeConfiguration& config);
+    /**
+     * @brief Serialize configuration to JSON string.
+     * @param config NodeConfiguration to serialize.
+     * @return JSON string.
+     */
+    static std::string toJson(const NodeConfiguration& config);
+
+    /**
+     * @brief Deserialize configuration from JSON string.
+     * @param json_str JSON string.
+     * @return NodeConfiguration object.
+     */
     static NodeConfiguration fromJson(const std::string& json_str);
 };
 
-// Snapshot configuration structure
+/**
+ * @brief Configuration for a snapshot.
+ *
+ * Contains scheduling, metadata, and JSON-encoded execution details.
+ */
 struct SnapshotConfiguration
 {
-    // Priority weight of the snapshot, used for scheduling
-    int weight = 0;
+    int weight = 0; /**< Priority weight for scheduling. */
+    std::string weight_unit; /**< Unit of the weight (e.g., "eps", "mbps"). */
+    std::string update_timestamp; /**< ISO8601 UTC timestamp of last update. */
+    std::string config_json; /**< JSON-encoded configuration for snapshot execution. */
 
-    // Unit of the weight, e.g., "eps" (events/sec) or "mbps" (megabits/sec)
-    std::string weight_unit;
+    /**
+     * @brief Serialize snapshot configuration to JSON string.
+     * @param config SnapshotConfiguration to serialize.
+     * @return JSON string.
+     */
+    static std::string toJson(const SnapshotConfiguration& config);
 
-    // ISO 8601 UTC timestamp (e.g., "2025-07-29T10:15:30Z") of snapshot update
-    std::string update_timestamp;
-
-    // JSON-encoded configuration for snapshot execution (e.g., PV list, interval)
-    std::string                  config_json;
-    static std::string           toJson(const SnapshotConfiguration& config);
+    /**
+     * @brief Deserialize snapshot configuration from JSON string.
+     * @param json_str JSON string.
+     * @return SnapshotConfiguration object.
+     */
     static SnapshotConfiguration fromJson(const std::string& json_str);
 };
 
@@ -91,42 +142,63 @@ DEFINE_PTR_TYPES(SnapshotConfiguration);
 /*
 The INodeConfiguration interface defines the base logic for node configuration services.
 */
+
+/**
+ * @brief Interface for node configuration services.
+ *
+ * Provides methods for managing node and snapshot configurations, archiving status, and distributed snapshot control.
+ */
 class INodeConfiguration
 {
 protected:
+    /** Configuration service settings for this node. */
     ConstConfigurationServiceConfigUPtr config;
 
 public:
+    /**
+     * @brief Construct a new INodeConfiguration.
+     * @param config Configuration service settings.
+     */
     INodeConfiguration(ConstConfigurationServiceConfigUPtr config);
+
+    /**
+     * @brief Destroy the INodeConfiguration object.
+     */
     virtual ~INodeConfiguration();
+
     /**
      * @brief Get the node configuration.
      * @return Shared pointer to the node configuration.
      */
     virtual NodeConfigurationShrdPtr getNodeConfiguration() const = 0;
+
     /**
      * @brief Set the node configuration.
      * @param node_configuration Shared pointer to the node configuration to set.
      * @return True if the configuration was successfully set, false otherwise.
      */
     virtual bool setNodeConfiguration(NodeConfigurationShrdPtr node_configuration) = 0;
+
     /**
      * @brief Get the name of the node.
      * @return The name of the node as a string.
      */
     virtual std::string getNodeName() const = 0;
+
     /**
      * @brief Get the key for a specific snapshot by its ID.
      * @param snapshot_id ID of the snapshot to retrieve the key for.
      * @return The key string for the snapshot.
      */
     virtual const std::string getSnapshotKey(const std::string& snapshot_id) const = 0;
+
     /**
      * @brief Get the configuration for a specific snapshot by its ID.
      * @param snapshot_id ID of the snapshot to retrieve.
      * @return Shared pointer to the snapshot configuration, or nullptr if not found.
      */
     virtual ConstSnapshotConfigurationShrdPtr getSnapshotConfiguration(const std::string& snapshot_id) const = 0;
+
     /**
      * @brief Set the configuration for a specific snapshot.
      * @param snapshot_id ID of the snapshot to configure.
@@ -134,74 +206,86 @@ public:
      * @return True if the configuration was successfully set, false otherwise.
      */
     virtual bool setSnapshotConfiguration(const std::string& snapshot_id, SnapshotConfigurationShrdPtr snapshot_config) = 0;
+
     /**
      * @brief Delete a snapshot configuration by its ID.
      * @param snapshot_id ID of the snapshot to delete.
      * @return True if the deletion was successful, false otherwise.
      */
     virtual bool deleteSnapshotConfiguration(const std::string& snapshot_id) = 0;
+
     /**
      * @brief Get the list of snapshot IDs managed by the node.
      * @return Vector of snapshot IDs.
      */
     virtual const std::vector<std::string> getSnapshotIds() const = 0;
+
     /**
      * @brief Check if a snapshot is currently running on the node.
      * @param snapshot_id ID of the snapshot to check.
      * @return True if the snapshot is running, false otherwise.
      */
     virtual bool isSnapshotRunning(const std::string& snapshot_id) const = 0;
+
     /**
      * @brief Set the running status of a snapshot.
      * @param snapshot_id ID of the snapshot to update.
      * @param running True if the snapshot is running, false otherwise.
      */
     virtual void setSnapshotRunning(const std::string& snapshot_id, bool running) = 0;
+
     /**
      * @brief Check if a snapshot is marked for archiving.
      * @param snapshot_id ID of the snapshot to check.
      * @return True if the snapshot is marked for archiving, false otherwise.
      */
     virtual bool isSnapshotArchiveRequested(const std::string& snapshot_id) const = 0;
+
     /**
      * @brief Set the archiving status of a snapshot.
      * @param snapshot_id ID of the snapshot to update.
      * @param archived True if the snapshot is marked for archiving, false otherwise.
      */
     virtual void setSnapshotArchiveRequested(const std::string& snapshot_id, bool archived) = 0;
+
     /**
      * @brief Set the archiving status of a snapshot.
      * @param snapshot_id ID of the snapshot to update.
      * @param status New archiving status information.
      */
     virtual void setSnapshotArchiveStatus(const std::string& snapshot_id, const ArchiveStatusInfo& status) = 0;
+
     /**
      * @brief Get the archiving status of a snapshot.
      * @param snapshot_id ID of the snapshot to check.
      * @return Archiving status information.
      */
     virtual ArchiveStatusInfo getSnapshotArchiveStatus(const std::string& snapshot_id) const = 0;
+
     /**
      * @brief Get the gateway ID that is currently managing a snapshot.
      * @param snapshot_id ID of the snapshot to check.
      * @return Gateway ID if the snapshot is running, empty string otherwise.
      */
     virtual const std::string getSnapshotGateway(const std::string& snapshot_id) const = 0;
+
     /**
      * @brief Get the ID of the archiver node for a snapshot.
      * @param snapshot_id ID of the snapshot to check.
      * @return Archiver node ID if the snapshot is archived, empty string otherwise.
      */
     virtual const std::string getSnapshotArchiver(const std::string& snapshot_id) const = 0;
+
     /**
      * @brief Try to acquire a snapshot for the current node.
      * @param snapshot_id ID of the snapshot to acquire.
      * @param for_gateway True if the acquisition is for a gateway, for storage otherwise.
      * @details This method attempts to acquire a snapshot for the current node, allowing it to manage the snapshot.
-     * if the acquire is for gateway in the same time it set the running status to true
+     * If the acquire is for gateway, it also sets the running status to true.
      * @return True if the snapshot was successfully acquired, false otherwise.
      */
     virtual bool tryAcquireSnapshot(const std::string& snapshot_id, bool for_gateway) = 0;
+
     /**
      * @brief Release a snapshot that was acquired by the current node.
      * @param snapshot_id ID of the snapshot to release.
@@ -209,25 +293,24 @@ public:
      * @return True if the snapshot was successfully released, false otherwise.
      */
     virtual bool releaseSnapshot(const std::string& snapshot_id, bool for_gateway) = 0;
+
     /**
      * @brief Get the list of currently running snapshots on the node.
      * @return Vector of snapshot IDs that are currently running.
      */
     virtual const std::vector<std::string> getRunningSnapshots() const = 0;
+
     /**
      * @brief Get the list of all snapshots managed by the node.
      * @return Vector of snapshot IDs that are managed by the node.
      */
     virtual const std::vector<std::string> getSnapshots() const = 0;
+
     /**
-     * @brief Get the ID of a snapshot that is available for execution.
-     * @details This method checks for a snapshot configuration that is eligible to be started or resumed.
-     * It is typically used to detect snapshots that remain in a "running" state due to an unexpected node shutdown,
-     * crash, or reboot, where the snapshot was not explicitly stopped and its distributed lock/session has expired.
-     * Implementations should return the ID of a snapshot that is not currently locked or managed by another node,
-     * allowing recovery or continuation of unfinished snapshot tasks.
-     * If no such snapshot exists, an empty string is returned.
-     * @return The ID of the available snapshot as a string, or an empty string if none are available.
+     * @brief Get the IDs of snapshots available for execution.
+     * @details Checks for snapshot configurations eligible to be started or resumed, typically after a crash or unexpected shutdown.
+     * Returns IDs of snapshots not currently locked or managed by another node.
+     * @return Vector of available snapshot IDs, or empty if none are available.
      */
     virtual const std::vector<std::string> getAvailableSnapshot() const = 0;
 };

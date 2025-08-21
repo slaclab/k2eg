@@ -10,7 +10,7 @@ using namespace k2eg::service::epics_impl;
 using namespace std::chrono;
 
 BackTimedBufferedSnapshotOpInfo::BackTimedBufferedSnapshotOpInfo(const std::string& queue_name, ConstRepeatingSnapshotCommandShrdPtr cmd)
-    : SnapshotOpInfo(queue_name, cmd), acquiring_buffer(MakeMonitoEventBacktimeBufferUPtr(cmd->time_window_msec)), processing_buffer(MakeMonitoEventBacktimeBufferUPtr(cmd->time_window_msec))
+    : SnapshotOpInfo(queue_name, cmd), acquiring_buffer(MakeMonitorEventBacktimeBufferShrdPtr(cmd->time_window_msec)), processing_buffer(MakeMonitorEventBacktimeBufferShrdPtr(cmd->time_window_msec))
 {
     if (cmd->sub_push_delay_msec > 0)
     {

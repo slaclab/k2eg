@@ -1,13 +1,16 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_STORAGEWORKER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_STORAGEWORKER_H_
 
+#include "k2eg/service/configuration/INodeConfiguration.h"
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/types.h>
+
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/scheduler/Task.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/pubsub/ISubscriber.h>
 #include <k2eg/service/storage/IStorageService.h>
+#include <k2eg/service/configuration/configuration.h>
 
 #include <boost/program_options.hpp>
 
@@ -60,6 +63,7 @@ class StorageWorker
     ConstStorageWorkerConfigurationShrdPtr config;
     // Logger for logging messages related to storage worker operations
     service::log::ILoggerShrdPtr logger;
+    service::configuration::INodeConfigurationShrdPtr node_config;
     // Storage service for storing consumed data
     k2eg::service::storage::IStorageServiceShrdPtr storage_service;
     // Subscriber for consuming messages from Kafka topics

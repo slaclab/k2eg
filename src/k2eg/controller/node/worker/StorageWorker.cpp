@@ -17,6 +17,7 @@ using namespace k2eg::service::metric;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::storage;
 using namespace k2eg::service::scheduler;
+using namespace k2eg::service::configuration;
 
 using namespace k2eg::controller::node::worker;
 
@@ -134,28 +135,65 @@ StorageWorker::StorageWorker(const ConstStorageWorkerConfigurationShrdPtr& confi
 {
     // Resolve required services
     logger = ServiceResolver<ILogger>::resolve();
+    logger->logMessage("Initializing StorageWorker...", LogLevel::INFO);
+
     if (!storage_service)
     {
+        logger->logMessage("Storage service is not available", LogLevel::ERROR);
         throw std::runtime_error("Storage service is not available");
     }
 
-    auto task_restart_monitor = MakeTaskShrdPtr(DISCOVER_TASK_NAME, DISCOVER_TASK_NAME_DEFAULT_CRON, std::bind(&StorageWorker::executePeriodicTask, this, std::placeholders::_1),
-                                                -1 // start at application boot time
+    node_config = ServiceResolver<INodeConfiguration>::resolve();
+    if (!node_config)
+    {
+        logger->logMessage("Node configuration is not available", LogLevel::ERROR);
+        throw std::runtime_error("Node configuration is not available");
+    }
+
+    auto task_restart_monitor = MakeTaskShrdPtr(
+        DISCOVER_TASK_NAME,
+        DISCOVER_TASK_NAME_DEFAULT_CRON,
+        std::bind(&StorageWorker::executePeriodicTask, this, std::placeholders::_1),
+        -1 // start at application boot time
     );
     ServiceResolver<Scheduler>::resolve()->addTask(task_restart_monitor);
 
-    // print the configuration
-    logger->logMessage(STRING_FORMAT("StorageWorker initialized with configuration: %1%", config->toString()), LogLevel::INFO);
+    logger->logMessage(
+        STRING_FORMAT("StorageWorker initialized with configuration: %1%", config->toString()),
+        LogLevel::INFO);
 }
 
 StorageWorker::~StorageWorker()
 {
+    logger->logMessage("Destroying StorageWorker...", LogLevel::INFO);
     logger->logMessage("Remove periodic task from scheduler");
     bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(DISCOVER_TASK_NAME);
     logger->logMessage(STRING_FORMAT("Removed periodic discover task result: %1%", erased), LogLevel::DEBUG);
+    logger->logMessage("StorageWorker destroyed", LogLevel::INFO);
 }
 
 void StorageWorker::executePeriodicTask(TaskProperties& task_properties)
 {
-    logger->logMessage("Executing periodic task for StorageWorker", LogLevel::DEBUG);
+    logger->logMessage("Check if there are some snapshot to acquire", LogLevel::DEBUG);
+
+    auto available_snapshots = node_config->getAvailableSnapshot();
+    if (available_snapshots.empty())
+    {
+        logger->logMessage("No available snapshots to acquire", LogLevel::DEBUG);
+        return;
+    }
+
+    for (const auto& snapshot_id : available_snapshots)
+    {
+        logger->logMessage(STRING_FORMAT("Try to acquire snapshot: %1%", snapshot_id), LogLevel::DEBUG);
+        if (node_config->tryAcquireSnapshot(snapshot_id, false)) // false for storage
+        {
+            logger->logMessage(STRING_FORMAT("Acquired snapshot: %1%", snapshot_id), LogLevel::INFO);
+            // Here you can add logic to start processing the acquired snapshot
+        }
+        else
+        {
+            logger->logMessage(STRING_FORMAT("Failed to acquire snapshot: %1%", snapshot_id), LogLevel::ERROR);
+        }
+    }
 }
