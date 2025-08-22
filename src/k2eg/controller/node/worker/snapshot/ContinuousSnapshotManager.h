@@ -311,7 +311,7 @@ private:
 // class used to submit data to the publisher
 class SnapshotSubmissionTask
 {
-    bool                                     last_submition = false; // flag to indicate if the task should close
+    bool                                     last_submission = false; // flag to indicate if the task should close
     std::shared_ptr<SnapshotOpInfo>          snapshot_command_info;  // shared pointer to the snapshot operation info
     SnapshotSubmissionShrdPtr                submission_shrd_ptr;
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
@@ -319,7 +319,7 @@ class SnapshotSubmissionTask
     SnapshotIterationSynchronizer&           iteration_sync_;
 
 public:
-    SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, k2eg::service::pubsub::IPublisherShrdPtr publisher, k2eg::service::log::ILoggerShrdPtr logger, SnapshotIterationSynchronizer& iteration_sync, bool last_submition = false);
+    SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, k2eg::service::pubsub::IPublisherShrdPtr publisher, k2eg::service::log::ILoggerShrdPtr logger, SnapshotIterationSynchronizer& iteration_sync, bool last_submission = false);
 
     void operator()();
 };

@@ -500,6 +500,19 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                         metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotEventCounter,
                                                  submission_shard_ptr->snapshot_events.size());
                     }
+
+                    // if i need to submit also the tail i need ot update the statistic
+                    if ((submission_shard_ptr->submission_type & SnapshotSubmissionType::Tail) != SnapshotSubmissionType::None)
+                    {
+                        // update statistics
+                        auto stat_counter = s_op_ptr->getStatisticCounter();
+                        // reusing the expiration time stamp
+                        auto stat = stat_counter->getStatistics(now);
+                        if (stat)
+                        {
+                            node_configuration->setSnapshotWeight(s_op_ptr->queue_name, std::to_string(stat->event_size), "bytes/sec");
+                        }
+                    }
                     thread_pool->detach_task(
                         [this, s_op_ptr, submission_shard_ptr, last_submission]() mutable
                         {
@@ -645,8 +658,8 @@ bool ContinuousSnapshotManager::releaseSnapshotForStop(SnapshotOpInfo& snapshot_
 
 #pragma region Submission Task
 
-SnapshotSubmissionTask::SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, IPublisherShrdPtr publisher, ILoggerShrdPtr logger, SnapshotIterationSynchronizer& iteration_sync, bool last_submition)
-    : snapshot_command_info(snapshot_command_info), submission_shrd_ptr(submission_shrd_ptr), publisher(std::move(publisher)), logger(std::move(logger)), iteration_sync_(iteration_sync), last_submition(last_submition)
+SnapshotSubmissionTask::SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, IPublisherShrdPtr publisher, ILoggerShrdPtr logger, SnapshotIterationSynchronizer& iteration_sync, bool last_submission)
+    : snapshot_command_info(snapshot_command_info), submission_shrd_ptr(submission_shrd_ptr), publisher(std::move(publisher)), logger(std::move(logger)), iteration_sync_(iteration_sync), last_submission(last_submission)
 {
 }
 
@@ -738,7 +751,7 @@ void SnapshotSubmissionTask::operator()()
         // or later when the last running Data task calls its TaskGuard destructor.
         iteration_sync_.markTailProcessed(snapshot_command_info->cmd->snapshot_name, current_iteration);
 
-        if (last_submition)
+        if (last_submission)
         {
             iteration_sync_.removeSnapshot(snapshot_command_info->cmd->snapshot_name);
             snapshot_command_info->removal_promise.set_value(); // Notify that the snapshot is fully removed.

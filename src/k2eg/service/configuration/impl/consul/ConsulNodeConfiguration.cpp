@@ -643,6 +643,19 @@ ArchiveStatusInfo ConsulNodeConfiguration::getSnapshotArchiveStatus(const std::s
     return out;
 }
 
+void ConsulNodeConfiguration::setSnapshotWeight(const std::string& snapshot_id, const std::string& weight, const std::string& weight_unit)
+{
+    std::string        base_key = getSnapshotKey(snapshot_id);
+    std::string        weight_key = base_key + "/weight";
+    std::string        weight_unit_key = base_key + "/weight_unit";
+    boost::json::array ops;
+    ops.reserve(2);
+    addSetOp(ops, weight_key, weight);
+    addSetOp(ops, weight_unit_key, weight_unit);
+    if (!executeTxn(ops))
+        throw std::runtime_error("Failed to set snapshot weight via transaction");
+}
+
 const std::string ConsulNodeConfiguration::getSnapshotGateway(const std::string& snapshot_id) const
 {
     try

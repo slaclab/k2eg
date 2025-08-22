@@ -65,6 +65,7 @@ public:
     void                           setSnapshotArchiveRequested(const std::string& snapshot_id, bool archived) override;
     void                           setSnapshotArchiveStatus(const std::string& snapshot_id, const ArchiveStatusInfo& status) override;
     ArchiveStatusInfo              getSnapshotArchiveStatus(const std::string& snapshot_id) const override;
+    void                           setSnapshotWeight(const std::string& snapshot_id, const std::string& weight, const std::string& weight_unit) override;
     const std::string              getSnapshotGateway(const std::string& snapshot_id) const override;
     const std::string              getSnapshotArchiver(const std::string& snapshot_id) const override;
     bool                           tryAcquireSnapshot(const std::string& snapshot_id, bool for_gateway) override;

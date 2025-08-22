@@ -8,7 +8,6 @@
 #include <cstdint>
 #include <stdint.h>
 
-
 /**
  * @namespace k2eg::service::configuration
  * @brief Contains types and interfaces for node configuration management in K2EG.
@@ -23,7 +22,7 @@ namespace k2eg::service::configuration {
 struct ConfigurationServiceConfig
 {
     /** Hostname or IP address of the configuration server. */
-    const std::string  config_server_host;
+    const std::string config_server_host;
     /** Port number of the configuration server. */
     const std::int16_t config_server_port;
     /** If true, resets the configuration on node startup. */
@@ -65,9 +64,9 @@ enum class ArchiveStatus
 struct ArchiveStatusInfo
 {
     ArchiveStatus status = ArchiveStatus::STOPPED; /**< Current archiving status. */
-    std::string   started_at; /**< ISO8601 UTC timestamp when archiving started. */
-    std::string   updated_at; /**< ISO8601 UTC timestamp of last heartbeat/update. */
-    std::string   error_message; /**< Error message if status is ERROR. */
+    std::string   started_at;                      /**< ISO8601 UTC timestamp when archiving started. */
+    std::string   updated_at;                      /**< ISO8601 UTC timestamp of last heartbeat/update. */
+    std::string   error_message;                   /**< Error message if status is ERROR. */
 };
 
 /**
@@ -117,10 +116,10 @@ struct NodeConfiguration
  */
 struct SnapshotConfiguration
 {
-    int weight = 0; /**< Priority weight for scheduling. */
-    std::string weight_unit; /**< Unit of the weight (e.g., "eps", "mbps"). */
+    int         weight = 0;       /**< Priority weight for scheduling. */
+    std::string weight_unit;      /**< Unit of the weight (e.g., "eps", "mbps"). */
     std::string update_timestamp; /**< ISO8601 UTC timestamp of last update. */
-    std::string config_json; /**< JSON-encoded configuration for snapshot execution. */
+    std::string config_json;      /**< JSON-encoded configuration for snapshot execution. */
 
     /**
      * @brief Serialize snapshot configuration to JSON string.
@@ -258,9 +257,22 @@ public:
     /**
      * @brief Get the archiving status of a snapshot.
      * @param snapshot_id ID of the snapshot to check.
+     * @return Shared pointer to the ArchiveStatusInfo object containing status information.
+     */
+    /**
+     * @brief Get the archiving status of a snapshot.
+     * @param snapshot_id ID of the snapshot to check.
      * @return Archiving status information.
      */
     virtual ArchiveStatusInfo getSnapshotArchiveStatus(const std::string& snapshot_id) const = 0;
+
+    /**
+     * @brief Set the statistics for a snapshot.
+     * @param snapshot_id ID of the snapshot to update.
+     * @param stat_value New statistics value.
+     * @param stat_type Type of the statistics being set.
+     */
+    virtual void setSnapshotWeight(const std::string& snapshot_id, const std::string& weight, const std::string& weight_unit) = 0;
 
     /**
      * @brief Get the gateway ID that is currently managing a snapshot.

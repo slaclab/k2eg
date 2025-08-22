@@ -69,7 +69,7 @@ SnapshotSubmission::SnapshotSubmission(const std::chrono::steady_clock::time_poi
 #pragma region SnapshotOpInfo
 
 SnapshotOpInfo::SnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd)
-    : WorkerAsyncOperation(std::chrono::milliseconds(cmd->time_window_msec)), queue_name(queue_name), cmd(cmd), is_triggered(cmd->triggered)
+    : WorkerAsyncOperation(std::chrono::milliseconds(cmd->time_window_msec)), snapshot_statistic(MakeSnapshotStatisticCounterShrdPtr()), queue_name(queue_name), cmd(cmd), is_triggered(cmd->triggered)
 {
 }
 
