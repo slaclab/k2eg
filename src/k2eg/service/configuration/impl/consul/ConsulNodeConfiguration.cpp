@@ -103,6 +103,10 @@ inline k2eg::service::configuration::ArchiveStatus fromStateString(const std::st
     using k2eg::service::configuration::ArchiveStatus;
     if (s == "ARCHIVING")
         return ArchiveStatus::ARCHIVING;
+    if (s == "PREPARE_TO_ARCHIVE")
+        return ArchiveStatus::PREPARE_TO_ARCHIVE;
+    if (s == "ARCHIVING")
+        return ArchiveStatus::ARCHIVING;
     if (s == "ERROR")
         return ArchiveStatus::ERROR;
     return ArchiveStatus::STOPPED;
@@ -824,4 +828,23 @@ const std::vector<std::string> ConsulNodeConfiguration::getAvailableSnapshot() c
         }
     }
     return available_snapshots;
+}
+
+const std::vector<std::string> ConsulNodeConfiguration::getRunningSnapshotToArchive() const
+{
+    std::vector<std::string> running_snapshots;
+    try
+    {
+        auto all_snapshots = getSnapshotIds();
+        for (const auto& snapshot_id : all_snapshots)
+        {
+            if (isSnapshotRunning(snapshot_id) && getSnapshotArchiver(snapshot_id) == "")
+                running_snapshots.push_back(snapshot_id);
+        }
+    }
+    catch (const Client::Error& err)
+    {
+        // Return empty vector on error
+    }
+    return running_snapshots;
 }

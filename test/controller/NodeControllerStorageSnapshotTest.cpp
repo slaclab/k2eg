@@ -63,8 +63,8 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     ASSERT_EQ(json_obj_start_snapshot["publishing_topic"].as_string(), SNAPSHOT_NAME) << "JSON object 'publishing_topic' is not 'snapshot_name'";
 
     // wait for acquire some snapshot
-    auto snapshot_msg = k2eg->getMessages(subscriber_snapshot, 5, 10000);
-    ASSERT_EQ(snapshot_msg.size(), 5) << "Unexpected number of snapshot messages";
+    auto snapshot_msg = k2eg->getMessages(subscriber_snapshot, 80, 100000);
+    ASSERT_EQ(snapshot_msg.size(), 80) << "Unexpected number of snapshot messages";
 
     // stop the snapshot
     auto stop_snapshot_cmd = MakeRepeatingSnapshotStopCommandShrdPtr(

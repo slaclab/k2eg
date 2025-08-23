@@ -73,6 +73,7 @@ public:
     const std::vector<std::string> getRunningSnapshots() const override;
     const std::vector<std::string> getSnapshots() const override;
     const std::vector<std::string> getAvailableSnapshot() const override;
+    const std::vector<std::string> getRunningSnapshotToArchive() const override;
 };
 DEFINE_PTR_TYPES(ConsulNodeConfiguration)
 } // namespace k2eg::service::configuration::impl::consul

@@ -627,6 +627,7 @@ bool ContinuousSnapshotManager::tryToConfigureSnapshotStart(SnapshotOpInfo& snap
         result = node_configuration->setSnapshotConfiguration(snapshot_ops_info.queue_name, snapshot_ops_info.snapshot_configuration);
         // set the snapshot as running
         node_configuration->setSnapshotRunning(snapshot_ops_info.queue_name, true);
+        node_configuration->setSnapshotArchiveRequested(snapshot_ops_info.queue_name, true);
     }
     catch (const std::exception& ex)
     {

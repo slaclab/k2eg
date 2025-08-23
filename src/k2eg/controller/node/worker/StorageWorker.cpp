@@ -1,6 +1,6 @@
-#include "k2eg/service/scheduler/Task.h"
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
+#include <k2eg/service/scheduler/Task.h>
 
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/scheduler/Scheduler.h>
@@ -175,8 +175,8 @@ StorageWorker::~StorageWorker()
 void StorageWorker::executePeriodicTask(TaskProperties& task_properties)
 {
     logger->logMessage("Check if there are some snapshot to acquire", LogLevel::DEBUG);
-
-    auto available_snapshots = node_config->getAvailableSnapshot();
+    // get all running snapshot that have been requested to be archived but are not associated to any archiver
+    auto available_snapshots = node_config->getRunningSnapshotToArchive();
     if (available_snapshots.empty())
     {
         logger->logMessage("No available snapshots to acquire", LogLevel::DEBUG);
@@ -185,11 +185,18 @@ void StorageWorker::executePeriodicTask(TaskProperties& task_properties)
 
     for (const auto& snapshot_id : available_snapshots)
     {
+        auto snapshot = node_config->isSnapshotArchiveRequested(snapshot_id);
+        if (!snapshot)
+        {
+            logger->logMessage(STRING_FORMAT("Snapshot '%1%' is not requested to be archived, skipping acquisition", snapshot_id), LogLevel::DEBUG);
+            continue;
+        }
         logger->logMessage(STRING_FORMAT("Try to acquire snapshot: %1%", snapshot_id), LogLevel::DEBUG);
         if (node_config->tryAcquireSnapshot(snapshot_id, false)) // false for storage
         {
             logger->logMessage(STRING_FORMAT("Acquired snapshot: %1%", snapshot_id), LogLevel::INFO);
             // Here you can add logic to start processing the acquired snapshot
+            node_config->setSnapshotArchiveStatus(snapshot_id, ArchiveStatusInfo{ArchiveStatus::PREPARE_TO_ARCHIVE});
         }
         else
         {

@@ -51,9 +51,10 @@ DEFINE_PTR_TYPES(NodeConfiguration)
  */
 enum class ArchiveStatus
 {
-    STOPPED = 0,   /**< Archiving is stopped. */
-    ARCHIVING = 1, /**< Archiving is in progress. */
-    ERROR = 2      /**< Archiving encountered an error. */
+    STOPPED = 0,            /**< Archiving is stopped. */
+    PREPARE_TO_ARCHIVE = 1, /**< Preparing to archive. */
+    ARCHIVING = 2,          /**< Archiving is in progress. */
+    ERROR = 3               /**< Archiving encountered an error. */
 };
 
 /**
@@ -68,6 +69,29 @@ struct ArchiveStatusInfo
     std::string   updated_at;                      /**< ISO8601 UTC timestamp of last heartbeat/update. */
     std::string   error_message;                   /**< Error message if status is ERROR. */
 };
+
+/**
+ * @brief Convert ArchiveStatus to string representation.
+ * @param s ArchiveStatus to convert.
+ * @return String representation of the ArchiveStatus.
+ */
+inline std::string toStateString(const ArchiveStatus& s)
+{
+    using k2eg::service::configuration::ArchiveStatus;
+    switch (s)
+    {
+    case ArchiveStatus::STOPPED:
+        return "STOPPED";
+    case ArchiveStatus::PREPARE_TO_ARCHIVE:
+        return "PREPARE_TO_ARCHIVE";
+    case ArchiveStatus::ARCHIVING:
+        return "ARCHIVING";
+    case ArchiveStatus::ERROR:
+        return "ERROR";
+    default:
+        return "UNKNOWN";
+    }
+}
 
 /**
  * @brief Cluster node configuration.
@@ -259,11 +283,6 @@ public:
      * @param snapshot_id ID of the snapshot to check.
      * @return Shared pointer to the ArchiveStatusInfo object containing status information.
      */
-    /**
-     * @brief Get the archiving status of a snapshot.
-     * @param snapshot_id ID of the snapshot to check.
-     * @return Archiving status information.
-     */
     virtual ArchiveStatusInfo getSnapshotArchiveStatus(const std::string& snapshot_id) const = 0;
 
     /**
@@ -325,6 +344,12 @@ public:
      * @return Vector of available snapshot IDs, or empty if none are available.
      */
     virtual const std::vector<std::string> getAvailableSnapshot() const = 0;
+
+    /**
+     * @brief Get the list of running snapshots that are requested to be archived.
+     * @return Vector of snapshot IDs that are running and requested for archiving.
+     */
+    virtual const std::vector<std::string> getRunningSnapshotToArchive() const = 0;
 };
 DEFINE_PTR_TYPES(INodeConfiguration)
 } // namespace k2eg::service::configuration
