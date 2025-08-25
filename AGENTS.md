@@ -27,8 +27,60 @@
 - Test uses google test framework
 
 ## Commit & Pull Request Guidelines
-- Commits: Use imperative mood. Conventional prefixes encouraged: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`. Example: `feat: add MsgPack compact serialization`.
+- Commits must follow Conventional Commits: `type(scope): subject` in imperative mood. Common types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `build`, `ci`, `revert`. Use optional `!` for breaking changes and add `BREAKING CHANGE:` in the body when applicable.
+- Summarize what changed in a short subject line, then include a concise body when helpful.
+- Include a "Changes by file" bullet list in the body describing what was done per file, one line per file. Example:
+  - `src/k2eg/service/epics/EpicsChannel.cpp: handle disconnect edge-case`
+  - `test/epics/epics_data_serialization.cpp: add failing-path test`
+- Reference related issues in the footer using `Refs: #123` or `Fixes: #123` as appropriate.
 - PRs: Provide a concise description, link issues, list config impacts (Kafka topics, EPICS providers), and include test updates. Ensure CI passes.
+
+### Commit Template
+- Template: `.gitmessage` at repo root provides a ready-to-use skeleton.
+- Enable locally: `git config commit.template .gitmessage`
+- Example:
+  - `feat(epics): improve disconnect handling`
+  - Body: context and rationale (wrapped at ~72 chars)
+  - Changes by file:
+    - `src/k2eg/service/epics/EpicsChannel.cpp: guard null state`
+    - `test/epics/epics_disconnect_test.cpp: add regression case`
+  - Footer: `Fixes: #123`
+
+
+## LLM Commit Message Rules (Short)
+
+- Conventional Commits: `type(scope): subject` (imperative, ≤72 chars).
+- Subject, blank line, then concise bullets (what/why).
+- Never embed "\n" in one `-m`. Use multiple `-m` or `-F` (file/heredoc).
+- Add `BREAKING CHANGE:` line when needed.
+- Verify: `git log -1 --pretty=%B`; fix via `git commit --amend`.
+- After amend on shared branches: `git push --force-with-lease`.
+
+Template
+```
+<type>(<scope>): <subject>
+
+- <bullet 1>
+- <bullet 2>
+
+Refs: #<issue>
+
+BREAKING CHANGE: <explanation>
+```
+
+Examples
+```bash
+git commit -m "feat(notification): add rule validation" \
+           -m "- validate targets per engine" \
+           -m "- expose metadata endpoints"
+
+git commit -F - <<'MSG'
+feat(api): expose notification metadata
+
+- GET /v1/logbooks/notification/types
+- GET /v1/logbooks/notification/engines
+MSG
+```
 
 ## Security & Configuration Tips
 - Configuration via CLI flags and `EPICS_k2eg_*` environment variables. Do not commit secrets or real broker endpoints.
