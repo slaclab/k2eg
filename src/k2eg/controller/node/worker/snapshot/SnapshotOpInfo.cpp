@@ -37,8 +37,8 @@ void SnapshotStatisticCounter::reset()
 }
 
 #pragma region SnapshotSubmission
-SnapshotSubmission::SnapshotSubmission(const std::chrono::steady_clock::time_point& snap_time, std::vector<service::epics_impl::MonitorEventShrdPtr>&& snapshot_events, SnapshotSubmissionType submission_type)
-        : snap_time(snap_time), snapshot_events(std::move(snapshot_events)), submission_type(submission_type)
+SnapshotSubmission::SnapshotSubmission(const std::chrono::steady_clock::time_point& snap_time, const std::chrono::steady_clock::time_point& header_timestamp, std::vector<service::epics_impl::MonitorEventShrdPtr>&& snapshot_events, SnapshotSubmissionType submission_type)
+        : snap_time(snap_time), header_timestamp(header_timestamp), snapshot_events(std::move(snapshot_events)), submission_type(submission_type)
     {
     }
 

@@ -65,6 +65,7 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout(const std::chrono::steady_clock:
             // On timeout, swap the buffers so getData works on a stable snapshot.
             std::unique_lock lock(buffer_mutex);
             std::swap(acquiring_buffer, processing_buffer);
+            last_forced_expire = now;
         }
     }
     else
@@ -103,6 +104,7 @@ SnapshotSubmissionShrdPtr BackTimedBufferedSnapshotOpInfo::getData()
 {
     SnapshotSubmissionType                                      type = SnapshotSubmissionType::None;
     std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr> result;
+    std::chrono::steady_clock::time_point submission_timestamp = last_forced_expire;
     {
         std::shared_lock lock(buffer_mutex);
 
@@ -111,6 +113,7 @@ SnapshotSubmissionShrdPtr BackTimedBufferedSnapshotOpInfo::getData()
         {
             type |= SnapshotSubmissionType::Header;
             header_sent = true;
+            header_snapshot_time = last_forced_expire;
         }
 
         // Emit data every 100ms if available
@@ -150,5 +153,5 @@ SnapshotSubmissionShrdPtr BackTimedBufferedSnapshotOpInfo::getData()
             header_sent = false; // Reset header for the next window
         }
     }
-    return MakeSnapshotSubmissionShrdPtr(std::chrono::steady_clock::now(),std::move(result), type);
+    return MakeSnapshotSubmissionShrdPtr(submission_timestamp, header_snapshot_time, std::move(result), type);
 }

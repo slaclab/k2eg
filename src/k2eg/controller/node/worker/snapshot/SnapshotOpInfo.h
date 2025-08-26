@@ -132,7 +132,7 @@ class SnapshotOpInfo;
 class SnapshotSubmission
 {
 public:
-    std::chrono::steady_clock::time_point                 sheader_snap_time; /**< Time point for the snapshot header. */
+    std::chrono::steady_clock::time_point                 header_timestamp; /**< Time point for the snapshot header. */
     std::chrono::steady_clock::time_point                 snap_time;         /**< Time point for the snapshot. */
     std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events;   /**< Events captured in the snapshot. */
     SnapshotSubmissionType                                submission_type;   /**< Type flags for the submission. */
@@ -145,6 +145,7 @@ public:
      */
     SnapshotSubmission(
         const std::chrono::steady_clock::time_point&            snap_time,
+        const std::chrono::steady_clock::time_point&            header_timestamp,
         std::vector<service::epics_impl::MonitorEventShrdPtr>&& snapshot_events,
         SnapshotSubmissionType                                  submission_type);
 

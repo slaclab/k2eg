@@ -61,6 +61,7 @@ class BackTimedBufferedSnapshotOpInfo : public SnapshotOpInfo
     MonitorEventBacktimeBufferShrdPtr     processing_buffer;
     std::chrono::steady_clock::time_point last_forced_expire = std::chrono::steady_clock::now();
     bool                                  header_sent = false;
+    std::chrono::steady_clock::time_point header_snapshot_time; /**< Time point for the snapshot. */
     bool                                  win_time_expired = false;
     std::int64_t                          fast_expire_time_msec = 0; // fast expire time in milliseconds
 public:

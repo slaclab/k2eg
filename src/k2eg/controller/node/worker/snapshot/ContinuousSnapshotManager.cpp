@@ -676,6 +676,7 @@ void SnapshotSubmissionTask::operator()()
 
     int64_t current_iteration = 0;
     auto    snap_ts = CHRONO_TO_UNIX_INT64(submission_shrd_ptr->snap_time);
+    auto    header_timestamp = CHRONO_TO_UNIX_INT64(submission_shrd_ptr->header_timestamp);
     auto    statistic_counter = snapshot_command_info->getStatisticCounter();
 
     // HEADER: This is the start of a new logical iteration.
@@ -714,7 +715,12 @@ void SnapshotSubmissionTask::operator()()
         {
             pv_names_published.insert(event->channel_data.pv_name);
             auto serialized_message =
-                serialize(RepeatingSnaptshotData{1, snap_ts, current_iteration, MakeChannelDataShrdPtr(event->channel_data)},
+                serialize(RepeatingSnaptshotData{
+                    1,
+                    snap_ts,
+                    header_timestamp,
+                    current_iteration,
+                    MakeChannelDataShrdPtr(event->channel_data)},
                           snapshot_command_info->cmd->serialization);
             if (serialized_message)
             {
@@ -742,7 +748,14 @@ void SnapshotSubmissionTask::operator()()
     if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Tail) != SnapshotSubmissionType::None)
     {
         logger->logMessage(STRING_FORMAT("[Tail] Snapshot %1% iteration %2% completed", snapshot_command_info->cmd->snapshot_name % current_iteration), LogLevel::DEBUG);
-        auto serialized_completion_message = serialize(RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, snap_ts, current_iteration},
+        auto serialized_completion_message = serialize(RepeatingSnaptshotCompletion{
+                                                           2,
+                                                           0,
+                                                           "",
+                                                           snapshot_command_info->cmd->snapshot_name,
+                                                           snap_ts,
+                                                           header_timestamp,
+                                                           current_iteration},
                                                        snapshot_command_info->cmd->serialization);
         publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
                                                             snapshot_command_info->cmd->snapshot_name, serialized_completion_message),

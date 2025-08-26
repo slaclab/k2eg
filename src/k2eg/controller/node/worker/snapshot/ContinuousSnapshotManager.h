@@ -70,6 +70,8 @@ struct RepeatingSnaptshotData
     const std::int8_t message_type = 1;
     // this is the snapshot instance where the pv is related
     const std::int64_t timestamp;
+    // this is the snapshot header timestamp
+    const std::int64_t header_timestamp;
     // this is the snapshot iteration
     const std::int64_t iteration_index;
     // this is the snapshot values for a specific pv
@@ -92,6 +94,8 @@ struct RepeatingSnaptshotCompletion
     const std::string snapshot_name;
     // this is the snapshot instance where the pv is related
     const std::int64_t timestamp;
+    // this is the snapshot header timestamp
+    const std::int64_t header_timestamp;
     // this is the snapshot iteration
     const std::int64_t iteration_index;
 };
@@ -113,6 +117,7 @@ inline void serializeJson(const RepeatingSnaptshotData& event_data, common::Json
     json_message.getJsonObject()["message_type"] = event_data.message_type;
     json_message.getJsonObject()["iter_index"] = event_data.iteration_index;
     json_message.getJsonObject()["timestamp"] = event_data.timestamp;
+    json_message.getJsonObject()["header_timestamp"] = event_data.header_timestamp;
     service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::JSON)->serialize(*event_data.pv_data, json_message);
 }
 
@@ -123,6 +128,7 @@ inline void serializeJson(const RepeatingSnaptshotCompletion& event_completion, 
     json_message.getJsonObject()["error_message"] = event_completion.error_message;
     json_message.getJsonObject()["iter_index"] = event_completion.iteration_index;
     json_message.getJsonObject()["timestamp"] = event_completion.timestamp;
+    json_message.getJsonObject()["header_timestamp"] = event_completion.header_timestamp;
     json_message.getJsonObject()["snapshot_name"] = event_completion.snapshot_name;
 }
 
@@ -151,6 +157,8 @@ inline void serializeMsgpack(const RepeatingSnaptshotData& data_event, common::M
     packer.pack(data_event.message_type);
     packer.pack("timestamp");
     packer.pack(data_event.timestamp);
+    packer.pack("header_timestamp");
+    packer.pack(data_event.header_timestamp);
     packer.pack("iter_index");
     packer.pack(data_event.iteration_index);
     service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::Msgpack)->serialize(*data_event.pv_data, msgpack_message);
@@ -173,6 +181,8 @@ inline void serializeMsgpack(const RepeatingSnaptshotCompletion& header_completi
     packer.pack(header_completion.iteration_index);
     packer.pack("timestamp");
     packer.pack(header_completion.timestamp);
+    packer.pack("header_timestamp");
+    packer.pack(header_completion.header_timestamp);
     packer.pack("snapshot_name");
     packer.pack(header_completion.snapshot_name);
 }
@@ -312,7 +322,7 @@ private:
 class SnapshotSubmissionTask
 {
     bool                                     last_submission = false; // flag to indicate if the task should close
-    std::shared_ptr<SnapshotOpInfo>          snapshot_command_info;  // shared pointer to the snapshot operation info
+    std::shared_ptr<SnapshotOpInfo>          snapshot_command_info;   // shared pointer to the snapshot operation info
     SnapshotSubmissionShrdPtr                submission_shrd_ptr;
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
     k2eg::service::log::ILoggerShrdPtr       logger;
