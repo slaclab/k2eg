@@ -68,6 +68,7 @@ struct Snapshot
     std::chrono::system_clock::time_point created_at;
     std::string                           description;
     std::unordered_set<std::string>       pv_names;
+    std::string                           search_key;  // Format: "snapshot_name:header_timestamp:iter_index"
 };
 DEFINE_PTR_TYPES(Snapshot)
 
@@ -135,6 +136,7 @@ public:
     virtual bool               deleteSnapshot(const std::string& snapshot_id) = 0;
     virtual std::vector<Snapshot> listSnapshots() = 0;
     virtual std::optional<Snapshot> getSnapshot(const std::string& snapshot_id) = 0;
+    virtual std::optional<Snapshot> findSnapshotBySearchKey(const std::string& search_key) = 0;
 };
 
 DEFINE_PTR_TYPES(IStorageService)

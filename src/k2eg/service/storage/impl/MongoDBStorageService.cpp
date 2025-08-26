@@ -40,6 +40,7 @@ constexpr std::string BSON_SNAPSHOT_NAME_FIELD = "snapshot_name";
 constexpr std::string BSON_CREATED_AT_FIELD = "created_at";
 constexpr std::string BSON_DESCRIPTION_FIELD = "description";
 constexpr std::string BSON_PV_NAMES_FIELD = "pv_names";
+constexpr std::string BSON_SEARCH_KEY_FIELD = "search_key";
 
 constexpr std::string MONGO_GTE_OPERATOR = "$gte";
 constexpr std::string MONGO_LTE_OPERATOR = "$lte";
@@ -190,6 +191,18 @@ MongoDBStorageService::createIndexes() {
     auto snapshot_pv_index = bsoncxx_builder::document{} << BSON_SNAPSHOT_ID_FIELD << 1 << BSON_PV_NAME_FIELD << 1 << bsoncxx_builder::finalize;
     collection.create_index(snapshot_pv_index.view());
 
+    // Create composite unique index to prevent duplicates (matches our upsert filter)
+    auto unique_record_index = bsoncxx_builder::document{} 
+        << BSON_PV_NAME_FIELD << 1 
+        << BSON_TIMESTAMP_FIELD << 1 
+        << BSON_TOPIC_FIELD << 1 
+        << BSON_SNAPSHOT_ID_FIELD << 1 
+        << bsoncxx_builder::finalize;
+    mongocxx::options::index unique_index_options{};
+    unique_index_options.unique(true);
+    unique_index_options.sparse(true);  // Allow records without snapshot_id
+    collection.create_index(unique_record_index.view(), unique_index_options);
+
     // Create indexes for snapshots collection
     // Create unique index on snapshot_id
     auto snapshot_id_index = bsoncxx_builder::document{} << "_id" << 1 << bsoncxx_builder::finalize;
@@ -197,6 +210,12 @@ MongoDBStorageService::createIndexes() {
     // Create index on snapshot name for efficient lookups
     auto snapshot_name_index = bsoncxx_builder::document{} << BSON_SNAPSHOT_NAME_FIELD << 1 << bsoncxx_builder::finalize;
     snapshots_collection.create_index(snapshot_name_index.view());
+
+    // Create unique index on search_key for efficient snapshot lookups by search key
+    auto search_key_index = bsoncxx_builder::document{} << BSON_SEARCH_KEY_FIELD << 1 << bsoncxx_builder::finalize;
+    mongocxx::options::index search_key_index_options{};
+    search_key_index_options.unique(true);  // Make it unique since search_key should be unique per snapshot
+    snapshots_collection.create_index(search_key_index.view(), search_key_index_options);
 
     // Create index on created_at for time-based sorting
     auto snapshot_time_index = bsoncxx_builder::document{} << BSON_CREATED_AT_FIELD << 1 << bsoncxx_builder::finalize;
@@ -215,7 +234,22 @@ MongoDBStorageService::store(const ArchiveRecord& record) {
     auto collection = (*client)[config_->database_name][config_->collection_name];
 
     auto doc = recordToBson(record);
-    collection.insert_one(doc.view());
+    
+    // Create a unique filter based on pv_name, timestamp, topic, and snapshot_id
+    auto filter = bsoncxx_builder::document{};
+    filter << BSON_PV_NAME_FIELD << record.pv_name
+           << BSON_TIMESTAMP_FIELD << bsoncxx::types::b_date{record.timestamp}
+           << BSON_TOPIC_FIELD << record.topic;
+    
+    if (record.snapshot_id) {
+      filter << BSON_SNAPSHOT_ID_FIELD << *record.snapshot_id;
+    }
+    
+    // Use replace_one with upsert to handle duplicates gracefully
+    mongocxx::options::replace replace_options{};
+    replace_options.upsert(true);
+    
+    auto result = collection.replace_one(filter.view(), doc.view(), replace_options);
 
     {
       std::lock_guard<std::mutex> lock(stats_mutex_);
@@ -487,6 +521,28 @@ MongoDBStorageService::getSnapshot(const std::string& snapshot_id) {
   }
 }
 
+std::optional<Snapshot>
+MongoDBStorageService::findSnapshotBySearchKey(const std::string& search_key) {
+  try {
+    auto client = pool_->acquire();
+    auto snapshots_collection = (*client)[config_->database_name][config_->snapshots_collection_name];
+
+    auto filter = bsoncxx_builder::document{} << BSON_SEARCH_KEY_FIELD << search_key << bsoncxx_builder::finalize;
+    auto result = snapshots_collection.find_one(filter.view());
+
+    if (result) {
+      logger->logMessage(STRING_FORMAT("Found snapshot by search key: {%1%}", search_key), LogLevel::DEBUG);
+      return bsonToSnapshot(result->view());
+    } else {
+      logger->logMessage(STRING_FORMAT("Snapshot not found by search key: {%1%}", search_key), LogLevel::DEBUG);
+      return std::nullopt;
+    }
+  } catch (const mongocxx::exception& e) {
+    logger->logMessage(STRING_FORMAT("Failed to find snapshot by search key: {%1%}", e.what()), LogLevel::ERROR);
+    return std::nullopt;
+  }
+}
+
 bsoncxx::document::value
 MongoDBStorageService::snapshotToBson(const Snapshot& snapshot) {
   auto doc = bsoncxx_builder::document{};
@@ -494,7 +550,8 @@ MongoDBStorageService::snapshotToBson(const Snapshot& snapshot) {
   doc << "_id" << snapshot.snapshot_id
       << BSON_SNAPSHOT_NAME_FIELD << snapshot.snapshot_name
       << BSON_CREATED_AT_FIELD << bsoncxx::types::b_date{snapshot.created_at}
-      << BSON_DESCRIPTION_FIELD << snapshot.description;
+      << BSON_DESCRIPTION_FIELD << snapshot.description
+      << BSON_SEARCH_KEY_FIELD << snapshot.search_key;
 
   // Convert pv_names set to BSON array
   auto pv_names_array = bsoncxx_builder::array{};
@@ -519,6 +576,8 @@ MongoDBStorageService::bsonToSnapshot(const bsoncxx::document::view& doc) {
   }
 
   if (auto description = doc[BSON_DESCRIPTION_FIELD]) { snapshot.description = description.get_string().value; }
+
+  if (auto search_key = doc[BSON_SEARCH_KEY_FIELD]) { snapshot.search_key = search_key.get_string().value; }
 
   if (auto pv_names = doc[BSON_PV_NAMES_FIELD]) {
     auto pv_names_array = pv_names.get_array().value;

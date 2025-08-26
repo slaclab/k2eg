@@ -118,6 +118,7 @@ public:
     bool deleteSnapshot(const std::string& snapshot_id) override;
     std::vector<Snapshot> listSnapshots() override;
     std::optional<Snapshot> getSnapshot(const std::string& snapshot_id) override;
+    std::optional<Snapshot> findSnapshotBySearchKey(const std::string& search_key) override;
 };
 
 DEFINE_PTR_TYPES(MongoDBStorageService)

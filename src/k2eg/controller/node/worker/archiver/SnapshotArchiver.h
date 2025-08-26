@@ -18,6 +18,7 @@ class SnapshotArchiver : public BaseArchiver
                               int&                              message_type,
                               int64_t&                          iter_index,
                               int64_t&                          payload_ts,
+                              int64_t&                          header_timestamp,
                               std::string&                      snapshot_name);
 
 public:

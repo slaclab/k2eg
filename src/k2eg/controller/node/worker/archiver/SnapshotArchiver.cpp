@@ -1,11 +1,8 @@
-#include "k2eg/controller/node/worker/archiver/BaseArchiver.h"
-#include <k2eg/controller/node/worker/archiver/SnapshotArchiver.h>
-
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
+#include <k2eg/controller/node/worker/archiver/SnapshotArchiver.h>
 
 #include <chrono>
-#include <vector>
 #include <unordered_map>
 
 using namespace k2eg::service::log;
@@ -66,12 +63,12 @@ void SnapshotArchiver::performWork(int /*num_of_msg*/, int timeout)
         int                             message_type;
         int64_t                         iter_index;
         int64_t                         payload_ts;
+        int64_t                         header_timestamp;
         std::string                     snapshot_name;
-
-    this->parseSnapshotMessage(*m, ser, message_type, iter_index, payload_ts, snapshot_name);
-
-        // Build ArchiveRecord
         service::storage::ArchiveRecord rec;
+
+        this->parseSnapshotMessage(*m, ser, message_type, iter_index, payload_ts, header_timestamp, snapshot_name); // Build ArchiveRecord
+
         rec.pv_name = m->key;
         rec.topic = archiver_params.snapshot_queue_name;
 
@@ -94,16 +91,22 @@ void SnapshotArchiver::performWork(int /*num_of_msg*/, int timeout)
                 meta["snapshot_name"] = snapshot_name;
             rec.metadata = boost::json::serialize(meta);
         }
-        catch (...) { rec.metadata = ""; }
+        catch (...)
+        {
+            rec.metadata = "";
+        }
 
+        // here data is moved
         rec.data = std::make_unique<service::storage::StoredMessage>(m->data.get(), m->data_len, ser);
 
         // Handle snapshot management: check if snapshot exists, create if needed
         if (!snapshot_name.empty())
         {
-            const std::string key = snapshot_name + ":" + std::to_string(iter_index);
-            std::string snapshot_id;
-            
+            // Use header_timestamp for header messages, or the parsed header_timestamp for data/tail messages
+            const int64_t     key_timestamp = (message_type == 0) ? payload_ts : header_timestamp;
+            const std::string key = snapshot_name + ":" + std::to_string(key_timestamp) + ":" + std::to_string(iter_index);
+            std::string       snapshot_id;
+
             // First check our local cache
             auto it = created_snapshots.find(key);
             if (it != created_snapshots.end())
@@ -115,19 +118,15 @@ void SnapshotArchiver::performWork(int /*num_of_msg*/, int timeout)
                 // Check if snapshot already exists in storage (from previous execution/crash recovery)
                 try
                 {
-                    // Query existing snapshots to find one with matching name and created around the same time
-                    auto existing_snapshots = storage_service->listSnapshots();
-                    for (const auto& existing_snap : existing_snapshots)
+                    // Use the efficient search key method instead of listing all snapshots
+                    auto existing_snap = storage_service->findSnapshotBySearchKey(key);
+                    if (existing_snap.has_value())
                     {
-                        if (existing_snap.snapshot_name == snapshot_name)
-                        {
-                            // Found a snapshot with the same name, use its ID
-                            snapshot_id = existing_snap.snapshot_id;
-                            created_snapshots[key] = snapshot_id;
-                            if (logger)
-                                logger->logMessage(STRING_FORMAT("SnapshotArchiver found existing snapshot: %1% for %2%", snapshot_id % snapshot_name), LogLevel::DEBUG);
-                            break;
-                        }
+                        // Found a snapshot with the matching search key, use its ID
+                        snapshot_id = existing_snap->snapshot_id;
+                        created_snapshots[key] = snapshot_id;
+                        if (logger)
+                            logger->logMessage(STRING_FORMAT("SnapshotArchiver found existing snapshot: %1% for key %2%", snapshot_id % key), LogLevel::DEBUG);
                     }
                 }
                 catch (const std::exception& ex)
@@ -135,7 +134,7 @@ void SnapshotArchiver::performWork(int /*num_of_msg*/, int timeout)
                     if (logger)
                         logger->logMessage(STRING_FORMAT("SnapshotArchiver error checking existing snapshots: %1%", ex.what()), LogLevel::ERROR);
                 }
-                
+
                 // If header message and no existing snapshot found, create a new one
                 if (snapshot_id.empty() && message_type == 0)
                 {
@@ -143,6 +142,7 @@ void SnapshotArchiver::performWork(int /*num_of_msg*/, int timeout)
                     snap.snapshot_name = snapshot_name;
                     snap.created_at = rec.timestamp;
                     snap.description = STRING_FORMAT("Snapshot iteration %1%", iter_index);
+                    snap.search_key = key; // Store the search key for efficient lookups
                     try
                     {
                         snapshot_id = storage_service->createSnapshot(snap);
@@ -160,7 +160,7 @@ void SnapshotArchiver::performWork(int /*num_of_msg*/, int timeout)
                     }
                 }
             }
-            
+
             // Attach snapshot_id to the record if we have one
             if (!snapshot_id.empty())
             {
@@ -168,111 +168,37 @@ void SnapshotArchiver::performWork(int /*num_of_msg*/, int timeout)
             }
         }
 
-        // Prepare the storage action to be executed on commit
-        auto rec_ptr = std::make_shared<service::storage::ArchiveRecord>(std::move(rec));
-        // share the snapshot map across lambdas
-        auto shared_snapshots = std::make_shared<std::unordered_map<std::string, std::string>>(created_snapshots);
-
-        // Attach on_commit_action to commit handle so storage happens only after commit
-        if (m->commit_handle)
+        // Store the record immediately (not deferred)
+        try
         {
-            // Need to make a mutable copy of the shared map for lambdas to update
-            auto snaps_ptr = std::make_shared<std::unordered_map<std::string, std::string>>();
-            // initialize with current map snapshot
-            *snaps_ptr = *shared_snapshots;
-
-            const std::string snap_name_copy = snapshot_name;
-            const int64_t iter_index_copy = iter_index;
-            const int msg_type_copy = message_type;
-
-            const auto storage = storage_service;
-
-            const_cast<SubscriberInterfaceElement::CommitHandle*>(m->commit_handle.get())->on_commit_action = [storage, rec_ptr, snaps_ptr, snap_name_copy, iter_index_copy, msg_type_copy, this]() {
+            storage_service->store(rec);
+            
+            // Only commit after successful storage to prevent duplicates
+            if (m->commit_handle)
+            {
                 try
                 {
-                    // Check if we need to find an existing snapshot first
-                    std::string snapshot_id;
-                    if (!snap_name_copy.empty())
-                    {
-                        const std::string key = snap_name_copy + ":" + std::to_string(iter_index_copy);
-                        auto it = snaps_ptr->find(key);
-                        if (it != snaps_ptr->end())
-                        {
-                            snapshot_id = it->second;
-                        }
-                        else
-                        {
-                            // Check storage for existing snapshot
-                            try
-                            {
-                                auto existing_snapshots = storage->listSnapshots();
-                                for (const auto& existing_snap : existing_snapshots)
-                                {
-                                    if (existing_snap.snapshot_name == snap_name_copy)
-                                    {
-                                        snapshot_id = existing_snap.snapshot_id;
-                                        (*snaps_ptr)[key] = snapshot_id;
-                                        break;
-                                    }
-                                }
-                            }
-                            catch (...) { /* ignore lookup errors */ }
-                            
-                            // If header and no existing snapshot, create one
-                            if (snapshot_id.empty() && msg_type_copy == 0)
-                            {
-                                service::storage::Snapshot snap;
-                                snap.snapshot_name = snap_name_copy;
-                                snap.created_at = rec_ptr->timestamp;
-                                snap.description = STRING_FORMAT("Snapshot iteration %1%", iter_index_copy);
-                                snapshot_id = storage->createSnapshot(snap);
-                                if (!snapshot_id.empty())
-                                {
-                                    (*snaps_ptr)[key] = snapshot_id;
-                                }
-                            }
-                        }
-                        
-                        // Attach snapshot_id to record
-                        if (!snapshot_id.empty())
-                        {
-                            rec_ptr->snapshot_id = snapshot_id;
-                        }
-                    }
-                    
-                    // Store the record
-                    storage->store(*rec_ptr);
-                    
-                    // If tail, remove mapping
-                    if (msg_type_copy == 2 && !snap_name_copy.empty())
-                    {
-                        const std::string key = snap_name_copy + ":" + std::to_string(iter_index_copy);
-                        snaps_ptr->erase(key);
-                    }
+                    subscriber->commit(m->commit_handle, true);
                 }
                 catch (const std::exception& ex)
                 {
-                    if (this->logger)
-                        this->logger->logMessage(STRING_FORMAT("SnapshotArchiver on_commit_action exception: %1%", ex.what()), LogLevel::ERROR);
+                    if (logger)
+                        logger->logMessage(STRING_FORMAT("SnapshotArchiver commit exception: %1%", ex.what()), LogLevel::ERROR);
                 }
-            };
-
-            // Now commit this specific message which will trigger the on_commit_action upon success
-            try
-            {
-                subscriber->commit(m->commit_handle, true);
             }
-            catch (const std::exception& ex)
-            {
-                if (logger)
-                    logger->logMessage(STRING_FORMAT("SnapshotArchiver commit exception: %1%", ex.what()), LogLevel::ERROR);
-            }
+        }
+        catch (const std::exception& ex)
+        {
+            if (logger)
+                logger->logMessage(STRING_FORMAT("SnapshotArchiver store exception: %1%", ex.what()), LogLevel::ERROR);
+            // Don't commit if storage failed - message will be redelivered
         }
 
         // If tail message, we can drop the snapshot mapping for this iteration
         if (message_type == 2 && !snapshot_name.empty())
         {
-            const std::string key = snapshot_name + ":" + std::to_string(iter_index);
+            const int64_t     key_timestamp = (message_type == 0) ? payload_ts : header_timestamp;
+            const std::string key = snapshot_name + ":" + std::to_string(key_timestamp) + ":" + std::to_string(iter_index);
             created_snapshots.erase(key);
         }
 
@@ -285,19 +211,20 @@ void SnapshotArchiver::performWork(int /*num_of_msg*/, int timeout)
     }
 }
 
-// Helper: parse snapshot message payload to extract serialization and metadata
 void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMessage(const k2eg::service::pubsub::SubscriberInterfaceElement& m,
-                                                                                         k2eg::common::SerializationType&  ser,
-                                                                                         int&                              message_type,
-                                                                                         int64_t&                          iter_index,
-                                                                                         int64_t&                          payload_ts,
-                                                                                         std::string&                      snapshot_name)
+                                                                                      k2eg::common::SerializationType&                         ser,
+                                                                                      int&                                                     message_type,
+                                                                                      int64_t&                                                 iter_index,
+                                                                                      int64_t&                                                 payload_ts,
+                                                                                      int64_t&                                                 header_timestamp,
+                                                                                      std::string&                                             snapshot_name)
 {
     // Initialize outputs with defaults
     ser = k2eg::common::SerializationType::Unknown;
     message_type = -1;
     iter_index = -1;
     payload_ts = 0;
+    header_timestamp = 0;
     snapshot_name.clear();
 
     // Detect serialization type from header if available
@@ -322,6 +249,8 @@ void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMe
                     iter_index = static_cast<int64_t>(obj.at("iter_index").as_int64());
                 if (obj.contains("timestamp"))
                     payload_ts = static_cast<int64_t>(obj.at("timestamp").as_int64());
+                if (obj.contains("header_timestamp"))
+                    header_timestamp = static_cast<int64_t>(obj.at("header_timestamp").as_int64());
                 if (obj.contains("snapshot_name"))
                     snapshot_name = obj.at("snapshot_name").as_string();
             }
@@ -342,6 +271,8 @@ void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMe
                         iter_index = kv.val.as<int64_t>();
                     else if (key == "timestamp")
                         payload_ts = kv.val.as<int64_t>();
+                    else if (key == "header_timestamp")
+                        header_timestamp = kv.val.as<int64_t>();
                     else if (key == "snapshot_name")
                         snapshot_name = kv.val.as<std::string>();
                 }
@@ -364,6 +295,8 @@ void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMe
                         iter_index = static_cast<int64_t>(obj.at("iter_index").as_int64());
                     if (obj.contains("timestamp"))
                         payload_ts = static_cast<int64_t>(obj.at("timestamp").as_int64());
+                    if (obj.contains("header_timestamp"))
+                        header_timestamp = static_cast<int64_t>(obj.at("header_timestamp").as_int64());
                     if (obj.contains("snapshot_name"))
                         snapshot_name = obj.at("snapshot_name").as_string();
                 }
