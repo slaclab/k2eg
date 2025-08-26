@@ -91,6 +91,7 @@ inline std::string toStateString(k2eg::service::configuration::ArchiveStatus s)
     using k2eg::service::configuration::ArchiveStatus;
     switch (s)
     {
+    case ArchiveStatus::SUBMITTED: return "SUBMITTED";
     case ArchiveStatus::ARCHIVING: return "ARCHIVING";
     case ArchiveStatus::ERROR: return "ERROR";
     case ArchiveStatus::STOPPED:
@@ -101,6 +102,8 @@ inline std::string toStateString(k2eg::service::configuration::ArchiveStatus s)
 inline k2eg::service::configuration::ArchiveStatus fromStateString(const std::string& s)
 {
     using k2eg::service::configuration::ArchiveStatus;
+    if (s == "SUBMITTED")
+        return ArchiveStatus::SUBMITTED;
     if (s == "ARCHIVING")
         return ArchiveStatus::ARCHIVING;
     if (s == "PREPARE_TO_ARCHIVE")
@@ -604,12 +607,23 @@ void ConsulNodeConfiguration::setSnapshotArchiveStatus(const std::string& snapsh
     boost::json::array ops;
     ops.reserve(4);
     addSetOp(ops, status_base + "/state", toStateString(status.status));
+    if (!status.topic_name.empty())
+    {
+        addSetOp(ops, status_base + "/topic_name", status.topic_name);
+    }
     if (!status.started_at.empty())
+    {
         addSetOp(ops, status_base + "/started_at", status.started_at);
-    if (!status.updated_at.empty())
-        addSetOp(ops, status_base + "/updated_at", status.updated_at);
-    // Always set error_message (empty clears it)
-    addSetOp(ops, status_base + "/error_message", status.error_message);
+    }
+
+    // updated_at needs to be automatically filled
+    addSetOp(ops, status_base + "/updated_at", nowIsoUtc());
+
+    if (status.error_message.empty())
+    {
+        // Always set error_message (empty clears it)
+        addSetOp(ops, status_base + "/error_message", status.error_message);
+    }
 
     if (!executeTxn(ops))
         throw std::runtime_error("Failed to set snapshot archive status via transaction");

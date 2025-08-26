@@ -20,6 +20,7 @@ namespace bsoncxx_builder = bsoncxx::builder::stream;
 constexpr const char* DEFAULT_CONNECTION_STRING = "mongodb://localhost:27017";
 constexpr const char* DEFAULT_DATABASE = "k2eg";
 constexpr const char* DEFAULT_COLLECTION = "data";
+constexpr const char* DEFAULT_SNAPSHOTS_COLLECTION = "snapshots";
 constexpr int         DEFAULT_POOL_SIZE = 10;
 constexpr int         DEFAULT_TIMEOUT_MS = 5000;
 constexpr bool        DEFAULT_CREATE_INDEXES = true;
@@ -28,10 +29,17 @@ constexpr int         DEFAULT_BATCH_SIZE = 1000;
 constexpr std::string BSON_PV_NAME_FIELD = "pv_name";
 constexpr std::string BSON_TOPIC_FIELD = "topic";
 constexpr std::string BSON_TIMESTAMP_FIELD = "timestamp";
-constexpr std::string BSON_MESSAGE_ID_FIELD = "message_id";
 constexpr std::string BSON_METADATA_FIELD = "metadata";
 constexpr std::string BSON_DATA_FIELD = "data";
+constexpr std::string BSON_SERIALIZATION_TYPE_FIELD = "ser_type";
+constexpr std::string BSON_SNAPSHOT_ID_FIELD = "snapshot_id";
 constexpr std::string BSON_PING_FIELD = "ping";
+
+// Snapshot-specific fields
+constexpr std::string BSON_SNAPSHOT_NAME_FIELD = "snapshot_name";
+constexpr std::string BSON_CREATED_AT_FIELD = "created_at";
+constexpr std::string BSON_DESCRIPTION_FIELD = "description";
+constexpr std::string BSON_PV_NAMES_FIELD = "pv_names";
 
 constexpr std::string MONGO_GTE_OPERATOR = "$gte";
 constexpr std::string MONGO_LTE_OPERATOR = "$lte";
@@ -54,6 +62,7 @@ fill_mongodb_program_option(boost::program_options::options_description& desc) {
   mongodb_section.add_options()(MONGODB_CONNECTION_STRING_KEY, boost::program_options::value<std::string>()->default_value(DEFAULT_CONNECTION_STRING), "MongoDB connection string")(
       MONGODB_DATABASE_KEY, boost::program_options::value<std::string>()->default_value(DEFAULT_DATABASE), "MongoDB database name")(
       MONGODB_COLLECTION_KEY, boost::program_options::value<std::string>()->default_value(DEFAULT_COLLECTION), "MongoDB collection name")(
+      MONGODB_SNAPSHOTS_COLLECTION_KEY, boost::program_options::value<std::string>()->default_value(DEFAULT_SNAPSHOTS_COLLECTION), "MongoDB snapshots collection name")(
       MONGODB_POOL_SIZE_KEY, boost::program_options::value<int>()->default_value(DEFAULT_POOL_SIZE), "MongoDB connection pool size")(
       MONGODB_TIMEOUT_MS_KEY, boost::program_options::value<int>()->default_value(DEFAULT_TIMEOUT_MS), "MongoDB operation timeout in milliseconds")(
       MONGODB_CREATE_INDEXES_KEY, boost::program_options::value<bool>()->default_value(DEFAULT_CREATE_INDEXES), "Create database indexes automatically")(
@@ -77,6 +86,10 @@ get_mongodb_program_option(const boost::program_options::variables_map& vm) {
 
   if (vm.count(MONGODB_COLLECTION_KEY)) {
     config->collection_name = vm[MONGODB_COLLECTION_KEY].as<std::string>();
+  }
+
+  if (vm.count(MONGODB_SNAPSHOTS_COLLECTION_KEY)) {
+    config->snapshots_collection_name = vm[MONGODB_SNAPSHOTS_COLLECTION_KEY].as<std::string>();
   }
 
   if (vm.count(MONGODB_POOL_SIZE_KEY)) {
@@ -155,6 +168,7 @@ MongoDBStorageService::createIndexes() {
   try {
     auto       client     = pool_->acquire();
     auto       collection = (*client)[config_->database_name][config_->collection_name];
+    auto       snapshots_collection = (*client)[config_->database_name][config_->snapshots_collection_name];
 
     // Create compound index on pv_name and timestamp for efficient queries
     auto pv_time_index = bsoncxx_builder::document{} << BSON_PV_NAME_FIELD << 1 << BSON_TIMESTAMP_FIELD << 1 << bsoncxx_builder::finalize;
@@ -168,11 +182,25 @@ MongoDBStorageService::createIndexes() {
     auto topic_index = bsoncxx_builder::document{} << BSON_TOPIC_FIELD << 1 << bsoncxx_builder::finalize;
     collection.create_index(topic_index.view());
 
-    // Create unique index on message_id to prevent duplicates
-    auto msg_id_index   = bsoncxx_builder::document{} << BSON_MESSAGE_ID_FIELD << 1 << bsoncxx_builder::finalize;
-    auto unique_options = mongocxx::options::index{};
-    unique_options.unique(true);
-    collection.create_index(msg_id_index.view(), unique_options);
+    // Create index on snapshot_id for snapshot-based queries
+    auto snapshot_index = bsoncxx_builder::document{} << BSON_SNAPSHOT_ID_FIELD << 1 << bsoncxx_builder::finalize;
+    collection.create_index(snapshot_index.view());
+
+    // Create compound index on snapshot_id and pv_name for efficient snapshot queries
+    auto snapshot_pv_index = bsoncxx_builder::document{} << BSON_SNAPSHOT_ID_FIELD << 1 << BSON_PV_NAME_FIELD << 1 << bsoncxx_builder::finalize;
+    collection.create_index(snapshot_pv_index.view());
+
+    // Create indexes for snapshots collection
+    // Create unique index on snapshot_id
+    auto snapshot_id_index = bsoncxx_builder::document{} << "_id" << 1 << bsoncxx_builder::finalize;
+    
+    // Create index on snapshot name for efficient lookups
+    auto snapshot_name_index = bsoncxx_builder::document{} << BSON_SNAPSHOT_NAME_FIELD << 1 << bsoncxx_builder::finalize;
+    snapshots_collection.create_index(snapshot_name_index.view());
+
+    // Create index on created_at for time-based sorting
+    auto snapshot_time_index = bsoncxx_builder::document{} << BSON_CREATED_AT_FIELD << 1 << bsoncxx_builder::finalize;
+    snapshots_collection.create_index(snapshot_time_index.view());
 
     logger->logMessage("MongoDB indexes created successfully", LogLevel::INFO);
   } catch (const mongocxx::exception& e) {
@@ -242,8 +270,12 @@ MongoDBStorageService::recordToBson(const ArchiveRecord& record) {
   auto doc = bsoncxx_builder::document{};
 
   doc << BSON_PV_NAME_FIELD << record.pv_name << BSON_TOPIC_FIELD << record.topic << BSON_TIMESTAMP_FIELD
-      << bsoncxx::types::b_date{record.timestamp} << BSON_MESSAGE_ID_FIELD << static_cast<int64_t>(record.message_id) << BSON_METADATA_FIELD
-      << record.metadata;
+      << bsoncxx::types::b_date{record.timestamp} << BSON_METADATA_FIELD << record.metadata;
+
+  // Add snapshot_id if present
+  if (record.snapshot_id) {
+    doc << BSON_SNAPSHOT_ID_FIELD << *record.snapshot_id;
+  }
 
   // Store binary data as BSON binary
   if (record.data) {
@@ -251,6 +283,8 @@ MongoDBStorageService::recordToBson(const ArchiveRecord& record) {
     if(data_ptr && data_ptr->size() > 0) {
       doc << BSON_DATA_FIELD
         << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary, static_cast<uint32_t>(data_ptr->size()), reinterpret_cast<const uint8_t*>(data_ptr->data())};
+      // Persist serialization type alongside data
+      doc << BSON_SERIALIZATION_TYPE_FIELD << k2eg::common::serialization_to_string(record.data->serializationType());
     }
   }
 
@@ -270,13 +304,25 @@ MongoDBStorageService::bsonToRecord(const bsoncxx::document::view& doc) {
     record.timestamp = std::chrono::system_clock::time_point{std::chrono::milliseconds{timestamp.get_date().value.count()}};
   }
 
-  if (auto message_id = doc[BSON_MESSAGE_ID_FIELD]) { record.message_id = static_cast<uint64_t>(message_id.get_int64().value); }
-
   if (auto metadata = doc[BSON_METADATA_FIELD]) { record.metadata = metadata.get_string().value; }
 
+  // Extract snapshot_id if present
+  if (auto snapshot_id = doc[BSON_SNAPSHOT_ID_FIELD]) { 
+    record.snapshot_id = std::string{snapshot_id.get_string().value}; 
+  }
+
   if (auto data = doc[BSON_DATA_FIELD]) {
-    auto binary    = data.get_binary();
-    record.data = std::make_unique<StoredMessage>(reinterpret_cast<const char*>(binary.bytes), binary.size);
+    auto binary = data.get_binary();
+    // Try to read serialization type; default to Unknown if missing
+    k2eg::common::SerializationType ser = k2eg::common::SerializationType::Unknown;
+    if (auto serf = doc[BSON_SERIALIZATION_TYPE_FIELD]) {
+      try {
+        ser = k2eg::common::serialization_from_string(std::string{serf.get_string().value});
+      } catch (...) {
+        ser = k2eg::common::SerializationType::Unknown;
+      }
+    }
+    record.data = std::make_unique<StoredMessage>(reinterpret_cast<const char*>(binary.bytes), binary.size, ser);
   }
 
   return record;
@@ -297,6 +343,8 @@ MongoDBStorageService::query(const ArchiveQuery& query) {
     if (!query.pv_name.empty()) { filter_builder << BSON_PV_NAME_FIELD << query.pv_name; }
 
     if (query.topic) { filter_builder << BSON_TOPIC_FIELD << *query.topic; }
+
+    if (query.snapshot_id) { filter_builder << BSON_SNAPSHOT_ID_FIELD << *query.snapshot_id; }
 
     if (query.start_time || query.end_time) {
       auto time_filter = bsoncxx_builder::document{};
@@ -346,4 +394,140 @@ MongoDBStorageService::isHealthy() {
   } catch (const std::exception& e) {
     return false;
   }
+}
+
+// Snapshot management methods implementation
+
+std::string
+MongoDBStorageService::createSnapshot(const Snapshot& snapshot) {
+  try {
+    auto client = pool_->acquire();
+    auto snapshots_collection = (*client)[config_->database_name][config_->snapshots_collection_name];
+
+    auto doc = snapshotToBson(snapshot);
+    auto result = snapshots_collection.insert_one(doc.view());
+    
+    if (result) {
+      logger->logMessage(STRING_FORMAT("Created snapshot with ID: {%1%}", snapshot.snapshot_id), LogLevel::INFO);
+      return snapshot.snapshot_id;
+    } else {
+      logger->logMessage("Failed to create snapshot - no result returned", LogLevel::ERROR);
+      return "";
+    }
+  } catch (const mongocxx::exception& e) {
+    logger->logMessage(STRING_FORMAT("Failed to create snapshot: {%1%}", e.what()), LogLevel::ERROR);
+    return "";
+  }
+}
+
+bool
+MongoDBStorageService::deleteSnapshot(const std::string& snapshot_id) {
+  try {
+    auto client = pool_->acquire();
+    auto snapshots_collection = (*client)[config_->database_name][config_->snapshots_collection_name];
+
+    auto filter = bsoncxx_builder::document{} << "_id" << snapshot_id << bsoncxx_builder::finalize;
+    auto result = snapshots_collection.delete_one(filter.view());
+
+    if (result && result->deleted_count() > 0) {
+      logger->logMessage(STRING_FORMAT("Deleted snapshot with ID: {%1%}", snapshot_id), LogLevel::INFO);
+      return true;
+    } else {
+      logger->logMessage(STRING_FORMAT("Snapshot not found for deletion: {%1%}", snapshot_id), LogLevel::ERROR);
+      return false;
+    }
+  } catch (const mongocxx::exception& e) {
+    logger->logMessage(STRING_FORMAT("Failed to delete snapshot: {%1%}", e.what()), LogLevel::ERROR);
+    return false;
+  }
+}
+
+std::vector<Snapshot>
+MongoDBStorageService::listSnapshots() {
+  std::vector<Snapshot> snapshots;
+  
+  try {
+    auto client = pool_->acquire();
+    auto snapshots_collection = (*client)[config_->database_name][config_->snapshots_collection_name];
+
+    mongocxx::options::find opts{};
+    opts.sort(bsoncxx_builder::document{} << BSON_CREATED_AT_FIELD << -1 << bsoncxx_builder::finalize); // Sort by creation time descending
+
+    auto cursor = snapshots_collection.find({}, opts);
+    for (const auto& doc : cursor) {
+      snapshots.push_back(bsonToSnapshot(doc));
+    }
+
+    logger->logMessage(STRING_FORMAT("Retrieved {%1%} snapshots", snapshots.size()), LogLevel::DEBUG);
+  } catch (const mongocxx::exception& e) {
+    logger->logMessage(STRING_FORMAT("Failed to list snapshots: {%1%}", e.what()), LogLevel::ERROR);
+  }
+
+  return snapshots;
+}
+
+std::optional<Snapshot>
+MongoDBStorageService::getSnapshot(const std::string& snapshot_id) {
+  try {
+    auto client = pool_->acquire();
+    auto snapshots_collection = (*client)[config_->database_name][config_->snapshots_collection_name];
+
+    auto filter = bsoncxx_builder::document{} << "_id" << snapshot_id << bsoncxx_builder::finalize;
+    auto result = snapshots_collection.find_one(filter.view());
+
+    if (result) {
+      return bsonToSnapshot(result->view());
+    } else {
+      logger->logMessage(STRING_FORMAT("Snapshot not found: {%1%}", snapshot_id), LogLevel::ERROR);
+      return std::nullopt;
+    }
+  } catch (const mongocxx::exception& e) {
+    logger->logMessage(STRING_FORMAT("Failed to get snapshot: {%1%}", e.what()), LogLevel::ERROR);
+    return std::nullopt;
+  }
+}
+
+bsoncxx::document::value
+MongoDBStorageService::snapshotToBson(const Snapshot& snapshot) {
+  auto doc = bsoncxx_builder::document{};
+
+  doc << "_id" << snapshot.snapshot_id
+      << BSON_SNAPSHOT_NAME_FIELD << snapshot.snapshot_name
+      << BSON_CREATED_AT_FIELD << bsoncxx::types::b_date{snapshot.created_at}
+      << BSON_DESCRIPTION_FIELD << snapshot.description;
+
+  // Convert pv_names set to BSON array
+  auto pv_names_array = bsoncxx_builder::array{};
+  for (const auto& pv_name : snapshot.pv_names) {
+    pv_names_array << pv_name;
+  }
+  doc << BSON_PV_NAMES_FIELD << pv_names_array;
+
+  return doc << bsoncxx_builder::finalize;
+}
+
+Snapshot
+MongoDBStorageService::bsonToSnapshot(const bsoncxx::document::view& doc) {
+  Snapshot snapshot;
+
+  if (auto id = doc["_id"]) { snapshot.snapshot_id = id.get_string().value; }
+
+  if (auto name = doc[BSON_SNAPSHOT_NAME_FIELD]) { snapshot.snapshot_name = name.get_string().value; }
+
+  if (auto created_at = doc[BSON_CREATED_AT_FIELD]) {
+    snapshot.created_at = std::chrono::system_clock::time_point{std::chrono::milliseconds{created_at.get_date().value.count()}};
+  }
+
+  if (auto description = doc[BSON_DESCRIPTION_FIELD]) { snapshot.description = description.get_string().value; }
+
+  if (auto pv_names = doc[BSON_PV_NAMES_FIELD]) {
+    auto pv_names_array = pv_names.get_array().value;
+    for (const auto& pv_name : pv_names_array) {
+      if (pv_name.type() == bsoncxx::type::k_string) {
+        snapshot.pv_names.insert(std::string{pv_name.get_string().value});
+      }
+    }
+  }
+
+  return snapshot;
 }

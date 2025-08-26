@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <stdint.h>
+#include <string>
 
 /**
  * @namespace k2eg::service::configuration
@@ -52,9 +53,10 @@ DEFINE_PTR_TYPES(NodeConfiguration)
 enum class ArchiveStatus
 {
     STOPPED = 0,            /**< Archiving is stopped. */
-    PREPARE_TO_ARCHIVE = 1, /**< Preparing to archive. */
-    ARCHIVING = 2,          /**< Archiving is in progress. */
-    ERROR = 3               /**< Archiving encountered an error. */
+    SUBMITTED = 1,          /**< Archiving has been submitted. */
+    PREPARE_TO_ARCHIVE = 2, /**< Preparing to archive. */
+    ARCHIVING = 3,          /**< Archiving is in progress. */
+    ERROR = 4               /**< Archiving encountered an error. */
 };
 
 /**
@@ -65,6 +67,7 @@ enum class ArchiveStatus
 struct ArchiveStatusInfo
 {
     ArchiveStatus status = ArchiveStatus::STOPPED; /**< Current archiving status. */
+    std::string   topic_name;                      /**< Name of the topic being archived. */
     std::string   started_at;                      /**< ISO8601 UTC timestamp when archiving started. */
     std::string   updated_at;                      /**< ISO8601 UTC timestamp of last heartbeat/update. */
     std::string   error_message;                   /**< Error message if status is ERROR. */

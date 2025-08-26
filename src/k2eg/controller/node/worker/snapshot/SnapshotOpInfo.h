@@ -19,7 +19,9 @@ struct SnapshotStatistic
     std::atomic<double> event_size = 0;  /**< Total size of events in bytes. */
     std::atomic<double> event_count = 0; /**< Number of events processed. */
 };
+
 DEFINE_PTR_TYPES(SnapshotStatistic);
+
 /**
  * @struct Statistic
  * @brief Stores per-second statistics for snapshot operations.
@@ -130,9 +132,10 @@ class SnapshotOpInfo;
 class SnapshotSubmission
 {
 public:
-    std::chrono::steady_clock::time_point                 snap_time;       /**< Time point for the snapshot. */
-    std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events; /**< Events captured in the snapshot. */
-    SnapshotSubmissionType                                submission_type; /**< Type flags for the submission. */
+    std::chrono::steady_clock::time_point                 sheader_snap_time; /**< Time point for the snapshot header. */
+    std::chrono::steady_clock::time_point                 snap_time;         /**< Time point for the snapshot. */
+    std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events;   /**< Events captured in the snapshot. */
+    SnapshotSubmissionType                                submission_type;   /**< Type flags for the submission. */
 
     /**
      * @brief Constructs a SnapshotSubmission with given time, events, and type.

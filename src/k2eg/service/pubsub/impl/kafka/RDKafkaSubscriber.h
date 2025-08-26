@@ -29,6 +29,7 @@ public:
     virtual void setQueue(const k2eg::common::StringVector& queue);
     virtual void addQueue(const k2eg::common::StringVector& queue);
     virtual void commit(const bool& async = false);
+    virtual void commit(const std::shared_ptr<const void>& handle, const bool& async = false);
     virtual int  getMsg(SubscriberInterfaceElementVector& dataVector, unsigned int m_num, unsigned int timeo = 250);
 };
 DEFINE_PTR_TYPES(RDKafkaSubscriber)

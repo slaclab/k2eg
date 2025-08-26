@@ -6,6 +6,7 @@
 #include <k2eg/service/scheduler/Scheduler.h>
 
 #include <k2eg/controller/node/worker/StorageWorker.h>
+#include <k2eg/controller/node/worker/archiver/SnapshotArchiver.h>
 
 #include <functional>
 
@@ -131,7 +132,7 @@ ConstStorageWorkerConfigurationShrdPtr get_storage_worker_program_option(const b
 #define DISCOVER_TASK_NAME_DEFAULT_CRON     "* * * * * *"
 
 StorageWorker::StorageWorker(const ConstStorageWorkerConfigurationShrdPtr& config_, IStorageServiceShrdPtr storage_service_)
-    : logger(ServiceResolver<ILogger>::resolve()), config(config_), storage_service(storage_service_)
+    : logger(ServiceResolver<ILogger>::resolve()), config(config_), thread_pool(std::make_shared<BS::light_thread_pool>(config->worker_thread_count)), storage_service(storage_service_)
 {
     // Resolve required services
     logger = ServiceResolver<ILogger>::resolve();

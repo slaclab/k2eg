@@ -6,9 +6,23 @@
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/pubsub/ISubscriber.h>
 #include <k2eg/service/storage/IStorageService.h>
+#include <string>
 #include <thread>
 
 namespace k2eg::controller::node::worker::archiver {
+/**
+ * @brief Initialization parameters for archivers.
+ * @details Groups constructor dependencies so they can be passed and stored
+ *          consistently and be available to all subclasses via the base class.
+ */
+struct ArchiverParameters
+{
+    ConstStorageWorkerConfigurationShrdPtr         config;              ///< Storage worker configuration
+    k2eg::service::pubsub::ISubscriberShrdPtr      subscriber;          ///< Input subscriber
+    k2eg::service::storage::IStorageServiceShrdPtr storage_service;     ///< Storage backend
+    std::string                                    snapshot_queue_name; ///< Optional queue name (used by snapshot archiver)
+};
+
 /**
  * @brief Base class for archivers in the K2EG controller node worker.
  * @details This class provides a common interface and functionality for all archivers.
@@ -22,6 +36,9 @@ class BaseArchiver
     std::atomic<bool> is_archiving{false};
 
 protected:
+    // Aggregated parameters available to all derived archivers
+    ArchiverParameters archiver_params;
+    // Keep discrete members for current internal usage
     ConstStorageWorkerConfigurationShrdPtr config;
     /**
      * @brief Logger for logging messages related to archiving.
@@ -42,16 +59,6 @@ protected:
      * (e.g., MongoDB, SQLite) and is injected into the archiver.
      */
     k2eg::service::storage::IStorageServiceShrdPtr storage_service;
-
-    /**
-     * @brief Processes messages received from the subscriber.
-     * @details This method should be implemented by derived classes to define how
-     * messages are processed and archived.
-     * @param messages Vector of messages to be processed.
-     * @return The number of messages processed.
-     */
-    virtual int processMessage(service::pubsub::SubscriberInterfaceElementVector& messages) = 0;
-
 public:
     /**
      * @brief Constructs a new BaseArchiver object.
@@ -60,32 +67,23 @@ public:
     BaseArchiver(ConstStorageWorkerConfigurationShrdPtr config_, k2eg::service::pubsub::ISubscriberShrdPtr subscriber_, k2eg::service::storage::IStorageServiceShrdPtr storage_service_);
 
     /**
+     * @brief Constructs a new BaseArchiver object using aggregated parameters.
+     */
+    explicit BaseArchiver(const ArchiverParameters& params);
+
+    /**
      * @brief Destroys the BaseArchiver object.
      * @details Cleans up resources and stops any ongoing archiving processes.
      */
     virtual ~BaseArchiver();
 
     /**
-     * @brief Starts the archiving process.
-     * @details This method should be implemented by derived classes to start archiving.
+     * @brief Performs the work of the archiver.
+     * @details This method is called to continue the archiving process.
+     * @param timeout The timeout for the work to be performed.
      */
-    virtual void startArchiving();
+    virtual void performWork(int num_of_msg, int timeout) = 0;
 
-    /**
-     * @brief Stops the archiving process.
-     * @details This method should be implemented by derived classes to stop archiving.
-     */
-    virtual void stopArchiving();
-
-    /**
-     * @brief Consumes messages from the subscriber.
-     * @details This method fetches messages from the message queue and processes them.
-     * It can be overridden by derived classes to implement specific consumption logic.
-     * @param data_vector Vector to store the consumed messages.
-     * @param m_num Number of messages to consume.
-     * @param timeo Timeout for consuming messages.
-     */
-    void consume();
 };
 
 } // namespace k2eg::controller::node::worker::archiver

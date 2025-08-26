@@ -10,53 +10,39 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 namespace k2eg::service::storage {
 
 // StoredData is a concrete implementation of the Data interface, designed to hold data retrieved from storage.
 class StoredData : public common::Data
 {
-    std::vector<char> buffer;
+    const char* data_{nullptr};
+    size_t      size_{0};
 
 public:
-    // Constructor that takes a vector of chars and moves it into the buffer.
-    explicit StoredData(std::vector<char>&& data)
-        : buffer(std::move(data)) {}
-
-    // Constructor that copies a chunk of memory into the buffer.
-    StoredData(const char* data, size_t size)
-        : buffer(data, data + size) {}
-
+    // Non-owning view over external memory. Caller guarantees lifetime.
+    StoredData(const char* data, size_t size) : data_(data), size_(size) {}
     virtual ~StoredData() = default;
 
-    // Returns the size of the stored data.
-    const size_t
-    size() const override
-    {
-        return buffer.size();
-    }
-
-    // Returns a pointer to the stored data.
-    const char*
-    data() const override
-    {
-        return buffer.data();
-    }
+    const size_t size() const override { return size_; }
+    const char*  data() const override { return data_; }
 };
 
 // StoredMessage is a concrete implementation of the SerializedMessage interface, designed to hold data retrieved from storage.
 class StoredMessage : public common::SerializedMessage
 {
-    std::vector<char> buffer;
+    std::vector<char>            buffer;
+    common::SerializationType    serialization_type_ {common::SerializationType::Unknown};
 
 public:
     // Constructor that takes a vector of chars and moves it into the buffer.
-    explicit StoredMessage(std::vector<char>&& data)
-        : buffer(std::move(data)) {}
+    explicit StoredMessage(std::vector<char>&& data, common::SerializationType ser_type = common::SerializationType::Unknown)
+        : buffer(std::move(data)), serialization_type_(ser_type) {}
 
     // Constructor that copies a chunk of memory into the buffer.
-    StoredMessage(const char* data, size_t size)
-        : buffer(data, data + size) {}
+    StoredMessage(const char* data, size_t size, common::SerializationType ser_type = common::SerializationType::Unknown)
+        : buffer(data, data + size), serialization_type_(ser_type) {}
 
     virtual ~StoredMessage() = default;
 
@@ -65,8 +51,25 @@ public:
     {
         return std::make_unique<StoredData>(buffer.data(), buffer.size());
     }
+
+    // Return the serialization type associated with this message
+    common::SerializationType
+    serializationType() const { return serialization_type_; }
 };
 DEFINE_PTR_TYPES(StoredMessage)
+
+/**
+ * @brief Represents a snapshot of PV data at a specific time
+ */
+struct Snapshot
+{
+    std::string                           snapshot_id;
+    std::string                           snapshot_name;
+    std::chrono::system_clock::time_point created_at;
+    std::string                           description;
+    std::unordered_set<std::string>       pv_names;
+};
+DEFINE_PTR_TYPES(Snapshot)
 
 /**
  * @brief Represents a record to be archived
@@ -76,9 +79,9 @@ struct ArchiveRecord
     std::string                           pv_name;
     std::string                           topic;
     std::chrono::system_clock::time_point timestamp;
-    uint64_t                              message_id;
     std::string                           metadata;
-    common::ConstSerializedMessageUPtr    data;
+    ConstStoredMessageUPtr                data;
+    std::optional<std::string>            snapshot_id;  // Optional snapshot identifier
 };
 
 /**
@@ -91,6 +94,7 @@ struct ArchiveQuery
     std::optional<std::chrono::system_clock::time_point> start_time;
     std::optional<std::chrono::system_clock::time_point> end_time;
     std::optional<size_t>                                limit;
+    std::optional<std::string>                           snapshot_id;  // Optional snapshot filter
 };
 
 /**
@@ -125,6 +129,12 @@ public:
     virtual size_t             storeBatch(const std::vector<ArchiveRecord>& records) = 0;
     virtual ArchiveQueryResult query(const ArchiveQuery& query) = 0;
     virtual bool               isHealthy() = 0;
+    
+    // Snapshot management methods
+    virtual std::string        createSnapshot(const Snapshot& snapshot) = 0;
+    virtual bool               deleteSnapshot(const std::string& snapshot_id) = 0;
+    virtual std::vector<Snapshot> listSnapshots() = 0;
+    virtual std::optional<Snapshot> getSnapshot(const std::string& snapshot_id) = 0;
 };
 
 DEFINE_PTR_TYPES(IStorageService)

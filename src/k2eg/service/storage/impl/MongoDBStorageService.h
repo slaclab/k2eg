@@ -23,6 +23,7 @@ namespace k2eg::service::storage::impl {
 constexpr const char* MONGODB_CONNECTION_STRING_KEY = "connection-string";
 constexpr const char* MONGODB_DATABASE_KEY = "database";
 constexpr const char* MONGODB_COLLECTION_KEY = "collection";
+constexpr const char* MONGODB_SNAPSHOTS_COLLECTION_KEY = "snapshots-collection";
 constexpr const char* MONGODB_POOL_SIZE_KEY = "pool-size";
 constexpr const char* MONGODB_TIMEOUT_MS_KEY = "timeout-ms";
 constexpr const char* MONGODB_CREATE_INDEXES_KEY = "create-indexes";
@@ -36,6 +37,7 @@ struct MongoDBStorageImplementationConfig : public StorageImplementationConfig {
     std::string connection_string = "mongodb://localhost:27017";
     std::string database_name = "k2eg_archive";
     std::string collection_name = "epics_data";
+    std::string snapshots_collection_name = "snapshots";
     std::string index_collection_name = "epics_index";
     size_t connection_pool_size = 10;
     size_t batch_size = 1000;
@@ -89,6 +91,16 @@ private:
      * @brief Convert BSON document to ArchiveRecord
      */
     ArchiveRecord bsonToRecord(const bsoncxx::document::view& doc);
+    
+    /**
+     * @brief Convert Snapshot to BSON document
+     */
+    bsoncxx::document::value snapshotToBson(const Snapshot& snapshot);
+
+    /**
+     * @brief Convert BSON document to Snapshot
+     */
+    Snapshot bsonToSnapshot(const bsoncxx::document::view& doc);
     void initialize();
     void shutdown();
 public:
@@ -100,6 +112,12 @@ public:
     size_t storeBatch(const std::vector<ArchiveRecord>& records) override;
     ArchiveQueryResult query(const ArchiveQuery& query) override;
     bool isHealthy() override;
+    
+    // Snapshot management methods
+    std::string createSnapshot(const Snapshot& snapshot) override;
+    bool deleteSnapshot(const std::string& snapshot_id) override;
+    std::vector<Snapshot> listSnapshots() override;
+    std::optional<Snapshot> getSnapshot(const std::string& snapshot_id) override;
 };
 
 DEFINE_PTR_TYPES(MongoDBStorageService)

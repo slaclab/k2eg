@@ -5,12 +5,12 @@
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/types.h>
 
+#include <k2eg/service/configuration/configuration.h>
 #include <k2eg/service/log/ILogger.h>
-#include <k2eg/service/scheduler/Task.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/pubsub/ISubscriber.h>
+#include <k2eg/service/scheduler/Task.h>
 #include <k2eg/service/storage/IStorageService.h>
-#include <k2eg/service/configuration/configuration.h>
 
 #include <boost/program_options.hpp>
 
@@ -23,17 +23,17 @@ namespace k2eg::controller::node::worker {
  */
 struct StorageWorkerConfiguration
 {
-    size_t batch_size = 100;
-    size_t batch_timeout = 100;
-    size_t worker_thread_count = 4;
-    size_t queue_max_size = 10000;
-    std::string discover_task_cron = "* * * * * *"; // Every minute
+    size_t      batch_size = 100;
+    size_t      batch_timeout = 100;
+    size_t      worker_thread_count = 4;
+    size_t      queue_max_size = 10000;
+    std::string discover_task_cron = "* * * * * *";         // Every minute
     std::string consumer_group_id = "k2eg-storage-workers"; // Default consumer group
 
     std::string toString() const
     {
         return std::format("StorageWorkerConfiguration(batch_size={}, batch_timeout={}, worker_thread_count={}, queue_max_size={}, discover_task_cron={}, consumer_group_id={})",
-                             batch_size, batch_timeout, worker_thread_count, queue_max_size, discover_task_cron, consumer_group_id);
+                           batch_size, batch_timeout, worker_thread_count, queue_max_size, discover_task_cron, consumer_group_id);
     }
 };
 
@@ -61,8 +61,11 @@ class StorageWorker
 {
     // Configuration for the storage worker
     ConstStorageWorkerConfigurationShrdPtr config;
+    // Thread pool for managing worker threads
+    std::shared_ptr<BS::light_thread_pool> thread_pool;
     // Logger for logging messages related to storage worker operations
     service::log::ILoggerShrdPtr logger;
+    // Node configuration service for managing snapshots and node settings
     service::configuration::INodeConfigurationShrdPtr node_config;
     // Storage service for storing consumed data
     k2eg::service::storage::IStorageServiceShrdPtr storage_service;

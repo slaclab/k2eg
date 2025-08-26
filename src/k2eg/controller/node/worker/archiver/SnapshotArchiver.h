@@ -2,7 +2,6 @@
 #define K2EG_CONTROLLER_NODE_WORKER_ARCHIVER_SNAPSHOTARCHIVER_H_
 
 #include <k2eg/controller/node/worker/archiver/BaseArchiver.h>
-#include <string>
 
 namespace k2eg::controller::node::worker::archiver {
 
@@ -14,7 +13,12 @@ namespace k2eg::controller::node::worker::archiver {
  */
 class SnapshotArchiver : public BaseArchiver
 {
-    std::atomic<bool> is_archiving{false};
+    void parseSnapshotMessage(const service::pubsub::SubscriberInterfaceElement& m,
+                              k2eg::common::SerializationType&  ser,
+                              int&                              message_type,
+                              int64_t&                          iter_index,
+                              int64_t&                          payload_ts,
+                              std::string&                      snapshot_name);
 
 public:
     /**
@@ -24,20 +28,17 @@ public:
      * @param storage_service_ The storage service to be used for archiving.
      * @param snapshot_queue_name_ The name of the message queue to consume snapshots from.
      */
-    SnapshotArchiver(ConstStorageWorkerConfigurationShrdPtr config_, k2eg::service::pubsub::ISubscriberShrdPtr subscriber_, k2eg::service::storage::IStorageServiceShrdPtr storage_service_, const std::string& snapshot_queue_name_);
+    SnapshotArchiver(const ArchiverParameters& params);
     /**
      * @brief Destroys the SnapshotArchiver object.
      * @details Cleans up resources and stops any ongoing archiving processes.
      */
     ~SnapshotArchiver();
-
-    void startArchiving() override;
-    void stopArchiving() override;
-
-private:
-    std::string snapshot_queue_name;
-
-    int processMessage(service::pubsub::SubscriberInterfaceElementVector& messages) override;
+    /**
+     * @brief Performs the work of the SnapshotArchiver.
+     * @param timeout The timeout for the work to be performed.
+     */
+    void performWork(int num_of_msg, int timeout) override;
 };
 
 } // namespace k2eg::controller::node::worker::archiver
