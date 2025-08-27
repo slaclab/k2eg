@@ -1,6 +1,7 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_STORAGEWORKER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_STORAGEWORKER_H_
 
+#include "k2eg/controller/node/worker/archiver/BaseArchiver.h"
 #include "k2eg/service/configuration/INodeConfiguration.h"
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/types.h>
@@ -24,7 +25,7 @@ namespace k2eg::controller::node::worker {
 struct StorageWorkerConfiguration
 {
     size_t      batch_size = 100;
-    size_t      batch_timeout = 100;
+    size_t      batch_timeout = 1000;
     size_t      worker_thread_count = 4;
     size_t      queue_max_size = 10000;
     std::string discover_task_cron = "* * * * * *";         // Every minute
@@ -59,6 +60,8 @@ ConstStorageWorkerConfigurationShrdPtr get_storage_worker_program_option(const b
  */
 class StorageWorker
 {
+    // signal the worker to stop
+    bool stop = false;
     // Configuration for the storage worker
     ConstStorageWorkerConfigurationShrdPtr config;
     // Thread pool for managing worker threads
@@ -73,6 +76,7 @@ class StorageWorker
     k2eg::service::pubsub::ISubscriberShrdPtr subscriber;
     // Metric service for reporting metrics
     k2eg::service::metric::IMetricServiceShrdPtr metric_service;
+    void                                         processArchiver(archiver::BaseArchiverShrdPtr archiver);
 
 public:
     StorageWorker(const ConstStorageWorkerConfigurationShrdPtr&, k2eg::service::storage::IStorageServiceShrdPtr);

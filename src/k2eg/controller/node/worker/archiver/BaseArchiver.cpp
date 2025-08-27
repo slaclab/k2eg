@@ -10,23 +10,14 @@ using namespace k2eg::service;
 using namespace k2eg::service::log;
 using namespace k2eg::service::pubsub;
 
-BaseArchiver::BaseArchiver(ConstStorageWorkerConfigurationShrdPtr config_, k2eg::service::pubsub::ISubscriberShrdPtr subscriber_, k2eg::service::storage::IStorageServiceShrdPtr storage_service_)
-    : archiver_params{config_, subscriber_, storage_service_, {}}
-    , config(config_)
-    , logger(ServiceResolver<ILogger>::resolve())
-    , subscriber(subscriber_)
-    , storage_service(storage_service_)
+BaseArchiver::BaseArchiver(
+    const ArchiverParameters&                      params_,
+    k2eg::service::log::ILoggerShrdPtr             logger_,
+    k2eg::service::pubsub::ISubscriberShrdPtr      subscriber_,
+    k2eg::service::storage::IStorageServiceShrdPtr storage_service_)
+    : params(params_), logger(logger_), subscriber(subscriber_), storage_service(storage_service_)
 {
-}
-
-BaseArchiver::BaseArchiver(const ArchiverParameters& params)
-    : archiver_params(params)
-    , config(params.config)
-    , logger(ServiceResolver<ILogger>::resolve())
-    , subscriber(params.subscriber)
-    , storage_service(params.storage_service)
-{
-        // Start consuming messages from the snapshot queue
+    // Start consuming messages from the snapshot queue
     // This is where you would set up your message queue consumer
     is_archiving.store(true);
 }

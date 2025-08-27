@@ -21,6 +21,7 @@ using namespace k2eg::service::scheduler;
 using namespace k2eg::service::configuration;
 
 using namespace k2eg::controller::node::worker;
+using namespace k2eg::controller::node::worker::archiver;
 
 // Default values for StorageWorker configuration
 #define DEFAULT_BATCH_SIZE 100
@@ -166,10 +167,13 @@ StorageWorker::StorageWorker(const ConstStorageWorkerConfigurationShrdPtr& confi
 
 StorageWorker::~StorageWorker()
 {
+    stop = true;
     logger->logMessage("Destroying StorageWorker...", LogLevel::INFO);
     logger->logMessage("Remove periodic task from scheduler");
     bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(DISCOVER_TASK_NAME);
     logger->logMessage(STRING_FORMAT("Removed periodic discover task result: %1%", erased), LogLevel::DEBUG);
+    logger->logMessage("Stopping archivers", LogLevel::DEBUG);
+    thread_pool->wait();
     logger->logMessage("StorageWorker destroyed", LogLevel::INFO);
 }
 
@@ -196,12 +200,40 @@ void StorageWorker::executePeriodicTask(TaskProperties& task_properties)
         if (node_config->tryAcquireSnapshot(snapshot_id, false)) // false for storage
         {
             logger->logMessage(STRING_FORMAT("Acquired snapshot: %1%", snapshot_id), LogLevel::INFO);
-            // Here you can add logic to start processing the acquired snapshot
-            node_config->setSnapshotArchiveStatus(snapshot_id, ArchiveStatusInfo{ArchiveStatus::PREPARE_TO_ARCHIVE});
+
+            thread_pool->detach_task(
+                [this, snapshot_id]() mutable
+                {
+                    auto archiver = archiver::MakeSnapshotArchiverShrdPtr(
+                        ArchiverParameters{
+                            .engine_config = this->config,
+                            .snapshot_queue_name = snapshot_id},
+                        this->logger,
+                        ServiceResolver<ISubscriber>::resolve(),
+                        this->storage_service);
+                    // set snapshot as archiving
+                    node_config->setSnapshotArchiveStatus(snapshot_id, ArchiveStatusInfo{ArchiveStatus::ARCHIVING});
+                    // start processing the acquired snapshot
+                    processArchiver(archiver);
+                });
         }
         else
         {
             logger->logMessage(STRING_FORMAT("Failed to acquire snapshot: %1%", snapshot_id), LogLevel::ERROR);
         }
     }
+}
+
+void StorageWorker::processArchiver(archiver::BaseArchiverShrdPtr archiver)
+{
+    if (stop)
+        return;
+    // give time to archive
+    archiver->performWork(std::chrono::milliseconds(config->batch_timeout));
+    // resubmit to scheduler
+    thread_pool->detach_task(
+        [this, archiver]() mutable
+        {
+            processArchiver(archiver);
+        });
 }

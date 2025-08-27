@@ -1,13 +1,21 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_ARCHIVER_BASEARCHIVER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_ARCHIVER_BASEARCHIVER_H_
 
-#include <k2eg/controller/node/worker/StorageWorker.h>
+#include <k2eg/common/types.h>
 
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/pubsub/ISubscriber.h>
 #include <k2eg/service/storage/IStorageService.h>
+
+#include <chrono>
+#include <memory>
 #include <string>
 #include <thread>
+
+// Forward declare to avoid circular include with StorageWorker.h
+namespace k2eg::controller::node::worker {
+struct StorageWorkerConfiguration;
+}
 
 namespace k2eg::controller::node::worker::archiver {
 /**
@@ -17,10 +25,8 @@ namespace k2eg::controller::node::worker::archiver {
  */
 struct ArchiverParameters
 {
-    ConstStorageWorkerConfigurationShrdPtr         config;              ///< Storage worker configuration
-    k2eg::service::pubsub::ISubscriberShrdPtr      subscriber;          ///< Input subscriber
-    k2eg::service::storage::IStorageServiceShrdPtr storage_service;     ///< Storage backend
-    std::string                                    snapshot_queue_name; ///< Optional queue name (used by snapshot archiver)
+    std::shared_ptr<const k2eg::controller::node::worker::StorageWorkerConfiguration> engine_config;       ///< Storage worker configuration
+    const std::string                                                                 snapshot_queue_name; ///< Name of the queue to consume snapshot messages from.
 };
 
 /**
@@ -37,39 +43,27 @@ class BaseArchiver
 
 protected:
     // Aggregated parameters available to all derived archivers
-    ArchiverParameters archiver_params;
-    // Keep discrete members for current internal usage
-    ConstStorageWorkerConfigurationShrdPtr config;
-    /**
-     * @brief Logger for logging messages related to archiving.
-     * @details This logger is used to log information, warnings, and errors during the
-     * archiving process.
-     */
+    const ArchiverParameters params;
+    // Logger for the archiver.
     k2eg::service::log::ILoggerShrdPtr logger;
-    /**
-     * @brief Subscriber for receiving messages related to archiving.
-     * @details This subscriber is used to consume messages from a message queue
-     * that contains data to be archived.
-     */
+    // Subscriber for the archiver.
     k2eg::service::pubsub::ISubscriberShrdPtr subscriber;
-
-    /**
-     * @brief Storage service used for storing archived data.
-     * @details This service is responsible for the actual storage implementation
-     * (e.g., MongoDB, SQLite) and is injected into the archiver.
-     */
+    // Storage service for the archiver.
     k2eg::service::storage::IStorageServiceShrdPtr storage_service;
+    // Keep discrete members for current internal usage
+    std::shared_ptr<const k2eg::controller::node::worker::StorageWorkerConfiguration>
+        config;
+
 public:
     /**
      * @brief Constructs a new BaseArchiver object.
      * @param storage_service_ The storage service to be used for archiving.
      */
-    BaseArchiver(ConstStorageWorkerConfigurationShrdPtr config_, k2eg::service::pubsub::ISubscriberShrdPtr subscriber_, k2eg::service::storage::IStorageServiceShrdPtr storage_service_);
-
-    /**
-     * @brief Constructs a new BaseArchiver object using aggregated parameters.
-     */
-    explicit BaseArchiver(const ArchiverParameters& params);
+    explicit BaseArchiver(
+        const ArchiverParameters&                      params,
+        k2eg::service::log::ILoggerShrdPtr             logger,
+        k2eg::service::pubsub::ISubscriberShrdPtr      subscriber,
+        k2eg::service::storage::IStorageServiceShrdPtr storage_service);
 
     /**
      * @brief Destroys the BaseArchiver object.
@@ -82,9 +76,8 @@ public:
      * @details This method is called to continue the archiving process.
      * @param timeout The timeout for the work to be performed.
      */
-    virtual void performWork(int num_of_msg, int timeout) = 0;
-
+    virtual void performWork(std::chrono::milliseconds timeout) = 0;
 };
-
+DEFINE_PTR_TYPES(BaseArchiver)
 } // namespace k2eg::controller::node::worker::archiver
 #endif // K2EG_CONTROLLER_NODE_WORKER_ARCHIVER_BASEARCHIVER_H_

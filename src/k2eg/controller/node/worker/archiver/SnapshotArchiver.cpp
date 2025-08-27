@@ -1,5 +1,6 @@
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
+#include <k2eg/controller/node/worker/StorageWorker.h>
 #include <k2eg/controller/node/worker/archiver/SnapshotArchiver.h>
 
 #include <chrono>
@@ -11,203 +12,288 @@ using namespace k2eg::service::storage;
 
 using namespace k2eg::controller::node::worker::archiver;
 
-SnapshotArchiver::SnapshotArchiver(const ArchiverParameters& params)
-    : BaseArchiver(params)
+SnapshotArchiver::SnapshotArchiver(
+    const ArchiverParameters&                      params_,
+    k2eg::service::log::ILoggerShrdPtr             logger_,
+    k2eg::service::pubsub::ISubscriberShrdPtr      subscriber_,
+    k2eg::service::storage::IStorageServiceShrdPtr storage_service_)
+    : BaseArchiver(
+          params_,
+          logger_,
+          subscriber_,
+          storage_service_)
 {
-    logger->logMessage(STRING_FORMAT("SnapshotArchiver started consuming from queue: %1%", archiver_params.snapshot_queue_name), LogLevel::INFO);
+    logger->logMessage(STRING_FORMAT("SnapshotArchiver started consuming from queue: %1%", params.snapshot_queue_name), LogLevel::INFO);
     if (!subscriber || !storage_service || !config)
     {
         if (logger)
             logger->logMessage("SnapshotArchiver not properly initialized (subscriber/storage/config missing)", LogLevel::ERROR);
         throw std::runtime_error("SnapshotArchiver not properly initialized (subscriber/storage/config missing)");
     }
+    // Ensure the subscriber is subscribed to the snapshot queue
+    try
+    {
+        if (!params_.snapshot_queue_name.empty())
+        {
+            k2eg::common::StringVector q{params_.snapshot_queue_name};
+            subscriber->addQueue(q);
+        }
+    }
+    catch (const std::exception& ex)
+    {
+        if (logger)
+            logger->logMessage(STRING_FORMAT("SnapshotArchiver failed to subscribe to queue: %1%", ex.what()), LogLevel::ERROR);
+        throw;
+    }
 }
 
 SnapshotArchiver::~SnapshotArchiver() {}
 
-void SnapshotArchiver::performWork(int /*num_of_msg*/, int timeout)
+void SnapshotArchiver::performWork(std::chrono::milliseconds timeout)
 {
     using namespace std::chrono;
     const auto batch_sz = static_cast<unsigned int>(config->batch_size);
 
-    // Read messages from subscriber (this blocks up to 'timeout')
-    service::pubsub::SubscriberInterfaceElementVector messages;
-    const int                                         rc = subscriber->getMsg(messages, batch_sz, static_cast<unsigned int>(timeout));
-    if (rc != 0 || messages.empty())
-    {
-        return;
-    }
-
-    // Deadline to respect the timeout for this batch
+    // Deadline to respect the timeout for this call (both fetch and process)
     const auto start_time = steady_clock::now();
-    const auto deadline = start_time + milliseconds(timeout);
+    const auto deadline = start_time + timeout;
 
-    // Map to track snapshots created per snapshot_name+iter_index so subsequent messages can reference the id
+    // Map to track snapshots created per snapshot_name+iter_index so subsequent
+    // messages in this invocation can reference the id.
     std::unordered_map<std::string, std::string> created_snapshots;
 
-    // Process messages individually: create snapshot on header, store each record and commit that message
-    size_t processed_count = 0;
-    for (const auto& m : messages)
+    // Keep working until we run out of time.
+    while (steady_clock::now() < deadline)
     {
-        if (!m)
-            continue;
-
-        // If we are very close to deadline, stop processing more messages to avoid overrunning
-        if (steady_clock::now() > deadline)
+        // If no backlog is present, fetch a new batch while respecting the
+        // total timeout budget. We allocate most of the time to fetching,
+        // but keep a small slice for processing the fetched messages.
+        if (pending_messages.empty())
         {
-            break;
+            service::pubsub::SubscriberInterfaceElementVector fetched;
+
+            // Time budget left for this performWork() call.
+            auto         now = steady_clock::now();
+            milliseconds remaining = duration_cast<milliseconds>(deadline - now);
+            if (remaining.count() <= 0)
+            {
+                // Nothing left in the budget: skip fetch and exit.
+                break;
+            }
+
+            // Reserve approximately 10% of the remaining time (minimum 10ms)
+            // so we can process the fetched messages without exceeding the
+            // overall call deadline. Clamp to ensure reservation is always
+            // strictly less than the remaining budget when possible.
+            milliseconds reserve = remaining / 10; // ~10% of remaining
+            if (reserve < milliseconds(10))
+                reserve = milliseconds(10);
+            if (reserve >= remaining)
+                reserve = remaining > milliseconds(1) ? remaining - milliseconds(1) : milliseconds(0);
+
+            // The fetch timeout is whatever remains after the reservation.
+            // Ensure we pass a positive timeout (at least 1ms) to the subscriber.
+            auto fetch_timeout = remaining - reserve;
+            if (fetch_timeout <= milliseconds(0))
+                fetch_timeout = milliseconds(1);
+
+            // Fetch up to batch_sz messages using the computed timeout.
+            const int rc = subscriber->getMsg(fetched, batch_sz, static_cast<unsigned int>(fetch_timeout.count()));
+            if (rc != 0 || fetched.empty())
+            {
+                // Either no data arrived within the budget or an error occurred.
+                // Leave backlog empty and exit; caller will try again on the next tick.
+                break;
+            }
+
+            // Stash fetched messages as backlog so this invocation can process them.
+            pending_messages = std::move(fetched);
         }
 
-        // Parse the message payload (encapsulated helper)
-        k2eg::common::SerializationType ser;
-        int                             message_type;
-        int64_t                         iter_index;
-        int64_t                         payload_ts;
-        int64_t                         header_timestamp;
-        std::string                     snapshot_name;
-        service::storage::ArchiveRecord rec;
+        // Process as many pending messages as the remaining time allows.
+        size_t processed_count = 0;
+        // Process a fixed initial burst without checking time to reduce
+        // deadline-check overhead and guarantee some progress even under
+        // tight budgets. Keep the burst strictly less than batch size when possible.
+        const unsigned int burst_cap = batch_sz > 1 ? (batch_sz - 1) : 1;
+        const size_t       burst_target = std::min(pending_messages.size(), static_cast<size_t>(burst_cap));
 
-        this->parseSnapshotMessage(*m, ser, message_type, iter_index, payload_ts, header_timestamp, snapshot_name); // Build ArchiveRecord
-
-        rec.pv_name = m->key;
-        rec.topic = archiver_params.snapshot_queue_name;
-
-        if (payload_ts > 0)
+        for (size_t idx = 0; idx < pending_messages.size(); ++idx)
         {
-            rec.timestamp = std::chrono::system_clock::time_point(std::chrono::milliseconds(payload_ts));
+            // After the initial burst, honor the deadline. This may slightly
+            // exceed the budget for the first few messages, which is acceptable.
+            if (idx >= burst_target && steady_clock::now() > deadline)
+                break;
+
+            const auto& m = pending_messages[idx];
+            if (!m)
+                continue;
+
+            processMessage(*m, created_snapshots);
+
+            ++processed_count;
+
+            // Periodically re-check the deadline only after the initial burst
+            // to avoid excessive time checking overhead.
+            if (idx >= burst_target && (processed_count % 50 == 0) && steady_clock::now() > deadline)
+            {
+                break;
+            }
+        }
+
+        // Remove the processed messages from the front of the backlog so the
+        // next iteration continues with the remaining ones or fetches new data.
+        if (processed_count > 0)
+        {
+            if (processed_count >= pending_messages.size())
+                pending_messages.clear();
+            else
+                pending_messages.erase(pending_messages.begin(), pending_messages.begin() + processed_count);
+        }
+
+        // If we couldn't process anything (likely due to timeout), exit.
+        if (processed_count == 0)
+            break;
+    }
+}
+
+void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInterfaceElement& m,
+                                      std::unordered_map<std::string, std::string>&            created_snapshots)
+{
+    // Parse the message payload (encapsulated helper)
+    k2eg::common::SerializationType ser;
+    int                             message_type;
+    int64_t                         iter_index;
+    int64_t                         payload_ts;
+    int64_t                         header_timestamp;
+    std::string                     snapshot_name;
+    service::storage::ArchiveRecord rec;
+
+    this->parseSnapshotMessage(m, ser, message_type, iter_index, payload_ts, header_timestamp, snapshot_name);
+
+    rec.pv_name = m.key;
+    rec.topic = params.snapshot_queue_name;
+
+    if (payload_ts > 0)
+        rec.timestamp = std::chrono::system_clock::time_point(std::chrono::milliseconds(payload_ts));
+    else
+        rec.timestamp = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+
+    try
+    {
+        boost::json::object meta;
+        meta["message_type"] = message_type >= 0 ? message_type : 1;
+        if (iter_index >= 0)
+            meta["iter_index"] = iter_index;
+        if (!snapshot_name.empty())
+            meta["snapshot_name"] = snapshot_name;
+        rec.metadata = boost::json::serialize(meta);
+    }
+    catch (...)
+    {
+        rec.metadata = "";
+    }
+
+    // here data is moved
+    rec.data = std::make_unique<service::storage::StoredMessage>(m.data.get(), m.data_len, ser);
+
+    // Handle snapshot management: check if snapshot exists, create if needed
+    if (!snapshot_name.empty())
+    {
+        const int64_t     key_timestamp = (message_type == 0) ? payload_ts : header_timestamp;
+        const std::string key = snapshot_name + ":" + std::to_string(key_timestamp) + ":" + std::to_string(iter_index);
+        std::string       snapshot_id;
+
+        // First check our local cache
+        auto it = created_snapshots.find(key);
+        if (it != created_snapshots.end())
+        {
+            snapshot_id = it->second;
         }
         else
         {
-            rec.timestamp = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
-        }
-
-        try
-        {
-            boost::json::object meta;
-            meta["message_type"] = message_type >= 0 ? message_type : 1;
-            if (iter_index >= 0)
-                meta["iter_index"] = iter_index;
-            if (!snapshot_name.empty())
-                meta["snapshot_name"] = snapshot_name;
-            rec.metadata = boost::json::serialize(meta);
-        }
-        catch (...)
-        {
-            rec.metadata = "";
-        }
-
-        // here data is moved
-        rec.data = std::make_unique<service::storage::StoredMessage>(m->data.get(), m->data_len, ser);
-
-        // Handle snapshot management: check if snapshot exists, create if needed
-        if (!snapshot_name.empty())
-        {
-            // Use header_timestamp for header messages, or the parsed header_timestamp for data/tail messages
-            const int64_t     key_timestamp = (message_type == 0) ? payload_ts : header_timestamp;
-            const std::string key = snapshot_name + ":" + std::to_string(key_timestamp) + ":" + std::to_string(iter_index);
-            std::string       snapshot_id;
-
-            // First check our local cache
-            auto it = created_snapshots.find(key);
-            if (it != created_snapshots.end())
+            // Check if snapshot already exists in storage (from previous execution/crash recovery)
+            try
             {
-                snapshot_id = it->second;
+                auto existing_snap = storage_service->findSnapshotBySearchKey(key);
+                if (existing_snap.has_value())
+                {
+                    snapshot_id = existing_snap->snapshot_id;
+                    created_snapshots[key] = snapshot_id;
+                    if (logger)
+                        logger->logMessage(STRING_FORMAT("SnapshotArchiver found existing snapshot: %1% for key %2%", snapshot_id % key), LogLevel::DEBUG);
+                }
             }
-            else
+            catch (const std::exception& ex)
             {
-                // Check if snapshot already exists in storage (from previous execution/crash recovery)
+                if (logger)
+                    logger->logMessage(STRING_FORMAT("SnapshotArchiver error checking existing snapshots: %1%", ex.what()), LogLevel::ERROR);
+            }
+
+            // If header message and no existing snapshot found, create a new one
+            if (snapshot_id.empty() && message_type == 0)
+            {
+                service::storage::Snapshot snap;
+                snap.snapshot_name = snapshot_name;
+                snap.created_at = rec.timestamp;
+                snap.description = STRING_FORMAT("Snapshot iteration %1%", iter_index);
+                snap.search_key = key;
                 try
                 {
-                    // Use the efficient search key method instead of listing all snapshots
-                    auto existing_snap = storage_service->findSnapshotBySearchKey(key);
-                    if (existing_snap.has_value())
+                    snapshot_id = storage_service->createSnapshot(snap);
+                    if (!snapshot_id.empty())
                     {
-                        // Found a snapshot with the matching search key, use its ID
-                        snapshot_id = existing_snap->snapshot_id;
                         created_snapshots[key] = snapshot_id;
                         if (logger)
-                            logger->logMessage(STRING_FORMAT("SnapshotArchiver found existing snapshot: %1% for key %2%", snapshot_id % key), LogLevel::DEBUG);
+                            logger->logMessage(STRING_FORMAT("SnapshotArchiver created new snapshot: %1% for %2%", snapshot_id % snapshot_name), LogLevel::INFO);
                     }
                 }
                 catch (const std::exception& ex)
                 {
                     if (logger)
-                        logger->logMessage(STRING_FORMAT("SnapshotArchiver error checking existing snapshots: %1%", ex.what()), LogLevel::ERROR);
-                }
-
-                // If header message and no existing snapshot found, create a new one
-                if (snapshot_id.empty() && message_type == 0)
-                {
-                    service::storage::Snapshot snap;
-                    snap.snapshot_name = snapshot_name;
-                    snap.created_at = rec.timestamp;
-                    snap.description = STRING_FORMAT("Snapshot iteration %1%", iter_index);
-                    snap.search_key = key; // Store the search key for efficient lookups
-                    try
-                    {
-                        snapshot_id = storage_service->createSnapshot(snap);
-                        if (!snapshot_id.empty())
-                        {
-                            created_snapshots[key] = snapshot_id;
-                            if (logger)
-                                logger->logMessage(STRING_FORMAT("SnapshotArchiver created new snapshot: %1% for %2%", snapshot_id % snapshot_name), LogLevel::INFO);
-                        }
-                    }
-                    catch (const std::exception& ex)
-                    {
-                        if (logger)
-                            logger->logMessage(STRING_FORMAT("SnapshotArchiver createSnapshot exception: %1%", ex.what()), LogLevel::ERROR);
-                    }
+                        logger->logMessage(STRING_FORMAT("SnapshotArchiver createSnapshot exception: %1%", ex.what()), LogLevel::ERROR);
                 }
             }
+        }
 
-            // Attach snapshot_id to the record if we have one
-            if (!snapshot_id.empty())
+        // Attach snapshot_id to the record if we have one
+        if (!snapshot_id.empty())
+        {
+            rec.snapshot_id = snapshot_id;
+        }
+    }
+
+    // Store the record immediately (not deferred)
+    try
+    {
+        storage_service->store(rec);
+        // Only commit after successful storage to prevent duplicates
+        if (m.commit_handle)
+        {
+            try
             {
-                rec.snapshot_id = snapshot_id;
+                subscriber->commit(m.commit_handle, true);
             }
-        }
-
-        // Store the record immediately (not deferred)
-        try
-        {
-            storage_service->store(rec);
-            
-            // Only commit after successful storage to prevent duplicates
-            if (m->commit_handle)
+            catch (const std::exception& ex)
             {
-                try
-                {
-                    subscriber->commit(m->commit_handle, true);
-                }
-                catch (const std::exception& ex)
-                {
-                    if (logger)
-                        logger->logMessage(STRING_FORMAT("SnapshotArchiver commit exception: %1%", ex.what()), LogLevel::ERROR);
-                }
+                if (logger)
+                    logger->logMessage(STRING_FORMAT("SnapshotArchiver commit exception: %1%", ex.what()), LogLevel::ERROR);
             }
         }
-        catch (const std::exception& ex)
-        {
-            if (logger)
-                logger->logMessage(STRING_FORMAT("SnapshotArchiver store exception: %1%", ex.what()), LogLevel::ERROR);
-            // Don't commit if storage failed - message will be redelivered
-        }
+    }
+    catch (const std::exception& ex)
+    {
+        if (logger)
+            logger->logMessage(STRING_FORMAT("SnapshotArchiver store exception: %1%", ex.what()), LogLevel::ERROR);
+        // Don't commit if storage failed - message will be redelivered
+    }
 
-        // If tail message, we can drop the snapshot mapping for this iteration
-        if (message_type == 2 && !snapshot_name.empty())
-        {
-            const int64_t     key_timestamp = (message_type == 0) ? payload_ts : header_timestamp;
-            const std::string key = snapshot_name + ":" + std::to_string(key_timestamp) + ":" + std::to_string(iter_index);
-            created_snapshots.erase(key);
-        }
-
-        ++processed_count;
-
-        if (processed_count % 50 == 0 && steady_clock::now() > deadline)
-        {
-            break;
-        }
+    // If tail message, we can drop the snapshot mapping for this iteration
+    if (message_type == 2 && !snapshot_name.empty())
+    {
+        const int64_t     key_timestamp = (message_type == 0) ? payload_ts : header_timestamp;
+        const std::string key = snapshot_name + ":" + std::to_string(key_timestamp) + ":" + std::to_string(iter_index);
+        created_snapshots.erase(key);
     }
 }
 
