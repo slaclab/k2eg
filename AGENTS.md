@@ -22,6 +22,20 @@
 - Language: Prefer modern C++ (C++20), avoid raw pointers where possible, and keep headers under `src/` include paths.
 - Includes: In project `.cpp` files, always include project headers using the `k2eg`-scoped include path with angle brackets, e.g. `#include <k2eg/service/pubsub/ISubscriber.h>`. Avoid relative includes like `#include "../.."`.
 
+### API Documentation (Doxygen)
+- Use concise [Doxygen](https://www.doxygen.nl/manual/docblocks.html) blocks for public methods and types.
+- Format:
+  ```
+  /**
+   * @brief <short one-line summary>
+   * @param <name> <what it represents; units/range if relevant>
+   * @return <what is returned; success semantics and error cases>
+   */
+  ```
+- Keep brief lines short and specific; expand only when needed.
+- Prefer imperative voice; avoid restating names in descriptions.
+- Document ownership/lifetime and thread-safety when non-obvious.
+
 ## Testing Guidelines
 - Framework: GoogleTest with a global environment initializer in `test/test.cpp` (starts/stops EPICS providers).
 - Organization: Place tests near their domain (e.g., `test/epics/epics_data_serialization.cpp`). Use clear test names and cover error paths.

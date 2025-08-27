@@ -36,6 +36,11 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     auto subscriber_snapshot = k2eg->getSubscriberInstance(SNAPSHOT_NAME);
     ASSERT_NE(subscriber_snapshot, nullptr) << "Failed to get subscriber instance for snapshot";
 
+    auto storage_service = k2eg->getStorageServiceInstance();
+    ASSERT_NE(storage_service, nullptr) << "Failed to get storage service instance";
+
+    storage_service->clearAllData();
+
     // start a snapshot
     auto start_snapshot_cmd = MakeRepeatingSnapshotCommandShrdPtr(
         SerializationType::JSON,

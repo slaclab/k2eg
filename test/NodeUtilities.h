@@ -29,7 +29,8 @@
 #include <thread>
 
 /**
- * Command message wrapper for publishing commands
+ * @brief Command message wrapper for publishing commands.
+ * @tparam T Command pointer type used by controller.
  */
 template <typename T>
 class CMDMessage : public k2eg::service::pubsub::PublishMessage
@@ -42,51 +43,77 @@ class CMDMessage : public k2eg::service::pubsub::PublishMessage
     T cmd;
 
 public:
+    /**
+     * @brief Construct a command message.
+     * @param queue Target topic/queue name.
+     * @param cmd Command pointer to serialize.
+     */
     CMDMessage(const std::string& queue, T cmd)
         : request_type("test"), distribution_key(k2eg::common::UUID::generateUUIDLite()), queue(queue), cmd(cmd)
     {
         json_nmessage = k2eg::controller::command::to_json_string_cmd_ptr(cmd);
     }
 
+    /**
+     * @brief Destroy the message.
+     */
     virtual ~CMDMessage() {}
 
-    char*
-    getBufferPtr()
+    /**
+     * @brief Get mutable buffer pointer for publisher.
+     * @return Pointer to internal JSON buffer.
+     */
+    char* getBufferPtr()
     {
         return const_cast<char*>(json_nmessage.c_str());
     }
 
-    const size_t
-    getBufferSize()
+    /**
+     * @brief Get payload size in bytes.
+     * @return Size of the JSON buffer.
+     */
+    const size_t getBufferSize()
     {
         return json_nmessage.size();
     }
 
-    const std::string&
-    getQueue()
+    /**
+     * @brief Get target queue name.
+     * @return Queue/topic string.
+     */
+    const std::string& getQueue()
     {
         return queue;
     }
 
-    const std::string&
-    getDistributionKey()
+    /**
+     * @brief Get distribution key used for partitioning.
+     * @return Stable per-message key.
+     */
+    const std::string& getDistributionKey()
     {
         return distribution_key;
     }
 
-    const std::string&
-    getReqType()
+    /**
+     * @brief Get request type label.
+     * @return Constant request type string.
+     */
+    const std::string& getReqType()
     {
         return request_type;
     }
 };
 
 /**
- * Test environment for K2EG
+ * @brief Test environment bootstrapping K2EG for integration tests.
  */
 class K2EGTestEnv : public k2eg::K2EG
 {
 public:
+    /**
+     * @brief Initialize K2EG with test defaults.
+     */
     K2EGTestEnv()
     {
         int         argc = 1;
@@ -97,22 +124,28 @@ public:
         }
     }
 
+    /**
+     * @brief Shutdown K2EG on destruction.
+     */
     ~K2EGTestEnv()
     {
         deinit();
     }
 
-    /*
-        Return the publisher instance
-    */
+    /**
+     * @brief Create a Kafka publisher bound to test config.
+     * @return Shared pointer to publisher.
+     */
     k2eg::service::pubsub::IPublisherShrdPtr getPublisherInstance()
     {
         return k2eg::service::pubsub::impl::kafka::MakeRDKafkaPublisherShrdPtr(po->getPublisherConfiguration());
     }
 
     /**
-        Return the subscriber instance
-    */
+     * @brief Create a Kafka subscriber bound to test config.
+     * @param queue Optional queue to subscribe immediately.
+     * @return Shared pointer to subscriber.
+     */
     k2eg::service::pubsub::ISubscriberShrdPtr getSubscriberInstance(const std::string& queue = "")
     {
         auto subscriber = k2eg::service::pubsub::impl::kafka::MakeRDKafkaSubscriberShrdPtr(po->getSubscriberConfiguration());
@@ -122,13 +155,28 @@ public:
     }
 
     /**
-        Return the gateway command topic
-    */
+     * @brief Create a MongoDB storage service instance.
+     * @return Shared pointer to storage service.
+     */
+    k2eg::service::storage::IStorageServiceShrdPtr getStorageServiceInstance()
+    {
+        return k2eg::service::storage::StorageServiceFactory::create(po->getStorageServiceConfiguration());
+    }
+
+    /**
+     * @brief Get the gateway command topic.
+     * @return Topic string used for commands.
+     */
     const std::string& getGatewayCMDTopic()
     {
         return po->getOption<std::string>(CMD_INPUT_TOPIC);
     }
 
+    /**
+     * @brief Publish a command message with basic safety checks.
+     * @param publisher Publisher to use.
+     * @param command Serialized command message.
+     */
     void sendCommand(k2eg::service::pubsub::IPublisherShrdPtr publisher, k2eg::service::pubsub::PublishMessageUniquePtr command)
     {
         if (!publisher)
@@ -145,6 +193,13 @@ public:
         publisher->pushMessage(std::move(command));
     }
 
+    /**
+     * @brief Drain messages from a subscriber until count or timeout.
+     * @param subscriber Subscriber to read from.
+     * @param num_of_msg Target number of messages.
+     * @param timeout_ms Max wait in milliseconds (<=0 waits indefinitely).
+     * @return Collected messages up to requested count.
+     */
     k2eg::service::pubsub::SubscriberInterfaceElementVector getMessages(k2eg::service::pubsub::ISubscriberShrdPtr subscriber, int num_of_msg, int timeout_ms = 10000)
     {
         if (!subscriber)
@@ -185,6 +240,11 @@ public:
         return mesg_received;
     }
 
+    /**
+     * @brief Parse a subscriber message into a JSON object.
+     * @param message Subscriber message buffer and size.
+     * @return Parsed JSON object; adds a test failure on parse errors.
+     */
     boost::json::object getJsonObject(const k2eg::service::pubsub::SubscriberInterfaceElement& message)
     {
         boost::json::object result;
