@@ -15,8 +15,6 @@
 
 #include <boost/program_options.hpp>
 
-#include <atomic>
-
 namespace k2eg::controller::node::worker {
 
 /**
@@ -24,11 +22,11 @@ namespace k2eg::controller::node::worker {
  */
 struct StorageWorkerConfiguration
 {
-    size_t      batch_size = 100;
-    size_t      batch_timeout = 1000;
-    size_t      worker_thread_count = 4;
-    size_t      queue_max_size = 10000;
-    std::string discover_task_cron = "* * * * * *";         // Every minute
+    size_t      batch_size = 100;                           ///< Size of each batch
+    size_t      batch_timeout = 500;                        ///< Timeout for batch processing
+    size_t      worker_thread_count = 4;                    ///< Number of worker threads
+    size_t      queue_max_size = 10000;                     ///< Maximum size of the processing queue
+    std::string discover_task_cron = "*/30 * * * * *";      // Every 30 seconds
     std::string consumer_group_id = "k2eg-storage-workers"; // Default consumer group
 
     std::string toString() const

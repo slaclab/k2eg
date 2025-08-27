@@ -20,6 +20,7 @@
 - Formatting: `.clang-format` (LLVM-based), 4-space indent, no tabs. Run `clang-format -i` on changed files before committing.
 - Naming: Classes use PascalCase (e.g., `EpicsChannel`); member variables and files follow existing patterns (`pv_name`, `EpicsChannel.cpp`). Keep directories lowercase.
 - Language: Prefer modern C++ (C++20), avoid raw pointers where possible, and keep headers under `src/` include paths.
+- Includes: In project `.cpp` files, always include project headers using the `k2eg`-scoped include path with angle brackets, e.g. `#include <k2eg/service/pubsub/ISubscriber.h>`. Avoid relative includes like `#include "../.."`.
 
 ## Testing Guidelines
 - Framework: GoogleTest with a global environment initializer in `test/test.cpp` (starts/stops EPICS providers).
