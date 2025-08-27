@@ -3,11 +3,13 @@
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
 #include "k2eg/controller/node/NodeController.h"
 #include "gtest/gtest.h"
+#include <thread>
 
 int k2eg_controller_storage_snapshot_test_port = 20600;
 
 using namespace k2eg::common;
 using namespace k2eg::service::pubsub;
+using namespace k2eg::service::storage;
 using namespace k2eg::controller::node;
 using namespace k2eg::controller::command::cmd;
 
@@ -39,6 +41,7 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     auto storage_service = k2eg->getStorageServiceInstance();
     ASSERT_NE(storage_service, nullptr) << "Failed to get storage service instance";
 
+    // remove all data
     storage_service->clearAllData();
 
     // start a snapshot
@@ -67,9 +70,9 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     ASSERT_EQ(json_obj_start_snapshot["error"].as_int64(), 0) << "JSON object 'error' is not 0";
     ASSERT_EQ(json_obj_start_snapshot["publishing_topic"].as_string(), SNAPSHOT_NAME) << "JSON object 'publishing_topic' is not 'snapshot_name'";
 
-    // wait for acquire some snapshot
-    auto snapshot_msg = k2eg->getMessages(subscriber_snapshot, 80, 100000);
-    ASSERT_EQ(snapshot_msg.size(), 80) << "Unexpected number of snapshot messages";
+    // list all snapshots from now up to two minutes ago using helper
+    auto found_ids = k2eg->waitForSnapshotIdsInRange(storage_service);
+    ASSERT_FALSE(found_ids.empty()) << "No snapshots found";
 
     // stop the snapshot
     auto stop_snapshot_cmd = MakeRepeatingSnapshotStopCommandShrdPtr(

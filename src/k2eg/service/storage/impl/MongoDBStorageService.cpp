@@ -45,9 +45,26 @@ constexpr std::string BSON_SEARCH_KEY_FIELD = "search_key";
 constexpr std::string MONGO_GTE_OPERATOR = "$gte";
 constexpr std::string MONGO_LTE_OPERATOR = "$lte";
 
-// Removed global mongocxx::instance; managed per-service instance instead
+// Manage mongocxx::instance as a process-wide singleton to avoid
+// "cannot create a mongocxx::instance object if one has already been created"
+// exceptions when multiple storage services/tests are active in the same process.
 
 namespace {
+// Returns a reference to the process-wide mongocxx::instance.
+// Constructed once and shared for the program lifetime.
+inline mongocxx::instance& mongo_global_instance()
+{
+    static std::once_flag init_once;
+    static std::unique_ptr<mongocxx::instance> instance_ptr;
+    std::call_once(
+        init_once,
+        []()
+        {
+            instance_ptr = std::make_unique<mongocxx::instance>();
+        });
+    return *instance_ptr;
+}
+
 inline void create_index_safely(mongocxx::collection& coll, const bsoncxx::document::view_or_value& keys)
 {
     try
@@ -198,8 +215,8 @@ void MongoDBStorageService::initialize()
 {
     try
     {
-        // Initialize per-service MongoDB driver instance
-        instance_ = std::make_unique<mongocxx::instance>();
+        // Ensure process-wide MongoDB driver instance exists
+        (void)mongo_global_instance();
 
         // Create connection pool
         mongocxx::uri uri{config_->connection_string};
@@ -241,10 +258,6 @@ void MongoDBStorageService::shutdown()
     if (pool_)
     {
         pool_.reset();
-    }
-    if (instance_)
-    {
-        instance_.reset();
     }
     logger->logMessage("MongoDB storage service shut down", LogLevel::INFO);
 }

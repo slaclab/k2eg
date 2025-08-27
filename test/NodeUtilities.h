@@ -20,6 +20,7 @@
 #include <k2eg/service/pubsub/impl/kafka/RDKafkaSubscriber.h>
 #include <k2eg/service/storage/StorageServiceFactory.h>
 #include <k2eg/service/storage/impl/MongoDBStorageService.h>
+#include <k2eg/service/ServiceResolver.h>
 
 #include <chrono>
 #include <cstdlib>
@@ -27,6 +28,8 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <vector>
+#include <unordered_set>
 
 /**
  * @brief Command message wrapper for publishing commands.
@@ -160,6 +163,7 @@ public:
      */
     k2eg::service::storage::IStorageServiceShrdPtr getStorageServiceInstance()
     {
+        //  create one if not running a storage-capable node
         return k2eg::service::storage::StorageServiceFactory::create(po->getStorageServiceConfiguration());
     }
 
@@ -238,6 +242,73 @@ public:
         }
 
         return mesg_received;
+    }
+
+    /**
+     * @brief Poll storage and return all snapshot IDs found within a time range.
+     *
+     * Repeatedly queries `listSnapshotIdsInRange` and paginates within each poll
+     * iteration until all IDs in the range are returned by the storage layer.
+     * Stops early if any IDs are found, or when attempts/timeout are reached.
+     * Duplicate IDs are de-duplicated in the result.
+     *
+     * @param storage_service Storage service instance.
+     * @param lookback Amount of time to look back from now (default 2 minutes).
+     * @param page_size Page size for each storage call (default 10).
+     * @param max_attempts Maximum polling attempts (default 10).
+     * @param max_total Maximum wall-clock time to wait (default 30s).
+     * @param sleep_between Delay between attempts (default 500ms).
+     * @return Vector with all unique snapshot IDs found.
+     */
+    std::vector<std::string> waitForSnapshotIdsInRange(
+        k2eg::service::storage::IStorageServiceShrdPtr storage_service,
+        const std::chrono::system_clock::duration& lookback = std::chrono::minutes(2),
+        size_t page_size = 10,
+        int max_attempts = 10,
+        std::chrono::milliseconds max_total = std::chrono::seconds(30),
+        std::chrono::milliseconds sleep_between = std::chrono::milliseconds(500))
+    {
+        if (!storage_service)
+        {
+            ADD_FAILURE() << "Storage service is null";
+            return {};
+        }
+
+        std::vector<std::string> all_ids;
+        std::unordered_set<std::string> seen;
+        int attempts = 0;
+        const auto deadline = std::chrono::steady_clock::now() + max_total;
+        while (attempts < max_attempts && std::chrono::steady_clock::now() < deadline)
+        {
+            const auto start_time = std::chrono::system_clock::now() - lookback;
+            const auto end_time = std::chrono::system_clock::now();
+
+            std::optional<std::string> token;
+            bool has_more = true;
+            while (has_more)
+            {
+                auto result = storage_service->listSnapshotIdsInRange(
+                    start_time,
+                    end_time,
+                    page_size,
+                    token);
+
+                for (const auto& id : result.snapshot_ids)
+                {
+                    if (seen.insert(id).second)
+                        all_ids.push_back(id);
+                }
+
+                has_more = result.has_more;
+                token = result.continuation_token;
+                if (!has_more) break;
+            }
+
+            if (!all_ids.empty()) { break; }
+            std::this_thread::sleep_for(sleep_between);
+            ++attempts;
+        }
+        return all_ids;
     }
 
     /**
