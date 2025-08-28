@@ -83,6 +83,16 @@ void K2EG::init()
     ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsulNodeConfiguration>(po->getConfigurationServiceConfiguration()));
     logger->logMessage("Start Metric Service");
     ServiceResolver<IMetricService>::registerService(instanceMetricService(po->getMetricConfiguration()));
+    // Persist pub/sub configurations for external creation of new instances
+    if (auto pub_cfg = po->getPublisherConfiguration())
+    {
+        ServiceResolver<IPublisher>::setConfiguration<PublisherConfiguration>(*pub_cfg);
+    }
+    if (auto sub_cfg = po->getSubscriberConfiguration())
+    {
+        ServiceResolver<ISubscriber>::setConfiguration<SubscriberConfiguration>(*sub_cfg);
+    }
+
     switch (po->getNodeType())
     {
     case NodeType::GATEWAY:

@@ -9,6 +9,7 @@
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/storage/impl/MongoDBStorageService.h>
 #include <mongocxx/exception/exception.hpp>
+#include <mongocxx/instance.hpp>
 
 using namespace k2eg::service::storage;
 using namespace k2eg::service::storage::impl;

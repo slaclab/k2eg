@@ -1,7 +1,7 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_ARCHIVER_SNAPSHOTARCHIVER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_ARCHIVER_SNAPSHOTARCHIVER_H_
 
-#include "k2eg/common/types.h"
+#include <k2eg/common/types.h>
 #include <k2eg/controller/node/worker/archiver/BaseArchiver.h>
 #include <unordered_map>
 
@@ -34,7 +34,8 @@ class SnapshotArchiver : public BaseArchiver
                               int64_t&                                           iter_index,
                               int64_t&                                           payload_ts,
                               int64_t&                                           header_timestamp,
-                              std::string&                                       snapshot_name);
+                              std::string&                                       snapshot_name,
+                              std::string&                                       pv_name);
 
     // Process a single message: build record, manage snapshot lifecycle,
     // store it, and commit on success. Updates created_snapshots cache.
@@ -44,10 +45,10 @@ class SnapshotArchiver : public BaseArchiver
 public:
     /**
      * @brief Constructs a new SnapshotArchiver object.
-     * @param config_ The configuration for the storage worker.
-     * @param subscriber_ The subscriber to be used for consuming snapshot messages.
-     * @param storage_service_ The storage service to be used for archiving.
-     * @param snapshot_queue_name_ The name of the message queue to consume snapshots from.
+     * @param params The configuration for the storage worker.
+     * @param subscriber The subscriber to be used for consuming snapshot messages.
+     * @param storage_service The storage service to be used for archiving.
+     * @param snapshot_queue_name The name of the message queue to consume snapshots from.
      */
     SnapshotArchiver(
         const ArchiverParameters&                      params,

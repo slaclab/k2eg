@@ -204,17 +204,24 @@ void StorageWorker::executePeriodicTask(TaskProperties& task_properties)
             thread_pool->detach_task(
                 [this, snapshot_id]() mutable
                 {
-                    auto archiver = archiver::MakeSnapshotArchiverShrdPtr(
-                        ArchiverParameters{
-                            .engine_config = this->config,
-                            .snapshot_queue_name = snapshot_id},
-                        this->logger,
-                        ServiceResolver<ISubscriber>::resolve(),
-                        this->storage_service);
-                    // set snapshot as archiving
-                    node_config->setSnapshotArchiveStatus(snapshot_id, ArchiveStatusInfo{ArchiveStatus::ARCHIVING});
-                    // start processing the acquired snapshot
-                    processArchiver(archiver);
+                    try
+                    {
+                        auto archiver = archiver::MakeSnapshotArchiverShrdPtr(
+                            ArchiverParameters{
+                                .engine_config = this->config,
+                                .snapshot_queue_name = snapshot_id},
+                            this->logger,
+                            nullptr, // subscriber will be created by the archiver
+                            this->storage_service);
+                        // set snapshot as archiving
+                        node_config->setSnapshotArchiveStatus(snapshot_id, ArchiveStatusInfo{ArchiveStatus::ARCHIVING});
+                        // start processing the acquired snapshot
+                        processArchiver(archiver);
+                    }
+                    catch (...)
+                    {
+                        logger->logMessage(STRING_FORMAT("Failed to create archiver for snapshot: %1%", snapshot_id), LogLevel::ERROR);
+                    }
                 });
         }
         else

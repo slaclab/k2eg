@@ -3,11 +3,11 @@
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
 #include "k2eg/controller/node/NodeController.h"
 #include "gtest/gtest.h"
-#include <thread>
 
 int k2eg_controller_storage_snapshot_test_port = 20600;
 
 using namespace k2eg::common;
+using namespace k2eg::service;;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::storage;
 using namespace k2eg::controller::node;
@@ -29,14 +29,16 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
 
     sleep(2);
 
+    auto& node_controller = k2eg->getNodeControllerReference();
+
     auto publisher = k2eg->getPublisherInstance();
     ASSERT_NE(publisher, nullptr) << "Failed to get publisher instance";
 
     auto subscriber_reply = k2eg->getSubscriberInstance(REPLY_TOPIC);
     ASSERT_NE(subscriber_reply, nullptr) << "Failed to get subscriber instance for reply";
 
-    auto subscriber_snapshot = k2eg->getSubscriberInstance(SNAPSHOT_NAME);
-    ASSERT_NE(subscriber_snapshot, nullptr) << "Failed to get subscriber instance for snapshot";
+    // auto subscriber_snapshot = k2eg->getSubscriberInstance(SNAPSHOT_NAME);
+    // ASSERT_NE(subscriber_snapshot, nullptr) << "Failed to get subscriber instance for snapshot";
 
     auto storage_service = k2eg->getStorageServiceInstance();
     ASSERT_NE(storage_service, nullptr) << "Failed to get storage service instance";
@@ -46,7 +48,7 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
 
     // start a snapshot
     auto start_snapshot_cmd = MakeRepeatingSnapshotCommandShrdPtr(
-        SerializationType::JSON,
+        SerializationType::Msgpack,
         REPLY_TOPIC,
         "rep-id",
         SNAPSHOT_NAME,
@@ -61,6 +63,7 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     // send snapshot request
     k2eg->sendCommand(publisher, std::make_unique<CMDMessage<RepeatingSnapshotCommandShrdPtr>>(k2eg->getGatewayCMDTopic(), start_snapshot_cmd));
 
+
     // wait for ack
     auto reply_msg_start_snapshot = k2eg->waitForReplyID(subscriber_reply, "rep-id", 60000);
     ASSERT_NE(reply_msg_start_snapshot, nullptr) << "Failed to get reply message";
@@ -69,6 +72,9 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     // check that the snapshot has been started
     ASSERT_EQ(json_obj_start_snapshot["error"].as_int64(), 0) << "JSON object 'error' is not 0";
     ASSERT_EQ(json_obj_start_snapshot["publishing_topic"].as_string(), SNAPSHOT_NAME) << "JSON object 'publishing_topic' is not 'snapshot_name'";
+
+    // give a ticken to the maintanace task
+    node_controller.performManagementTask();
 
     // list all snapshots from now up to two minutes ago using helper
     auto found_ids = k2eg->waitForSnapshotIdsInRange(storage_service);

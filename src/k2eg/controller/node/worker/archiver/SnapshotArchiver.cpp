@@ -24,11 +24,11 @@ SnapshotArchiver::SnapshotArchiver(
           storage_service_)
 {
     logger->logMessage(STRING_FORMAT("SnapshotArchiver started consuming from queue: %1%", params.snapshot_queue_name), LogLevel::INFO);
-    if (!subscriber || !storage_service || !config)
+    if (!subscriber || !storage_service)
     {
         if (logger)
-            logger->logMessage("SnapshotArchiver not properly initialized (subscriber/storage/config missing)", LogLevel::ERROR);
-        throw std::runtime_error("SnapshotArchiver not properly initialized (subscriber/storage/config missing)");
+            logger->logMessage("SnapshotArchiver not properly initialized (subscriber/storage missing)", LogLevel::ERROR);
+        throw std::runtime_error("SnapshotArchiver not properly initialized (subscriber/storage missing)");
     }
     // Ensure the subscriber is subscribed to the snapshot queue
     try
@@ -52,7 +52,7 @@ SnapshotArchiver::~SnapshotArchiver() {}
 void SnapshotArchiver::performWork(std::chrono::milliseconds timeout)
 {
     using namespace std::chrono;
-    const auto batch_sz = static_cast<unsigned int>(config->batch_size);
+    const auto batch_sz = static_cast<unsigned int>(params.engine_config->batch_size);
 
     // Deadline to respect the timeout for this call (both fetch and process)
     const auto start_time = steady_clock::now();
@@ -169,9 +169,12 @@ void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInt
     std::string                     snapshot_name;
     service::storage::ArchiveRecord rec;
 
-    this->parseSnapshotMessage(m, ser, message_type, iter_index, payload_ts, header_timestamp, snapshot_name);
+    std::string pv_name;
+    this->parseSnapshotMessage(m, ser, message_type, iter_index, payload_ts, header_timestamp, snapshot_name, pv_name);
 
-    rec.pv_name = m.key;
+    // PV name is carried as the remaining top-level key in data messages
+    // (besides known metadata keys). Fall back to message key if not found.
+    rec.pv_name = pv_name.empty() ? m.key : pv_name;
     rec.topic = params.snapshot_queue_name;
 
     if (payload_ts > 0)
@@ -212,7 +215,7 @@ void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInt
         }
         else
         {
-            // Check if snapshot already exists in storage (from previous execution/crash recovery)
+            // Check if snapshot already exists in storage (from previous execution/crash recovery/or created by another node)
             try
             {
                 auto existing_snap = storage_service->findSnapshotBySearchKey(key);
@@ -254,6 +257,32 @@ void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInt
                         logger->logMessage(STRING_FORMAT("SnapshotArchiver createSnapshot exception: %1%", ex.what()), LogLevel::ERROR);
                 }
             }
+        }
+
+        // If we are processing a non-header message (data/tail) and we do not
+        // have a snapshot created/found yet, discard the message. This handles
+        // cases where the consumer starts in the middle of a snapshot.
+        if (snapshot_id.empty() && message_type != 0)
+        {
+            if (logger)
+                logger->logMessage(
+                    STRING_FORMAT(
+                        "SnapshotArchiver discarding message for snapshot '%1%' (key %2%): snapshot not initialized",
+                        snapshot_name % key),
+                    LogLevel::DEBUG);
+            if (m.commit_handle)
+            {
+                try
+                {
+                    subscriber->commit(m.commit_handle, true);
+                }
+                catch (const std::exception& ex)
+                {
+                    if (logger)
+                        logger->logMessage(STRING_FORMAT("SnapshotArchiver commit exception (discard): %1%", ex.what()), LogLevel::ERROR);
+                }
+            }
+            return; // do not store
         }
 
         // Attach snapshot_id to the record if we have one
@@ -303,7 +332,8 @@ void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMe
                                                                                       int64_t&                                                 iter_index,
                                                                                       int64_t&                                                 payload_ts,
                                                                                       int64_t&                                                 header_timestamp,
-                                                                                      std::string&                                             snapshot_name)
+                                                                                      std::string&                                             snapshot_name,
+                                                                                      std::string&                                             pv_name)
 {
     // Initialize outputs with defaults
     ser = k2eg::common::SerializationType::Unknown;
@@ -312,6 +342,7 @@ void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMe
     payload_ts = 0;
     header_timestamp = 0;
     snapshot_name.clear();
+    pv_name.clear();
 
     // Detect serialization type from header if available
     if (auto it = m.header.find("k2eg-ser-type"); it != m.header.end())
@@ -329,8 +360,11 @@ void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMe
             if (jv.is_object())
             {
                 auto& obj = jv.as_object();
+                // message_type may appear as "message_type" or "type"
                 if (obj.contains("message_type"))
                     message_type = static_cast<int>(obj.at("message_type").as_int64());
+                else if (obj.contains("type"))
+                    message_type = static_cast<int>(obj.at("type").as_int64());
                 if (obj.contains("iter_index"))
                     iter_index = static_cast<int64_t>(obj.at("iter_index").as_int64());
                 if (obj.contains("timestamp"))
@@ -339,6 +373,21 @@ void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMe
                     header_timestamp = static_cast<int64_t>(obj.at("header_timestamp").as_int64());
                 if (obj.contains("snapshot_name"))
                     snapshot_name = obj.at("snapshot_name").as_string();
+
+                // Extract pv_name as the remaining key for data messages
+                // Skip known metadata keys
+                if (message_type == 1)
+                {
+                    for (auto& kv : obj)
+                    {
+                        const std::string& k = kv.key();
+                        if (k == "message_type" || k == "type" || k == "iter_index" || k == "timestamp" ||
+                            k == "header_timestamp" || k == "snapshot_name" || k == "error" || k == "error_message")
+                            continue;
+                        pv_name = k;
+                        break;
+                    }
+                }
             }
         }
         else if (ser == k2eg::common::SerializationType::Msgpack || ser == k2eg::common::SerializationType::MsgpackCompact)
@@ -347,11 +396,14 @@ void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMe
             msgpack::object        obj = oh.get();
             if (obj.type == msgpack::type::MAP)
             {
+                // First pass: read metadata
                 for (uint32_t i = 0; i < obj.via.map.size; ++i)
                 {
                     const msgpack::object_kv& kv = obj.via.map.ptr[i];
                     std::string               key = kv.key.as<std::string>();
                     if (key == "message_type")
+                        message_type = kv.val.as<int>();
+                    else if (key == "type")
                         message_type = kv.val.as<int>();
                     else if (key == "iter_index")
                         iter_index = kv.val.as<int64_t>();
@@ -361,7 +413,11 @@ void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMe
                         header_timestamp = kv.val.as<int64_t>();
                     else if (key == "snapshot_name")
                         snapshot_name = kv.val.as<std::string>();
-                }
+                    else {
+                        // here is the pv name
+                        pv_name = kv.key.as<std::string>();
+                    }
+                } 
             }
         }
         else
@@ -377,6 +433,8 @@ void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMe
                     auto& obj = jv.as_object();
                     if (obj.contains("message_type"))
                         message_type = static_cast<int>(obj.at("message_type").as_int64());
+                    else if (obj.contains("type"))
+                        message_type = static_cast<int>(obj.at("type").as_int64());
                     if (obj.contains("iter_index"))
                         iter_index = static_cast<int64_t>(obj.at("iter_index").as_int64());
                     if (obj.contains("timestamp"))
@@ -385,6 +443,19 @@ void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMe
                         header_timestamp = static_cast<int64_t>(obj.at("header_timestamp").as_int64());
                     if (obj.contains("snapshot_name"))
                         snapshot_name = obj.at("snapshot_name").as_string();
+
+                    if (message_type == 1)
+                    {
+                        for (auto& kv : obj)
+                        {
+                            const std::string& k = kv.key();
+                            if (k == "message_type" || k == "type" || k == "iter_index" || k == "timestamp" ||
+                                k == "header_timestamp" || k == "snapshot_name" || k == "error" || k == "error_message")
+                                continue;
+                            pv_name = k;
+                            break;
+                        }
+                    }
                 }
             }
             catch (...)

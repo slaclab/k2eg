@@ -4,9 +4,10 @@
 #include <k2eg/service/pubsub/impl/kafka/RDKafkaSubscriber.h>
 
 #include <chrono>
+#include <cstdlib>
+#include <iostream>
 #include <memory>
 #include <stdexcept>
-#include <iostream>
 
 using namespace k2eg::common;
 using namespace k2eg::service::pubsub::impl::kafka;
@@ -211,16 +212,24 @@ int RDKafkaSubscriber::internalConsume(std::unique_ptr<RdKafka::Message> message
     SubscriberHeaders headers;
     if (message->headers())
     {
-        for (auto& h : message->headers()->get_all())
+        auto all = message->headers()->get_all();
+        for (auto& h : all)
         {
-            std::string value((const char*)h.value(), h.value_size());
-            headers.insert(SubscriberHeadersPair(h.key(), value));
+            // Header value may be null (tombstone) in Kafka; guard it
+            if (h.value() != nullptr && h.value_size() > 0)
+            {
+                std::string value(static_cast<const char*>(h.value()), h.value_size());
+                headers.insert(SubscriberHeadersPair(h.key(), value));
+            }
+            else
+            {
+                headers.insert(SubscriberHeadersPair(h.key(), std::string{}));
+            }
         }
     }
 
     // Prepare commit info for this message so callers can commit only this message later
-
-        auto commit_info = std::make_shared<SubscriberInterfaceElement::CommitHandle>();
+    auto commit_info = std::make_shared<SubscriberInterfaceElement::CommitHandle>();
     if (message->err() == RdKafka::ERR_NO_ERROR)
     {
         commit_info->topic = message->topic_name();
@@ -233,7 +242,5 @@ int RDKafkaSubscriber::internalConsume(std::unique_ptr<RdKafka::Message> message
     // Attach the opaque commit handle
     const_cast<SubscriberInterfaceElement*>(element.get())->commit_handle = commit_info;
     messages.push_back(element);
-
-    // No per-subscriber commit tracking any more. Use element->commit_handle and commit(handle) to commit individual messages.
     return 0;
 }

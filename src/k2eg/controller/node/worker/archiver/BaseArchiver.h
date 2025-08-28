@@ -50,10 +50,6 @@ protected:
     k2eg::service::pubsub::ISubscriberShrdPtr subscriber;
     // Storage service for the archiver.
     k2eg::service::storage::IStorageServiceShrdPtr storage_service;
-    // Keep discrete members for current internal usage
-    std::shared_ptr<const k2eg::controller::node::worker::StorageWorkerConfiguration>
-        config;
-
 public:
     /**
      * @brief Constructs a new BaseArchiver object.

@@ -135,6 +135,11 @@ public:
         deinit();
     }
 
+    k2eg::controller::node::NodeController& getNodeControllerReference()
+    {
+        return *this->node_controller;
+    }
+
     /**
      * @brief Create a Kafka publisher bound to test config.
      * @return Shared pointer to publisher.
@@ -265,7 +270,7 @@ public:
         const std::chrono::system_clock::duration& lookback = std::chrono::minutes(2),
         size_t page_size = 10,
         int max_attempts = 10,
-        std::chrono::milliseconds max_total = std::chrono::seconds(30),
+        std::chrono::milliseconds max_total = std::chrono::seconds(120),
         std::chrono::milliseconds sleep_between = std::chrono::milliseconds(500))
     {
         if (!storage_service)

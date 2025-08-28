@@ -8,7 +8,6 @@
 #include <mongocxx/client.hpp>
 #include <mongocxx/collection.hpp>
 #include <mongocxx/database.hpp>
-#include <mongocxx/instance.hpp>
 #include <mongocxx/pool.hpp>
 
 #include <boost/program_options.hpp>
@@ -68,7 +67,6 @@ private:
     log::ILoggerShrdPtr logger; ///< Logger instance for logging
 
     ConstMongoDBStorageImplementationConfigShrdPtr config_;      ///< MongoDB storage configuration
-    std::unique_ptr<mongocxx::instance>            instance_;    ///< MongoDB driver instance
     std::unique_ptr<mongocxx::pool>                pool_;        ///< MongoDB connection pool
     mutable std::mutex                             stats_mutex_; ///< Mutex for synchronizing access to statistics
 
