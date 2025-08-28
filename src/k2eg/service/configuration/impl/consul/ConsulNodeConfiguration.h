@@ -43,7 +43,7 @@ class ConsulNodeConfiguration : public INodeConfiguration
     void                           deregisterService();
 
 public:
-    ConsulNodeConfiguration(ConstConfigurationServiceConfigUPtr config);
+    ConsulNodeConfiguration(ConstConfigurationServiceConfigShrdPtr config);
     virtual ~ConsulNodeConfiguration();
 
     // Node configuration methods

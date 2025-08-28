@@ -122,7 +122,7 @@ string_to_log_level(const std::string& token)
     return level;
 }
 
-BoostLogger::BoostLogger(ConstLogConfigurationUPtr _configuration)
+BoostLogger::BoostLogger(ConstLogConfigurationShrdPtr _configuration)
     : ILogger(std::move(_configuration))
 {
     logging::add_common_attributes();

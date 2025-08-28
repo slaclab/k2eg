@@ -118,7 +118,7 @@ inline k2eg::service::configuration::ArchiveStatus fromStateString(const std::st
 
 #pragma region Implementation
 
-ConsulNodeConfiguration::ConsulNodeConfiguration(ConstConfigurationServiceConfigUPtr _config)
+ConsulNodeConfiguration::ConsulNodeConfiguration(ConstConfigurationServiceConfigShrdPtr _config)
     : INodeConfiguration(std::move(_config))
 {
     // Initialize Oat++ environment.

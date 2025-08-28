@@ -148,8 +148,8 @@ bool ProgramOptions::optionConfigure(const std::string& name)
 #define GET_OPTION_NO_DEF(opt, type) getOption<type>(opt)
 
 // clang-format off
-ConstLogConfigurationUPtr ProgramOptions::getloggerConfiguration() {
-  return std::make_unique<const LogConfiguration>(LogConfiguration{
+ConstLogConfigurationShrdPtr ProgramOptions::getloggerConfiguration() {
+  return std::make_shared<const LogConfiguration>(LogConfiguration{
       .log_level = GET_OPTION_NO_DEF(LOG_LEVEL, std::string),
       .log_on_console = GET_OPTION(LOG_ON_CONSOLE, bool, false),
       .log_on_file = GET_OPTION(LOG_ON_FILE, bool, false),
@@ -215,44 +215,44 @@ ProgramOptions::getNodeControllerConfiguration() {
     );
 }
 
-ConstPublisherConfigurationUPtr ProgramOptions::getPublisherConfiguration() {
-  return std::make_unique<const PublisherConfiguration>(PublisherConfiguration{
+ConstPublisherConfigurationShrdPtr ProgramOptions::getPublisherConfiguration() {
+  return std::make_shared<const PublisherConfiguration>(PublisherConfiguration{
       .server_address = GET_OPTION(PUB_SERVER_ADDRESS, std::string, ""),
       .flush_timeout_ms = GET_OPTION(PUB_FLUSH_TIMEOUT_MS, size_t, 500),
       .custom_impl_parameter = parseKVCustomParam(GET_OPTION(PUB_IMPL_KV, std::vector<std::string>, std::vector<std::string>()))});
 }
 
-ConstSubscriberConfigurationUPtr ProgramOptions::getSubscriberConfiguration() {
-  return std::make_unique<const SubscriberConfiguration>(
+ConstSubscriberConfigurationShrdPtr ProgramOptions::getSubscriberConfiguration() {
+  return std::make_shared<const SubscriberConfiguration>(
       SubscriberConfiguration{
           .server_address = GET_OPTION(SUB_SERVER_ADDRESS, std::string, ""),
           .group_id = GET_OPTION(SUB_GROUP_ID, std::string, ""),
           .custom_impl_parameter = parseKVCustomParam(GET_OPTION(SUB_IMPL_KV, std::vector<std::string>, std::vector<std::string>()))});
 }
 
-ConstMetricConfigurationUPtr ProgramOptions::getMetricConfiguration() {
-  return std::make_unique<const MetricConfiguration>(MetricConfiguration{
+ConstMetricConfigurationShrdPtr ProgramOptions::getMetricConfiguration() {
+  return std::make_shared<const MetricConfiguration>(MetricConfiguration{
       .enable = GET_OPTION(METRIC_ENABLE, bool, false),
       .tcp_port = GET_OPTION(METRIC_HTTP_PORT, unsigned int, 8080)});
 }
 
-ConstSchedulerConfigurationUPtr ProgramOptions::getSchedulerConfiguration() {
-  return std::make_unique<const SchedulerConfiguration>(SchedulerConfiguration{
+ConstSchedulerConfigurationShrdPtr ProgramOptions::getSchedulerConfiguration() {
+  return std::make_shared<const SchedulerConfiguration>(SchedulerConfiguration{
       .check_every_amount_of_seconds = GET_OPTION(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS, unsigned int, 60),
       .thread_number = GET_OPTION(SCHEDULER_THREAD_NUMBER, unsigned int, 1)});
 }
 
-ConstEpicsServiceManagerConfigUPtr
+ConstEpicsServiceManagerConfigShrdPtr
 ProgramOptions::getEpicsManagerConfiguration() {
-  return std::make_unique<const EpicsServiceManagerConfig>(
+  return std::make_shared<const EpicsServiceManagerConfig>(
       EpicsServiceManagerConfig{
           .thread_count = GET_OPTION_NO_DEF(EPICS_MONITOR_THREAD_COUNT, std::int32_t),
           .max_event_from_monitor_queue = GET_OPTION_NO_DEF(EPICS_MONITOR_CHANNEL_POLL_MAX, std::int32_t)});
 }
 
-ConstConfigurationServiceConfigUPtr
+ConstConfigurationServiceConfigShrdPtr
 ProgramOptions::getConfigurationServiceConfiguration() {
-  return std::make_unique<const ::ConfigurationServiceConfig>(
+  return std::make_shared<const ::ConfigurationServiceConfig>(
       ConfigurationServiceConfig{
           .config_server_host = GET_OPTION(CONFIGURATION_SERVICE_HOST, std::string, "localhost"),
           .config_server_port = GET_OPTION(CONFIGURATION_SERVICE_PORT, short, static_cast<short>(8500)),

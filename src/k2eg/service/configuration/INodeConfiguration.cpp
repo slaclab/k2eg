@@ -78,7 +78,7 @@ NodeConfiguration NodeConfiguration::fromJson(const std::string& json_str)
 
 // Provide out-of-line definition for INodeConfiguration destructor to emit vtable
 
-INodeConfiguration::INodeConfiguration(ConstConfigurationServiceConfigUPtr config)
+INodeConfiguration::INodeConfiguration(ConstConfigurationServiceConfigShrdPtr config)
     : config(std::move(config)){};
 
 INodeConfiguration::~INodeConfiguration() {}

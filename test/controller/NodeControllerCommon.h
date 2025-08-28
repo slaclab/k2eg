@@ -717,13 +717,13 @@ inline std::unique_ptr<NodeController> initGatewayBackend(int& tcp_port, IPublis
     setenv(("EPICS_k2eg_" + std::string(METRIC_HTTP_PORT)).c_str(), std::to_string(++tcp_port).c_str(), 1);
     std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
     opt->parse(argc, argv);
-    ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsulNodeConfiguration>(opt->getConfigurationServiceConfiguration()));
-    ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(opt->getSchedulerConfiguration()));
+    ServiceResolver<INodeConfiguration>::registerService<k2eg::service::configuration::ConstConfigurationServiceConfigShrdPtr, ConsulNodeConfiguration>(opt->getConfigurationServiceConfiguration());
+    ServiceResolver<Scheduler>::registerService<k2eg::service::scheduler::ConstSchedulerConfigurationShrdPtr, Scheduler>(opt->getSchedulerConfiguration());
     ServiceResolver<Scheduler>::resolve()->start();
-    ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
-    ServiceResolver<IMetricService>::registerService(std::make_shared<PrometheusMetricService>(opt->getMetricConfiguration()));
-    ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>());
-    ServiceResolver<IPublisher>::registerService(pub);
+    ServiceResolver<ILogger>::registerService<k2eg::service::log::ConstLogConfigurationShrdPtr, BoostLogger>(opt->getloggerConfiguration());
+    ServiceResolver<IMetricService>::registerService<k2eg::service::metric::ConstMetricConfigurationShrdPtr, PrometheusMetricService>(opt->getMetricConfiguration());
+    ServiceResolver<EpicsServiceManager>::registerService<k2eg::service::epics_impl::ConstEpicsServiceManagerConfigShrdPtr, EpicsServiceManager>(std::make_shared<const k2eg::service::epics_impl::EpicsServiceManagerConfig>());
+    ServiceResolver<IPublisher>::registerService<k2eg::service::pubsub::ConstPublisherConfigurationShrdPtr, k2eg::service::pubsub::impl::kafka::RDKafkaPublisher>(opt->getPublisherConfiguration());
     DataStorageUPtr storage = std::make_unique<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");
     // data should be alwasys erased becasue now the local databas eis only used at runtime the persistent
     // data is stored on the central configuration management server

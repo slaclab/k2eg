@@ -2,6 +2,7 @@
 #include <bsoncxx/builder/stream/document.hpp>
 #include <bsoncxx/json.hpp>
 #include <chrono>
+#include <k2eg/common/uuid.h>
 #include <k2eg/common/utility.h>
 #include <mutex>
 
@@ -646,13 +647,31 @@ MongoDBStorageService::createSnapshot(const Snapshot& snapshot)
         auto client = pool_->acquire();
         auto snapshots_collection = (*client)[config_->database_name][config_->snapshots_collection_name];
 
+        // Let MongoDB assign _id if not provided
         auto doc = snapshotToBson(snapshot);
         auto result = snapshots_collection.insert_one(doc.view());
 
         if (result)
         {
-            logger->logMessage(STRING_FORMAT("Created snapshot with ID: {%1%}", snapshot.snapshot_id), LogLevel::INFO);
-            return snapshot.snapshot_id;
+            std::string sid;
+            auto        idv = result->inserted_id();
+            try
+            {
+                if (idv.type() == bsoncxx::type::k_oid)
+                {
+                    sid = idv.get_oid().value.to_string();
+                }
+                else if (idv.type() == bsoncxx::type::k_string)
+                {
+                    sid = std::string{idv.get_string().value};
+                }
+            }
+            catch (...)
+            {
+                sid.clear();
+            }
+            logger->logMessage(STRING_FORMAT("Created snapshot with ID: {%1%}", sid), LogLevel::INFO);
+            return sid;
         }
         else
         {
@@ -674,7 +693,17 @@ bool MongoDBStorageService::deleteSnapshot(const std::string& snapshot_id)
         auto client = pool_->acquire();
         auto snapshots_collection = (*client)[config_->database_name][config_->snapshots_collection_name];
 
-        auto filter = bsoncxx_builder::document{} << "_id" << snapshot_id << bsoncxx_builder::finalize;
+        // Support both ObjectId and legacy string _id
+        bsoncxx_builder::document filter;
+        try
+        {
+            filter << "_id" << bsoncxx::oid{snapshot_id} << bsoncxx_builder::finalize;
+        }
+        catch (...)
+        {
+            filter.clear();
+            filter << "_id" << snapshot_id << bsoncxx_builder::finalize;
+        }
         auto result = snapshots_collection.delete_one(filter.view());
 
         if (result && result->deleted_count() > 0)
@@ -732,7 +761,16 @@ MongoDBStorageService::getSnapshot(const std::string& snapshot_id)
         auto client = pool_->acquire();
         auto snapshots_collection = (*client)[config_->database_name][config_->snapshots_collection_name];
 
-        auto filter = bsoncxx_builder::document{} << "_id" << snapshot_id << bsoncxx_builder::finalize;
+        bsoncxx_builder::document filter;
+        try
+        {
+            filter << "_id" << bsoncxx::oid{snapshot_id} << bsoncxx_builder::finalize;
+        }
+        catch (...)
+        {
+            filter.clear();
+            filter << "_id" << snapshot_id << bsoncxx_builder::finalize;
+        }
         auto result = snapshots_collection.find_one(filter.view());
 
         if (result)
@@ -830,10 +868,17 @@ SnapshotIdRangeResult MongoDBStorageService::listSnapshotIdsInRange(
             }
             if (auto id = doc["_id"])
             {
-                auto sid = std::string{id.get_string().value};
-                out.snapshot_ids.push_back(sid);
-                out.continuation_token = sid;
-                ++count;
+                std::string sid;
+                if (id.type() == bsoncxx::type::k_oid)
+                    sid = id.get_oid().value.to_string();
+                else if (id.type() == bsoncxx::type::k_string)
+                    sid = std::string{id.get_string().value};
+                if (!sid.empty())
+                {
+                    out.snapshot_ids.push_back(sid);
+                    out.continuation_token = sid;
+                    ++count;
+                }
             }
         }
 
@@ -852,19 +897,16 @@ MongoDBStorageService::snapshotToBson(const Snapshot& snapshot)
     auto doc = bsoncxx_builder::document{};
 
     // Store snapshot creation time in UTC
-    doc << "_id" << snapshot.snapshot_id
-        << BSON_SNAPSHOT_NAME_FIELD << snapshot.snapshot_name
+    if (!snapshot.snapshot_id.empty())
+    {
+        doc << "_id" << snapshot.snapshot_id;
+    }
+    doc << BSON_SNAPSHOT_NAME_FIELD << snapshot.snapshot_name
         << BSON_CREATED_AT_FIELD << bsoncxx::types::b_date{to_utc(snapshot.created_at)}
         << BSON_DESCRIPTION_FIELD << snapshot.description
         << BSON_SEARCH_KEY_FIELD << snapshot.search_key;
 
-    // Convert pv_names set to BSON array
-    auto pv_names_array = bsoncxx_builder::array{};
-    for (const auto& pv_name : snapshot.pv_names)
-    {
-        pv_names_array << pv_name;
-    }
-    doc << BSON_PV_NAMES_FIELD << pv_names_array;
+    // Intentionally omit pv_names field to reduce document size and avoid storing empty arrays
 
     return doc << bsoncxx_builder::finalize;
 }

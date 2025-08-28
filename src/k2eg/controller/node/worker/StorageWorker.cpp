@@ -1,3 +1,4 @@
+#include "k2eg/service/pubsub/ISubscriber.h"
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
 #include <k2eg/service/scheduler/Task.h>
@@ -211,7 +212,7 @@ void StorageWorker::executePeriodicTask(TaskProperties& task_properties)
                                 .engine_config = this->config,
                                 .snapshot_queue_name = snapshot_id},
                             this->logger,
-                            nullptr, // subscriber will be created by the archiver
+                            ServiceResolver<ISubscriber>::createNewInstance(),
                             this->storage_service);
                         // set snapshot as archiving
                         node_config->setSnapshotArchiveStatus(snapshot_id, ArchiveStatusInfo{ArchiveStatus::ARCHIVING});

@@ -33,7 +33,7 @@ class BoostLogger : public ILogger
     inline boost::log::trivial::severity_level                                                      getLevel(LogLevel level);
 
 public:
-    BoostLogger(ConstLogConfigurationUPtr _configuration);
+    BoostLogger(ConstLogConfigurationShrdPtr _configuration);
     virtual ~BoostLogger();
     IScopedLoggerUPtr getScopedLogger(const std::string& scope) override;
     void              setLevel(LogLevel level) override;

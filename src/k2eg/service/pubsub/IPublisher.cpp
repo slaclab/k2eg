@@ -2,7 +2,7 @@
 
 using namespace k2eg::service::pubsub;
 
-IPublisher::IPublisher(ConstPublisherConfigurationUPtr configuration)
+IPublisher::IPublisher(ConstPublisherConfigurationShrdPtr configuration)
     : configuration(std::move(configuration)) {
     if (this->configuration->server_address.empty()) {
         throw std::runtime_error("The pub/sub server address is mandatory");

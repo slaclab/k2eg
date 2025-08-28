@@ -12,7 +12,7 @@
 using namespace k2eg::common;
 using namespace k2eg::service::pubsub::impl::kafka;
 
-RDKafkaSubscriber::RDKafkaSubscriber(ConstSubscriberConfigurationUPtr configuration)
+RDKafkaSubscriber::RDKafkaSubscriber(ConstSubscriberConfigurationShrdPtr configuration)
     : ISubscriber(std::move(configuration)), RDKafkaBase()
 {
     init();

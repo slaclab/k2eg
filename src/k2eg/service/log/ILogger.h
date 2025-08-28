@@ -44,10 +44,10 @@ DEFINE_PTR_TYPES(IScopedLogger)
 class ILogger
 {
 protected:
-    ConstLogConfigurationUPtr configuration;
+    ConstLogConfigurationShrdPtr configuration;
 
 public:
-    ILogger(ConstLogConfigurationUPtr configuration)
+    ILogger(ConstLogConfigurationShrdPtr configuration)
         : configuration(std::move(configuration)){};
     virtual ~ILogger() = default;
     virtual IScopedLoggerUPtr getScopedLogger(const std::string& scope) = 0;

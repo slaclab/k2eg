@@ -178,14 +178,14 @@ class INodeConfiguration
 {
 protected:
     /** Configuration service settings for this node. */
-    ConstConfigurationServiceConfigUPtr config;
+    ConstConfigurationServiceConfigShrdPtr config;
 
 public:
     /**
      * @brief Construct a new INodeConfiguration.
      * @param config Configuration service settings.
      */
-    INodeConfiguration(ConstConfigurationServiceConfigUPtr config);
+    INodeConfiguration(ConstConfigurationServiceConfigShrdPtr config);
 
     /**
      * @brief Destroy the INodeConfiguration object.

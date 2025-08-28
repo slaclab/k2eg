@@ -18,6 +18,8 @@ using namespace k2eg::controller::command::cmd;
 
 TEST(NodeControllerStorageSnapshotTest, StartRecording)
 {
+    int64_t error = -1;
+    std::string topic = "";
     SubscriberInterfaceElementVector received_msg;
     auto                             k2eg = startK2EG(
         k2eg_controller_storage_snapshot_test_port,
@@ -63,15 +65,25 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     // send snapshot request
     k2eg->sendCommand(publisher, std::make_unique<CMDMessage<RepeatingSnapshotCommandShrdPtr>>(k2eg->getGatewayCMDTopic(), start_snapshot_cmd));
 
-
     // wait for ack
-    auto reply_msg_start_snapshot = k2eg->waitForReplyID(subscriber_reply, "rep-id", 60000);
+    auto reply_msg_start_snapshot = k2eg->waitForReplyID(subscriber_reply, "rep-id", SerializationType::Msgpack,60000);
     ASSERT_NE(reply_msg_start_snapshot, nullptr) << "Failed to get reply message";
     // get json object
-    auto json_obj_start_snapshot = k2eg->getJsonObject(*reply_msg_start_snapshot);
+    auto result_obj_start_snapshot = k2eg->getMsgpackObject(*reply_msg_start_snapshot);
     // check that the snapshot has been started
-    ASSERT_EQ(json_obj_start_snapshot["error"].as_int64(), 0) << "JSON object 'error' is not 0";
-    ASSERT_EQ(json_obj_start_snapshot["publishing_topic"].as_string(), SNAPSHOT_NAME) << "JSON object 'publishing_topic' is not 'snapshot_name'";
+    ASSERT_EQ(result_obj_start_snapshot.map.size(), 4) << "Msgpack object size is not 4";
+    {
+        auto it = result_obj_start_snapshot.map.find("error");
+        ASSERT_NE(it, result_obj_start_snapshot.map.end()) << "Missing 'error' field";
+        it->second.convert_if_not_nil(error);
+    }
+    ASSERT_EQ(error, 0) << "JSON object 'error' is not 0";
+    {
+        auto it = result_obj_start_snapshot.map.find("publishing_topic");
+        ASSERT_NE(it, result_obj_start_snapshot.map.end()) << "Missing 'publishing_topic' field";
+        it->second.convert_if_not_nil(topic);
+    }
+    ASSERT_EQ(topic, SNAPSHOT_NAME) << "JSON object 'publishing_topic' is not 'snapshot_name'";
 
     // give a ticken to the maintanace task
     node_controller.performManagementTask();
@@ -82,7 +94,7 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
 
     // stop the snapshot
     auto stop_snapshot_cmd = MakeRepeatingSnapshotStopCommandShrdPtr(
-        SerializationType::JSON,
+        SerializationType::Msgpack,
         REPLY_TOPIC,
         "rep-id-1",
         SNAPSHOT_NAME);
@@ -90,7 +102,7 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     k2eg->sendCommand(publisher, std::make_unique<CMDMessage<RepeatingSnapshotStopCommandShrdPtr>>(k2eg->getGatewayCMDTopic(), stop_snapshot_cmd));
 
     // wait for ack
-    auto reply_msg_stop_snapshot = k2eg->waitForReplyID(subscriber_reply, "rep-id-1", 60000);
+    auto reply_msg_stop_snapshot = k2eg->waitForReplyID(subscriber_reply, "rep-id-1", SerializationType::Msgpack, 60000);
     ASSERT_NE(reply_msg_stop_snapshot, nullptr) << "Failed to get reply message";
 
     ASSERT_NO_THROW(k2eg.reset();) << "Failed to reset K2EG instance";

@@ -52,9 +52,9 @@ typedef enum ConsumerInterfaceEventType { ONDELIVERY, ONARRIVE, ONERROR } Consum
 class ISubscriber {
 protected:
     DEFINE_MAP_FOR_TYPE(ConsumerInterfaceEventType, SubscriberInterfaceHandler, handlers)
-    const ConstSubscriberConfigurationUPtr configuration;
+    const ConstSubscriberConfigurationShrdPtr configuration;
 public:
-    ISubscriber(ConstSubscriberConfigurationUPtr configuration);
+    ISubscriber(ConstSubscriberConfigurationShrdPtr configuration);
     virtual ~ISubscriber() = default;
     /**
      * @brief Set the Topics where the consumer need to fetch data

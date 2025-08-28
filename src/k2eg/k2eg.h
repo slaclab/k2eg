@@ -37,7 +37,7 @@ class K2EG
      * @param metric_conf The configuration for the metric service.
      * @return A shared pointer to the metric service instance.
      */
-    k2eg::service::metric::IMetricServiceShrdPtr instanceMetricService(k2eg::service::metric::ConstMetricConfigurationUPtr metric_conf);
+    k2eg::service::metric::IMetricServiceShrdPtr instanceMetricService(k2eg::service::metric::ConstMetricConfigurationShrdPtr metric_conf);
 
     /**
      * @brief Get the version string of the K2EG application.

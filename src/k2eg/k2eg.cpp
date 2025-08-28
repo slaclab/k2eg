@@ -7,6 +7,7 @@
 #include <k2eg/common/utility.h>
 
 #include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/ServiceRegistration.h>
 #include <k2eg/service/configuration/configuration.h>
 #include <k2eg/service/configuration/impl/consul/ConsulNodeConfiguration.h>
 #include <k2eg/service/data/DataStorage.h>
@@ -72,36 +73,27 @@ bool K2EG::setup(int argc, const char* argv[])
 
 void K2EG::init()
 {
-    ServiceResolver<ILogger>::registerService(logger = std::make_shared<BoostLogger>(po->getloggerConfiguration()));
+    registerLogger(po.get());
+    logger = ServiceResolver<ILogger>::resolve();
     // setup services
     logger->logMessage(getTextVersion(true));
     logger->logMessage(std::format("Start {} Service", boost::lexical_cast<std::string>(po->getNodeType())));
     logger->logMessage("Start Scheduler Service");
-    ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(po->getSchedulerConfiguration()));
+    registerScheduler(po.get());
     ServiceResolver<Scheduler>::resolve()->start();
     logger->logMessage("Start configuration service");
-    ServiceResolver<INodeConfiguration>::registerService(std::make_shared<ConsulNodeConfiguration>(po->getConfigurationServiceConfiguration()));
+    registerConfigService(po.get());
     logger->logMessage("Start Metric Service");
-    ServiceResolver<IMetricService>::registerService(instanceMetricService(po->getMetricConfiguration()));
-    // Persist pub/sub configurations for external creation of new instances
-    if (auto pub_cfg = po->getPublisherConfiguration())
-    {
-        ServiceResolver<IPublisher>::setConfiguration<PublisherConfiguration>(*pub_cfg);
-    }
-    if (auto sub_cfg = po->getSubscriberConfiguration())
-    {
-        ServiceResolver<ISubscriber>::setConfiguration<SubscriberConfiguration>(*sub_cfg);
-    }
-
+    registerMetrics(po.get());
     switch (po->getNodeType())
     {
     case NodeType::GATEWAY:
         logger->logMessage("Start publisher service");
-        ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(po->getPublisherConfiguration()));
+        registerPublisher(po.get());
         logger->logMessage("Start subscriber service");
-        ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(po->getSubscriberConfiguration()));
+        registerSubscriber(po.get());
         logger->logMessage("Start EPICS service");
-        ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>(po->getEpicsManagerConfiguration()));
+        registerEpics(po.get());
         logger->logMessage("Start node controller");
         node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
         logger->logMessage("Start command controller");
@@ -109,19 +101,19 @@ void K2EG::init()
         break;
     case NodeType::STORAGE:
         logger->logMessage("Start storage service");
-        ServiceResolver<IStorageService>::registerService(StorageServiceFactory::create(po->getStorageServiceConfiguration()));
+        registerStorage(po.get());
         logger->logMessage("Start node controller");
         node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
         break;
     case NodeType::FULL:
         logger->logMessage("Start publisher service");
-        ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(po->getPublisherConfiguration()));
+        registerPublisher(po.get());
         logger->logMessage("Start subscriber service");
-        ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(po->getSubscriberConfiguration()));
+        registerSubscriber(po.get());
         logger->logMessage("Start EPICS service");
-        ServiceResolver<EpicsServiceManager>::registerService(std::make_shared<EpicsServiceManager>(po->getEpicsManagerConfiguration()));
+        registerEpics(po.get());
         logger->logMessage("Start storage service");
-        ServiceResolver<IStorageService>::registerService(StorageServiceFactory::create(po->getStorageServiceConfiguration()));
+        registerStorage(po.get());
         logger->logMessage("Start node controller");
         node_controller = std::make_unique<NodeController>(po->getNodeControllerConfiguration(), std::make_shared<DataStorage>(po->getStoragePath()));
         logger->logMessage("Start command controller");
@@ -188,7 +180,7 @@ void K2EG::deinit()
     terminated = true;
 }
 
-IMetricServiceShrdPtr K2EG::instanceMetricService(ConstMetricConfigurationUPtr metric_conf)
+IMetricServiceShrdPtr K2EG::instanceMetricService(ConstMetricConfigurationShrdPtr metric_conf)
 {
     if (metric_conf->enable)
     {

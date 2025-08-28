@@ -1,3 +1,4 @@
+#include <iostream>
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/worker/StorageWorker.h>
@@ -292,6 +293,24 @@ void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInt
         }
     }
 
+    // If this is a header message (message_type == 0), only ensure snapshot exists and skip storing payload
+    if (message_type == 0)
+    {
+        if (m.commit_handle)
+        {
+            try
+            {
+                subscriber->commit(m.commit_handle, true);
+            }
+            catch (const std::exception& ex)
+            {
+                if (logger)
+                    logger->logMessage(STRING_FORMAT("SnapshotArchiver commit exception (header): %1%", ex.what()), LogLevel::ERROR);
+            }
+        }
+        return;
+    }
+
     // Store the record immediately (not deferred)
     try
     {
@@ -326,14 +345,15 @@ void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInt
     }
 }
 
-void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMessage(const k2eg::service::pubsub::SubscriberInterfaceElement& m,
-                                                                                      k2eg::common::SerializationType&                         ser,
-                                                                                      int&                                                     message_type,
-                                                                                      int64_t&                                                 iter_index,
-                                                                                      int64_t&                                                 payload_ts,
-                                                                                      int64_t&                                                 header_timestamp,
-                                                                                      std::string&                                             snapshot_name,
-                                                                                      std::string&                                             pv_name)
+void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMessage(
+    const k2eg::service::pubsub::SubscriberInterfaceElement& m,
+    k2eg::common::SerializationType&                         ser,
+    int&                                                     message_type,
+    int64_t&                                                 iter_index,
+    int64_t&                                                 payload_ts,
+    int64_t&                                                 header_timestamp,
+    std::string&                                             snapshot_name,
+    std::string&                                             pv_name)
 {
     // Initialize outputs with defaults
     ser = k2eg::common::SerializationType::Unknown;
@@ -396,28 +416,61 @@ void k2eg::controller::node::worker::archiver::SnapshotArchiver::parseSnapshotMe
             msgpack::object        obj = oh.get();
             if (obj.type == msgpack::type::MAP)
             {
-                // First pass: read metadata
+                std::string candidate_pv_key;
+                // Single pass: read metadata and remember first non-metadata key
                 for (uint32_t i = 0; i < obj.via.map.size; ++i)
                 {
                     const msgpack::object_kv& kv = obj.via.map.ptr[i];
-                    std::string               key = kv.key.as<std::string>();
-                    if (key == "message_type")
-                        message_type = kv.val.as<int>();
-                    else if (key == "type")
-                        message_type = kv.val.as<int>();
-                    else if (key == "iter_index")
-                        iter_index = kv.val.as<int64_t>();
-                    else if (key == "timestamp")
-                        payload_ts = kv.val.as<int64_t>();
-                    else if (key == "header_timestamp")
-                        header_timestamp = kv.val.as<int64_t>();
-                    else if (key == "snapshot_name")
-                        snapshot_name = kv.val.as<std::string>();
-                    else {
-                        // here is the pv name
-                        pv_name = kv.key.as<std::string>();
+                    if (kv.key.type != msgpack::type::STR)
+                        continue;
+                    std::string key(kv.key.via.str.ptr, kv.key.via.str.size);
+                    try
+                    {
+                        if (key == "message_type")
+                        {
+                            int mt = 0;
+                            kv.val.convert(mt);
+                            message_type = mt;
+                        }
+                        else if (key == "type")
+                        {
+                            int mt = 0;
+                            kv.val.convert(mt);
+                            message_type = mt;
+                        }
+                        else if (key == "iter_index")
+                        {
+                            kv.val.convert(iter_index);
+                        }
+                        else if (key == "timestamp")
+                        {
+                            kv.val.convert(payload_ts);
+                        }
+                        else if (key == "header_timestamp")
+                        {
+                            kv.val.convert(header_timestamp);
+                        }
+                        else if (key == "snapshot_name")
+                        {
+                            kv.val.convert(snapshot_name);
+                        }
+                        else if (candidate_pv_key.empty() && key != "error" && key != "error_message")
+                        {
+                            // remember first non-metadata key as potential PV name
+                            candidate_pv_key = key;
+                        }
                     }
-                } 
+                    catch (...)
+                    {
+                        // ignore conversion errors for metadata
+                    }
+                }
+
+                // If this is a data message, accept the candidate PV key
+                if (message_type == 1 && pv_name.empty() && !candidate_pv_key.empty())
+                {
+                    pv_name = std::move(candidate_pv_key);
+                }
             }
         }
         else

@@ -2,6 +2,7 @@
 #define NODEUTILITIES_H_
 
 #include "boost/json/object.hpp"
+#include "k2eg/common/BaseSerialization.h"
 #include "k2eg/common/types.h"
 #include <cstddef>
 #include <gtest/gtest.h>
@@ -14,22 +15,23 @@
 #include <k2eg/controller/command/cmd/SnapshotCommand.h>
 #include <k2eg/controller/node/NodeController.h>
 
+#include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/pubsub/ISubscriber.h>
 #include <k2eg/service/pubsub/impl/kafka/RDKafkaPublisher.h>
 #include <k2eg/service/pubsub/impl/kafka/RDKafkaSubscriber.h>
 #include <k2eg/service/storage/StorageServiceFactory.h>
 #include <k2eg/service/storage/impl/MongoDBStorageService.h>
-#include <k2eg/service/ServiceResolver.h>
 
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <k2eg/common/MsgpackSerialization.h>
 #include <memory>
 #include <string>
 #include <thread>
-#include <vector>
 #include <unordered_set>
+#include <vector>
 
 /**
  * @brief Command message wrapper for publishing commands.
@@ -168,7 +170,7 @@ public:
      */
     k2eg::service::storage::IStorageServiceShrdPtr getStorageServiceInstance()
     {
-        //  create one if not running a storage-capable node
+        // create one if not running a storage-capable node
         return k2eg::service::storage::StorageServiceFactory::create(po->getStorageServiceConfiguration());
     }
 
@@ -267,11 +269,11 @@ public:
      */
     std::vector<std::string> waitForSnapshotIdsInRange(
         k2eg::service::storage::IStorageServiceShrdPtr storage_service,
-        const std::chrono::system_clock::duration& lookback = std::chrono::minutes(2),
-        size_t page_size = 10,
-        int max_attempts = 10,
-        std::chrono::milliseconds max_total = std::chrono::seconds(120),
-        std::chrono::milliseconds sleep_between = std::chrono::milliseconds(500))
+        const std::chrono::system_clock::duration&     lookback = std::chrono::minutes(2),
+        size_t                                         page_size = 10,
+        int                                            max_attempts = 10,
+        std::chrono::milliseconds                      max_total = std::chrono::seconds(120),
+        std::chrono::milliseconds                      sleep_between = std::chrono::milliseconds(500))
     {
         if (!storage_service)
         {
@@ -279,17 +281,17 @@ public:
             return {};
         }
 
-        std::vector<std::string> all_ids;
+        std::vector<std::string>        all_ids;
         std::unordered_set<std::string> seen;
-        int attempts = 0;
-        const auto deadline = std::chrono::steady_clock::now() + max_total;
+        int                             attempts = 0;
+        const auto                      deadline = std::chrono::steady_clock::now() + max_total;
         while (attempts < max_attempts && std::chrono::steady_clock::now() < deadline)
         {
             const auto start_time = std::chrono::system_clock::now() - lookback;
             const auto end_time = std::chrono::system_clock::now();
 
             std::optional<std::string> token;
-            bool has_more = true;
+            bool                       has_more = true;
             while (has_more)
             {
                 auto result = storage_service->listSnapshotIdsInRange(
@@ -306,10 +308,14 @@ public:
 
                 has_more = result.has_more;
                 token = result.continuation_token;
-                if (!has_more) break;
+                if (!has_more)
+                    break;
             }
 
-            if (!all_ids.empty()) { break; }
+            if (!all_ids.empty())
+            {
+                break;
+            }
             std::this_thread::sleep_for(sleep_between);
             ++attempts;
         }
@@ -335,7 +341,44 @@ public:
         return result;
     }
 
-    std::shared_ptr<const k2eg::service::pubsub::SubscriberInterfaceElement> waitForReplyID(k2eg::service::pubsub::ISubscriberShrdPtr subscriber, const std::string& reply_id, int timeout_ms = 1000)
+    /**
+     * @brief Zone-safe holder for a map view over a Msgpack-encoded payload.
+     * Keeps the msgpack object_handle (and its zone) alive while referencing objects in the map.
+     */
+    struct MsgpackMapView
+    {
+        msgpack::object_handle                                   handle;
+        std::unordered_map<std::string, msgpack::object>         map;
+        bool                                                     valid() const { return handle.get().type != msgpack::type::NIL || !map.empty(); }
+    };
+
+    /**
+     * @brief Deserialize a MessagePack-encoded subscriber payload into a zone-safe map view.
+     * @param message Subscriber message containing Msgpack bytes.
+     * @return MsgpackMapView with live zone and map of key->object.
+     */
+    MsgpackMapView getMsgpackObject(const k2eg::service::pubsub::SubscriberInterfaceElement& message)
+    {
+        MsgpackMapView out;
+        std::vector<unsigned char> buff(message.data_len);
+        std::memcpy(buff.data(), message.data.get(), message.data_len);
+        try
+        {
+            // Build a local handle and move it into the view to keep the zone alive
+            msgpack::object_handle oh;
+            msgpack::unpack(oh, reinterpret_cast<const char*>(buff.data()), buff.size());
+            out.handle = std::move(oh);
+            out.handle.get().convert(out.map);
+        }
+        catch (const std::exception& ex)
+        {
+            ADD_FAILURE() << "Msgpack unpack failed: " << ex.what();
+            out.map.clear();
+        }
+        return out;
+    }
+
+    std::shared_ptr<const k2eg::service::pubsub::SubscriberInterfaceElement> waitForReplyID(k2eg::service::pubsub::ISubscriberShrdPtr subscriber, const std::string& reply_id, k2eg::common::SerializationType serialization_type, int timeout_ms = 1000)
     {
         if (!subscriber)
         {
@@ -351,10 +394,27 @@ public:
 
             for (const auto& msg : messages)
             {
-                auto json_obj = getJsonObject(*msg);
-                if (json_obj.at("reply_id").get_string() == reply_id)
+                if (serialization_type == k2eg::common::SerializationType::JSON)
                 {
-                    return msg;
+                    auto json_obj = getJsonObject(*msg);
+                    if (json_obj.if_contains("reply_id") && json_obj.at("reply_id").is_string() && json_obj.at("reply_id").get_string() == reply_id)
+                    {
+                        return msg;
+                    }
+                }
+                else
+                {
+                    auto mv = getMsgpackObject(*msg);
+                    auto it = mv.map.find("reply_id");
+                    if (it != mv.map.end())
+                    {
+                        std::string rid;
+                        try { it->second.convert(rid); } catch (...) { rid.clear(); }
+                        if (rid == reply_id)
+                        {
+                            return msg;
+                        }
+                    }
                 }
             }
 

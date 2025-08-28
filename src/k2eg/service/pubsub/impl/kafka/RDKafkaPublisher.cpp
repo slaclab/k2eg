@@ -19,7 +19,7 @@ using namespace k2eg::service::log;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::pubsub::impl::kafka;
 
-RDKafkaPublisher::RDKafkaPublisher(ConstPublisherConfigurationUPtr configuration)
+RDKafkaPublisher::RDKafkaPublisher(ConstPublisherConfigurationShrdPtr configuration)
     : IPublisher(std::move(configuration)), RDKafkaBase(), _stop_inner_thread(false), _auto_poll(true)
 {
     init();

@@ -16,6 +16,11 @@
 - Sanitizers: `-DENABLE_ASAN=ON` or `-DENABLE_TSAN=ON`
 - Coverage: `-DENABLE_COVERAGE=ON` (requires `llvm-cov` or `lcov`/`genhtml`)
 
+### Important: Agent Execution Policy
+- The AI agent must never start or trigger builds, tests, or external tools itself.
+- When guidance is needed, provide commands for the user to run, but do not execute them.
+- Assume the user will run build/test locally or in CI and share results.
+
 ## Coding Style & Naming Conventions
 - Formatting: `.clang-format` (LLVM-based), 4-space indent, no tabs. Run `clang-format -i` on changed files before committing.
 - Naming: Classes use PascalCase (e.g., `EpicsChannel`); member variables and files follow existing patterns (`pv_name`, `EpicsChannel.cpp`). Keep directories lowercase.

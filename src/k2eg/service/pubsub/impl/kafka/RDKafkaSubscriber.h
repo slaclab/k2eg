@@ -23,7 +23,7 @@ protected:
     virtual void deinit();
 
 public:
-    RDKafkaSubscriber(ConstSubscriberConfigurationUPtr configuration);
+    RDKafkaSubscriber(ConstSubscriberConfigurationShrdPtr configuration);
     RDKafkaSubscriber() = delete;
     virtual ~RDKafkaSubscriber();
     virtual void setQueue(const k2eg::common::StringVector& queue);

@@ -114,7 +114,7 @@ protected:
     virtual void deinit();
 
 public:
-    explicit RDKafkaPublisher(ConstPublisherConfigurationUPtr configuration);
+    explicit RDKafkaPublisher(ConstPublisherConfigurationShrdPtr configuration);
     virtual ~RDKafkaPublisher();
     virtual int               createQueue(const QueueDescription& new_queue);
     virtual int               deleteQueue(const std::string& queue_name);

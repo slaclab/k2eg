@@ -111,10 +111,10 @@ class IPublisher
 {
 protected:
     MapEvtHndlrForReqType                 eventCallbackForReqType;
-    const ConstPublisherConfigurationUPtr configuration;
+    const ConstPublisherConfigurationShrdPtr configuration;
 
 public:
-    IPublisher(ConstPublisherConfigurationUPtr configuration);
+    IPublisher(ConstPublisherConfigurationShrdPtr configuration);
     IPublisher() = delete;
     IPublisher(const IPublisher&) = delete;
     IPublisher& operator=(const IPublisher&) = delete;

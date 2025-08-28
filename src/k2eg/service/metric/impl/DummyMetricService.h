@@ -57,7 +57,7 @@ class DummyMetricService : public IMetricService
     std::shared_ptr<INodeControllerSystemMetric> node_controller_system_metric;
 
 public:
-    DummyMetricService(ConstMetricConfigurationUPtr metric_configuration);
+    DummyMetricService(ConstMetricConfigurationShrdPtr metric_configuration);
     virtual ~DummyMetricService();
     DummyMetricService(const DummyMetricService&) = delete;
     DummyMetricService& operator=(const DummyMetricService&) = delete;

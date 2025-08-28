@@ -39,7 +39,7 @@ void set_thread_name(const std::size_t idx)
     BS::this_thread::set_os_thread_name(name);
 }
 inline auto thread_namer = [](unsigned long idx) { set_thread_name(idx); };
-EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config)
+EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigShrdPtr config)
     : config(std::move(config))
     , end_processing(false)
     , thread_throttling_vector(this->config->thread_count)

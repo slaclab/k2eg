@@ -3,6 +3,8 @@
 
 #include <memory>
 #include <any>
+#include <functional>
+#include <type_traits>
 
 namespace k2eg::service
 {
@@ -13,15 +15,67 @@ namespace k2eg::service
         static std::shared_ptr<T> registered_instance;
         // Opaque configuration associated to this service family
         static std::any configuration;
+        // Optional type-erased creator to build T from stored configuration
+        static std::function<std::shared_ptr<T>(const std::any&)> creator;
 
     public:
         /**
-         * @brief Register a concrete service instance to be used as the shared/default one.
+         * @brief Register and construct the shared/default instance from configuration.
+         * Captures concrete type D to allow future fresh instance creation without passing types.
+         * @tparam Cfg The configuration type (e.g., ConstPublisherConfigurationShrdPtr).
+         * @tparam D   The concrete derived type of T to instantiate.
          */
-        static void registerService(std::shared_ptr<T> object)
+        template <typename Cfg, typename D, typename = std::enable_if_t<std::is_base_of_v<T, D>>>
+        static void registerService(Cfg cfg)
         {
-            registered_instance = std::move(object);
+            configuration = cfg;
+            registered_instance = std::static_pointer_cast<T>(std::make_shared<D>(cfg));
+            creator = [](const std::any& stored) -> std::shared_ptr<T>
+            {
+                if (auto c = std::any_cast<Cfg>(&stored))
+                {
+                    return std::static_pointer_cast<T>(std::make_shared<D>(*c));
+                }
+                return nullptr;
+            };
         }
+
+        /**
+         * @brief Register using a zero-arg factory. Useful for factory-based services.
+         * The factory is responsible for capturing any needed configuration.
+         */
+        static void registerFactory(std::function<std::shared_ptr<T>()> factory)
+        {
+            // Build and store the singleton instance via the provided factory
+            registered_instance = factory();
+            // Install a creator that uses the zero-arg factory for fresh instances
+            creator = [factory](const std::any&) -> std::shared_ptr<T> { return factory(); };
+        }
+
+        /**
+         * @brief Register using a context + member getter + builder function, no lambdas at callsite.
+         * @tparam Cfg    Configuration type returned by Getter and consumed by Builder.
+         * @tparam Ctx    Context type that owns the getter (e.g., ProgramOptions).
+         * @tparam Getter Member function pointer or callable: Cfg (Ctx::*)() or compatible.
+         * @tparam Builder Free/static function or callable: std::shared_ptr<T>(Cfg).
+         */
+        template <typename Cfg, typename Ctx, typename Getter, typename Builder>
+        static void registerFactory(Ctx* ctx, Getter getter, Builder builder)
+        {
+            auto factory = [ctx, getter, builder]() {
+                if constexpr (std::is_member_function_pointer_v<Getter>)
+                {
+                    return builder((ctx->*getter)());
+                }
+                else
+                {
+                    return builder(getter(*ctx));
+                }
+            };
+            registerFactory(factory);
+        }
+
+        // No other registration overloads: singleton is always constructed internally from configuration
 
         /**
          * @brief Get the currently registered shared/default instance.
@@ -32,12 +86,13 @@ namespace k2eg::service
         }
 
         /**
-         * @brief Store/replace the configuration for this service family.
+         * @brief Create a new service instance using the stored configuration.
+         * @tparam Cfg The exact configuration type stored (e.g., ConstPublisherConfigurationShrdPtr).
+         * @return Freshly created instance, or nullptr if configuration is missing/mismatched.
          */
-        template <typename Cfg>
-        static void setConfiguration(Cfg cfg)
+        static std::shared_ptr<T> createNewInstance()
         {
-            configuration = std::move(cfg);
+            return (creator && configuration.has_value()) ? creator(configuration) : nullptr;
         }
 
         /**
@@ -56,6 +111,7 @@ namespace k2eg::service
         {
             registered_instance.reset();
             configuration.reset();
+            creator = nullptr;
         }
     };
 
@@ -63,6 +119,8 @@ namespace k2eg::service
     std::shared_ptr<T> ServiceResolver<T>::registered_instance;
     template <typename T>
     std::any ServiceResolver<T>::configuration;
+    template <typename T>
+    std::function<std::shared_ptr<T>(const std::any&)> ServiceResolver<T>::creator;
 }
 
 #endif // __SERVICERESOLVER_H__

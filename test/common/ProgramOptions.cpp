@@ -109,7 +109,7 @@ TEST(ProgramOptions, PublisherConfiguration) {
     int argc = 1;
     const char* argv[1] = {"epics-k2eg-test"};
     // set environment variable for test
-    ConstPublisherConfigurationUPtr conf;
+    ConstPublisherConfigurationShrdPtr conf;
     clearenv();
     setenv("EPICS_k2eg_pub-server-address", "pub-server", 1);
     setenv("EPICS_k2eg_pub-impl-kv", "k1:v1", 1);
@@ -125,7 +125,7 @@ TEST(ProgramOptions, SubscriberConfigurationConfFile) {
     int argc = 1;
     const char* argv[1] = {"epics-k2eg-test"};
     // set environment variable for test
-    ConstSubscriberConfigurationUPtr conf;
+    ConstSubscriberConfigurationShrdPtr conf;
     const std::string location = fs::path(fs::current_path()) / "test/test-conf-file.conf";
     clearenv();
     setenv("EPICS_k2eg_conf-file", "true", 1);

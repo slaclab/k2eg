@@ -152,7 +152,7 @@ inline void serializeMsgpack(const RepeatingSnaptshotHeader& header_event, commo
 inline void serializeMsgpack(const RepeatingSnaptshotData& data_event, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
 {
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
-    packer.pack_map(4);
+    packer.pack_map(5);
     packer.pack("message_type");
     packer.pack(data_event.message_type);
     packer.pack("timestamp");
@@ -167,7 +167,7 @@ inline void serializeMsgpack(const RepeatingSnaptshotData& data_event, common::M
 inline void serializeMsgpack(const RepeatingSnaptshotCompletion& header_completion, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
 {
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
-    packer.pack_map(header_completion.error_message.empty() ? 5 : 6);
+    packer.pack_map(header_completion.error_message.empty() ? 6 : 7);
     packer.pack("message_type");
     packer.pack(header_completion.message_type);
     packer.pack("error");
