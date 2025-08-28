@@ -133,9 +133,9 @@ class SnapshotSubmission
 {
 public:
     std::chrono::steady_clock::time_point                 header_timestamp; /**< Time point for the snapshot header. */
-    std::chrono::steady_clock::time_point                 snap_time;         /**< Time point for the snapshot. */
-    std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events;   /**< Events captured in the snapshot. */
-    SnapshotSubmissionType                                submission_type;   /**< Type flags for the submission. */
+    std::chrono::steady_clock::time_point                 snap_time;        /**< Time point for the snapshot. */
+    std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events;  /**< Events captured in the snapshot. */
+    SnapshotSubmissionType                                submission_type;  /**< Type flags for the submission. */
 
     /**
      * @brief Constructs a SnapshotSubmission with given time, events, and type.
@@ -201,6 +201,7 @@ public:
     std::promise<void>                                                   removal_promise;              /**< Promise for signaling removal of operation. */
     k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd;                          /**< Pointer to associated repeating snapshot command. */
     std::atomic<int64_t>                                                 snapshot_iteration_index = 0; /**< Index of current snapshot iteration. */
+    std::string                                                          snapshot_distribution_key;    /**< Unique identifier for the snapshot iteration to permit to have all the messages in the same partition. */
     const std::string                                                    queue_name;                   /**< Name of the queue for this operation. */
     const bool                                                           is_triggered;                 /**< Indicates if snapshot is triggered (immutable). */
     bool                                                                 request_to_trigger = false;   /**< Flag to request a trigger. */

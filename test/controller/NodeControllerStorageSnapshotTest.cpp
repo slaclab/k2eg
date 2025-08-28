@@ -71,6 +71,7 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     // get json object
     auto result_obj_start_snapshot = k2eg->getMsgpackObject(*reply_msg_start_snapshot);
     // check that the snapshot has been started
+    std::cout << "Start snapshot reply: " << result_obj_start_snapshot.handle.get() << std::endl;
     ASSERT_EQ(result_obj_start_snapshot.map.size(), 4) << "Msgpack object size is not 4";
     {
         auto it = result_obj_start_snapshot.map.find("error");

@@ -686,6 +686,10 @@ void SnapshotSubmissionTask::operator()()
         current_iteration = iteration_sync_.acquireIteration(snapshot_command_info->cmd->snapshot_name);
         // Store it in the shared atomic variable for other tasks to see.
         snapshot_command_info->snapshot_iteration_index.store(current_iteration);
+        // calculate the distribution key that is the snapshot_queue+header_ts+iteration
+        // this permit to have all the message of the same iteration of the snapshot
+        // in the same partition
+        snapshot_command_info->snapshot_distribution_key = snapshot_command_info->queue_name + std::to_string(header_timestamp) + std::to_string(current_iteration);
     }
     else
     {
@@ -700,9 +704,14 @@ void SnapshotSubmissionTask::operator()()
     {
         auto serialized_header_message = serialize(RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, current_iteration},
                                                    snapshot_command_info->cmd->serialization);
-        publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
-                                                            snapshot_command_info->cmd->snapshot_name, serialized_header_message),
-                               {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
+        publisher->pushMessage(
+            MakeReplyPushableMessageUPtr(
+                snapshot_command_info->queue_name,                // topic name where to publish
+                "repeating-snapshot-events",                      // publish subject to use on handler
+                snapshot_command_info->snapshot_distribution_key, // distribution key
+                serialized_header_message                         // message payload
+                ),
+            {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
         logger->logMessage(STRING_FORMAT("[Header] Snapshot %1% iteration %2% started", snapshot_command_info->cmd->snapshot_name % current_iteration), LogLevel::DEBUG);
     }
 
@@ -716,18 +725,24 @@ void SnapshotSubmissionTask::operator()()
             pv_names_published.insert(event->channel_data.pv_name);
             auto serialized_message =
                 serialize(RepeatingSnaptshotData{
-                    1,
-                    snap_ts,
-                    header_timestamp,
-                    current_iteration,
-                    MakeChannelDataShrdPtr(event->channel_data)},
+                              1,
+                              snap_ts,
+                              header_timestamp,
+                              current_iteration,
+                              MakeChannelDataShrdPtr(event->channel_data)},
                           snapshot_command_info->cmd->serialization);
             if (serialized_message)
             {
-                publisher->pushMessage(MakeReplyPushableMessageUPtr(
-                                           snapshot_command_info->queue_name, "repeating-snapshot-events",
-                                           snapshot_command_info->cmd->snapshot_name, serialized_message),
-                                       {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
+                publisher->pushMessage(
+                    MakeReplyPushableMessageUPtr(
+                        snapshot_command_info->queue_name,                // topic name where to publish
+                        "repeating-snapshot-events",                      // publish subject to use on handler
+                        snapshot_command_info->snapshot_distribution_key, // distribution key
+                        serialized_message                                // message payload
+                        ),
+                    {{
+                        "k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization) // serialization type in header
+                    }});
                 // update statistic
                 statistic_counter->incrementEventCount();
                 statistic_counter->incrementEventSize(serialized_message->data()->size());
@@ -757,9 +772,14 @@ void SnapshotSubmissionTask::operator()()
                                                            header_timestamp,
                                                            current_iteration},
                                                        snapshot_command_info->cmd->serialization);
-        publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
-                                                            snapshot_command_info->cmd->snapshot_name, serialized_completion_message),
-                               {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
+        publisher->pushMessage(
+            MakeReplyPushableMessageUPtr(
+                snapshot_command_info->queue_name,                // topic name where to publish
+                "repeating-snapshot-events",                      // publish subject to use on handler
+                snapshot_command_info->snapshot_distribution_key, // distribution key
+                serialized_completion_message                     // message payload
+                ),
+            {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
 
         // Mark the tail as processed. The lock will be released by finishTask either now (if this is the last task)
         // or later when the last running Data task calls its TaskGuard destructor.

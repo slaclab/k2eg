@@ -20,6 +20,27 @@ class SnapshotArchiver : public BaseArchiver
     // asking the subscriber for a new batch.
     k2eg::service::pubsub::SubscriberInterfaceElementVector pending_messages;
 
+    // Fast-path context for the currently active iteration observed on this
+    // consumer. With publisher guaranteeing in-order delivery of all messages
+    // belonging to the same iteration on a partition, most messages will hit
+    // this cache and avoid storage lookups and map accesses.
+    struct IterationContext {
+        bool        valid{false};
+        std::string key;            // snapshot_name:timestamp:iter_index
+        std::string snapshot_id;    // resolved/created snapshot id
+        std::string snapshot_name;  // cached for convenience
+        int64_t     iter_index{0};
+        int64_t     key_timestamp{0};
+        void reset() {
+            valid = false;
+            key.clear();
+            snapshot_id.clear();
+            snapshot_name.clear();
+            iter_index = 0;
+            key_timestamp = 0;
+        }
+    } current_iter;
+
     /**
      * @brief Parses a snapshot message and extracts relevant information.
      * @param m The snapshot message to parse.

@@ -2,8 +2,8 @@
 #include <bsoncxx/builder/stream/document.hpp>
 #include <bsoncxx/json.hpp>
 #include <chrono>
-#include <k2eg/common/uuid.h>
 #include <k2eg/common/utility.h>
+#include <k2eg/common/uuid.h>
 #include <mutex>
 
 #include <k2eg/service/ServiceResolver.h>
@@ -21,7 +21,7 @@ namespace bsoncxx_builder = bsoncxx::builder::stream;
 
 constexpr const char* DEFAULT_CONNECTION_STRING = "mongodb://localhost:27017";
 constexpr const char* DEFAULT_DATABASE = "k2eg";
-constexpr const char* DEFAULT_COLLECTION = "data";
+constexpr const char* DEFAULT_DATA_COLLECTION = "data";
 constexpr const char* DEFAULT_SNAPSHOTS_COLLECTION = "snapshots";
 constexpr int         DEFAULT_POOL_SIZE = 10;
 constexpr int         DEFAULT_TIMEOUT_MS = 5000;
@@ -40,8 +40,7 @@ constexpr std::string BSON_PING_FIELD = "ping";
 // Snapshot-specific fields
 constexpr std::string BSON_SNAPSHOT_NAME_FIELD = "snapshot_name";
 constexpr std::string BSON_CREATED_AT_FIELD = "created_at";
-constexpr std::string BSON_DESCRIPTION_FIELD = "description";
-constexpr std::string BSON_PV_NAMES_FIELD = "pv_names";
+// constexpr std::string BSON_PV_NAMES_FIELD = "pv_names";
 constexpr std::string BSON_SEARCH_KEY_FIELD = "search_key";
 
 constexpr std::string MONGO_GTE_OPERATOR = "$gte";
@@ -56,7 +55,7 @@ namespace {
 // Constructed once and shared for the program lifetime.
 inline mongocxx::instance& mongo_global_instance()
 {
-    static std::once_flag init_once;
+    static std::once_flag                      init_once;
     static std::unique_ptr<mongocxx::instance> instance_ptr;
     std::call_once(
         init_once,
@@ -139,7 +138,7 @@ void fill_mongodb_program_option(boost::program_options::options_description& de
 
     mongodb_section.add_options()(MONGODB_CONNECTION_STRING_KEY, boost::program_options::value<std::string>()->default_value(DEFAULT_CONNECTION_STRING), "MongoDB connection string")(
         MONGODB_DATABASE_KEY, boost::program_options::value<std::string>()->default_value(DEFAULT_DATABASE), "MongoDB database name")(
-        MONGODB_COLLECTION_KEY, boost::program_options::value<std::string>()->default_value(DEFAULT_COLLECTION), "MongoDB collection name")(
+        MONGODB_DATA_COLLECTION_KEY, boost::program_options::value<std::string>()->default_value(DEFAULT_DATA_COLLECTION), "MongoDB collection name")(
         MONGODB_SNAPSHOTS_COLLECTION_KEY, boost::program_options::value<std::string>()->default_value(DEFAULT_SNAPSHOTS_COLLECTION), "MongoDB snapshots collection name")(
         MONGODB_POOL_SIZE_KEY, boost::program_options::value<int>()->default_value(DEFAULT_POOL_SIZE), "MongoDB connection pool size")(
         MONGODB_TIMEOUT_MS_KEY, boost::program_options::value<int>()->default_value(DEFAULT_TIMEOUT_MS), "MongoDB operation timeout in milliseconds")(
@@ -165,9 +164,9 @@ get_mongodb_program_option(const boost::program_options::variables_map& vm)
         config->database_name = vm[MONGODB_DATABASE_KEY].as<std::string>();
     }
 
-    if (vm.count(MONGODB_COLLECTION_KEY))
+    if (vm.count(MONGODB_DATA_COLLECTION_KEY))
     {
-        config->collection_name = vm[MONGODB_COLLECTION_KEY].as<std::string>();
+        config->data_collection_name = vm[MONGODB_DATA_COLLECTION_KEY].as<std::string>();
     }
 
     if (vm.count(MONGODB_SNAPSHOTS_COLLECTION_KEY))
@@ -274,28 +273,24 @@ void MongoDBStorageService::createIndexes()
             [this]()
             {
                 auto client = pool_->acquire();
-                auto collection = (*client)[config_->database_name][config_->collection_name];
+                auto data_collection = (*client)[config_->database_name][config_->data_collection_name];
                 auto snapshots_collection = (*client)[config_->database_name][config_->snapshots_collection_name];
 
                 // Create compound index on pv_name and timestamp for efficient queries
                 auto pv_time_index = bsoncxx_builder::document{} << BSON_PV_NAME_FIELD << 1 << BSON_TIMESTAMP_FIELD << 1 << bsoncxx_builder::finalize;
-                create_index_safely(collection, pv_time_index.view());
+                create_index_safely(data_collection, pv_time_index.view());
 
                 // Create index on timestamp for time-range queries
                 auto time_index = bsoncxx_builder::document{} << BSON_TIMESTAMP_FIELD << 1 << bsoncxx_builder::finalize;
-                create_index_safely(collection, time_index.view());
+                create_index_safely(data_collection, time_index.view());
 
                 // Create index on topic for topic-based queries
                 auto topic_index = bsoncxx_builder::document{} << BSON_TOPIC_FIELD << 1 << bsoncxx_builder::finalize;
-                create_index_safely(collection, topic_index.view());
-
-                // Create index on snapshot_id for snapshot-based queries
-                auto snapshot_index = bsoncxx_builder::document{} << BSON_SNAPSHOT_ID_FIELD << 1 << bsoncxx_builder::finalize;
-                create_index_safely(collection, snapshot_index.view());
+                create_index_safely(data_collection, topic_index.view());
 
                 // Create compound index on snapshot_id and pv_name for efficient snapshot queries
-                auto snapshot_pv_index = bsoncxx_builder::document{} << BSON_SNAPSHOT_ID_FIELD << 1 << BSON_PV_NAME_FIELD << 1 << bsoncxx_builder::finalize;
-                create_index_safely(collection, snapshot_pv_index.view());
+                auto snapshot_pv_index = bsoncxx_builder::document{} << BSON_PV_NAME_FIELD << 1 << bsoncxx_builder::finalize;
+                create_index_safely(data_collection, snapshot_pv_index.view());
 
                 // Create composite unique index to prevent duplicates (matches our upsert filter)
                 auto unique_record_index = bsoncxx_builder::document{}
@@ -307,7 +302,7 @@ void MongoDBStorageService::createIndexes()
                 mongocxx::options::index unique_index_options{};
                 unique_index_options.unique(true);
                 unique_index_options.sparse(true); // Allow records without snapshot_id
-                create_index_safely(collection, unique_record_index.view(), std::move(unique_index_options));
+                create_index_safely(data_collection, unique_record_index.view(), std::move(unique_index_options));
 
                 // Create indexes for snapshots collection
                 // Create unique index on snapshot_id
@@ -341,7 +336,7 @@ bool MongoDBStorageService::store(const ArchiveRecord& record)
     try
     {
         auto client = pool_->acquire();
-        auto collection = (*client)[config_->database_name][config_->collection_name];
+        auto collection = (*client)[config_->database_name][config_->data_collection_name];
 
         auto doc = recordToBson(record);
 
@@ -389,7 +384,7 @@ MongoDBStorageService::storeBatch(const std::vector<ArchiveRecord>& records)
     try
     {
         auto client = pool_->acquire();
-        auto collection = (*client)[config_->database_name][config_->collection_name];
+        auto collection = (*client)[config_->database_name][config_->data_collection_name];
 
         std::vector<bsoncxx::document::value> docs;
         docs.reserve(records.size());
@@ -514,7 +509,7 @@ MongoDBStorageService::query(const ArchiveQuery& query)
     try
     {
         auto client = pool_->acquire();
-        auto collection = (*client)[config_->database_name][config_->collection_name];
+        auto collection = (*client)[config_->database_name][config_->data_collection_name];
 
         // Build query filter
         auto filter_builder = bsoncxx_builder::document{};
@@ -588,7 +583,7 @@ bool MongoDBStorageService::clearAllData()
         auto db = (*client)[config_->database_name];
 
         // Delete all documents from data and snapshots collections
-        auto data_collection = db[config_->collection_name];
+        auto data_collection = db[config_->data_collection_name];
         auto snap_collection = db[config_->snapshots_collection_name];
 
         auto res1 = data_collection.delete_many({});
@@ -897,13 +892,8 @@ MongoDBStorageService::snapshotToBson(const Snapshot& snapshot)
     auto doc = bsoncxx_builder::document{};
 
     // Store snapshot creation time in UTC
-    if (!snapshot.snapshot_id.empty())
-    {
-        doc << "_id" << snapshot.snapshot_id;
-    }
     doc << BSON_SNAPSHOT_NAME_FIELD << snapshot.snapshot_name
         << BSON_CREATED_AT_FIELD << bsoncxx::types::b_date{to_utc(snapshot.created_at)}
-        << BSON_DESCRIPTION_FIELD << snapshot.description
         << BSON_SEARCH_KEY_FIELD << snapshot.search_key;
 
     // Intentionally omit pv_names field to reduce document size and avoid storing empty arrays
@@ -931,26 +921,9 @@ MongoDBStorageService::bsonToSnapshot(const bsoncxx::document::view& doc)
         snapshot.created_at = std::chrono::system_clock::time_point{std::chrono::milliseconds{created_at.get_date().value.count()}};
     }
 
-    if (auto description = doc[BSON_DESCRIPTION_FIELD])
-    {
-        snapshot.description = description.get_string().value;
-    }
-
     if (auto search_key = doc[BSON_SEARCH_KEY_FIELD])
     {
         snapshot.search_key = search_key.get_string().value;
-    }
-
-    if (auto pv_names = doc[BSON_PV_NAMES_FIELD])
-    {
-        auto pv_names_array = pv_names.get_array().value;
-        for (const auto& pv_name : pv_names_array)
-        {
-            if (pv_name.type() == bsoncxx::type::k_string)
-            {
-                snapshot.pv_names.insert(std::string{pv_name.get_string().value});
-            }
-        }
     }
 
     return snapshot;

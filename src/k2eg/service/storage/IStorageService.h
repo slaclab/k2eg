@@ -95,12 +95,10 @@ DEFINE_PTR_TYPES(StoredMessage)
  */
 struct Snapshot
 {
-    std::string                           snapshot_id;
-    std::string                           snapshot_name;
-    std::chrono::system_clock::time_point created_at;
-    std::string                           description;
-    std::unordered_set<std::string>       pv_names;
-    std::string                           search_key; // Format: "snapshot_name:header_timestamp:iter_index"
+    std::string                           snapshot_id;   ///< Unique identifier for the snapshot
+    std::string                           snapshot_name; ///< Human-readable name for the snapshot
+    std::chrono::system_clock::time_point created_at;    ///< Timestamp when the snapshot was created
+    std::string                           search_key;    ///< Format: "snapshot_name:header_timestamp:iter_index"
 };
 DEFINE_PTR_TYPES(Snapshot)
 
@@ -163,9 +161,9 @@ struct ArchiveQueryResult
  */
 struct SnapshotIdRangeResult
 {
-    std::vector<std::string>      snapshot_ids;
-    bool                          has_more = false;
-    std::optional<std::string>    continuation_token; // last returned ID
+    std::vector<std::string>   snapshot_ids;
+    bool                       has_more = false;
+    std::optional<std::string> continuation_token; // last returned ID
 };
 DEFINE_PTR_TYPES(SnapshotIdRangeResult)
 
@@ -266,8 +264,8 @@ public:
     virtual SnapshotIdRangeResult listSnapshotIdsInRange(
         const std::chrono::system_clock::time_point& start_time,
         const std::chrono::system_clock::time_point& end_time,
-        size_t limit,
-        const std::optional<std::string>& continuation_token = std::nullopt) = 0;
+        size_t                                       limit,
+        const std::optional<std::string>&            continuation_token = std::nullopt) = 0;
 };
 
 DEFINE_PTR_TYPES(IStorageService)

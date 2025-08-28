@@ -1,4 +1,3 @@
-#include <iostream>
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/worker/StorageWorker.h>
@@ -168,79 +167,65 @@ void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInt
     int64_t                         payload_ts;
     int64_t                         header_timestamp;
     std::string                     snapshot_name;
-    service::storage::ArchiveRecord rec;
-
     std::string pv_name;
     this->parseSnapshotMessage(m, ser, message_type, iter_index, payload_ts, header_timestamp, snapshot_name, pv_name);
+    // Compute the iteration key upfront for cache/lookup decisions.
+    const int64_t     key_timestamp = (message_type == 0) ? payload_ts : header_timestamp;
+    const std::string key = snapshot_name.empty()
+                                ? std::string()
+                                : (snapshot_name + ":" + std::to_string(key_timestamp) + ":" + std::to_string(iter_index));
 
-    // PV name is carried as the remaining top-level key in data messages
-    // (besides known metadata keys). Fall back to message key if not found.
-    rec.pv_name = pv_name.empty() ? m.key : pv_name;
-    rec.topic = params.snapshot_queue_name;
-
-    if (payload_ts > 0)
-        rec.timestamp = std::chrono::system_clock::time_point(std::chrono::milliseconds(payload_ts));
-    else
-        rec.timestamp = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
-
-    try
+    // Fast path for header messages: ensure snapshot existence and commit, skip
+    // building ArchiveRecord and metadata to avoid allocations/serialization.
+    if (message_type == 0)
     {
-        boost::json::object meta;
-        meta["message_type"] = message_type >= 0 ? message_type : 1;
-        if (iter_index >= 0)
-            meta["iter_index"] = iter_index;
-        if (!snapshot_name.empty())
-            meta["snapshot_name"] = snapshot_name;
-        rec.metadata = boost::json::serialize(meta);
-    }
-    catch (...)
-    {
-        rec.metadata = "";
-    }
+        std::string snapshot_id;
 
-    // here data is moved
-    rec.data = std::make_unique<service::storage::StoredMessage>(m.data.get(), m.data_len, ser);
-
-    // Handle snapshot management: check if snapshot exists, create if needed
-    if (!snapshot_name.empty())
-    {
-        const int64_t     key_timestamp = (message_type == 0) ? payload_ts : header_timestamp;
-        const std::string key = snapshot_name + ":" + std::to_string(key_timestamp) + ":" + std::to_string(iter_index);
-        std::string       snapshot_id;
-
-        // First check our local cache
-        auto it = created_snapshots.find(key);
-        if (it != created_snapshots.end())
+        // Reuse context when possible
+        if (current_iter.valid && current_iter.key == key && !current_iter.snapshot_id.empty())
         {
-            snapshot_id = it->second;
+            snapshot_id = current_iter.snapshot_id;
         }
-        else
+        else if (!snapshot_name.empty())
         {
-            // Check if snapshot already exists in storage (from previous execution/crash recovery/or created by another node)
-            try
+            // Check local per-call cache first
+            if (auto it = created_snapshots.find(key); it != created_snapshots.end())
             {
-                auto existing_snap = storage_service->findSnapshotBySearchKey(key);
-                if (existing_snap.has_value())
+                snapshot_id = it->second;
+            }
+            else
+            {
+                // Try storage (recovery or created by another node)
+                try
                 {
-                    snapshot_id = existing_snap->snapshot_id;
-                    created_snapshots[key] = snapshot_id;
+                    auto existing_snap = storage_service->findSnapshotBySearchKey(key);
+                    if (existing_snap.has_value())
+                    {
+                        snapshot_id = existing_snap->snapshot_id;
+                        created_snapshots[key] = snapshot_id;
+                        if (logger)
+                            logger->logMessage(
+                                STRING_FORMAT("SnapshotArchiver found existing snapshot: %1% for key %2%", snapshot_id % key),
+                                LogLevel::DEBUG);
+                    }
+                }
+                catch (const std::exception& ex)
+                {
                     if (logger)
-                        logger->logMessage(STRING_FORMAT("SnapshotArchiver found existing snapshot: %1% for key %2%", snapshot_id % key), LogLevel::DEBUG);
+                        logger->logMessage(
+                            STRING_FORMAT("SnapshotArchiver error checking existing snapshots: %1%", ex.what()), LogLevel::ERROR);
                 }
             }
-            catch (const std::exception& ex)
-            {
-                if (logger)
-                    logger->logMessage(STRING_FORMAT("SnapshotArchiver error checking existing snapshots: %1%", ex.what()), LogLevel::ERROR);
-            }
 
-            // If header message and no existing snapshot found, create a new one
-            if (snapshot_id.empty() && message_type == 0)
+            // Create if still missing
+            if (snapshot_id.empty())
             {
                 service::storage::Snapshot snap;
                 snap.snapshot_name = snapshot_name;
-                snap.created_at = rec.timestamp;
-                snap.description = STRING_FORMAT("Snapshot iteration %1%", iter_index);
+                snap.created_at = (payload_ts > 0)
+                                      ? std::chrono::system_clock::time_point(std::chrono::milliseconds(payload_ts))
+                                      : std::chrono::time_point_cast<std::chrono::milliseconds>(
+                                            std::chrono::system_clock::now());
                 snap.search_key = key;
                 try
                 {
@@ -249,7 +234,9 @@ void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInt
                     {
                         created_snapshots[key] = snapshot_id;
                         if (logger)
-                            logger->logMessage(STRING_FORMAT("SnapshotArchiver created new snapshot: %1% for %2%", snapshot_id % snapshot_name), LogLevel::INFO);
+                            logger->logMessage(
+                                STRING_FORMAT("SnapshotArchiver created new snapshot: %1% for %2%", snapshot_id % snapshot_name),
+                                LogLevel::INFO);
                     }
                 }
                 catch (const std::exception& ex)
@@ -260,42 +247,19 @@ void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInt
             }
         }
 
-        // If we are processing a non-header message (data/tail) and we do not
-        // have a snapshot created/found yet, discard the message. This handles
-        // cases where the consumer starts in the middle of a snapshot.
-        if (snapshot_id.empty() && message_type != 0)
+        // Update iteration context
+        if (!snapshot_name.empty() && !key.empty() && !snapshot_id.empty())
         {
-            if (logger)
-                logger->logMessage(
-                    STRING_FORMAT(
-                        "SnapshotArchiver discarding message for snapshot '%1%' (key %2%): snapshot not initialized",
-                        snapshot_name % key),
-                    LogLevel::DEBUG);
-            if (m.commit_handle)
-            {
-                try
-                {
-                    subscriber->commit(m.commit_handle, true);
-                }
-                catch (const std::exception& ex)
-                {
-                    if (logger)
-                        logger->logMessage(STRING_FORMAT("SnapshotArchiver commit exception (discard): %1%", ex.what()), LogLevel::ERROR);
-                }
-            }
-            return; // do not store
+            current_iter.valid = true;
+            current_iter.key = key;
+            current_iter.snapshot_id = snapshot_id;
+            current_iter.snapshot_name = snapshot_name;
+            current_iter.iter_index = iter_index;
+            current_iter.key_timestamp = key_timestamp;
         }
 
-        // Attach snapshot_id to the record if we have one
-        if (!snapshot_id.empty())
-        {
-            rec.snapshot_id = snapshot_id;
-        }
-    }
-
-    // If this is a header message (message_type == 0), only ensure snapshot exists and skip storing payload
-    if (message_type == 0)
-    {
+        // Commit header regardless of whether snapshot creation succeeded; data
+        // messages will be re-delivered if needed.
         if (m.commit_handle)
         {
             try
@@ -310,6 +274,109 @@ void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInt
         }
         return;
     }
+
+    // Determine snapshot id for data/tail with preference to current iteration
+    // context; fall back to caches/storage if context does not match.
+    std::string snapshot_id;
+    if (current_iter.valid && current_iter.key == key && !current_iter.snapshot_id.empty())
+    {
+        snapshot_id = current_iter.snapshot_id;
+    }
+    else if (!snapshot_name.empty())
+    {
+        if (auto it = created_snapshots.find(key); it != created_snapshots.end())
+        {
+            snapshot_id = it->second;
+            // update context to help subsequent messages if same iteration resumes
+            current_iter.valid = true;
+            current_iter.key = key;
+            current_iter.snapshot_id = snapshot_id;
+            current_iter.snapshot_name = snapshot_name;
+            current_iter.iter_index = iter_index;
+            current_iter.key_timestamp = key_timestamp;
+        }
+        else
+        {
+            try
+            {
+                auto existing_snap = storage_service->findSnapshotBySearchKey(key);
+                if (existing_snap.has_value())
+                {
+                    snapshot_id = existing_snap->snapshot_id;
+                    created_snapshots[key] = snapshot_id;
+                }
+            }
+            catch (const std::exception& ex)
+            {
+                if (logger)
+                    logger->logMessage(STRING_FORMAT("SnapshotArchiver error checking existing snapshots: %1%", ex.what()), LogLevel::ERROR);
+            }
+
+            if (!snapshot_id.empty())
+            {
+                current_iter.valid = true;
+                current_iter.key = key;
+                current_iter.snapshot_id = snapshot_id;
+                current_iter.snapshot_name = snapshot_name;
+                current_iter.iter_index = iter_index;
+                current_iter.key_timestamp = key_timestamp;
+            }
+        }
+    }
+
+    // If we are processing a non-header message (data/tail) and we do not have
+    // a snapshot created/found yet, discard the message.
+    if (snapshot_id.empty())
+    {
+        if (logger && !snapshot_name.empty())
+            logger->logMessage(
+                STRING_FORMAT(
+                    "SnapshotArchiver discarding message for snapshot '%1%' (key %2%): snapshot not initialized",
+                    snapshot_name % key),
+                LogLevel::DEBUG);
+        if (m.commit_handle)
+        {
+            try
+            {
+                subscriber->commit(m.commit_handle, true);
+            }
+            catch (const std::exception& ex)
+            {
+                if (logger)
+                    logger->logMessage(STRING_FORMAT("SnapshotArchiver commit exception (discard): %1%", ex.what()), LogLevel::ERROR);
+            }
+        }
+        return; // do not store
+    }
+
+    // Build ArchiveRecord lazily (we skipped this for header messages)
+    service::storage::ArchiveRecord rec;
+    // PV name is carried as the remaining top-level key in data messages
+    // (besides known metadata keys). Fall back to message key if not found.
+    rec.pv_name = pv_name.empty() ? m.key : pv_name;
+    rec.topic = params.snapshot_queue_name;
+    rec.snapshot_id = snapshot_id;
+
+    if (payload_ts > 0)
+        rec.timestamp = std::chrono::system_clock::time_point(std::chrono::milliseconds(payload_ts));
+    else
+        rec.timestamp = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+
+    try
+    {
+        boost::json::object meta;
+        meta["message_type"] = message_type >= 0 ? message_type : 1;
+        meta["iter_index"] = iter_index;
+        meta["snapshot_name"] = snapshot_name;
+        rec.metadata = boost::json::serialize(meta);
+    }
+    catch (...)
+    {
+        rec.metadata = "";
+    }
+
+    // Move data
+    rec.data = std::make_unique<service::storage::StoredMessage>(m.data.get(), m.data_len, ser);
 
     // Store the record immediately (not deferred)
     try
@@ -336,12 +403,12 @@ void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInt
         // Don't commit if storage failed - message will be redelivered
     }
 
-    // If tail message, we can drop the snapshot mapping for this iteration
+    // If tail message, we can drop the snapshot mapping/context for this iteration
     if (message_type == 2 && !snapshot_name.empty())
     {
-        const int64_t     key_timestamp = (message_type == 0) ? payload_ts : header_timestamp;
-        const std::string key = snapshot_name + ":" + std::to_string(key_timestamp) + ":" + std::to_string(iter_index);
         created_snapshots.erase(key);
+        if (current_iter.valid && current_iter.key == key)
+            current_iter.reset();
     }
 }
 
