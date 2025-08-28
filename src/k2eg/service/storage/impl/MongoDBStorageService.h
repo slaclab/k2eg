@@ -81,8 +81,10 @@ private:
 
     /**
      * @brief Convert ArchiveRecord to BSON document.
+     * @param record Source record.
+     * @param include_parsed_payload When true, embed a BSON-converted view of the payload (data_bson).
      */
-    bsoncxx::document::value recordToBson(const ArchiveRecord& record);
+    bsoncxx::document::value recordToBson(const ArchiveRecord& record, bool include_parsed_payload = false);
 
     /**
      * @brief Convert BSON document to ArchiveRecord.

@@ -63,6 +63,26 @@ class SnapshotArchiver : public BaseArchiver
     void processMessage(const service::pubsub::SubscriberInterfaceElement& m,
                         std::unordered_map<std::string, std::string>&      created_snapshots);
 
+    // Split handlers to improve readability
+    void handleHeaderMessage(const service::pubsub::SubscriberInterfaceElement& m,
+                             int64_t                                           iter_index,
+                             int64_t                                           payload_ts,
+                             const std::string&                                snapshot_name,
+                             const std::string&                                key,
+                             std::unordered_map<std::string, std::string>&     created_snapshots);
+
+    void handleDataMessage(const service::pubsub::SubscriberInterfaceElement& m,
+                           k2eg::common::SerializationType                   ser,
+                           int64_t                                           iter_index,
+                           int64_t                                           payload_ts,
+                           int64_t                                           header_timestamp,
+                           const std::string&                                snapshot_name,
+                           const std::string&                                pv_name,
+                           const std::string&                                key,
+                           std::unordered_map<std::string, std::string>&     created_snapshots);
+
+    void handleTailMessage(const service::pubsub::SubscriberInterfaceElement& m);
+
 public:
     /**
      * @brief Constructs a new SnapshotArchiver object.

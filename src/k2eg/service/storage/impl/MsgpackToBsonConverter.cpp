@@ -43,6 +43,52 @@ bsoncxx::document::value MsgPackToBsonConverter::convertToBson(const std::vector
     }
 }
 
+std::optional<bsoncxx::document::value> MsgPackToBsonConverter::convertPvValueToBson(const std::vector<uint8_t>& msgpack_data, const std::string& pv_name) {
+    try {
+        msgpack::object_handle oh = msgpack::unpack(
+            reinterpret_cast<const char*>(msgpack_data.data()),
+            msgpack_data.size()
+        );
+
+        const msgpack::object& root = oh.get();
+
+        // Message root is a map keyed by PV names; extract only the requested PV
+        if (root.type == msgpack::type::MAP) {
+            auto& map = root.via.map;
+            for (uint32_t i = 0; i < map.size; ++i) {
+                if (map.ptr[i].key.type == msgpack::type::STR) {
+                    std::string key = map.ptr[i].key.as<std::string>();
+                    if (key == pv_name) {
+                        auto doc = document{};
+                        // If PV value is a map, expose its fields directly; otherwise wrap under "value"
+                        if (map.ptr[i].val.type == msgpack::type::MAP) {
+                            convertMapToBson(map.ptr[i].val, doc);
+                        } else {
+                            convertObject(map.ptr[i].val, doc, "value");
+                        }
+                        return doc.extract();
+                    }
+                }
+            }
+        } else if (root.type == msgpack::type::ARRAY && root.via.array.size >= 2) {
+            // Compact format: [pv_name, value, ...]
+            const auto& arr = root.via.array;
+            if (arr.ptr[0].type == msgpack::type::STR && arr.ptr[0].as<std::string>() == pv_name) {
+                auto doc = document{};
+                // Convert the second element as the value; if missing, return empty doc
+                if (arr.size >= 2) {
+                    convertObject(arr.ptr[1], doc, "value");
+                }
+                return doc.extract();
+            }
+        }
+
+        return std::nullopt;
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
 void MsgPackToBsonConverter::convertMapToBson(const msgpack::object& map_obj, document& doc) {
     if (map_obj.type != msgpack::type::MAP) return;
     

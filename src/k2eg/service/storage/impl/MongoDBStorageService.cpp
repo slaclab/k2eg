@@ -5,10 +5,12 @@
 #include <k2eg/common/utility.h>
 #include <k2eg/common/uuid.h>
 #include <mutex>
+#include <vector>
 
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/log/ILogger.h>
 #include <k2eg/service/storage/impl/MongoDBStorageService.h>
+#include <k2eg/service/storage/impl/MsgpackToBsonConverter.h>
 #include <mongocxx/exception/exception.hpp>
 #include <mongocxx/instance.hpp>
 
@@ -32,10 +34,11 @@ constexpr std::string BSON_PV_NAME_FIELD = "pv_name";
 constexpr std::string BSON_TOPIC_FIELD = "topic";
 constexpr std::string BSON_TIMESTAMP_FIELD = "timestamp";
 constexpr std::string BSON_METADATA_FIELD = "metadata";
-constexpr std::string BSON_DATA_FIELD = "data";
+constexpr std::string BSON_PV_RAW_VALUE_FIELD = "raw_value";
 constexpr std::string BSON_SERIALIZATION_TYPE_FIELD = "ser_type";
 constexpr std::string BSON_SNAPSHOT_ID_FIELD = "snapshot_id";
 constexpr std::string BSON_PING_FIELD = "ping";
+constexpr std::string BSON_PV_VALUE_FIELD = "value";
 
 // Snapshot-specific fields
 constexpr std::string BSON_SNAPSHOT_NAME_FIELD = "snapshot_name";
@@ -338,7 +341,8 @@ bool MongoDBStorageService::store(const ArchiveRecord& record)
         auto client = pool_->acquire();
         auto collection = (*client)[config_->database_name][config_->data_collection_name];
 
-        auto doc = recordToBson(record);
+        // Base document for update ($set always)
+        auto base_doc = recordToBson(record, false);
 
         // Create a unique filter based on pv_name, timestamp, topic, and snapshot_id
         auto filter = bsoncxx_builder::document{};
@@ -351,11 +355,35 @@ bool MongoDBStorageService::store(const ArchiveRecord& record)
             filter << BSON_SNAPSHOT_ID_FIELD << *record.snapshot_id;
         }
 
-        // Use replace_one with upsert to handle duplicates gracefully
-        mongocxx::options::replace replace_options{};
-        replace_options.upsert(true);
+        // Build update with $set and $setOnInsert for the parsed payload
+        auto update = bsoncxx_builder::document{};
+        update << "$set" << base_doc.view();
 
-        auto result = collection.replace_one(filter.view(), doc.view(), replace_options);
+        // Only on creation: embed parsed BSON for the raw payload
+        if (record.data && record.data->serializationType() == k2eg::common::SerializationType::Msgpack)
+        {
+            auto data_ptr = record.data->data();
+            if (data_ptr && data_ptr->size() > 0)
+            {
+                const auto*          p = reinterpret_cast<const uint8_t*>(data_ptr->data());
+                std::vector<uint8_t> buf(p, p + data_ptr->size());
+                auto                 pv_only = MsgPackToBsonConverter::convertPvValueToBson(buf, record.pv_name);
+                auto                 on_insert = bsoncxx_builder::document{};
+                if (pv_only) {
+                    on_insert << BSON_PV_VALUE_FIELD << pv_only->view();
+                } else {
+                    // Fallback: store full conversion if PV-specific extraction fails
+                    auto parsed = MsgPackToBsonConverter::convertToBson(buf);
+                    on_insert << BSON_PV_VALUE_FIELD << parsed.view();
+                }
+                update << "$setOnInsert" << on_insert.view();
+            }
+        }
+
+        mongocxx::options::update update_options{};
+        update_options.upsert(true);
+
+        auto result = collection.update_one(filter.view(), update.view(), update_options);
 
         {
             std::lock_guard<std::mutex> lock(stats_mutex_);
@@ -391,7 +419,8 @@ MongoDBStorageService::storeBatch(const std::vector<ArchiveRecord>& records)
 
         for (const auto& record : records)
         {
-            docs.push_back(recordToBson(record));
+            // Batch is always creation: include parsed payload
+            docs.push_back(recordToBson(record, true));
         }
 
         auto   result = collection.insert_many(docs);
@@ -416,7 +445,7 @@ MongoDBStorageService::storeBatch(const std::vector<ArchiveRecord>& records)
 }
 
 bsoncxx::document::value
-MongoDBStorageService::recordToBson(const ArchiveRecord& record)
+MongoDBStorageService::recordToBson(const ArchiveRecord& record, bool include_parsed_payload)
 {
     auto doc = bsoncxx_builder::document{};
 
@@ -436,10 +465,25 @@ MongoDBStorageService::recordToBson(const ArchiveRecord& record)
         auto data_ptr = record.data->data();
         if (data_ptr && data_ptr->size() > 0)
         {
-            doc << BSON_DATA_FIELD
+            doc << BSON_PV_RAW_VALUE_FIELD
                 << bsoncxx::types::b_binary{bsoncxx::binary_sub_type::k_binary, static_cast<uint32_t>(data_ptr->size()), reinterpret_cast<const uint8_t*>(data_ptr->data())};
             // Persist serialization type alongside data
             doc << BSON_SERIALIZATION_TYPE_FIELD << k2eg::common::serialization_to_string(record.data->serializationType());
+
+            // Optionally embed a parsed BSON representation of the payload (only the value for this pv_name)
+            if (include_parsed_payload && record.data->serializationType() == k2eg::common::SerializationType::Msgpack)
+            {
+                const auto*          p = reinterpret_cast<const uint8_t*>(data_ptr->data());
+                std::vector<uint8_t> buf(p, p + data_ptr->size());
+                auto                 pv_only = MsgPackToBsonConverter::convertPvValueToBson(buf, record.pv_name);
+                if (pv_only) {
+                    doc << BSON_PV_VALUE_FIELD << pv_only->view();
+                } else {
+                    // Fallback: store full conversion if PV-specific extraction fails
+                    auto parsed = MsgPackToBsonConverter::convertToBson(buf);
+                    doc << BSON_PV_VALUE_FIELD << parsed.view();
+                }
+            }
         }
     }
 
@@ -478,7 +522,7 @@ MongoDBStorageService::bsonToRecord(const bsoncxx::document::view& doc)
         record.snapshot_id = std::string{snapshot_id.get_string().value};
     }
 
-    if (auto data = doc[BSON_DATA_FIELD])
+    if (auto data = doc[BSON_PV_RAW_VALUE_FIELD])
     {
         auto binary = data.get_binary();
         // Try to read serialization type; default to Unknown if missing

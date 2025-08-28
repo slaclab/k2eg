@@ -19,6 +19,13 @@ public:
      */
     static bsoncxx::document::value   convertToBson(const std::vector<uint8_t>& msgpack_data);
     /**
+     * Converts only the value associated with the provided PV name to a BSON document.
+     * If the PV value is a map, the returned document contains that map's keys.
+     * If it's a scalar/array, the returned document contains a single field named "value".
+     * Returns std::nullopt if the PV name is not present.
+     */
+    static std::optional<bsoncxx::document::value> convertPvValueToBson(const std::vector<uint8_t>& msgpack_data, const std::string& pv_name);
+    /**
      * Extracts the PV name from the MessagePack data.
      * Returns std::nullopt if not found or if the data is malformed.
      */
