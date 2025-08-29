@@ -37,9 +37,10 @@
    * @return <what is returned; success semantics and error cases>
    */
   ```
-- Keep brief lines short and specific; expand only when needed.
-- Prefer imperative voice; avoid restating names in descriptions.
-- Document ownership/lifetime and thread-safety when non-obvious.
+- Keep @brief truly brief. Add detail only when necessary using @details.
+- Use imperative voice; don’t repeat the function or parameter names.
+- Always document ownership/lifetime and thread-safety when not obvious.
+- Document every non-overridden method.
 
 ## Testing Guidelines
 - Framework: GoogleTest with a global environment initializer in `test/test.cpp` (starts/stops EPICS providers).

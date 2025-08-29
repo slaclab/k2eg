@@ -47,7 +47,6 @@ serializeMsgpack(const PutCommandReply& reply, common::MsgpackMessage& msgpack_m
     packer.pack("message");
     packer.pack(reply.message);
   }
-  // service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::Msgpack)->serialize(*reply.pv_data, msgpack_message);
 }
 
 /**
@@ -61,7 +60,6 @@ serializeMsgpackCompact(const PutCommandReply& reply, common::MsgpackMessage& ms
     packer.pack("message");
     packer.pack(reply.message);
   }
-  // service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::MsgpackCompact)->serialize(*reply.pv_data, msgpack_message);
 }
 
 struct PutOpInfo : public WorkerAsyncOperation {

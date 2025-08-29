@@ -25,7 +25,7 @@ using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::node::worker::archiver;
 
 // Default values for StorageWorker configuration
-#define DEFAULT_BATCH_SIZE 100
+#define DEFAULT_BATCH_SIZE 10
 #define DEFAULT_BATCH_TIMEOUT_MS 5000
 #define DEFAULT_WORKER_THREAD_COUNT 4
 #define DEFAULT_QUEUE_MAX_SIZE 10000
@@ -212,8 +212,7 @@ void StorageWorker::executePeriodicTask(TaskProperties& task_properties)
                                 .engine_config = this->config,
                                 .snapshot_queue_name = snapshot_id},
                             this->logger,
-                            ServiceResolver<ISubscriber>::createNewInstance({
-                                {"group.id", this->config->consumer_group_id}}),
+                            ServiceResolver<ISubscriber>::createNewInstance({{"group.id", this->config->consumer_group_id}}),
                             this->storage_service);
                         // set snapshot as archiving
                         node_config->setSnapshotArchiveStatus(snapshot_id, ArchiveStatusInfo{ArchiveStatus::ARCHIVING});
@@ -238,13 +237,13 @@ void StorageWorker::processArchiver(archiver::BaseArchiverShrdPtr archiver)
     if (stop)
         return;
     // give time to archive
+    // logger->logMessage("----------------------------start process archiving---------------------------", LogLevel::DEBUG);
     archiver->performWork(std::chrono::milliseconds(config->batch_timeout));
+    // logger->logMessage("----------------------------end process archiving---------------------------", LogLevel::DEBUG);
     // resubmit to scheduler
     thread_pool->detach_task(
         [this, archiver]() mutable
         {
-            logger->logMessage("----------------------------start process archiving---------------------------", LogLevel::DEBUG);
             processArchiver(archiver);
-            logger->logMessage("----------------------------end process archiving---------------------------", LogLevel::DEBUG);
         });
 }

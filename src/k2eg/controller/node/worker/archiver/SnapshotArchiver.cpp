@@ -97,6 +97,14 @@ void SnapshotArchiver::performWork(std::chrono::milliseconds timeout)
             if (fetch_timeout <= milliseconds(0))
                 fetch_timeout = milliseconds(1);
 
+            // Cap the per-fetch blocking time to improve responsiveness.
+            // This makes performWork perform multiple short polls within the
+            // overall budget instead of a single long wait which delays
+            // reaction when data arrives just after the call starts.
+            const milliseconds fetch_cap(250);
+            if (fetch_timeout > fetch_cap)
+                fetch_timeout = fetch_cap;
+
             // Fetch up to batch_sz messages using the computed timeout.
             const int rc = subscriber->getMsg(fetched, batch_sz, static_cast<unsigned int>(fetch_timeout.count()));
             if (rc != 0 || fetched.empty())
@@ -167,7 +175,7 @@ void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInt
     int64_t                         payload_ts;
     int64_t                         header_timestamp;
     std::string                     snapshot_name;
-    std::string pv_name;
+    std::string                     pv_name;
     this->parseSnapshotMessage(m, ser, message_type, iter_index, payload_ts, header_timestamp, snapshot_name, pv_name);
     // Compute the iteration key upfront for cache/lookup decisions.
     const int64_t     key_timestamp = (message_type == 0) ? payload_ts : header_timestamp;
@@ -178,24 +186,24 @@ void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInt
     // Branch per message type to improve readability
     switch (message_type)
     {
-        case 0: // header
-            handleHeaderMessage(m, iter_index, payload_ts, snapshot_name, key, created_snapshots);
-            break;
-        case 1: // data
-            handleDataMessage(m, ser, iter_index, payload_ts, header_timestamp, snapshot_name, pv_name, key, created_snapshots);
-            break;
-        default: // ignore/ack other types
-            handleTailMessage(m);
-            break;
+    case 0: // header
+        handleHeaderMessage(m, iter_index, payload_ts, snapshot_name, key, created_snapshots);
+        break;
+    case 1: // data
+        handleDataMessage(m, ser, iter_index, payload_ts, header_timestamp, snapshot_name, pv_name, key, created_snapshots);
+        break;
+    default: // ignore/ack other types
+        handleTailMessage(m);
+        break;
     }
 }
 
 void SnapshotArchiver::handleHeaderMessage(const k2eg::service::pubsub::SubscriberInterfaceElement& m,
-                                           int64_t                                                 iter_index,
-                                           int64_t                                                 payload_ts,
-                                           const std::string&                                      snapshot_name,
-                                           const std::string&                                      key,
-                                           std::unordered_map<std::string, std::string>&           created_snapshots)
+                                           int64_t                                                  iter_index,
+                                           int64_t                                                  payload_ts,
+                                           const std::string&                                       snapshot_name,
+                                           const std::string&                                       key,
+                                           std::unordered_map<std::string, std::string>&            created_snapshots)
 {
     std::string snapshot_id;
 
@@ -296,14 +304,14 @@ void SnapshotArchiver::handleHeaderMessage(const k2eg::service::pubsub::Subscrib
 }
 
 void SnapshotArchiver::handleDataMessage(const k2eg::service::pubsub::SubscriberInterfaceElement& m,
-                                         k2eg::common::SerializationType                         ser,
-                                         int64_t                                                 iter_index,
-                                         int64_t                                                 payload_ts,
-                                         int64_t                                                 header_timestamp,
-                                         const std::string&                                      snapshot_name,
-                                         const std::string&                                      pv_name,
-                                         const std::string&                                      key,
-                                         std::unordered_map<std::string, std::string>&           created_snapshots)
+                                         k2eg::common::SerializationType                          ser,
+                                         int64_t                                                  iter_index,
+                                         int64_t                                                  payload_ts,
+                                         int64_t                                                  header_timestamp,
+                                         const std::string&                                       snapshot_name,
+                                         const std::string&                                       pv_name,
+                                         const std::string&                                       key,
+                                         std::unordered_map<std::string, std::string>&            created_snapshots)
 {
     const int64_t key_timestamp = header_timestamp;
 
