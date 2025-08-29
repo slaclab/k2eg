@@ -118,10 +118,12 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     // for each found snapshot, check that two value has been recorded
     auto found_ids = k2eg->waitForSnapshotIdsInRange(storage_service);
     ASSERT_FALSE(found_ids.empty()) << "No snapshots found";
+
+    // calculate the total number of records across snapshots and per-PV occurrences
+    std::unordered_map<std::string, std::size_t> per_pv_counts{{"variable:a", 0}, {"variable:b", 0}};
+    std::size_t                                   total_records = 0;
     for (const auto& snapshot_id : found_ids)
     {
-        size_t total_records = 0;
-
         for (const auto& pv_name : {std::string("variable:a"), std::string("variable:b")})
         {
             ArchiveQuery query;
@@ -130,6 +132,7 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
             query.limit = 10;
 
             auto result = storage_service->query(query);
+            per_pv_counts[pv_name] += result.records.size();
             total_records += result.records.size();
 
             for (const auto& rec : result.records)
@@ -141,9 +144,12 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
                 ASSERT_GT(payload->size(), 0u) << "Empty payload";
             }
         }
-
-        ASSERT_EQ(total_records, 2u) << "Snapshot does not contain two values";
     }
+
+    // Expect one record per PV per snapshot
+    ASSERT_EQ(per_pv_counts["variable:a"], found_ids.size()) << "PV variable:a should appear once per snapshot";
+    ASSERT_EQ(per_pv_counts["variable:b"], found_ids.size()) << "PV variable:b should appear once per snapshot";
+    ASSERT_EQ(total_records, found_ids.size() * 2u) << "Total records should be two per snapshot";
 
     ASSERT_NO_THROW(k2eg.reset();) << "Failed to reset K2EG instance";
 }

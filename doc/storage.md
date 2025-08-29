@@ -17,7 +17,7 @@ This document describes how K2EG persists EPICS data and snapshots using the sto
 
 Collection names are configurable (defaults shown from `MongoDB` section):
 
-- `MongoDB.collection` (default: `epics_data`)
+- `MongoDB.data_collection` (default: `epics_data`)
 - `MongoDB.snapshots-collection` (default: `snapshots`)
 
 ### epics_data (data records)
@@ -28,19 +28,103 @@ Example (MsgPack payload, linked to a snapshot):
 
 ```json
 {
-  "pv_name": "BPMS:LTUH:250:X",
-  "topic": "snapshot:BL1",
-  "timestamp": {"$date": "2025-06-21T12:34:56Z"},
-  "metadata": "epics-NTScalar; unit=mm",
-  "snapshot_id": "669d8a9e5ee8e8399d71c9b2",
-
-  "raw_value": {"$binary": {"base64": "...", "subType": "00"}},
-  "ser_type": "msgpack",
-
+  "_id": {
+    "$oid": "68b21bd8d75e30abe2e2339c"
+  },
+  "pv_name": "variable:b",
+  "snapshot_id": "68b21bd83efc5f6511081744",
+  "timestamp": {
+    "$date": "2025-08-29T21:30:00.335Z"
+  },
+  "topic": "snapshot_name",
+  "metadata": "{\"message_type\":1,\"iter_index\":1,\"snapshot_name\":\"snapshot_name\"}",
+  "raw_value": {
+    "$binary": {
+      "base64": "haxtZXN...ZXJlc2lzAA==",
+      "subType": "00"
+    }
+  },
+  "ser_type": "Msgpack",
   "value": {
-    "timeStamp": {"secondsPastEpoch": 1750509296, "nanoseconds": 123000000},
-    "value": 3.14159,
-    "alarm": {"severity": 0, "status": 0}
+    "value": 0,
+    "alarm": {
+      "severity": {
+        "$numberLong": "0"
+      },
+      "status": {
+        "$numberLong": "0"
+      },
+      "message": "NO_ALARM"
+    },
+    "timeStamp": {
+      "secondsPastEpoch": {
+        "$numberLong": "1756502027"
+      },
+      "nanoseconds": {
+        "$numberLong": "148821126"
+      },
+      "userTag": {
+        "$numberLong": "0"
+      }
+    },
+    "display": {
+      "limitLow": 0,
+      "limitHigh": 0,
+      "description": "",
+      "units": "",
+      "precision": {
+        "$numberLong": "0"
+      },
+      "form": {
+        "index": {
+          "$numberLong": "0"
+        },
+        "choices": [
+          "Default",
+          "String",
+          "Binary",
+          "Decimal",
+          "Hex",
+          "Exponential",
+          "Engineering"
+        ]
+      }
+    },
+    "control": {
+      "limitLow": 0,
+      "limitHigh": 100,
+      "minStep": 0
+    },
+    "valueAlarm": {
+      "active": false,
+      "lowAlarmLimit": {
+        "$numberDouble": "NaN"
+      },
+      "lowWarningLimit": {
+        "$numberDouble": "NaN"
+      },
+      "highWarningLimit": {
+        "$numberDouble": "NaN"
+      },
+      "highAlarmLimit": {
+        "$numberDouble": "NaN"
+      },
+      "lowAlarmSeverity": {
+        "$numberLong": "0"
+      },
+      "lowWarningSeverity": {
+        "$numberLong": "0"
+      },
+      "highWarningSeverity": {
+        "$numberLong": "0"
+      },
+      "highAlarmSeverity": {
+        "$numberLong": "0"
+      },
+      "hysteresis": {
+        "$numberLong": "0"
+      }
+    }
   }
 }
 ```

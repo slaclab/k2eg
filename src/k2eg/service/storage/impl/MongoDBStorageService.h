@@ -20,7 +20,7 @@ namespace k2eg::service::storage::impl {
 
 constexpr const char* MONGODB_CONNECTION_STRING_KEY = "connection-string";
 constexpr const char* MONGODB_DATABASE_KEY = "database";
-constexpr const char* MONGODB_DATA_COLLECTION_KEY = "collection";
+constexpr const char* MONGODB_DATA_COLLECTION_KEY = "data-collection";
 constexpr const char* MONGODB_SNAPSHOTS_COLLECTION_KEY = "snapshots-collection";
 constexpr const char* MONGODB_POOL_SIZE_KEY = "pool-size";
 constexpr const char* MONGODB_TIMEOUT_MS_KEY = "timeout-ms";
