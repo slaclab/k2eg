@@ -39,7 +39,7 @@ struct StorageWorkerConfiguration
 DEFINE_PTR_TYPES(StorageWorkerConfiguration);
 
 /**
- * @brief Fill storage worker program options
+ * @brief Define CLI options for the storage worker section.
  */
 void fill_storage_worker_program_option(boost::program_options::options_description& desc);
 /**
@@ -81,6 +81,9 @@ public:
 
     ~StorageWorker();
 
+    /**
+     * @brief Execute periodic tasks such as discovery or metrics collection.
+     */
     void executePeriodicTask(k2eg::service::scheduler::TaskProperties& task_properties);
 };
 

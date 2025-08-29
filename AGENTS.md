@@ -40,7 +40,8 @@
 - Keep @brief truly brief. Add detail only when necessary using @details.
 - Use imperative voice; don’t repeat the function or parameter names.
 - Always document ownership/lifetime and thread-safety when not obvious.
-- Document every non-overridden method.
+- Document every non-overridden method
+- Document the instance variable of a class describing what it is needed for
 
 ## Testing Guidelines
 - Framework: GoogleTest with a global environment initializer in `test/test.cpp` (starts/stops EPICS providers).

@@ -17,16 +17,19 @@
 
 namespace k2eg::controller::node::worker {
 
+/**
+ * @brief Configuration for snapshot command handling.
+ */
 struct SnapshotCommandConfiguration
 {
-    // the cron stirng for schedule the monitor
+    /** @brief Parameters for repeating/continuous snapshot engine. */
     snapshot::RepeatingSnaptshotConfiguration continuous_snapshot_configuration;
 };
 DEFINE_PTR_TYPES(SnapshotCommandConfiguration)
 
-/*
-Snapshot reply message
-*/
+/**
+ * @brief Reply payload for a snapshot command containing PV data.
+ */
 struct SnapshotCommandReply : public k2eg::controller::node::worker::CommandReply
 {
     const std::int32_t                                 element_number;
@@ -34,15 +37,18 @@ struct SnapshotCommandReply : public k2eg::controller::node::worker::CommandRepl
 };
 DEFINE_PTR_TYPES(SnapshotCommandReply)
 
-/*
-    Snapshot faulty reply message
-*/
+/**
+ * @brief Faulty reply payload for snapshot commands.
+ */
 struct SnapshotFaultyCommandReply : public k2eg::controller::node::worker::CommandReply
 {
     const std::string message;
 };
 DEFINE_PTR_TYPES(SnapshotFaultyCommandReply)
 
+/**
+ * @brief Reply for continuous snapshot commands (start/stop/trigger).
+ */
 struct ContinuousSnapshotCommandReply : public k2eg::controller::node::worker::CommandReply
 {
     const std::string message;
@@ -51,8 +57,8 @@ struct ContinuousSnapshotCommandReply : public k2eg::controller::node::worker::C
 DEFINE_PTR_TYPES(ContinuousSnapshotCommandReply)
 
 /**
-Get reply message json serialization
-*/
+ * @brief Serialize SnapshotCommandReply to JSON.
+ */
 inline void serializeJson(const SnapshotCommandReply& reply, common::JsonMessage& json_message)
 {
     serializeJson(static_cast<CommandReply>(reply), json_message);
@@ -82,8 +88,8 @@ inline void serializeJson(const ContinuousSnapshotCommandReply& reply, common::J
 }
 
 /**
-Get reply message msgpack serialization
-*/
+ * @brief Serialize snapshot replies to Msgpack.
+ */
 inline void serializeMsgpack(const SnapshotCommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
 {
     serializeMsgpack(static_cast<CommandReply>(reply), msgpack_message, map_size + 1);
@@ -121,8 +127,8 @@ inline void serializeMsgpack(const ContinuousSnapshotCommandReply& reply, common
 }
 
 /**
-Get reply message msgpack compact serialization
-*/
+ * @brief Serialize snapshot replies to compact Msgpack.
+ */
 inline void serializeMsgpackCompact(const SnapshotCommandReply& reply, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
 {
     serializeMsgpackCompact(static_cast<CommandReply>(reply), msgpack_message, map_size + 1);
@@ -157,19 +163,20 @@ inline void serializeMsgpackCompact(const ContinuousSnapshotCommandReply& reply,
     }
 }
 
-/*
-Is the worker that take care to manage the snapshot command
-and collect all the structure for the monitor operation
-for all the PV
-*/
+/**
+ * @brief Single-shot snapshot execution context.
+ *
+ * Manages the monitor operations required to complete a one-off snapshot
+ * over a set of PVs and coordinate their completion.
+ */
 class SnapshotOpInfo : public WorkerAsyncOperation
 {
 public:
-    // keep track of the comamnd specification
+    /** @brief Original snapshot command specification. */
     k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd;
-    // take track for all the monitor operation that have been processed
+    /** @brief Bitset tracking processed monitor operations. */
     boost::dynamic_bitset<> processed_index;
-    // contains the monitor async opration for all the PVs
+    /** @brief Async monitor operations for all PVs. */
     std::vector<service::epics_impl::ConstMonitorOperationShrdPtr> v_mon_ops;
 
     SnapshotOpInfo(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd, std::vector<service::epics_impl::ConstMonitorOperationShrdPtr> v_mon_ops, std::uint32_t tout_msc = 1000)
@@ -180,9 +187,9 @@ public:
 DEFINE_PTR_TYPES(SnapshotOpInfo)
 
 /**
- * Worker responsible for handling snapshot commands.
- * It manages the lifecycle of the snapshot operation,
- * including data collection and response publication.
+ * @brief Worker that handles snapshot commands (single-shot and continuous).
+ *
+ * Coordinates EPICS operations, publishes replies, and updates metrics.
  */
 class SnapshotCommandWorker : public CommandWorker
 {
@@ -198,26 +205,26 @@ class SnapshotCommandWorker : public CommandWorker
     void checkGetCompletion(std::shared_ptr<BS::light_thread_pool> thread_pool, SnapshotOpInfoShrdPtr snapshot_info);
     // send a faulty reply to the client
     void manageFaultyReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd);
-    // send the snapshot reply to the client for a pv index
-    /*
-    The function return the value of a pv in a specific index respect to the original list of PVs when it is ready
-    so the client could receive event in a different order than the original list of PVs and it need to reconsturct the
-    original list of PVs
-    */
+    /**
+     * @brief Publish the snapshot reply for a PV index.
+     *
+     * Replies may arrive out of order relative to the original PV list; the
+     * client must reassemble based on index.
+     */
     void publishSnapshotReply(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd, std::uint32_t pv_index, service::epics_impl::ConstChannelDataShrdPtr pv_data);
-    /*
-    Is the final message that is sent to the client to notify that the snapshot has been completed
-    */
+    /**
+     * @brief Publish the final message indicating snapshot completion.
+     */
     void publishEndSnapshotReply(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd);
-    /*
-        preparae and submit the single snapshot command to the thread pool
-    */
+    /**
+     * @brief Prepare and submit a single-shot snapshot to the thread pool.
+     */
     void submitSingleSnapshot(std::shared_ptr<BS::light_thread_pool> command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 
 public:
     SnapshotCommandWorker(const SnapshotCommandConfiguration& snapshot_command_configuration, k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager);
     virtual ~SnapshotCommandWorker();
-    // process the command
+    /** @brief Process snapshot-related commands. */
     void processCommand(std::shared_ptr<BS::light_thread_pool> thread_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
     std::size_t getTaskRunning() const;
 };

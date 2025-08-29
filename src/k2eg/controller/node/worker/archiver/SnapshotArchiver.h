@@ -24,14 +24,17 @@ class SnapshotArchiver : public BaseArchiver
     // consumer. With publisher guaranteeing in-order delivery of all messages
     // belonging to the same iteration on a partition, most messages will hit
     // this cache and avoid storage lookups and map accesses.
-    struct IterationContext {
+    struct IterationContext
+    {
         bool        valid{false};
-        std::string key;            // snapshot_name:timestamp:iter_index
-        std::string snapshot_id;    // resolved/created snapshot id
-        std::string snapshot_name;  // cached for convenience
+        std::string key;           // snapshot_name:timestamp:iter_index
+        std::string snapshot_id;   // resolved/created snapshot id
+        std::string snapshot_name; // cached for convenience
         int64_t     iter_index{0};
         int64_t     key_timestamp{0};
-        void reset() {
+
+        void reset()
+        {
             valid = false;
             key.clear();
             snapshot_id.clear();
@@ -63,24 +66,26 @@ class SnapshotArchiver : public BaseArchiver
     void processMessage(const service::pubsub::SubscriberInterfaceElement& m,
                         std::unordered_map<std::string, std::string>&      created_snapshots);
 
-    // Split handlers to improve readability
+    // Handle a header message: create snapshot if needed, update context.
     void handleHeaderMessage(const service::pubsub::SubscriberInterfaceElement& m,
-                             int64_t                                           iter_index,
-                             int64_t                                           payload_ts,
-                             const std::string&                                snapshot_name,
-                             const std::string&                                key,
-                             std::unordered_map<std::string, std::string>&     created_snapshots);
+                             int64_t                                            iter_index,
+                             int64_t                                            payload_ts,
+                             const std::string&                                 snapshot_name,
+                             const std::string&                                 key,
+                             std::unordered_map<std::string, std::string>&      created_snapshots);
 
+    // Handle a data message: process the snapshot data.
     void handleDataMessage(const service::pubsub::SubscriberInterfaceElement& m,
-                           k2eg::common::SerializationType                   ser,
-                           int64_t                                           iter_index,
-                           int64_t                                           payload_ts,
-                           int64_t                                           header_timestamp,
-                           const std::string&                                snapshot_name,
-                           const std::string&                                pv_name,
-                           const std::string&                                key,
-                           std::unordered_map<std::string, std::string>&     created_snapshots);
+                           k2eg::common::SerializationType                    ser,
+                           int64_t                                            iter_index,
+                           int64_t                                            payload_ts,
+                           int64_t                                            header_timestamp,
+                           const std::string&                                 snapshot_name,
+                           const std::string&                                 pv_name,
+                           const std::string&                                 key,
+                           std::unordered_map<std::string, std::string>&      created_snapshots);
 
+    // Handle a tail message: finalize the snapshot processing.
     void handleTailMessage(const service::pubsub::SubscriberInterfaceElement& m);
 
 public:

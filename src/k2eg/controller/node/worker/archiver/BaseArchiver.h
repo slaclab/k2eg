@@ -30,9 +30,11 @@ struct ArchiverParameters
 };
 
 /**
- * @brief Base class for archivers in the K2EG controller node worker.
- * @details This class provides a common interface and functionality for all archivers.
- * It can be extended to implement specific archiving strategies.
+ * @brief Base class for archivers in the controller node.
+ * @details Provides common wiring (logger, subscriber, storage) and a minimal
+ *          interface for concrete archivers that consume from a queue and
+ *          persist records. Subclasses implement performWork() with the
+ *          specific consumption/archiving logic.
  */
 class BaseArchiver
 {
@@ -52,8 +54,11 @@ protected:
     k2eg::service::storage::IStorageServiceShrdPtr storage_service;
 public:
     /**
-     * @brief Constructs a new BaseArchiver object.
-     * @param storage_service_ The storage service to be used for archiving.
+     * @brief Construct a BaseArchiver with required dependencies.
+     * @param params Aggregated archiver parameters (engine config, queue name).
+     * @param logger Logger instance used by the archiver.
+     * @param subscriber Subscriber used to consume messages.
+     * @param storage_service Storage service used to persist archived data.
      */
     explicit BaseArchiver(
         const ArchiverParameters&                      params,
@@ -68,9 +73,11 @@ public:
     virtual ~BaseArchiver();
 
     /**
-     * @brief Performs the work of the archiver.
-     * @details This method is called to continue the archiving process.
-     * @param timeout The timeout for the work to be performed.
+     * @brief Perform a unit of work for the archiver.
+     * @details Called repeatedly by the owner to advance consumption and
+     *          storage; implement non-blocking or bounded-blocking behavior
+     *          respecting the provided timeout.
+     * @param timeout Maximum time to wait for new work before returning.
      */
     virtual void performWork(std::chrono::milliseconds timeout) = 0;
 };
