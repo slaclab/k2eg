@@ -881,18 +881,153 @@ SnapshotIdRangeResult MongoDBStorageService::listSnapshotIdsInRange(
                                                        << bsoncxx::types::b_date{end_utc} << bsoncxx_builder::finalize;
         auto filter = bsoncxx_builder::document{} << BSON_CREATED_AT_FIELD << time_filter << bsoncxx_builder::finalize;
 
-        // Apply continuation token by _id if provided
+        // Apply continuation token using stable pagination over (created_at, _id)
+        // Supports two token formats:
+        // 1) "<created_at_ms>|<id>" (preferred, no DB lookup)
+        // 2) "<id>" (legacy); falls back to DB lookup to read created_at
         if (continuation_token && !continuation_token->empty())
         {
-            auto and_filter = bsoncxx_builder::array{};
-            and_filter << filter.view();
-            and_filter << (bsoncxx_builder::document{} << "_id" << (bsoncxx_builder::document{} << "$gt" << *continuation_token << bsoncxx_builder::finalize)
+            // Try token format parsing first ("<ms>|<id>")
+            auto pipe_pos = continuation_token->find('|');
+            if (pipe_pos != std::string::npos)
+            {
+                std::string ms_str = continuation_token->substr(0, pipe_pos);
+                std::string id_str = continuation_token->substr(pipe_pos + 1);
+                // Parse millis
+                int64_t ms_val = 0;
+                try { ms_val = std::stoll(ms_str); } catch (...) { ms_val = 0; }
+                auto token_tp = std::chrono::system_clock::time_point{std::chrono::milliseconds{ms_val}};
+                auto token_created = bsoncxx::types::b_date{token_tp};
+
+                bool token_is_oid = false;
+                bsoncxx::oid token_oid;
+                try { token_oid = bsoncxx::oid{id_str}; token_is_oid = true; } catch (...) { token_is_oid = false; }
+
+                // Build: base time range AND (created_at > token_created OR (created_at == token_created AND _id > token_id))
+                auto and_arr = bsoncxx_builder::array{};
+                and_arr << filter.view();
+
+                auto or_arr = bsoncxx_builder::array{};
+                // created_at > token_created
+                or_arr << (bsoncxx_builder::document{} << BSON_CREATED_AT_FIELD
+                                                       << (bsoncxx_builder::document{} << "$gt" << token_created << bsoncxx_builder::finalize)
                                                        << bsoncxx_builder::finalize);
-            filter = bsoncxx_builder::document{} << "$and" << and_filter << bsoncxx_builder::finalize;
+                // (created_at == token_created AND _id > token_id)
+                auto sub_and = bsoncxx_builder::array{};
+                sub_and << (bsoncxx_builder::document{} << BSON_CREATED_AT_FIELD << token_created << bsoncxx_builder::finalize);
+                if (token_is_oid)
+                {
+                    sub_and << (bsoncxx_builder::document{} << "_id"
+                                                            << (bsoncxx_builder::document{} << "$gt" << token_oid << bsoncxx_builder::finalize)
+                                                            << bsoncxx_builder::finalize);
+                }
+                else
+                {
+                    sub_and << (bsoncxx_builder::document{} << "_id"
+                                                            << (bsoncxx_builder::document{} << "$gt" << id_str << bsoncxx_builder::finalize)
+                                                            << bsoncxx_builder::finalize);
+                }
+                or_arr << (bsoncxx_builder::document{} << "$and" << sub_and << bsoncxx_builder::finalize);
+
+                and_arr << (bsoncxx_builder::document{} << "$or" << or_arr << bsoncxx_builder::finalize);
+
+                filter = bsoncxx_builder::document{} << "$and" << and_arr << bsoncxx_builder::finalize;
+            }
+            else
+            {
+                // Legacy token: use lookup to fetch created_at
+                auto token_lookup_filter = bsoncxx_builder::document{};
+                bool token_is_oid = false;
+                try
+                {
+                    token_lookup_filter << "_id" << bsoncxx::oid{*continuation_token} << bsoncxx_builder::finalize;
+                    token_is_oid = true;
+                }
+                catch (...)
+                {
+                    token_lookup_filter.clear();
+                    token_lookup_filter << "_id" << *continuation_token << bsoncxx_builder::finalize;
+                }
+
+                auto token_doc_opt = snapshots_collection.find_one(token_lookup_filter.view());
+                if (token_doc_opt)
+                {
+                    auto token_doc = token_doc_opt->view();
+                    if (auto created = token_doc[BSON_CREATED_AT_FIELD])
+                    {
+                        auto token_created = created.get_date();
+
+                        auto and_arr = bsoncxx_builder::array{};
+                        and_arr << filter.view();
+
+                        auto or_arr = bsoncxx_builder::array{};
+                        or_arr << (bsoncxx_builder::document{} << BSON_CREATED_AT_FIELD
+                                                               << (bsoncxx_builder::document{} << "$gt" << token_created << bsoncxx_builder::finalize)
+                                                               << bsoncxx_builder::finalize);
+                        auto sub_and = bsoncxx_builder::array{};
+                        sub_and << (bsoncxx_builder::document{} << BSON_CREATED_AT_FIELD << token_created << bsoncxx_builder::finalize);
+                        if (token_is_oid)
+                        {
+                            sub_and << (bsoncxx_builder::document{} << "_id"
+                                                                    << (bsoncxx_builder::document{} << "$gt" << bsoncxx::oid{*continuation_token}
+                                                                                                   << bsoncxx_builder::finalize)
+                                                                    << bsoncxx_builder::finalize);
+                        }
+                        else
+                        {
+                            sub_and << (bsoncxx_builder::document{} << "_id"
+                                                                    << (bsoncxx_builder::document{} << "$gt" << *continuation_token << bsoncxx_builder::finalize)
+                                                                    << bsoncxx_builder::finalize);
+                        }
+                        or_arr << (bsoncxx_builder::document{} << "$and" << sub_and << bsoncxx_builder::finalize);
+                        and_arr << (bsoncxx_builder::document{} << "$or" << or_arr << bsoncxx_builder::finalize);
+                        filter = bsoncxx_builder::document{} << "$and" << and_arr << bsoncxx_builder::finalize;
+                    }
+                    else
+                    {
+                        auto and_filter = bsoncxx_builder::array{};
+                        and_filter << filter.view();
+                        if (token_is_oid)
+                        {
+                            and_filter << (bsoncxx_builder::document{} << "_id"
+                                                                       << (bsoncxx_builder::document{} << "$gt" << bsoncxx::oid{*continuation_token}
+                                                                                                    << bsoncxx_builder::finalize)
+                                                                       << bsoncxx_builder::finalize);
+                        }
+                        else
+                        {
+                            and_filter << (bsoncxx_builder::document{} << "_id"
+                                                                       << (bsoncxx_builder::document{} << "$gt" << *continuation_token << bsoncxx_builder::finalize)
+                                                                       << bsoncxx_builder::finalize);
+                        }
+                        filter = bsoncxx_builder::document{} << "$and" << and_filter << bsoncxx_builder::finalize;
+                    }
+                }
+                else
+                {
+                    auto and_filter = bsoncxx_builder::array{};
+                    and_filter << filter.view();
+                    try
+                    {
+                        and_filter << (bsoncxx_builder::document{} << "_id"
+                                                                   << (bsoncxx_builder::document{} << "$gt" << bsoncxx::oid{*continuation_token}
+                                                                                                << bsoncxx_builder::finalize)
+                                                                   << bsoncxx_builder::finalize);
+                    }
+                    catch (...)
+                    {
+                        and_filter << (bsoncxx_builder::document{} << "_id"
+                                                                   << (bsoncxx_builder::document{} << "$gt" << *continuation_token << bsoncxx_builder::finalize)
+                                                                   << bsoncxx_builder::finalize);
+                    }
+                    filter = bsoncxx_builder::document{} << "$and" << and_filter << bsoncxx_builder::finalize;
+                }
+            }
         }
 
         mongocxx::options::find opts{};
-        opts.projection(bsoncxx_builder::document{} << "_id" << 1 << bsoncxx_builder::finalize);
+        // Need created_at in results to emit composite continuation token
+        opts.projection(bsoncxx_builder::document{} << "_id" << 1 << BSON_CREATED_AT_FIELD << 1 << bsoncxx_builder::finalize);
         opts.sort(bsoncxx_builder::document{} << BSON_CREATED_AT_FIELD << 1 << "_id" << 1 << bsoncxx_builder::finalize);
         opts.limit(static_cast<int64_t>(limit + 1));
 
@@ -915,7 +1050,18 @@ SnapshotIdRangeResult MongoDBStorageService::listSnapshotIdsInRange(
                 if (!sid.empty())
                 {
                     out.snapshot_ids.push_back(sid);
-                    out.continuation_token = sid;
+                    // If created_at present, encode composite token "<ms>|<id>"
+                    if (auto ca = doc[BSON_CREATED_AT_FIELD])
+                    {
+                        auto bd = ca.get_date();
+                        auto ms = bd.value.count();
+                        out.continuation_token = std::to_string(ms) + std::string("|") + sid;
+                    }
+                    else
+                    {
+                        // Fallback to legacy token containing only id
+                        out.continuation_token = sid;
+                    }
                     ++count;
                 }
             }

@@ -243,6 +243,8 @@ void StorageWorker::processArchiver(archiver::BaseArchiverShrdPtr archiver)
     thread_pool->detach_task(
         [this, archiver]() mutable
         {
+            logger->logMessage("----------------------------start process archiving---------------------------", LogLevel::DEBUG);
             processArchiver(archiver);
+            logger->logMessage("----------------------------end process archiving---------------------------", LogLevel::DEBUG);
         });
 }
