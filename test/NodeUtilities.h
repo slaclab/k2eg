@@ -31,6 +31,7 @@
 #include <string>
 #include <thread>
 #include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 /**
@@ -489,52 +490,73 @@ public:
  * // use env for test; env.reset() will stop the environment
  * @endcode
  */
-inline std::shared_ptr<K2EGTestEnv> startK2EG(int& tcp_port, k2eg::controller::node::NodeType type, bool enable_debug_log = false, bool reset_conf = true)
+inline std::shared_ptr<K2EGTestEnv> startK2EG(
+    int&                                        tcp_port,
+    k2eg::controller::node::NodeType            type,
+    bool                                        enable_debug_log = false,
+    bool                                        reset_conf = true,
+    const std::unordered_map<std::string, std::string>& env_overrides = {})
 {
     clearenv();
+    auto get_override = [&](const std::string& key, const std::string& defval) -> std::string {
+        auto it = env_overrides.find(key);
+        return it != env_overrides.end() ? it->second : defval;
+    };
+    auto set_env_for = [&](const std::string& key, const std::string& defval) {
+        auto val = get_override(key, defval);
+        setenv(key.c_str(), val.c_str(), 1);
+    };
     if (enable_debug_log)
     {
-        setenv("EPICS_k2eg_log-on-console", "true", 1);
-        setenv("EPICS_k2eg_log-level", "debug", 1);
-        setenv(("EPICS_k2eg_" + std::string(LOG_DEBUG_INFO)).c_str(), "true", 1);
+        set_env_for("EPICS_k2eg_log-on-console", "true");
+        set_env_for("EPICS_k2eg_log-level", "debug");
+        set_env_for("EPICS_k2eg_" + std::string(LOG_DEBUG_INFO), "true");
     }
     else
     {
-        setenv("EPICS_k2eg_log-on-console", "false", 1);
+        set_env_for("EPICS_k2eg_log-on-console", "false");
     }
 
     if (reset_conf)
     {
-        setenv("EPICS_k2eg_configuration-reset-on-start", "true", 1);
+        set_env_for("EPICS_k2eg_configuration-reset-on-start", "true");
+    }
+
+    // apply all the overrides
+    for (const auto& [key, value] : env_overrides)
+    {
+        setenv(key.c_str(), value.c_str(), 1);
     }
 
     switch (type)
     {
     case k2eg::controller::node::NodeType::GATEWAY:
-        setenv("EPICS_k2eg_node-type", "gateway", 1);
-        setenv(("EPICS_k2eg_" + std::string(CMD_INPUT_TOPIC)).c_str(), "cmd-in-topic", 1);
-        setenv(("EPICS_k2eg_" + std::string(NC_MONITOR_EXPIRATION_TIMEOUT)).c_str(), "1", 1);
+        set_env_for("EPICS_k2eg_node-type", "gateway");
+        set_env_for("EPICS_k2eg_" + std::string(CMD_INPUT_TOPIC), "cmd-in-topic");
+        set_env_for("EPICS_k2eg_" + std::string(NC_MONITOR_EXPIRATION_TIMEOUT), "1");
         break;
     case k2eg::controller::node::NodeType::STORAGE:
-        setenv("EPICS_k2eg_node-type", "storage", 1);
-        setenv(("EPICS_k2eg_" + std::string(k2eg::service::storage::impl::MONGODB_CONNECTION_STRING_KEY)).c_str(), "mongodb://admin:admin@mongodb-primary:27017", 1);
+        set_env_for("EPICS_k2eg_node-type", "storage");
+        set_env_for("EPICS_k2eg_" + std::string(k2eg::service::storage::impl::MONGODB_CONNECTION_STRING_KEY), "mongodb://admin:admin@mongodb-primary:27017");
         break;
     case k2eg::controller::node::NodeType::FULL:
-        setenv("EPICS_k2eg_node-type", "full", 1);
-        setenv(("EPICS_k2eg_" + std::string(CMD_INPUT_TOPIC)).c_str(), "cmd-in-topic", 1);
-        setenv(("EPICS_k2eg_" + std::string(NC_MONITOR_EXPIRATION_TIMEOUT)).c_str(), "1", 1);
-        setenv(("EPICS_k2eg_" + std::string(k2eg::service::storage::impl::MONGODB_CONNECTION_STRING_KEY)).c_str(), "mongodb://admin:admin@mongodb-primary:27017", 1);
+        set_env_for("EPICS_k2eg_node-type", "full");
+        set_env_for("EPICS_k2eg_" + std::string(CMD_INPUT_TOPIC), "cmd-in-topic");
+        set_env_for("EPICS_k2eg_" + std::string(NC_MONITOR_EXPIRATION_TIMEOUT), "1");
+        set_env_for("EPICS_k2eg_" + std::string(k2eg::service::storage::impl::MONGODB_CONNECTION_STRING_KEY), "mongodb://admin:admin@mongodb-primary:27017");
         break;
     default:
         throw std::runtime_error("Unknown node type");
     }
-    setenv(("EPICS_k2eg_" + std::string(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS)).c_str(), "1", 1);
+    set_env_for("EPICS_k2eg_" + std::string(SCHEDULER_CHECK_EVERY_AMOUNT_OF_SECONDS), "1");
     // set monitor expiration time out at minimum
-    setenv(("EPICS_k2eg_" + std::string(CONFIGURATION_SERVICE_HOST)).c_str(), "consul", 1);
-    setenv(("EPICS_k2eg_" + std::string(METRIC_ENABLE)).c_str(), "true", 1);
-    setenv(("EPICS_k2eg_" + std::string(METRIC_HTTP_PORT)).c_str(), std::to_string(++tcp_port).c_str(), 1);
-    setenv(("EPICS_k2eg_" + std::string(PUB_SERVER_ADDRESS)).c_str(), "kafka:9092", 1);
-    setenv(("EPICS_k2eg_" + std::string(SUB_SERVER_ADDRESS)).c_str(), "kafka:9092", 1);
+    set_env_for("EPICS_k2eg_" + std::string(CONFIGURATION_SERVICE_HOST), "consul");
+    set_env_for("EPICS_k2eg_" + std::string(METRIC_ENABLE), "true");
+    // Always increment the tcp_port to avoid collisions; allow override for the value used.
+    ++tcp_port;
+    set_env_for("EPICS_k2eg_" + std::string(METRIC_HTTP_PORT), std::to_string(tcp_port));
+    set_env_for("EPICS_k2eg_" + std::string(PUB_SERVER_ADDRESS), "kafka:9092");
+    set_env_for("EPICS_k2eg_" + std::string(SUB_SERVER_ADDRESS), "kafka:9092");
     return std::make_shared<K2EGTestEnv>();
 }
 

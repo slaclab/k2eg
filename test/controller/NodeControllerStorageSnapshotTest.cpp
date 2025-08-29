@@ -1,16 +1,21 @@
 #include "../NodeUtilities.h"
 #include "k2eg/common/BaseSerialization.h"
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
-#include "k2eg/controller/node/NodeController.h"
+#include "k2eg/common/uuid.h"
 #include "gtest/gtest.h"
+
+#include <unistd.h>
+#include <unordered_map>
 
 int k2eg_controller_storage_snapshot_test_port = 20600;
 
 using namespace k2eg::common;
-using namespace k2eg::service;;
+using namespace k2eg::service;
+;
 using namespace k2eg::service::pubsub;
 using namespace k2eg::service::storage;
 using namespace k2eg::controller::node;
+using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::command::cmd;
 
 #define REPLY_TOPIC "app_reply_topic"
@@ -18,14 +23,19 @@ using namespace k2eg::controller::command::cmd;
 
 TEST(NodeControllerStorageSnapshotTest, StartRecording)
 {
-    int64_t error = -1;
-    std::string topic = "";
+    int64_t                          error = -1;
+    std::string                      topic = "";
     SubscriberInterfaceElementVector received_msg;
     auto                             k2eg = startK2EG(
         k2eg_controller_storage_snapshot_test_port,
         NodeType::FULL,
         true,
-        true);
+        true,
+        // override storage worker group id to be randomly generate to not get the old not acquired data
+        std::unordered_map<std::string, std::string>{
+            {"EPICS_k2eg_storage-worker-consumer-group-id", UUID::generateUUIDLite()}
+        }
+    );
     ASSERT_NE(k2eg, nullptr) << "Failed to create K2EG instance";
     ASSERT_TRUE(k2eg->isRunning()) << "K2EG instance is not started";
 
@@ -66,7 +76,7 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     k2eg->sendCommand(publisher, std::make_unique<CMDMessage<RepeatingSnapshotCommandShrdPtr>>(k2eg->getGatewayCMDTopic(), start_snapshot_cmd));
 
     // wait for ack
-    auto reply_msg_start_snapshot = k2eg->waitForReplyID(subscriber_reply, "rep-id", SerializationType::Msgpack,60000);
+    auto reply_msg_start_snapshot = k2eg->waitForReplyID(subscriber_reply, "rep-id", SerializationType::Msgpack, 60000);
     ASSERT_NE(reply_msg_start_snapshot, nullptr) << "Failed to get reply message";
     // get json object
     auto result_obj_start_snapshot = k2eg->getMsgpackObject(*reply_msg_start_snapshot);
@@ -89,9 +99,8 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     // give a ticken to the maintanace task
     node_controller.performManagementTask();
 
-    // list all snapshots from now up to two minutes ago using helper
-    auto found_ids = k2eg->waitForSnapshotIdsInRange(storage_service);
-    ASSERT_FALSE(found_ids.empty()) << "No snapshots found";
+    // give some time for acquire data
+    sleep(30);
 
     // stop the snapshot
     auto stop_snapshot_cmd = MakeRepeatingSnapshotStopCommandShrdPtr(
@@ -105,6 +114,36 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     // wait for ack
     auto reply_msg_stop_snapshot = k2eg->waitForReplyID(subscriber_reply, "rep-id-1", SerializationType::Msgpack, 60000);
     ASSERT_NE(reply_msg_stop_snapshot, nullptr) << "Failed to get reply message";
+
+    // for each found snapshot, check that two value has been recorded
+    auto found_ids = k2eg->waitForSnapshotIdsInRange(storage_service);
+    ASSERT_FALSE(found_ids.empty()) << "No snapshots found";
+    for (const auto& snapshot_id : found_ids)
+    {
+        size_t total_records = 0;
+
+        for (const auto& pv_name : {std::string("variable:a"), std::string("variable:b")})
+        {
+            ArchiveQuery query;
+            query.pv_name = pv_name;
+            query.snapshot_id = snapshot_id;
+            query.limit = 10;
+
+            auto result = storage_service->query(query);
+            total_records += result.records.size();
+
+            for (const auto& rec : result.records)
+            {
+                ASSERT_EQ(rec.pv_name, pv_name) << "Record PV mismatch";
+                ASSERT_TRUE(rec.data != nullptr) << "Missing stored payload";
+                auto payload = rec.data->data();
+                ASSERT_TRUE(payload != nullptr) << "Null payload view";
+                ASSERT_GT(payload->size(), 0u) << "Empty payload";
+            }
+        }
+
+        ASSERT_EQ(total_records, 2u) << "Snapshot does not contain two values";
+    }
 
     ASSERT_NO_THROW(k2eg.reset();) << "Failed to reset K2EG instance";
 }

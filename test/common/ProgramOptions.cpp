@@ -118,7 +118,7 @@ TEST(ProgramOptions, PublisherConfiguration) {
     EXPECT_NO_THROW(conf = opt->getPublisherConfiguration(););
     EXPECT_STREQ(conf->server_address.c_str(), "pub-server");
     EXPECT_EQ(conf->custom_impl_parameter.size(), 1);
-    EXPECT_STREQ(conf->custom_impl_parameter.at("k1").c_str(), "v1");
+    EXPECT_EQ(std::any_cast<const std::string&>(conf->custom_impl_parameter.at("k1")), "v1");
 }
 
 TEST(ProgramOptions, SubscriberConfigurationConfFile) {
@@ -136,8 +136,8 @@ TEST(ProgramOptions, SubscriberConfigurationConfFile) {
     EXPECT_STREQ(conf->server_address.c_str(), "sub-address");
     EXPECT_STREQ(conf->group_id.c_str(), "sub-group-id");
     EXPECT_EQ(conf->custom_impl_parameter.size(), 2);
-    EXPECT_STREQ(conf->custom_impl_parameter.at("k1").c_str(), "v1");
-    EXPECT_STREQ(conf->custom_impl_parameter.at("k2").c_str(), "v2");
+    EXPECT_EQ(std::any_cast<const std::string&>(conf->custom_impl_parameter.at("k1")), "v1");
+    EXPECT_EQ(std::any_cast<const std::string&>(conf->custom_impl_parameter.at("k2")), "v2");
 }
 
 TEST(ProgramOptions, MetricConfiguration) {

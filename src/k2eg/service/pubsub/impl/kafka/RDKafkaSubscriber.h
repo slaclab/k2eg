@@ -3,9 +3,11 @@
 
 #pragma once
 
+#include <any>
 #include <librdkafka/rdkafkacpp.h>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 #include <k2eg/common/types.h>
 #include <k2eg/service/pubsub/ISubscriber.h>
@@ -19,11 +21,13 @@ class RDKafkaSubscriber : public ISubscriber, RDKafkaBase
 
 protected:
     int          internalConsume(std::unique_ptr<RdKafka::Message> message, SubscriberInterfaceElementVector& dataVector);
-    virtual void init();
+    virtual void init(const k2eg::common::MapStrKV& overrides = {});
     virtual void deinit();
 
 public:
     RDKafkaSubscriber(ConstSubscriberConfigurationShrdPtr configuration);
+    RDKafkaSubscriber(ConstSubscriberConfigurationShrdPtr              configuration,
+                      const std::unordered_map<std::string, std::any>& overrides);
     RDKafkaSubscriber() = delete;
     virtual ~RDKafkaSubscriber();
     virtual void setQueue(const k2eg::common::StringVector& queue);

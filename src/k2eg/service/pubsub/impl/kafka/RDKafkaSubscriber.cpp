@@ -15,7 +15,24 @@ using namespace k2eg::service::pubsub::impl::kafka;
 RDKafkaSubscriber::RDKafkaSubscriber(ConstSubscriberConfigurationShrdPtr configuration)
     : ISubscriber(std::move(configuration)), RDKafkaBase()
 {
-    init();
+    k2eg::common::MapStrKV merged = this->configuration ? this->configuration->custom_impl_parameter : k2eg::common::MapStrKV{};
+    for (const auto& kv : this->getRuntimeOverrides())
+    {
+        merged[kv.first] = kv.second;
+    }
+    init(merged);
+}
+
+RDKafkaSubscriber::RDKafkaSubscriber(ConstSubscriberConfigurationShrdPtr              configuration,
+                                     const std::unordered_map<std::string, std::any>& overrides)
+    : ISubscriber(std::move(configuration), overrides), RDKafkaBase()
+{
+    k2eg::common::MapStrKV merged = this->configuration ? this->configuration->custom_impl_parameter : k2eg::common::MapStrKV{};
+    for (const auto& kv : this->getRuntimeOverrides())
+    {
+        merged[kv.first] = kv.second;
+    }
+    init(merged);
 }
 
 RDKafkaSubscriber::~RDKafkaSubscriber()
@@ -23,26 +40,23 @@ RDKafkaSubscriber::~RDKafkaSubscriber()
     deinit();
 }
 
-void RDKafkaSubscriber::init()
+void RDKafkaSubscriber::init(const k2eg::common::MapStrKV& overrides)
 {
     std::string errstr;
-    // setting properties
-    RDK_CONF_SET(conf, "enable.partition.eof", "false")
-    // RDK_CONF_SET(conf, "debug", "cgrp,topic,fetch,protocol")
-    RDK_CONF_SET(conf, "bootstrap.servers", configuration->server_address)
-    RDK_CONF_SET(conf, "group.id", configuration->group_id.empty() ? UUID::generateUUIDLite() : configuration->group_id)
-    RDK_CONF_SET(conf, "client.id", "k2eg_consumer_" + UUID::generateUUIDLite())
-    RDK_CONF_SET(conf, "enable.auto.commit", "false")
-    RDK_CONF_SET(conf, "enable.auto.offset.store", "true")
-    RDK_CONF_SET(conf, "auto.offset.reset", "latest")
-    RDK_CONF_SET(conf, "partition.assignment.strategy", "cooperative-sticky")
+    // Defaults first, then overrides
+    std::vector<std::pair<std::string, std::string>> defaults = {
+        {"enable.partition.eof", "false"},
+        {"bootstrap.servers", configuration->server_address},
+        {"group.id", configuration->group_id.empty() ? UUID::generateUUIDLite() : configuration->group_id},
+        {"client.id", std::string("k2eg_consumer_") + UUID::generateUUIDLite()},
+        {"enable.auto.commit", "false"},
+        {"enable.auto.offset.store", "true"},
+        {"auto.offset.reset", "latest"},
+        {"partition.assignment.strategy", "cooperative-sticky"},
+    };
+    applyDefaultsThenOverrides(defaults, overrides);
+    // Topic conf pointer must be set explicitly
     RDK_CONF_SET(conf, "default_topic_conf", t_conf.get())
-
-    if (configuration->custom_impl_parameter.size() > 0)
-    {
-        // apply custom user configuration
-        applyCustomConfiguration(configuration->custom_impl_parameter);
-    }
 
     // RDK_CONF_SET(conf, "batch.size", "2000", errstr);
     consumer.reset(RdKafka::KafkaConsumer::create(conf.get(), errstr));

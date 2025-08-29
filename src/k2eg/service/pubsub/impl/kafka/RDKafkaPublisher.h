@@ -9,8 +9,10 @@
 #include <librdkafka/rdkafka.h>
 #include <librdkafka/rdkafkacpp.h>
 
+#include <any>
 #include <memory>
 #include <thread>
+#include <unordered_map>
 
 // smart pointer delete for rd_kafka_queue_t
 namespace k2eg::service::pubsub::impl::kafka {
@@ -110,11 +112,13 @@ class RDKafkaPublisher : public IPublisher, RDKafkaBase, RdKafka::DeliveryReport
 protected:
     virtual void dr_cb(RdKafka::Message& message);
     void         autoPoll();
-    virtual void init();
+    virtual void init(const k2eg::common::MapStrKV& overrides = {});
     virtual void deinit();
 
 public:
     explicit RDKafkaPublisher(ConstPublisherConfigurationShrdPtr configuration);
+    RDKafkaPublisher(ConstPublisherConfigurationShrdPtr               configuration,
+                     const std::unordered_map<std::string, std::any>& overrides);
     virtual ~RDKafkaPublisher();
     virtual int               createQueue(const QueueDescription& new_queue);
     virtual int               deleteQueue(const std::string& queue_name);

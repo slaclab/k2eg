@@ -212,7 +212,8 @@ void StorageWorker::executePeriodicTask(TaskProperties& task_properties)
                                 .engine_config = this->config,
                                 .snapshot_queue_name = snapshot_id},
                             this->logger,
-                            ServiceResolver<ISubscriber>::createNewInstance(),
+                            ServiceResolver<ISubscriber>::createNewInstance({
+                                {"group.id", this->config->consumer_group_id}}),
                             this->storage_service);
                         // set snapshot as archiving
                         node_config->setSnapshotArchiveStatus(snapshot_id, ArchiveStatusInfo{ArchiveStatus::ARCHIVING});

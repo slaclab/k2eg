@@ -22,7 +22,24 @@ using namespace k2eg::service::pubsub::impl::kafka;
 RDKafkaPublisher::RDKafkaPublisher(ConstPublisherConfigurationShrdPtr configuration)
     : IPublisher(std::move(configuration)), RDKafkaBase(), _stop_inner_thread(false), _auto_poll(true)
 {
-    init();
+    k2eg::common::MapStrKV merged = this->configuration ? this->configuration->custom_impl_parameter : k2eg::common::MapStrKV{};
+    for (const auto& kv : this->getRuntimeOverrides())
+    {
+        merged[kv.first] = kv.second;
+    }
+    init(merged);
+}
+
+RDKafkaPublisher::RDKafkaPublisher(ConstPublisherConfigurationShrdPtr               configuration,
+                                   const std::unordered_map<std::string, std::any>& overrides)
+    : IPublisher(std::move(configuration), overrides), RDKafkaBase(), _stop_inner_thread(false), _auto_poll(true)
+{
+    k2eg::common::MapStrKV merged = this->configuration ? this->configuration->custom_impl_parameter : k2eg::common::MapStrKV{};
+    for (const auto& kv : this->getRuntimeOverrides())
+    {
+        merged[kv.first] = kv.second;
+    }
+    init(merged);
 }
 
 RDKafkaPublisher::~RDKafkaPublisher()
@@ -62,7 +79,7 @@ void RDKafkaPublisher::dr_cb(RdKafka::Message& message)
     }
 }
 
-void RDKafkaPublisher::init()
+void RDKafkaPublisher::init(const k2eg::common::MapStrKV& overrides)
 {
     // fetch logger
     logger = ServiceResolver<k2eg::service::log::ILogger>::resolve();
@@ -72,16 +89,16 @@ void RDKafkaPublisher::init()
     }
     std::string errstr;
     logger->logMessage(STRING_FORMAT("Initializing RDKafkaPublisher with server address: %1% ", configuration->server_address), LogLevel::INFO);
-    RDK_CONF_SET(conf, "bootstrap.servers", configuration->server_address.c_str())
-    RDK_CONF_SET(conf, "compression.type", "snappy")
 
+    // Apply defaults, then user overrides
+    std::vector<std::pair<std::string, std::string>> defaults = {
+        {"bootstrap.servers", configuration->server_address},
+        {"compression.type", "snappy"},
+    };
+    applyDefaultsThenOverrides(defaults, overrides);
+
+    // Always ensure delivery callback is set on this instance
     RDK_CONF_SET(conf, "dr_cb", this);
-
-    if (configuration->custom_impl_parameter.size() > 0)
-    {
-        // apply custom user configuration
-        applyCustomConfiguration(configuration->custom_impl_parameter);
-    }
 
     producer.reset(RdKafka::Producer::create(conf.get(), errstr));
     if (!producer)
@@ -317,7 +334,7 @@ QueueMetadataUPtr RDKafkaPublisher::getQueueMetadata(const std::string& queue_na
         rd_kafka_topic_new(producer.get()->c_ptr(), queue_name.c_str(), NULL), RdKafkaTopicDeleter());
 
     // consumer group
-    std::unique_ptr<rd_kafka_queue_t, RdKafkaQueueDeleter> queue(rd_kafka_queue_new(producer.get()->c_ptr()), RdKafkaQueueDeleter());
+    std::unique_ptr<rd_kafka_queue_t, RdKafkaQueueDeleter>              queue(rd_kafka_queue_new(producer.get()->c_ptr()), RdKafkaQueueDeleter());
     std::unique_ptr<rd_kafka_AdminOptions_t, RdKafkaAdminOptionDeleter> admin_options(
         rd_kafka_AdminOptions_new(producer.get()->c_ptr(), RD_KAFKA_ADMIN_OP_LISTCONSUMERGROUPS), RdKafkaAdminOptionDeleter());
 
@@ -376,8 +393,8 @@ int RDKafkaPublisher::scan_groups(const rd_kafka_ListConsumerGroups_result_t* li
         const rd_kafka_ConsumerGroupListing_t* group = result_groups[i];
         const char*                            group_id = rd_kafka_ConsumerGroupListing_group_id(group);
         rd_kafka_consumer_group_state_t        state = rd_kafka_ConsumerGroupListing_state(group);
-        int is_simple_consumer_group = rd_kafka_ConsumerGroupListing_is_simple_consumer_group(group);
-        const struct rd_kafka_group_list* grplistp = nullptr;
+        int                                    is_simple_consumer_group = rd_kafka_ConsumerGroupListing_is_simple_consumer_group(group);
+        const struct rd_kafka_group_list*      grplistp = nullptr;
 
         auto group_info = get_group_info(group_id);
         if (group_info->subscribers.size())
