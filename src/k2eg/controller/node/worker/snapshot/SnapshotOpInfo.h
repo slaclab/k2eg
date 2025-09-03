@@ -8,88 +8,38 @@
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 
+#include <condition_variable>
+#include <future>
 #include <k2eg/controller/node/worker/CommandWorker.h>
+#include <mutex>
+#include <unordered_map>
 
 #include <atomic>
 
 namespace k2eg::controller::node::worker::snapshot {
 
-struct SnapshotStatistic
-{
-    std::atomic<double> event_size = 0;  /**< Total size of events in bytes. */
-    std::atomic<double> event_count = 0; /**< Number of events processed. */
-};
-
-DEFINE_PTR_TYPES(SnapshotStatistic);
-
 /**
- * @struct Statistic
- * @brief Stores per-second statistics for snapshot operations.
- *
- * Contains the total event size and count for a given time window.
- */
-
-class SnapshotStatisticCounter
-
-{
-private:
-    SnapshotStatistic                     statistic;
-    std::chrono::steady_clock::time_point start_sampling_time;
-
-public:
-    SnapshotStatisticCounter();
-
-    /**
-     * @brief Increment the total event size.
-     * @param amount Number of bytes to add.
-     */
-    void incrementEventSize(double amount = 1);
-
-    /**
-     * @brief Increment the event count.
-     * @param count Number of events to add.
-     */
-    void incrementEventCount(double count = 1);
-
-    /**
-     * @brief Get the current statistics.
-     * @param now Current time point (default: now).
-     * @return Snapshot statistics.
-     */
-    SnapshotStatisticShrdPtr getStatistics(const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now()) const;
-
-    /**
-     * @brief Reset statistics and sampling times.
-     */
-    void reset();
-};
-
-DEFINE_PTR_TYPES(SnapshotStatisticCounter);
-
-/**
- * @enum SnapshotSubmissionType
- * @brief Flags for different stages of snapshot submission.
- *
- * - None: No submission.
- * - Header: Submission includes header information.
- * - Data: Submission includes data payload.
- * - Tail: Submission includes tail/finalization.
- *
- * Supports bitwise operations for combining flags.
+ * @brief Define the parts of a snapshot submission.
+ * @details Flags describing which logical section(s) are contained in a single
+ *          submission batch produced by a snapshot op. Values can be OR'ed.
+ *          - Header: marks the beginning of an iteration and carries metadata.
+ *          - Data: carries one or more PV events belonging to the iteration.
+ *          - Tail: marks the end of an iteration and carries completion info.
  */
 enum class SnapshotSubmissionType
 {
-    None = 0,        /**< No submission. */
-    Header = 1 << 0, /**< Submission includes header. */
-    Data = 1 << 1,   /**< Submission includes data. */
-    Tail = 1 << 2    /**< Submission includes tail. */
+    None = 0,        /**< No content. */
+    Header = 1 << 0, /**< Submit the iteration header. */
+    Data = 1 << 1,   /**< Submit PV data for the iteration. */
+    Tail = 1 << 2    /**< Submit the iteration completion (tail). */
 };
 
+// Bitwise operators for SnapshotSubmissionType
 /**
- * @brief Bitwise OR operator for SnapshotSubmissionType.
- * @param a First flag.
- * @param b Second flag.
- * @return Combined flag.
+ * @brief Combine flags.
+ * @param a Left-hand flag value.
+ * @param b Right-hand flag value.
+ * @return Bitwise OR of the two flags.
  */
 inline SnapshotSubmissionType operator|(SnapshotSubmissionType a, SnapshotSubmissionType b)
 {
@@ -97,10 +47,10 @@ inline SnapshotSubmissionType operator|(SnapshotSubmissionType a, SnapshotSubmis
 }
 
 /**
- * @brief Bitwise AND operator for SnapshotSubmissionType.
- * @param a First flag.
- * @param b Second flag.
- * @return Intersection of flags.
+ * @brief Intersect flags.
+ * @param a Left-hand flag value.
+ * @param b Right-hand flag value.
+ * @return Bitwise AND of the two flags.
  */
 inline SnapshotSubmissionType operator&(SnapshotSubmissionType a, SnapshotSubmissionType b)
 {
@@ -108,10 +58,10 @@ inline SnapshotSubmissionType operator&(SnapshotSubmissionType a, SnapshotSubmis
 }
 
 /**
- * @brief Bitwise OR assignment operator for SnapshotSubmissionType.
- * @param a Reference to flag to update.
- * @param b Flag to OR in.
- * @return Reference to updated flag.
+ * @brief In-place combine flags.
+ * @param a Left-hand flag reference to update.
+ * @param b Right-hand flag value.
+ * @return Updated left-hand flag.
  */
 inline SnapshotSubmissionType& operator|=(SnapshotSubmissionType& a, SnapshotSubmissionType b)
 {
@@ -123,52 +73,70 @@ inline SnapshotSubmissionType& operator|=(SnapshotSubmissionType& a, SnapshotSub
 class SnapshotOpInfo;
 
 /**
- * @class SnapshotSubmission
- * @brief Represents a single snapshot submission, including its events and type.
- *
- * Contains the time of the snapshot, the events captured, and the submission type flags.
- * Enforces move semantics to avoid accidental copies of large event vectors.
+ * @brief Hold one snapshot submission batch.
+ * @details Move-only container produced by a SnapshotOpInfo implementation
+ *          when the operation window expires or is triggered. It carries
+ *          the events and which sections are present (header/data/tail).
+ *          Ownership of events remains shared via shared_ptr.
  */
 class SnapshotSubmission
 {
 public:
-    std::chrono::steady_clock::time_point                 header_timestamp; /**< Time point for the snapshot header. */
-    std::chrono::steady_clock::time_point                 snap_time;        /**< Time point for the snapshot. */
-    std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events;  /**< Events captured in the snapshot. */
-    SnapshotSubmissionType                                submission_type;  /**< Type flags for the submission. */
+    /** @brief Time when the submission was created (steady clock). */
+    std::chrono::steady_clock::time_point snap_time;
+    /** @brief Collected PV events to publish. One per PV for repeating op; buffered for back-time op. */
+    std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events;
+    /** @brief Which parts of a submission are present (Header/Data/Tail). */
+    SnapshotSubmissionType submission_type;
+    /**
+     * @brief Iteration identifier assigned by the scheduler.
+     * @details Binds this submission to the logical snapshot iteration it belongs to.
+     *          - For batches containing Header, the scheduler assigns a new id and sets it here.
+     *          - For Data/Tail-only batches, the scheduler sets the id of the current iteration.
+     *          Consumers can rely on this value for coordination without reading shared state.
+     */
+    int64_t iteration_id{0};
 
     /**
-     * @brief Constructs a SnapshotSubmission with given time, events, and type.
-     * @param snap_time Time point for the snapshot.
-     * @param snapshot_events Vector of monitor events (moved).
-     * @param submission_type Submission type flags.
+     * @brief Construct a submission with explicit iteration id.
+     * @param snap_time Time of submission creation.
+     * @param snapshot_events Collected events (moved in).
+     * @param submission_type Flags for header/data/tail presence.
+     * @param iteration_id Iteration id bound to this submission.
      */
-    SnapshotSubmission(
-        const std::chrono::steady_clock::time_point&            snap_time,
-        const std::chrono::steady_clock::time_point&            header_timestamp,
-        std::vector<service::epics_impl::MonitorEventShrdPtr>&& snapshot_events,
-        SnapshotSubmissionType                                  submission_type);
+    SnapshotSubmission(const std::chrono::steady_clock::time_point& snap_time, std::vector<service::epics_impl::MonitorEventShrdPtr>&& snapshot_events, SnapshotSubmissionType submission_type, int64_t iteration_id)
+        : snap_time(snap_time), snapshot_events(std::move(snapshot_events)), submission_type(submission_type), iteration_id(iteration_id)
+    {
+    }
 
     /**
-     * @brief Move constructor.
-     * @param other SnapshotSubmission to move from.
+     * @brief Move-construct a submission.
+     * @param other Source to move from; left in valid but unspecified state.
      */
-    SnapshotSubmission(SnapshotSubmission&& other) noexcept;
+    SnapshotSubmission(SnapshotSubmission&& other) noexcept
+        : snapshot_events(std::move(other.snapshot_events)), submission_type(other.submission_type), iteration_id(other.iteration_id)
+    {
+    }
 
     /**
-     * @brief Move assignment operator.
-     * @param other SnapshotSubmission to move from.
-     * @return Reference to this object.
+     * @brief Move-assign a submission.
+     * @param other Source to move from.
+     * @return Reference to this.
      */
-    SnapshotSubmission& operator=(SnapshotSubmission&& other) noexcept;
+    SnapshotSubmission& operator=(SnapshotSubmission&& other) noexcept
+    {
+        if (this != &other)
+        {
+            snapshot_events = std::move(other.snapshot_events);
+            submission_type = other.submission_type;
+            iteration_id = other.iteration_id;
+        }
+        return *this;
+    }
 
-    /**
-     * @brief Deleted copy constructor to enforce move semantics.
-     */
+    /** @brief Disable copy to enforce move-only semantics. */
     SnapshotSubmission(const SnapshotSubmission&) = delete;
-    /**
-     * @brief Deleted copy assignment operator to enforce move semantics.
-     */
+    /** @brief Disable copy to enforce move-only semantics. */
     SnapshotSubmission& operator=(const SnapshotSubmission&) = delete;
 };
 
@@ -178,79 +146,181 @@ public:
 DEFINE_PTR_TYPES(SnapshotSubmission);
 
 /**
- * @class SnapshotOpInfo
- * @brief Abstract base class for managing snapshot operations.
+ * @brief Per-iteration synchronization primitives used by SnapshotOpInfo.
+ * @details One instance exists for each logical snapshot iteration (identified
+ *          by an iteration_id). It coordinates the ordering guarantees:
+ *          - Header-before-Data: Data publishers wait on `header_future` until
+ *            the Header publisher calls `set_value()` on `header_promise`.
+ *          - Data-before-Tail: Tail waits until all scheduled Data submissions
+ *            decrement `data_pending` to zero, signaled via `data_cv`.
  *
- * Stores state, configuration, and provides an interface for adding and retrieving snapshot data.
- * Derived classes must implement data handling and statistics reporting.
+ *          Lifecycle:
+ *          - Created lazily on first use for a given iteration (beginHeaderGate
+ *            or dataScheduled).
+ *          - Cleared by SnapshotOpInfo after `waitDataDrained(iteration_id)` returns
+ *            to avoid unbounded growth.
+ *
+ *          Thread-safety:
+ *          - The struct itself is owned behind a shared_ptr. Access to the
+ *            map that holds these instances is guarded by SnapshotOpInfo's
+ *            `iteration_sync_mutex` when inserting/looking up instances.
+ *          - Within the struct, `data_mutex` protects `data_cv` wait/notify
+ *            operations. `data_pending` uses atomics to minimize contention.
+ *          - `header_promise/header_future` are set/consumed with map access
+ *            protected by `iteration_sync_mutex` to avoid races on replacement.
+ */
+struct IterationSyncState
+{
+    // Header gate
+    std::shared_ptr<std::promise<void>> header_promise;
+    std::shared_future<void>            header_future;
+    // Data drain
+    std::mutex              data_mutex;
+    std::condition_variable data_cv;
+    std::atomic<int>        data_pending{0};
+};
+
+/**
+ * @brief Base class for snapshot operations.
+ * @details Stores immutable command context and common state for repeating
+ *          or buffered snapshot implementations. Provides the interface to
+ *          accept EPICS events and produce submission batches. Also exposes
+ *          per-snapshot coordination primitives to guarantee publish order:
+ *          - Header gate: Data waits until Header is published per iteration.
+ *          - Data drain: Tail waits until all Data of the iteration is done.
+ *          Thread-safety: addData(), getData(), and the coordination helpers
+ *          are intended to be called from multiple threads.
  */
 class SnapshotOpInfo : public WorkerAsyncOperation
 {
-    SnapshotStatisticCounterShrdPtr snapshot_statistic;
+    /** @brief Protect access to per-iteration synchronization map. */
+    std::mutex iteration_sync_mutex;
+    /** @brief Map of iteration_id to its synchronization state. */
+    std::unordered_map<int64_t, std::shared_ptr<IterationSyncState>> iteration_sync_states;
 
 protected:
     /**
-     * @brief Filters PVStructure fields, returning only those in fields_to_include.
-     * @param src Source PVStructure.
-     * @param fields_to_include Set of field names to include.
-     * @return Filtered PVStructure pointer.
+     * @brief Filter PVStructure fields to a subset.
+     * @param src Source PVStructure; may be null.
+     * @param fields_to_include Fields to copy into the filtered structure.
+     * @return New PVStructure with only requested fields; null if src is null.
      */
     const epics::pvData::PVStructure::const_shared_pointer filterPVField(const epics::pvData::PVStructure::const_shared_pointer& src, const std::unordered_set<std::string>& fields_to_include);
 
 public:
-    std::promise<void>                                                   removal_promise;              /**< Promise for signaling removal of operation. */
-    k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd;                          /**< Pointer to associated repeating snapshot command. */
-    std::atomic<int64_t>                                                 snapshot_iteration_index = 0; /**< Index of current snapshot iteration. */
-    std::string                                                          snapshot_distribution_key;    /**< Unique identifier for the snapshot iteration to permit to have all the messages in the same partition. */
-    const std::string                                                    queue_name;                   /**< Name of the queue for this operation. */
-    const bool                                                           is_triggered;                 /**< Indicates if snapshot is triggered (immutable). */
-    bool                                                                 request_to_trigger = false;   /**< Flag to request a trigger. */
-    bool                                                                 is_running = true;            /**< Indicates if operation is running. */
-    k2eg::service::configuration::SnapshotConfigurationShrdPtr           snapshot_configuration;       /**< Snapshot configuration pointer. */
+    /**
+     * @brief Promise fulfilled when the snapshot is fully removed.
+     * @details Used by the manager to await clean teardown when stopping.
+     */
+    std::promise<void> removal_promise;
+
+    /** @brief Command parameters associated with this operation (non-owning shared_ptr). */
+    k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd;
+
+
+    /** @brief Normalized queue name where events are published. */
+    const std::string queue_name;
+
+    /** @brief True if operation is trigger-driven instead of periodic. */
+    const bool is_triggered;
+
+    /** @brief Asynchronously request a trigger for the next window (triggered mode). */
+    bool request_to_trigger = false;
+
+    /** @brief True while the snapshot operation is active; false when stopping. */
+    bool is_running = true;
 
     /**
-     * @brief Constructs SnapshotOpInfo with queue name and command pointer.
-     * @param queue_name Name of the queue.
-     * @param cmd Pointer to repeating snapshot command.
+     * @brief Construct a snapshot operation.
+     * @param queue_name Normalized queue name.
+     * @param cmd Repeating snapshot command parameters.
      */
     SnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd);
 
-    /**
-     * @brief Virtual destructor.
-     */
+    /** @brief Destroy the snapshot operation. */
     virtual ~SnapshotOpInfo();
 
     /**
-     * @brief Initializes operation with a list of sanitized PV names.
-     * @param sanitized_pv_name_list List of sanitized PV pointers.
-     * @return True if initialization succeeds.
+     * @brief Initialize with sanitized PV list.
+     * @param sanitized_pv_name_list List of PV identifiers already sanitized.
+     * @return True on success; false if initialization fails.
      */
     virtual bool init(std::vector<service::epics_impl::PVShrdPtr>& sanitized_pv_name_list) = 0;
 
     /**
-     * @brief Adds monitor event data to the operation.
-     * @param event_data Monitor event pointer.
+     * @brief Add a monitor event into the current window.
+     * @param event_data Event shared_ptr; ownership is not taken.
      */
     virtual void addData(k2eg::service::epics_impl::MonitorEventShrdPtr event_data) = 0;
 
     /**
-     * @brief Retrieves collected monitor event data.
-     * @return Shared pointer to SnapshotSubmission.
+     * @brief Produce a submission batch from the current window.
+     * @return Submission object with header/data/tail flags and events.
      */
     virtual SnapshotSubmissionShrdPtr getData() = 0;
 
     /**
-     * @brief Checks if the operation has timed out.
-     * @param now Current time point (default: now).
-     * @return True if timed out.
+     * @brief Check whether the current window expired.
+     * @param now Optional reference time; defaults to steady_clock::now().
+     * @return True if a submission should be produced.
      */
     virtual bool isTimeout(const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now()) override;
 
+    // Submission chaining removed: Tail now waits on per-iteration data drain.
+
     /**
-     * @brief Retrieves the snapshot statistic counter.
-     * @return Shared pointer to SnapshotStatisticCounter.
+     * @brief Begin a new header gate for a specific iteration.
+     * @details Creates (or resets) the IterationSyncState for `iteration_id` and
+     *          initializes its header promise/future. Call exactly once per iteration
+     *          when scheduling a submission that includes a Header, prior to any
+     *          Data scheduling for the same iteration.
+     * @param iteration_id Iteration identifier bound to this header gate.
      */
-    SnapshotStatisticCounterShrdPtr getStatisticCounter();
+    void beginHeaderGate(int64_t iteration_id);
+
+    /**
+     * @brief Complete the header gate for a specific iteration.
+     * @details Signals the header promise inside IterationSyncState so any Data publishers
+     *          waiting on `waitForHeaderGate(iteration_id)` can proceed. Call right after
+     *          the Header message for `iteration_id` is published.
+     * @param iteration_id Iteration identifier whose header gate to release.
+     */
+    void completeHeaderGate(int64_t iteration_id);
+
+    /**
+     * @brief Wait until the Header for a specific iteration has been published.
+     * @details Looks up the IterationSyncState for `iteration_id` and blocks on its header
+     *          future. Use inside Data publishing path to guarantee Header-before-Data order.
+     *          If no state exists (should not happen when scheduled correctly), returns immediately.
+     * @param iteration_id Iteration identifier to wait on.
+     */
+    void waitForHeaderGate(int64_t iteration_id);
+
+    /**
+     * @brief Increment pending data submissions counter for a specific iteration.
+     * @details Lazily creates IterationSyncState if missing and increments `data_pending`.
+     *          Call exactly once per scheduled Data submission batch for `iteration_id`,
+     *          before the associated task begins publishing.
+     * @param iteration_id Iteration identifier whose counter to increment.
+     */
+    void dataScheduled(int64_t iteration_id);
+
+    /**
+     * @brief Decrement pending data submissions counter and notify waiters for a specific iteration.
+     * @details Decrements `data_pending` and, when it reaches zero, notifies `data_cv` inside the
+     *          IterationSyncState. Call at the end of the Data publishing task for `iteration_id`.
+     * @param iteration_id Iteration identifier whose counter to decrement.
+     */
+    void dataCompleted(int64_t iteration_id);
+
+    /**
+     * @brief Block until all scheduled data submissions are completed for a specific iteration.
+     * @details Waits on the `data_cv` of IterationSyncState for `iteration_id` until `data_pending`
+     *          is zero, ensuring Tail publishes after all Data. After the wait completes, the
+     *          per-iteration state is cleaned up to avoid leaks.
+     * @param iteration_id Iteration identifier to wait on.
+     */
+    void waitDataDrained(int64_t iteration_id);
 };
 
 /**
