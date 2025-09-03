@@ -62,6 +62,7 @@ SnapshotSubmissionShrdPtr SnapshotRepeatingOpInfo::getData()
     return MakeSnapshotSubmissionShrdPtr(
         std::chrono::steady_clock::now(),
         std::move(result),
-        (SnapshotSubmissionType::Header | SnapshotSubmissionType::Data | SnapshotSubmissionType::Tail)
+        (SnapshotSubmissionType::Header | SnapshotSubmissionType::Data | SnapshotSubmissionType::Tail),
+        0 // scheduler assigns iteration id
     );
 }

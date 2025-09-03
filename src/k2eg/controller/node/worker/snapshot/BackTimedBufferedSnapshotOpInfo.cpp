@@ -150,5 +150,6 @@ SnapshotSubmissionShrdPtr BackTimedBufferedSnapshotOpInfo::getData()
             header_sent = false; // Reset header for the next window
         }
     }
-    return MakeSnapshotSubmissionShrdPtr(std::chrono::steady_clock::now(),std::move(result), type);
+    // Iteration id is assigned by the scheduler; initialize as 0 here.
+    return MakeSnapshotSubmissionShrdPtr(std::chrono::steady_clock::now(), std::move(result), type, 0);
 }

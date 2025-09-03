@@ -33,6 +33,122 @@ bool SnapshotOpInfo::isTimeout(const std::chrono::steady_clock::time_point& now)
     return WorkerAsyncOperation::isTimeout(now);
 }
 
+// prepareNextSubmissionChain removed: Tail ordering handled by per-iteration drain.
+
+void SnapshotOpInfo::beginHeaderGate(int64_t iteration_id)
+{
+    std::shared_ptr<IterationSyncState> state;
+    {
+        std::lock_guard<std::mutex> lk(iteration_sync_mutex);
+        auto& slot = iteration_sync_states[iteration_id];
+        if (!slot)
+            slot = std::make_shared<IterationSyncState>();
+        state = slot;
+    }
+    state->header_promise = std::make_shared<std::promise<void>>();
+    state->header_future = state->header_promise->get_future().share();
+}
+
+void SnapshotOpInfo::completeHeaderGate(int64_t iteration_id)
+{
+    std::shared_ptr<std::promise<void>> p;
+    {
+        std::lock_guard<std::mutex> lk(iteration_sync_mutex);
+        auto it = iteration_sync_states.find(iteration_id);
+        if (it != iteration_sync_states.end() && it->second)
+        {
+            p = it->second->header_promise;
+        }
+    }
+    if (p)
+    {
+        try
+        {
+            p->set_value();
+        }
+        catch (...)
+        {
+        }
+    }
+}
+
+void SnapshotOpInfo::waitForHeaderGate(int64_t iteration_id)
+{
+    std::shared_future<void> f;
+    {
+        std::lock_guard<std::mutex> lk(iteration_sync_mutex);
+        auto it = iteration_sync_states.find(iteration_id);
+        if (it != iteration_sync_states.end() && it->second)
+        {
+            f = it->second->header_future;
+        }
+    }
+    if (f.valid())
+    {
+        try
+        {
+            f.wait();
+        }
+        catch (...)
+        {
+        }
+    }
+}
+
+void SnapshotOpInfo::dataScheduled(int64_t iteration_id)
+{
+    std::shared_ptr<IterationSyncState> state;
+    {
+        std::lock_guard<std::mutex> lk(iteration_sync_mutex);
+        auto& slot = iteration_sync_states[iteration_id];
+        if (!slot)
+            slot = std::make_shared<IterationSyncState>();
+        state = slot;
+    }
+    state->data_pending.fetch_add(1, std::memory_order_relaxed);
+}
+
+void SnapshotOpInfo::dataCompleted(int64_t iteration_id)
+{
+    std::shared_ptr<IterationSyncState> state;
+    {
+        std::lock_guard<std::mutex> lk(iteration_sync_mutex);
+        auto it = iteration_sync_states.find(iteration_id);
+        if (it != iteration_sync_states.end())
+            state = it->second;
+    }
+    if (!state)
+        return;
+    int new_val = state->data_pending.fetch_sub(1, std::memory_order_acq_rel) - 1;
+    if (new_val <= 0)
+    {
+        std::lock_guard<std::mutex> lk(state->data_mutex);
+        state->data_cv.notify_all();
+    }
+}
+
+void SnapshotOpInfo::waitDataDrained(int64_t iteration_id)
+{
+    std::shared_ptr<IterationSyncState> state;
+    {
+        std::lock_guard<std::mutex> lk(iteration_sync_mutex);
+        auto it = iteration_sync_states.find(iteration_id);
+        if (it != iteration_sync_states.end())
+            state = it->second;
+    }
+    if (!state)
+        return;
+
+    std::unique_lock<std::mutex> lk(state->data_mutex);
+    state->data_cv.wait(lk, [&] { return state->data_pending.load(std::memory_order_acquire) == 0; });
+
+    // Optional cleanup: remove iteration state after drain completes.
+    {
+        std::lock_guard<std::mutex> g(iteration_sync_mutex);
+        iteration_sync_states.erase(iteration_id);
+    }
+}
+
 const epics::pvData::PVStructure::const_shared_pointer SnapshotOpInfo::filterPVField(const epics::pvData::PVStructure::const_shared_pointer& src, const std::unordered_set<std::string>& fields_to_include)
 {
     using namespace epics::pvData;
