@@ -244,8 +244,12 @@ using PVSnapshotMap = std::unordered_multimap<std::string, std::shared_ptr<Snaps
 
 struct IterationState
 {
+    /** @brief Number of tasks (Header/Data/Tail submissions) currently active. */
     std::atomic<int>  active_tasks{0};
+    /** @brief True when Tail has been processed for this iteration. */
     std::atomic<bool> tail_processed{false};
+    /** @brief Number of Data submissions still publishing for this iteration. */
+    std::atomic<int>  data_pending{0};
 };
 
 class SnapshotIterationSynchronizer
@@ -278,6 +282,8 @@ public:
 
     // The Tail task calls this to mark the logical end of the iteration.
     void markTailProcessed(const std::string& snapshot_name, uint64_t iteration_id);
+
+    // Data submissions draining handled within SnapshotOpInfo
 
     // Clean up when a snapshot is removed entirely.
     void removeSnapshot(const std::string& snapshot_name);
@@ -369,6 +375,9 @@ class ContinuousSnapshotManager
     std::thread                                    expiration_thread;
     std::atomic<bool>                              expiration_thread_running{false};
     std::unique_ptr<SnapshotIterationSynchronizer> iteration_sync_;
+
+    // Tracks the currently active iteration id per snapshot name during scheduling.
+    std::unordered_map<std::string, int64_t> active_iteration_id_;
 
     /**
      * @brief Callback for receiving EPICS monitor events.
