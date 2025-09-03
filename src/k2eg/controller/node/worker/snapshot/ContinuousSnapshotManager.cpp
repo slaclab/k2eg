@@ -690,8 +690,9 @@ void SnapshotSubmissionTask::operator()()
         return;
 
     auto    snap_ts = CHRONO_TO_UNIX_INT64(submission_shrd_ptr->snap_time);
+    auto    header_timestamp = CHRONO_TO_UNIX_INT64(submission_shrd_ptr->header_timestamp);
     int64_t current_iteration = submission_shrd_ptr->iteration_id;
-
+    auto    statistic_counter = snapshot_command_info->getStatisticCounter();
     // Iteration id is resolved at scheduling and attached to the submission.
     if (current_iteration == 0)
     {
@@ -702,21 +703,15 @@ void SnapshotSubmissionTask::operator()()
     // This guard ensures that this task is counted, and its completion is always registered.
     TaskGuard task_guard(iteration_sync_, snapshot_command_info->cmd->snapshot_name, current_iteration);
 
+    // HEADER: This is the start of a new logical iteration.
     if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
     {
-        auto serialized_header_message = serialize(RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, current_iteration},
-                                                   snapshot_command_info->cmd->serialization);
-        publisher->pushMessage(
-            MakeReplyPushableMessageUPtr(
-                snapshot_command_info->queue_name,                // topic name where to publish
-                "repeating-snapshot-events",                      // publish subject to use on handler
-                snapshot_command_info->snapshot_distribution_key, // distribution key
-                serialized_header_message                         // message payload
-                ),
-            {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
-        logger->logMessage(STRING_FORMAT("[Header] Snapshot %1% iteration %2% started", snapshot_command_info->cmd->snapshot_name % current_iteration), LogLevel::DEBUG);
-
-        // Release header gate so Data submissions can proceed
+        // Acquire the lock and get the new, unique iteration number.
+        current_iteration = iteration_sync_.acquireIteration(snapshot_command_info->cmd->snapshot_name);
+        // calculate the distribution key that is the snapshot_queue+header_ts+iteration
+        // this permit to have all the message of the same iteration of the snapshot
+        // in the same partition
+        snapshot_command_info->snapshot_distribution_key = snapshot_command_info->queue_name + std::to_string(header_timestamp) + std::to_string(current_iteration);
         snapshot_command_info->completeHeaderGate(current_iteration);
     }
 

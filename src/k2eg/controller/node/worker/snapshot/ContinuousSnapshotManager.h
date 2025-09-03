@@ -30,11 +30,19 @@
 namespace k2eg::controller::node::worker::snapshot {
 #pragma region Types
 
+/**
+ * @struct RepeatingSnaptshotConfiguration
+ * @brief Configuration for repeating snapshot processing.
+ * @details Controls internal resources used to process snapshot submissions.
+ */
 struct RepeatingSnaptshotConfiguration
 {
-    // the cron stirng for schedule the monitor
-    size_t snapshot_processing_thread_count = 1;
+    size_t snapshot_processing_thread_count = 1; /**< Number of threads used to process snapshot submissions. */
 
+    /**
+     * @brief Serialize configuration to a compact string for logging.
+     * @return Human-readable key=value summary.
+     */
     const std::string toString() const
     {
         return std::format("RepeatingSnaptshotConfiguration(snapshot_processing_thread_count={})", snapshot_processing_thread_count);
@@ -42,68 +50,57 @@ struct RepeatingSnaptshotConfiguration
 };
 DEFINE_PTR_TYPES(RepeatingSnaptshotConfiguration)
 
-/*
-    @brief Repeating snapshot message header
-    @details This message is used to send the header of a repeating snapshot reply.
-    the messages that belong to this snapshot are sent in the same topic sequentially
-*/
+/**
+ * @brief Repeating snapshot message header.
+ * @details Carries metadata for a snapshot iteration. All messages that belong
+ *          to the same iteration are published sequentially to the same topic/partition.
+ */
 struct RepeatingSnaptshotHeader
 {
-    const std::int8_t message_type = 0;
-    // this is the snapshot name
-    const std::string snapshot_name;
-    // this is the snapshot timestamp
-    const std::int64_t timestamp;
-    // this is the snapshot iteration
-    const std::int64_t iteration_index;
+    const std::int8_t  message_type = 0; /**< Discriminator for header messages. */
+    const std::string  snapshot_name;    /**< Snapshot name associated with this iteration. */
+    const std::int64_t timestamp;        /**< Snapshot creation timestamp (epoch millis). */
+    const std::int64_t iteration_index;  /**< Monotonic iteration index assigned by the manager. */
 };
 DEFINE_PTR_TYPES(RepeatingSnaptshotHeader)
 
 #pragma region Serialization
 
-/*
-    @brief Repeating snapshot data
-    @details This message is used to send the data for a specific snapshot and pv
-*/
+/**
+ * @brief Repeating snapshot PV data message.
+ * @details Conveys the values for a specific PV belonging to an iteration.
+ */
 struct RepeatingSnaptshotData
 {
-    const std::int8_t message_type = 1;
-    // this is the snapshot instance where the pv is related
-    const std::int64_t timestamp;
-    // this is the snapshot header timestamp
-    const std::int64_t header_timestamp;
-    // this is the snapshot iteration
-    const std::int64_t iteration_index;
-    // this is the snapshot values for a specific pv
-    k2eg::service::epics_impl::ConstChannelDataShrdPtr pv_data;
+    const std::int8_t                                  message_type = 1; /**< Discriminator for data messages. */
+    const std::int64_t                                 timestamp;        /**< Event timestamp for this PV sample (epoch millis). */
+    const std::int64_t                                 header_timestamp; /**< Timestamp of the corresponding iteration header (epoch millis). */
+    const std::int64_t                                 iteration_index;  /**< Iteration index matching the header. */
+    k2eg::service::epics_impl::ConstChannelDataShrdPtr pv_data;          /**< Serialized PV payload. */
 };
 DEFINE_PTR_TYPES(RepeatingSnaptshotData)
 
-/*
-@brief Repeating snapshot completion
-@details This message is used to send the completion of a current submission
-*/
+/**
+ * @brief Repeating snapshot completion message.
+ * @details Marks the end of an iteration submission with optional error info.
+ */
 struct RepeatingSnaptshotCompletion
 {
-    const std::int8_t message_type = 2;
-    // this is the snapshot error code
-    const std::int32_t error;
-    // this is the snapshot error message( in case there is one)
-    const std::string error_message;
-    // this is the snapshot name
-    const std::string snapshot_name;
-    // this is the snapshot instance where the pv is related
-    const std::int64_t timestamp;
-    // this is the snapshot header timestamp
-    const std::int64_t header_timestamp;
-    // this is the snapshot iteration
-    const std::int64_t iteration_index;
+    const std::int8_t  message_type = 2; /**< Discriminator for completion messages. */
+    const std::int32_t error;            /**< Error code (0 for success). */
+    const std::string  error_message;    /**< Optional error description; empty on success. */
+    const std::string  snapshot_name;    /**< Snapshot name associated with this iteration. */
+    const std::int64_t timestamp;        /**< Completion timestamp (epoch millis). */
+    const std::int64_t header_timestamp; /**< Timestamp of the corresponding iteration header (epoch millis). */
+    const std::int64_t iteration_index;  /**< Iteration index matching the header. */
 };
 DEFINE_PTR_TYPES(RepeatingSnaptshotCompletion)
 
-/*
-json serialization for the repeating snapshot header and data
-*/
+/**
+ * @brief Serialize a snapshot header to JSON.
+ * @param event_header Header to serialize.
+ * @param json_message Output buffer.
+ */
 inline void serializeJson(const RepeatingSnaptshotHeader& event_header, common::JsonMessage& json_message)
 {
     json_message.getJsonObject()["message_type"] = event_header.message_type;
@@ -112,6 +109,11 @@ inline void serializeJson(const RepeatingSnaptshotHeader& event_header, common::
     json_message.getJsonObject()["timestamp"] = event_header.timestamp;
 }
 
+/**
+ * @brief Serialize PV data to JSON.
+ * @param event_data Data to serialize.
+ * @param json_message Output buffer.
+ */
 inline void serializeJson(const RepeatingSnaptshotData& event_data, common::JsonMessage& json_message)
 {
     json_message.getJsonObject()["message_type"] = event_data.message_type;
@@ -121,6 +123,11 @@ inline void serializeJson(const RepeatingSnaptshotData& event_data, common::Json
     service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::JSON)->serialize(*event_data.pv_data, json_message);
 }
 
+/**
+ * @brief Serialize a completion message to JSON.
+ * @param event_completion Completion to serialize.
+ * @param json_message Output buffer.
+ */
 inline void serializeJson(const RepeatingSnaptshotCompletion& event_completion, common::JsonMessage& json_message)
 {
     json_message.getJsonObject()["message_type"] = event_completion.message_type;
@@ -132,9 +139,12 @@ inline void serializeJson(const RepeatingSnaptshotCompletion& event_completion, 
     json_message.getJsonObject()["snapshot_name"] = event_completion.snapshot_name;
 }
 
-/*
-msgpack serialization for the repeating snapshot header and data
-*/
+/**
+ * @brief Serialize a snapshot header to MessagePack.
+ * @param header_event Header to serialize.
+ * @param msgpack_message Output buffer.
+ * @param map_size Unused; preserved for signature compatibility.
+ */
 inline void serializeMsgpack(const RepeatingSnaptshotHeader& header_event, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
 {
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
@@ -149,6 +159,12 @@ inline void serializeMsgpack(const RepeatingSnaptshotHeader& header_event, commo
     packer.pack(header_event.iteration_index);
 }
 
+/**
+ * @brief Serialize PV data to MessagePack.
+ * @param data_event Data to serialize.
+ * @param msgpack_message Output buffer.
+ * @param map_size Unused; preserved for signature compatibility.
+ */
 inline void serializeMsgpack(const RepeatingSnaptshotData& data_event, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
 {
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
@@ -164,6 +180,12 @@ inline void serializeMsgpack(const RepeatingSnaptshotData& data_event, common::M
     service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::Msgpack)->serialize(*data_event.pv_data, msgpack_message);
 }
 
+/**
+ * @brief Serialize a completion message to MessagePack.
+ * @param header_completion Completion to serialize.
+ * @param msgpack_message Output buffer.
+ * @param map_size Unused; preserved for signature compatibility.
+ */
 inline void serializeMsgpack(const RepeatingSnaptshotCompletion& header_completion, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
 {
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
@@ -187,7 +209,12 @@ inline void serializeMsgpack(const RepeatingSnaptshotCompletion& header_completi
     packer.pack(header_completion.snapshot_name);
 }
 
-// global serialization function
+/**
+ * @brief Serialize a header using the requested format.
+ * @param header Header to serialize.
+ * @param type Serialization format.
+ * @return Serialized message buffer, or null on unsupported type.
+ */
 inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshotHeader& header, k2eg::common::SerializationType type)
 {
     switch (type)
@@ -208,6 +235,12 @@ inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshot
     }
 }
 
+/**
+ * @brief Serialize PV data using the requested format.
+ * @param data Data to serialize.
+ * @param type Serialization format.
+ * @return Serialized message buffer, or null on unsupported type.
+ */
 inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshotData& data, k2eg::common::SerializationType type)
 {
     switch (type)
@@ -228,6 +261,12 @@ inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshot
     }
 }
 
+/**
+ * @brief Serialize a completion message using the requested format.
+ * @param data Completion to serialize.
+ * @param type Serialization format.
+ * @return Serialized message buffer, or null on unsupported type.
+ */
 inline k2eg::common::SerializedMessageShrdPtr serialize(const RepeatingSnaptshotCompletion& data, k2eg::common::SerializationType type)
 {
     switch (type)
@@ -259,17 +298,24 @@ using PVSnapshotMap = std::unordered_multimap<std::string, std::shared_ptr<Snaps
 struct IterationState
 {
     /** @brief Number of tasks (Header/Data/Tail submissions) currently active. */
-    std::atomic<int>  active_tasks{0};
+    std::atomic<int> active_tasks{0};
     /** @brief True when Tail has been processed for this iteration. */
     std::atomic<bool> tail_processed{false};
     /** @brief Number of Data submissions still publishing for this iteration. */
-    std::atomic<int>  data_pending{0};
+    std::atomic<int> data_pending{0};
 };
 
+/**
+ * @brief Per-snapshot iteration synchronizer.
+ * @details Ensures sequential processing of iterations per snapshot name while
+ *          allowing concurrent work across different snapshots. Tracks active
+ *          tasks within an iteration and notifies when Tail completes so the
+ *          next iteration can proceed. Thread-safe.
+ */
 class SnapshotIterationSynchronizer
 {
 private:
-    mutable std::shared_mutex                                                                      iteration_mutex_;
+    mutable std::shared_mutex                                                                      iteration_mutex_; ///< Mutex for synchronizing access to iteration state.
     std::unordered_map<std::string, uint64_t>                                                      current_iteration_;
     std::unordered_map<std::string, std::atomic<bool>>                                             iteration_in_progress_;
     std::unordered_map<std::string, std::unique_ptr<std::condition_variable_any>>                  iteration_cv_;
@@ -279,31 +325,54 @@ private:
     void releaseLock(const std::string& snapshot_name, uint64_t iteration_id_to_clear);
 
 public:
-    // Default constructor and destructor.
+    /** @brief Default constructor. */
     SnapshotIterationSynchronizer() = default;
-
-    // Deleted copy constructor and assignment operator to prevent copying.
+    /** @brief Default destructor. */
     ~SnapshotIterationSynchronizer() = default;
 
-    // Reserve an iteration number and wait if the previous iteration is still in progress.
+    /**
+     * @brief Reserve a new iteration id for a snapshot.
+     * @details Blocks if the previous iteration is still in progress.
+     * @param snapshot_name Snapshot name.
+     * @return Acquired iteration id.
+     */
     int64_t acquireIteration(const std::string& snapshot_name);
 
-    // A task calls this to announce it has started.
+    /**
+     * @brief Announce task start for an iteration.
+     * @param snapshot_name Snapshot name.
+     * @param iteration_id Iteration id.
+     */
     void startTask(const std::string& snapshot_name, uint64_t iteration_id);
 
-    // A task calls this to announce it has finished.
+    /**
+     * @brief Announce task completion for an iteration.
+     * @param snapshot_name Snapshot name.
+     * @param iteration_id Iteration id.
+     */
     void finishTask(const std::string& snapshot_name, uint64_t iteration_id);
 
-    // The Tail task calls this to mark the logical end of the iteration.
+    /**
+     * @brief Mark Tail processed for an iteration.
+     * @param snapshot_name Snapshot name.
+     * @param iteration_id Iteration id.
+     */
     void markTailProcessed(const std::string& snapshot_name, uint64_t iteration_id);
 
-    // Data submissions draining handled within SnapshotOpInfo
+    // Data submissions draining is handled within SnapshotOpInfo
 
-    // Clean up when a snapshot is removed entirely.
+    /**
+     * @brief Remove all state for a snapshot.
+     * @param snapshot_name Snapshot name.
+     */
     void removeSnapshot(const std::string& snapshot_name);
 };
 
 // RAII helper to ensure startTask/finishTask are always paired for exception safety.
+/**
+ * @brief RAII helper that pairs startTask/finishTask calls.
+ * @details Guarantees proper decrement in the presence of exceptions.
+ */
 class TaskGuard
 {
 public:
@@ -324,77 +393,56 @@ private:
     uint64_t                       id_;
 };
 
-// class used to submit data to the publisher
+/**
+ * @brief Publishes a single SnapshotSubmission to the output topic.
+ * @details Handles header/data/tail ordering constraints and metrics logging.
+ */
 class SnapshotSubmissionTask
 {
-    bool                                     last_submission = false; // flag to indicate if the task should close
-    std::shared_ptr<SnapshotOpInfo>          snapshot_command_info;   // shared pointer to the snapshot operation info
-    SnapshotSubmissionShrdPtr                submission_shrd_ptr;
-    k2eg::service::pubsub::IPublisherShrdPtr publisher;
-    k2eg::service::log::ILoggerShrdPtr       logger;
-    SnapshotIterationSynchronizer&           iteration_sync_;
+    bool                                     last_submission = false; /**< True if this is the last submission for the iteration. */
+    std::shared_ptr<SnapshotOpInfo>          snapshot_command_info;   /**< Owning snapshot operation context. */
+    SnapshotSubmissionShrdPtr                submission_shrd_ptr;     /**< Submission to publish. */
+    k2eg::service::pubsub::IPublisherShrdPtr publisher;               /**< Destination publisher. */
+    k2eg::service::log::ILoggerShrdPtr       logger;                  /**< Logger instance. */
+    SnapshotIterationSynchronizer&           iteration_sync_;         /**< Per-snapshot iteration synchronizer. */
 
 public:
     SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, k2eg::service::pubsub::IPublisherShrdPtr publisher, k2eg::service::log::ILoggerShrdPtr logger, SnapshotIterationSynchronizer& iteration_sync, bool last_submission = false);
 
+    /**
+     * @brief Execute the publishing task.
+     */
     void operator()();
 };
 
-/*
-@brief ContinuousSnapshotManager is a class that manages the continuous snapshot of EPICS events.
-It provides a local cache for continuous snapshots and ensures thread-safe access to the cache.
-@details
-The class uses a shared mutex to allow multiple threads to read from the cache simultaneously,
-while ensuring exclusive access for writing. The cache is implemented as an unordered map, where the key is a string
-representing the snapshot name and the value is an atomic shared pointer to the MonitorEvent object. The atomic shared
-pointer ensures that the MonitorEvent object can be safely accessed and modified by multiple threads without the need
-for additional locking mechanisms. The class provides methods to add, remove, and retrieve snapshots from the cache.
-*/
+/**
+ * @brief Orchestrates repeating/triggered snapshot operations.
+ * @details Manages the lifecycle of snapshot operations, wiring EPICS monitor
+ *          events to SnapshotOpInfo implementations, scheduling windows, and
+ *          publishing header/data/tail messages in-order per iteration.
+ *          Thread-safety: uses a shared mutex to allow concurrent reads of the
+ *          running-snapshots map and exclusive writes on updates. Iteration
+ *          ordering is enforced via SnapshotIterationSynchronizer.
+ */
 class ContinuousSnapshotManager
 {
-    // Reference to configuration for repeating snapshots (thread count, etc.)
-    const RepeatingSnaptshotConfiguration& repeating_snapshot_configuration;
+    const RepeatingSnaptshotConfiguration& repeating_snapshot_configuration; ///< Repeating snapshot configuration (resources).
 
-    // Flag indicating if the manager is running
-    std::atomic<bool> run_flag = false;
-
-    // Shared pointer to the logger instance
-    k2eg::service::log::ILoggerShrdPtr logger;
-
-    // Node cofiguration for accessing snapshot specific settings
-    service::configuration::INodeConfigurationShrdPtr node_configuration;
-
-    // Shared pointer to the publisher instance for publishing snapshot data
-    k2eg::service::pubsub::IPublisherShrdPtr publisher;
-
-    // Mutex for synchronizing access to running snapshots
-    mutable std::shared_mutex snapshot_runinnig_mutex_;
-
-    // Map of currently running snapshots (snapshot name -> SnapshotOpInfo)
-    RunninSnapshotMap snapshot_runinnig_;
-
-    // Multimap of PV names to their associated snapshot operations
-    // mutliple snapshots can be associated with the same PV
-    PVSnapshotMap pv_snapshot_map_;
-
-    // Thread pool for processing snapshot operations
-    std::shared_ptr<BS::light_thread_pool> thread_pool;
-
-    // Shared pointer to the EPICS service manager
-    k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
-
-    // Token for managing the liveness of EPICS event handlers
-    k2eg::common::BroadcastToken epics_handler_token;
-
-    // Reference to node controller metrics for statistics collection
-    k2eg::service::metric::INodeControllerMetric& metrics;
-
-    std::thread                                    expiration_thread;
-    std::atomic<bool>                              expiration_thread_running{false};
-    std::unique_ptr<SnapshotIterationSynchronizer> iteration_sync_;
-
-    // Tracks the currently active iteration id per snapshot name during scheduling.
-    std::unordered_map<std::string, int64_t> active_iteration_id_;
+    std::atomic<bool>                                     run_flag = false;                 ///< True while the manager is running.
+    k2eg::service::log::ILoggerShrdPtr                    logger;                           ///< Logger instance.
+    service::configuration::INodeConfigurationShrdPtr     node_configuration;               ///< Node configuration (topics, limits, etc.).
+    k2eg::service::pubsub::IPublisherShrdPtr              publisher;                        ///< Publisher for outgoing snapshot messages.
+    mutable std::shared_mutex                             snapshot_runinnig_mutex_;         ///< Protects access to running snapshot maps.
+    RunninSnapshotMap                                     snapshot_runinnig_;               ///< Running snapshots keyed by name.
+    PVSnapshotMap                                         pv_snapshot_map_;                 ///< Multimap from PV name to snapshot operations.
+    std::shared_ptr<BS::light_thread_pool>                thread_pool;                      ///< Worker pool for submission tasks.
+    k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;            ///< EPICS services entry point.
+    k2eg::common::BroadcastToken                          epics_handler_token;              ///< Liveness token for EPICS event handlers.
+    k2eg::service::metric::INodeControllerMetric&         metrics;                          ///< Node controller metrics sink.
+    std::thread                                           expiration_thread;                ///< Background thread that checks for expired snapshots.
+    std::atomic<bool>                                     expiration_thread_running{false}; ///< True while the expiration thread is running.
+    std::unique_ptr<SnapshotIterationSynchronizer>        iteration_sync_;                  ///< Per-snapshot iteration ordering helper.
+    std::unordered_map<std::string, int64_t>              active_iteration_id_;             ///< Active iteration id per snapshot during scheduling.
 
     /**
      * @brief Callback for receiving EPICS monitor events.

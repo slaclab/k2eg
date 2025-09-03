@@ -154,5 +154,5 @@ SnapshotSubmissionShrdPtr BackTimedBufferedSnapshotOpInfo::getData()
         }
     }
     // Iteration id is assigned by the scheduler; initialize as 0 here.
-    return MakeSnapshotSubmissionShrdPtr(std::chrono::steady_clock::now(), std::move(result), type, 0);
+    return MakeSnapshotSubmissionShrdPtr(std::chrono::steady_clock::now(), header_snapshot_time, std::move(result), type, 0);
 }

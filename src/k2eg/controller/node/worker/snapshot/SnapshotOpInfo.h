@@ -18,6 +18,57 @@
 
 namespace k2eg::controller::node::worker::snapshot {
 
+struct SnapshotStatistic
+{
+    std::atomic<double> event_size = 0;  /**< Total size of events in bytes. */
+    std::atomic<double> event_count = 0; /**< Number of events processed. */
+};
+
+DEFINE_PTR_TYPES(SnapshotStatistic);
+
+/**
+ * @struct SnapshotStatistic
+ * @brief Stores per-second statistics for snapshot operations.
+ *
+ * Contains the total event size and count for a given time window.
+ */
+
+class SnapshotStatisticCounter
+
+{
+private:
+    SnapshotStatistic                     statistic;
+    std::chrono::steady_clock::time_point start_sampling_time;
+
+public:
+    SnapshotStatisticCounter();
+
+    /**
+     * @brief Increment the total event size.
+     * @param amount Number of bytes to add.
+     */
+    void incrementEventSize(double amount = 1);
+
+    /**
+     * @brief Increment the event count.
+     * @param count Number of events to add.
+     */
+    void incrementEventCount(double count = 1);
+
+    /**
+     * @brief Get the current statistics.
+     * @param now Current time point (default: now).
+     * @return Snapshot statistics.
+     */
+    SnapshotStatisticShrdPtr getStatistics(const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now()) const;
+
+    /**
+     * @brief Reset statistics and sampling times.
+     */
+    void reset();
+};
+
+DEFINE_PTR_TYPES(SnapshotStatisticCounter);
 /**
  * @brief Define the parts of a snapshot submission.
  * @details Flags describing which logical section(s) are contained in a single
@@ -82,12 +133,11 @@ class SnapshotOpInfo;
 class SnapshotSubmission
 {
 public:
-    /** @brief Time when the submission was created (steady clock). */
-    std::chrono::steady_clock::time_point snap_time;
-    /** @brief Collected PV events to publish. One per PV for repeating op; buffered for back-time op. */
-    std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events;
-    /** @brief Which parts of a submission are present (Header/Data/Tail). */
-    SnapshotSubmissionType submission_type;
+    std::chrono::steady_clock::time_point                 header_timestamp; /**< Time point for the snapshot header. */
+    std::chrono::steady_clock::time_point                 snap_time;        /**< Time point for the snapshot. */
+    std::vector<service::epics_impl::MonitorEventShrdPtr> snapshot_events;  /**< Events captured in the snapshot. */
+    SnapshotSubmissionType                                submission_type;  /**< Type flags for the submission. */
+
     /**
      * @brief Iteration identifier assigned by the scheduler.
      * @details Binds this submission to the logical snapshot iteration it belongs to.
@@ -104,35 +154,25 @@ public:
      * @param submission_type Flags for header/data/tail presence.
      * @param iteration_id Iteration id bound to this submission.
      */
-    SnapshotSubmission(const std::chrono::steady_clock::time_point& snap_time, std::vector<service::epics_impl::MonitorEventShrdPtr>&& snapshot_events, SnapshotSubmissionType submission_type, int64_t iteration_id)
-        : snap_time(snap_time), snapshot_events(std::move(snapshot_events)), submission_type(submission_type), iteration_id(iteration_id)
-    {
-    }
+    SnapshotSubmission(
+        const std::chrono::steady_clock::time_point&            snap_time,
+        const std::chrono::steady_clock::time_point&            header_timestamp,
+        std::vector<service::epics_impl::MonitorEventShrdPtr>&& snapshot_events,
+        SnapshotSubmissionType                                  submission_type,
+        int64_t                                                 iteration_id);
 
     /**
      * @brief Move-construct a submission.
      * @param other Source to move from; left in valid but unspecified state.
      */
-    SnapshotSubmission(SnapshotSubmission&& other) noexcept
-        : snapshot_events(std::move(other.snapshot_events)), submission_type(other.submission_type), iteration_id(other.iteration_id)
-    {
-    }
+    SnapshotSubmission(SnapshotSubmission&& other) noexcept;
 
     /**
      * @brief Move-assign a submission.
      * @param other Source to move from.
      * @return Reference to this.
      */
-    SnapshotSubmission& operator=(SnapshotSubmission&& other) noexcept
-    {
-        if (this != &other)
-        {
-            snapshot_events = std::move(other.snapshot_events);
-            submission_type = other.submission_type;
-            iteration_id = other.iteration_id;
-        }
-        return *this;
-    }
+    SnapshotSubmission& operator=(SnapshotSubmission&& other) noexcept;
 
     /** @brief Disable copy to enforce move-only semantics. */
     SnapshotSubmission(const SnapshotSubmission&) = delete;
@@ -193,10 +233,9 @@ struct IterationSyncState
  */
 class SnapshotOpInfo : public WorkerAsyncOperation
 {
-    /** @brief Protect access to per-iteration synchronization map. */
-    std::mutex iteration_sync_mutex;
-    /** @brief Map of iteration_id to its synchronization state. */
-    std::unordered_map<int64_t, std::shared_ptr<IterationSyncState>> iteration_sync_states;
+    std::mutex                                                       iteration_sync_mutex;  ///< Mutex for synchronizing access to iteration_sync_states.
+    std::unordered_map<int64_t, std::shared_ptr<IterationSyncState>> iteration_sync_states; ///< Map of iteration IDs to their sync states.
+    SnapshotStatisticCounterShrdPtr                                  snapshot_statistic;    ///< Snapshot statistics for the operation.
 
 protected:
     /**
@@ -208,27 +247,14 @@ protected:
     const epics::pvData::PVStructure::const_shared_pointer filterPVField(const epics::pvData::PVStructure::const_shared_pointer& src, const std::unordered_set<std::string>& fields_to_include);
 
 public:
-    /**
-     * @brief Promise fulfilled when the snapshot is fully removed.
-     * @details Used by the manager to await clean teardown when stopping.
-     */
-    std::promise<void> removal_promise;
-
-    /** @brief Command parameters associated with this operation (non-owning shared_ptr). */
-    k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd;
-
-
-    /** @brief Normalized queue name where events are published. */
-    const std::string queue_name;
-
-    /** @brief True if operation is trigger-driven instead of periodic. */
-    const bool is_triggered;
-
-    /** @brief Asynchronously request a trigger for the next window (triggered mode). */
-    bool request_to_trigger = false;
-
-    /** @brief True while the snapshot operation is active; false when stopping. */
-    bool is_running = true;
+    service::configuration::SnapshotConfigurationShrdPtr                 snapshot_configuration;     ///< Snapshot configuration for the operation.
+    std::string                                                          snapshot_distribution_key;  ///< Unique identifier for the snapshot iteration.
+    std::promise<void>                                                   removal_promise;            ///< Promise fulfilled when the snapshot is fully removed.
+    k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd;                        ///< Command parameters for the snapshot operation.
+    const std::string                                                    queue_name;                 ///< Normalized queue name.
+    const bool                                                           is_triggered;               ///< True if operation is trigger-driven instead of periodic.
+    bool                                                                 request_to_trigger = false; ///< True if a trigger is requested for the next window.
+    bool                                                                 is_running = true;          ///< True if the operation is currently running.
 
     /**
      * @brief Construct a snapshot operation.
@@ -321,6 +347,12 @@ public:
      * @param iteration_id Iteration identifier to wait on.
      */
     void waitDataDrained(int64_t iteration_id);
+
+    /**
+     * @brief Retrieves the snapshot statistic counter.
+     * @return Shared pointer to SnapshotStatisticCounter.
+     */
+    SnapshotStatisticCounterShrdPtr getStatisticCounter();
 };
 
 /**
