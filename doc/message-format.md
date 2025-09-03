@@ -18,6 +18,23 @@ Notes:
 - `serialization` applies to commands that produce EPICS data (read-like operations). For write-like operations, it matters only if a payload is returned.
 - K2EG supports JSON and MessagePack payloads. Commands are submitted in JSON. For brevity, MessagePack is illustrated using JSON-like notation below.
 
+### Common Fields and Base Reply
+
+- `reply_topic`: Kafka topic where the gateway publishes the response or stream of events for the request.
+- `reply_id`: Correlation id chosen by the client; echoed back on replies to allow matching.
+- `protocol`: EPICS protocol for PV access (`pva` or `ca`) when applicable.
+- `pv_name`: EPICS process variable name (without protocol prefix unless otherwise noted).
+
+Base reply envelope (used for acks and simple responses):
+```json
+{
+  "error": 0,
+  "reply_id": "<correlation id>",
+  "message": "<optional info>"
+}
+```
+Where `error` is `0` on success; non-zero indicates an error with details in `message`.
+
 ## EPICS Value Serialization
 EPICS values are serialized differently depending on the format:
 
@@ -112,11 +129,7 @@ MAP( "<pv name>", MAP(
     )
 ))
 ```
-## MessagePack compact serialization (msgpack-compact)
-In compact mode, an array is used instead of a map (keys omitted). The first element is the PV name; subsequent elements follow the same positional order as the JSON/MessagePack layout.
-```
-VECTOR(<channel name>, <scalar | scalar array>, <severity>, <status>, <message>, <secondsPastEpoch>, <nanoseconds>, <userTag>, <limitLow>, <limitHigh>, <description>, <units>, <precision>, <index>, <control limitLow>, <control limitHigh>, <control minStep>, <active>, <lowAlarmLimit>, <lowWarningLimit>, <highWarningLimit>, <highAlarmLimit>, <lowAlarmSeverity>, <lowWarningSeverity>, <highWarningSeverity>, <highAlarmSeverity>, <hysteresis>)
-```
+ 
 
 ## Get Command
 Retrieve the current value of an EPICS PV; produces a single reply message.
@@ -129,6 +142,18 @@ Retrieve the current value of an EPICS PV; produces a single reply message.
     "pv_name": "channel::a",
     "reply_topic": "reply-destination-topic",
     "reply_id": "<reply id>"
+}
+```
+Reply example (JSON serialization):
+```json
+{
+  "error": 0,
+  "reply_id": "<reply id>",
+  "BPMS:LTUH:250:X": {
+    "value": 0.123,
+    "timeStamp": { "secondsPastEpoch": 1750509, "nanoseconds": 123000000 },
+    "alarm": { "severity": 0, "status": 0, "message": "NO_ALARM" }
+  }
 }
 ```
 
@@ -157,6 +182,20 @@ Enable or disable update notifications for a specific EPICS PV on a Kafka topic.
     "activate": false
 }
 ```
+Ack example:
+```json
+{ "error": 0, "reply_id": "<reply id>" }
+```
+Event example (published to `reply_topic` while active):
+```json
+{
+  "BPMS:LTUH:250:X": {
+    "value": 0.127,
+    "timeStamp": { "secondsPastEpoch": 1750510, "nanoseconds": 321000000 },
+    "alarm": { "severity": 0, "status": 0, "message": "NO_ALARM" }
+  }
+}
+```
 ## Put Command
 Apply a value to a PV (similar to caput/pvput). For scalar arrays, provide values separated by spaces.
 ### JSON Structure
@@ -169,6 +208,10 @@ Apply a value to a PV (similar to caput/pvput). For scalar arrays, provide value
     "reply_topic": "reply-destination-topic",
     "reply_id": "<reply id>",
 }
+```
+Ack example:
+```json
+{ "error": 0, "reply_id": "<reply id>", "message": "applied" }
 ```
 
 ## Snapshot Command
