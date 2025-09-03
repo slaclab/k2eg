@@ -1,17 +1,16 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 #define K2EG_CONTROLLER_NODE_WORKER_MONITOR_CONTINUOUSSNAPSHOTMANAGER_H_
 
-#include <k2eg/service/epics/EpicsData.h>
-#include <k2eg/service/metric/INodeControllerMetric.h>
-
 #include <k2eg/common/BS_thread_pool.hpp>
+#include <k2eg/common/LockFreeBuffer.h>
 #include <k2eg/common/ThrottlingManager.h>
 #include <k2eg/common/types.h>
 
-#include <k2eg/common/LockFreeBuffer.h>
-
+#include <k2eg/service/configuration/INodeConfiguration.h>
+#include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 #include <k2eg/service/metric/IMetricService.h>
+#include <k2eg/service/metric/INodeControllerMetric.h>
 #include <k2eg/service/scheduler/Scheduler.h>
 
 #include <k2eg/controller/command/cmd/Command.h>
@@ -35,6 +34,11 @@ struct RepeatingSnaptshotConfiguration
 {
     // the cron stirng for schedule the monitor
     size_t snapshot_processing_thread_count = 1;
+
+    const std::string toString() const
+    {
+        return std::format("RepeatingSnaptshotConfiguration(snapshot_processing_thread_count={})", snapshot_processing_thread_count);
+    }
 };
 DEFINE_PTR_TYPES(RepeatingSnaptshotConfiguration)
 
@@ -66,6 +70,8 @@ struct RepeatingSnaptshotData
     const std::int8_t message_type = 1;
     // this is the snapshot instance where the pv is related
     const std::int64_t timestamp;
+    // this is the snapshot header timestamp
+    const std::int64_t header_timestamp;
     // this is the snapshot iteration
     const std::int64_t iteration_index;
     // this is the snapshot values for a specific pv
@@ -88,6 +94,8 @@ struct RepeatingSnaptshotCompletion
     const std::string snapshot_name;
     // this is the snapshot instance where the pv is related
     const std::int64_t timestamp;
+    // this is the snapshot header timestamp
+    const std::int64_t header_timestamp;
     // this is the snapshot iteration
     const std::int64_t iteration_index;
 };
@@ -109,6 +117,7 @@ inline void serializeJson(const RepeatingSnaptshotData& event_data, common::Json
     json_message.getJsonObject()["message_type"] = event_data.message_type;
     json_message.getJsonObject()["iter_index"] = event_data.iteration_index;
     json_message.getJsonObject()["timestamp"] = event_data.timestamp;
+    json_message.getJsonObject()["header_timestamp"] = event_data.header_timestamp;
     service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::JSON)->serialize(*event_data.pv_data, json_message);
 }
 
@@ -119,6 +128,7 @@ inline void serializeJson(const RepeatingSnaptshotCompletion& event_completion, 
     json_message.getJsonObject()["error_message"] = event_completion.error_message;
     json_message.getJsonObject()["iter_index"] = event_completion.iteration_index;
     json_message.getJsonObject()["timestamp"] = event_completion.timestamp;
+    json_message.getJsonObject()["header_timestamp"] = event_completion.header_timestamp;
     json_message.getJsonObject()["snapshot_name"] = event_completion.snapshot_name;
 }
 
@@ -142,11 +152,13 @@ inline void serializeMsgpack(const RepeatingSnaptshotHeader& header_event, commo
 inline void serializeMsgpack(const RepeatingSnaptshotData& data_event, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
 {
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
-    packer.pack_map(4);
+    packer.pack_map(5);
     packer.pack("message_type");
     packer.pack(data_event.message_type);
     packer.pack("timestamp");
     packer.pack(data_event.timestamp);
+    packer.pack("header_timestamp");
+    packer.pack(data_event.header_timestamp);
     packer.pack("iter_index");
     packer.pack(data_event.iteration_index);
     service::epics_impl::epics_serializer_factory.resolve(common::SerializationType::Msgpack)->serialize(*data_event.pv_data, msgpack_message);
@@ -155,7 +167,7 @@ inline void serializeMsgpack(const RepeatingSnaptshotData& data_event, common::M
 inline void serializeMsgpack(const RepeatingSnaptshotCompletion& header_completion, common::MsgpackMessage& msgpack_message, std::uint8_t map_size = 0)
 {
     msgpack::packer<msgpack::sbuffer> packer(msgpack_message.getBuffer());
-    packer.pack_map(header_completion.error_message.empty() ? 5 : 6);
+    packer.pack_map(header_completion.error_message.empty() ? 6 : 7);
     packer.pack("message_type");
     packer.pack(header_completion.message_type);
     packer.pack("error");
@@ -169,6 +181,8 @@ inline void serializeMsgpack(const RepeatingSnaptshotCompletion& header_completi
     packer.pack(header_completion.iteration_index);
     packer.pack("timestamp");
     packer.pack(header_completion.timestamp);
+    packer.pack("header_timestamp");
+    packer.pack(header_completion.header_timestamp);
     packer.pack("snapshot_name");
     packer.pack(header_completion.snapshot_name);
 }
@@ -255,10 +269,10 @@ struct IterationState
 class SnapshotIterationSynchronizer
 {
 private:
-    mutable std::shared_mutex                                                     iteration_mutex_;
-    std::unordered_map<std::string, uint64_t>                                     current_iteration_;
-    std::unordered_map<std::string, std::atomic<bool>>                            iteration_in_progress_;
-    std::unordered_map<std::string, std::unique_ptr<std::condition_variable_any>> iteration_cv_;
+    mutable std::shared_mutex                                                                      iteration_mutex_;
+    std::unordered_map<std::string, uint64_t>                                                      current_iteration_;
+    std::unordered_map<std::string, std::atomic<bool>>                                             iteration_in_progress_;
+    std::unordered_map<std::string, std::unique_ptr<std::condition_variable_any>>                  iteration_cv_;
     std::unordered_map<std::string, std::unordered_map<uint64_t, std::shared_ptr<IterationState>>> iteration_states_;
 
     // Private helper to release the lock and notify the next waiting iteration.
@@ -313,15 +327,15 @@ private:
 // class used to submit data to the publisher
 class SnapshotSubmissionTask
 {
-    bool                                     last_submition = false; // flag to indicate if the task should close
-    std::shared_ptr<SnapshotOpInfo>          snapshot_command_info; // shared pointer to the snapshot operation info
+    bool                                     last_submission = false; // flag to indicate if the task should close
+    std::shared_ptr<SnapshotOpInfo>          snapshot_command_info;   // shared pointer to the snapshot operation info
     SnapshotSubmissionShrdPtr                submission_shrd_ptr;
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
     k2eg::service::log::ILoggerShrdPtr       logger;
     SnapshotIterationSynchronizer&           iteration_sync_;
 
 public:
-    SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, k2eg::service::pubsub::IPublisherShrdPtr publisher, k2eg::service::log::ILoggerShrdPtr logger, SnapshotIterationSynchronizer& iteration_sync, bool last_submition = false);
+    SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, k2eg::service::pubsub::IPublisherShrdPtr publisher, k2eg::service::log::ILoggerShrdPtr logger, SnapshotIterationSynchronizer& iteration_sync, bool last_submission = false);
 
     void operator()();
 };
@@ -346,6 +360,9 @@ class ContinuousSnapshotManager
 
     // Shared pointer to the logger instance
     k2eg::service::log::ILoggerShrdPtr logger;
+
+    // Node cofiguration for accessing snapshot specific settings
+    service::configuration::INodeConfigurationShrdPtr node_configuration;
 
     // Shared pointer to the publisher instance for publishing snapshot data
     k2eg::service::pubsub::IPublisherShrdPtr publisher;
@@ -431,7 +448,31 @@ class ContinuousSnapshotManager
      * @param task_properties Properties of the scheduled statistics task.
      */
     void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
+
+    /**
+     * @brief Loop to check for expired snapshots and clean them up.
+     */
     void expirationCheckerLoop();
+
+    /**
+     * @brief Try to configure the start of a snapshot.
+     * @param snapshot_ops_info Shared pointer to the snapshot operation info.
+     * @return True if the configuration was successful and snapshot can start, false otherwise.
+     */
+    bool tryToConfigureSnapshotStart(SnapshotOpInfo& snapshot_ops_info);
+
+    /**
+     * @brief Set the snapshot as running in the configuration.
+     * @param snapshot_ops_info Shared pointer to the snapshot operation info.
+     * @return True if the snapshot was successfully set as running, false otherwise.
+     */
+    bool releaseSnapshotForStop(SnapshotOpInfo& snapshot_ops_info);
+
+    /**
+     * @brief Handle the periodic task for snapshot management.
+     * @param task_properties Properties of the scheduled periodic task.
+     */
+    void handlePeriodicTask(k2eg::service::scheduler::TaskProperties& task_properties);
 
 public:
     /**

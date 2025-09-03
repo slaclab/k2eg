@@ -28,7 +28,7 @@ class PrometheusMetricService : public IMetricService
     std::shared_ptr<INodeControllerSystemMetric> node_controller_system_metric;
 
 public:
-    PrometheusMetricService(ConstMetricConfigurationUPtr metric_configuration);
+    PrometheusMetricService(ConstMetricConfigurationShrdPtr metric_configuration);
     virtual ~PrometheusMetricService();
     PrometheusMetricService(const PrometheusMetricService&) = delete;
     PrometheusMetricService& operator=(const PrometheusMetricService&) = delete;

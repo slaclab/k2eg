@@ -93,5 +93,18 @@ services:
       - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
       - KAFKA_CFG_MESSAGE_MAX_BYTES=256000
+
+  mongodb-primary:
+    image: ghcr.io/zcube/bitnami-compat/mongodb:6.0.5
+    restart: on-failure
+    environment:
+      - MONGODB_ROOT_USER=admin
+      - MONGODB_ROOT_PASSWORD=admin
+      - BITNAMI_DEBUG=true
+      - MONGODB_REPLICA_SET_MODE=primary
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb-primary
+      - MONGODB_REPLICA_SET_KEY=replicasetkey123
+    ports:
+      - "27017:27017"
 volumes:
   consul_data: {}

@@ -18,10 +18,10 @@ DEFINE_PTR_TYPES(MetricConfiguration)
 // abstra the metric implementation
 class IMetricService {
  protected:
-  ConstMetricConfigurationUPtr metric_configuration;
+  ConstMetricConfigurationShrdPtr metric_configuration;
 
  public:
-  IMetricService(ConstMetricConfigurationUPtr metric_configuration);
+  IMetricService(ConstMetricConfigurationShrdPtr metric_configuration);
   virtual ~IMetricService() = default;
 
   virtual IEpicsMetric& getEpicsMetric() = 0;

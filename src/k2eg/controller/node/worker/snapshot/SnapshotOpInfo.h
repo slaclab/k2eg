@@ -1,16 +1,20 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_SNAPSHOT_SNAPSHOTOPINFO_H_
 #define K2EG_CONTROLLER_NODE_WORKER_SNAPSHOT_SNAPSHOTOPINFO_H_
 
-#include "k2eg/common/types.h"
-#include "k2eg/service/epics/EpicsServiceManager.h"
-#include <atomic>
+#include <chrono>
+#include <k2eg/common/types.h>
+
+#include <k2eg/service/configuration/INodeConfiguration.h>
 #include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/epics/EpicsServiceManager.h>
 
 #include <condition_variable>
 #include <future>
 #include <k2eg/controller/node/worker/CommandWorker.h>
 #include <mutex>
 #include <unordered_map>
+
+#include <atomic>
 
 namespace k2eg::controller::node::worker::snapshot {
 
@@ -136,6 +140,9 @@ public:
     SnapshotSubmission& operator=(const SnapshotSubmission&) = delete;
 };
 
+/**
+ * @brief Defines shared and unique pointer types for SnapshotSubmission.
+ */
 DEFINE_PTR_TYPES(SnapshotSubmission);
 
 /**
@@ -315,6 +322,10 @@ public:
      */
     void waitDataDrained(int64_t iteration_id);
 };
+
+/**
+ * @brief Defines shared and unique pointer types for SnapshotOpInfo.
+ */
 DEFINE_PTR_TYPES(SnapshotOpInfo)
 } // namespace k2eg::controller::node::worker::snapshot
 

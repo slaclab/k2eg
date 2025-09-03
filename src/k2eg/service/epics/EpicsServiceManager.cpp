@@ -39,7 +39,7 @@ void set_thread_name(const std::size_t idx)
     BS::this_thread::set_os_thread_name(name);
 }
 inline auto thread_namer = [](unsigned long idx) { set_thread_name(idx); };
-EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config)
+EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigShrdPtr config)
     : config(std::move(config))
     , end_processing(false)
     , thread_throttling_vector(this->config->thread_count)
@@ -55,7 +55,7 @@ EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr conf
                                           -1 // start at application boot time
     );
     ServiceResolver<Scheduler>::resolve()->addTask(statistic_task);
-    logger->logMessage(STRING_FORMAT("[EpicsServiceManager] Epics Service Manager started [tthread_cout=%1%, poll_to=%2%]",
+    logger->logMessage(STRING_FORMAT("Epics Service Manager started [tthread_cout=%1%, poll_to=%2%]",
                                      this->config->thread_count % this->config->max_event_from_monitor_queue),
                        LogLevel::INFO);
 }
