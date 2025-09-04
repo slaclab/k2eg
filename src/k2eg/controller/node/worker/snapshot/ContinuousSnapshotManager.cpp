@@ -23,6 +23,7 @@
 #include <string>
 #include <unistd.h>
 #include <utility>
+#include <unordered_map>
 
 using namespace k2eg::controller::command::cmd;
 using namespace k2eg::controller::node::worker;
@@ -40,6 +41,37 @@ using namespace k2eg::service::epics_impl;
     std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower); \
     return norm; \
 })(snapshot_name)
+
+// Local aggregator to count events per snapshot iteration and log at Tail.
+namespace {
+std::mutex                                     g_tail_log_mutex;
+std::unordered_map<std::string, uint64_t>      g_tail_event_counters;
+
+inline std::string make_tail_key(const std::string& snapshot_name, int64_t iteration)
+{
+    return snapshot_name + "#" + std::to_string(iteration);
+}
+
+inline void add_events_for_iteration(const std::string& snapshot_name, int64_t iteration, uint64_t count)
+{
+    if (count == 0)
+        return;
+    std::lock_guard<std::mutex> lk(g_tail_log_mutex);
+    g_tail_event_counters[make_tail_key(snapshot_name, iteration)] += count;
+}
+
+inline uint64_t take_events_for_iteration(const std::string& snapshot_name, int64_t iteration)
+{
+    std::lock_guard<std::mutex> lk(g_tail_log_mutex);
+    auto                        key = make_tail_key(snapshot_name, iteration);
+    auto                        it = g_tail_event_counters.find(key);
+    if (it == g_tail_event_counters.end())
+        return 0;
+    auto n = it->second;
+    g_tail_event_counters.erase(it);
+    return n;
+}
+} // namespace
 
 void set_snapshot_thread_name(const std::size_t idx)
 {
@@ -553,11 +585,7 @@ void SnapshotSubmissionTask::operator()()
 
     if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
     {
-        auto serialized_header_message = serialize(RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, current_iteration},
-                                                   snapshot_command_info->cmd->serialization);
-        publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
-                                                            snapshot_command_info->cmd->snapshot_name, serialized_header_message),
-                               {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
+        snapshot_command_info->publishHeader(publisher, logger, snap_ts, current_iteration);
         logger->logMessage(STRING_FORMAT("[Header] Snapshot %1% iteration %2% started", snapshot_command_info->cmd->snapshot_name % current_iteration), LogLevel::DEBUG);
 
         // Release header gate so Data submissions can proceed
@@ -570,31 +598,10 @@ void SnapshotSubmissionTask::operator()()
         // Ensure header was published for this iteration before sending any data
         snapshot_command_info->waitForHeaderGate(current_iteration);
 
-        // Data processing logic is unchanged. It can run concurrently with other data tasks.
-        std::set<std::string> pv_names_published;
-        for (auto& event : submission_shrd_ptr->snapshot_events)
-        {
-            pv_names_published.insert(event->channel_data.pv_name);
-            auto serialized_message =
-                serialize(RepeatingSnaptshotData{1, snap_ts, current_iteration, MakeChannelDataShrdPtr(event->channel_data)},
-                          snapshot_command_info->cmd->serialization);
-            if (serialized_message)
-            {
-                publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
-                                                                    snapshot_command_info->cmd->snapshot_name, serialized_message),
-                                       {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
-            }
-            else
-            {
-                logger->logMessage(STRING_FORMAT("Failing serializing snapshot %1% for PV %2%",
-                                                 snapshot_command_info->cmd->snapshot_name % event->channel_data.pv_name),
-                                   LogLevel::ERROR);
-            }
-        }
-        logger->logMessage(STRING_FORMAT("[Data] Snapshot %1% iteration %2% with %3% events from [n. %4%] - %5% - PVs completed",
-                                         snapshot_command_info->cmd->snapshot_name % current_iteration %
-                                             submission_shrd_ptr->snapshot_events.size() % pv_names_published.size() % get_pv_names(pv_names_published)),
-                           LogLevel::DEBUG);
+        // Publish data via SnapshotOpInfo and aggregate counts for Tail logging
+        const auto events_sent_this_batch = snapshot_command_info->publishData(
+            publisher, logger, snap_ts, current_iteration, submission_shrd_ptr->snapshot_events);
+        add_events_for_iteration(snapshot_command_info->cmd->snapshot_name, current_iteration, events_sent_this_batch);
         // Mark data submission as completed for this iteration
         snapshot_command_info->dataCompleted(current_iteration);
     }
@@ -603,12 +610,12 @@ void SnapshotSubmissionTask::operator()()
     {
         // Ensure all data submissions for this iteration are fully published before sending Tail
         snapshot_command_info->waitDataDrained(current_iteration);
-        logger->logMessage(STRING_FORMAT("[Tail] Snapshot %1% iteration %2% completed", snapshot_command_info->cmd->snapshot_name % current_iteration), LogLevel::DEBUG);
-        auto serialized_completion_message = serialize(RepeatingSnaptshotCompletion{2, 0, "", snapshot_command_info->cmd->snapshot_name, snap_ts, current_iteration},
-                                                       snapshot_command_info->cmd->serialization);
-        publisher->pushMessage(MakeReplyPushableMessageUPtr(snapshot_command_info->queue_name, "repeating-snapshot-events",
-                                                            snapshot_command_info->cmd->snapshot_name, serialized_completion_message),
-                               {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
+        // Emit a single tail log with aggregated event count for this iteration
+        const auto events_published = take_events_for_iteration(snapshot_command_info->cmd->snapshot_name, current_iteration);
+        logger->logMessage(STRING_FORMAT("[Tail] Snapshot %1% iteration %2% completed, events=%3%",
+                                         snapshot_command_info->cmd->snapshot_name % current_iteration % events_published),
+                           LogLevel::DEBUG);
+        snapshot_command_info->publishTail(publisher, logger, snap_ts, current_iteration);
 
         // Mark the tail as processed. The lock will be released by finishTask either now (if this is the last task)
         // or later when the last running Data task calls its TaskGuard destructor.
