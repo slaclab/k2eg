@@ -706,17 +706,23 @@ void SnapshotSubmissionTask::operator()()
     // HEADER: This is the start of a new logical iteration.
     if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
     {
-        // Acquire the lock and get the new, unique iteration number.
-        current_iteration = iteration_sync_.acquireIteration(snapshot_command_info->cmd->snapshot_name);
-        // calculate the distribution key that is the snapshot_queue+header_ts+iteration
-        // this permit to have all the message of the same iteration of the snapshot
-        // in the same partition
-        snapshot_command_info->snapshot_distribution_key = snapshot_command_info->queue_name + std::to_string(header_timestamp) + std::to_string(current_iteration);
+        auto serialized_header_message = serialize(RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, current_iteration},
+                                                   snapshot_command_info->cmd->serialization);
+        publisher->pushMessage(
+            MakeReplyPushableMessageUPtr(
+                snapshot_command_info->queue_name,                // topic name where to publish
+                "repeating-snapshot-events",                      // publish subject to use on handler
+                snapshot_command_info->snapshot_distribution_key, // distribution key
+                serialized_header_message                         // message payload
+                ),
+            {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
+        logger->logMessage(STRING_FORMAT("[Header] Snapshot %1% iteration %2% started", snapshot_command_info->cmd->snapshot_name % current_iteration), LogLevel::DEBUG);
+
+        // Release header gate so Data submissions can proceed
         snapshot_command_info->completeHeaderGate(current_iteration);
     }
 
-    if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None &&
-        !submission_shrd_ptr->snapshot_events.empty())
+    if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None)
     {
         // Ensure header was published for this iteration before sending any data
         snapshot_command_info->waitForHeaderGate(current_iteration);

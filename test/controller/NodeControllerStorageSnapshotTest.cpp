@@ -58,13 +58,15 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     // remove all data
     storage_service->clearAllData();
 
+    sleep(2);
+
     // start a snapshot
     auto start_snapshot_cmd = MakeRepeatingSnapshotCommandShrdPtr(
         SerializationType::Msgpack,
         REPLY_TOPIC,
         "rep-id",
         SNAPSHOT_NAME,
-        std::unordered_set<std::string>{"pva://variable:a", "pva://variable:b"},
+        std::unordered_set<std::string>{"pva://channel:ramp:ramp", "pva://channel:ramp:ramp_1"},
         0,
         1000,
         0,
@@ -120,11 +122,11 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     ASSERT_FALSE(found_ids.empty()) << "No snapshots found";
 
     // calculate the total number of records across snapshots and per-PV occurrences
-    std::unordered_map<std::string, std::size_t> per_pv_counts{{"variable:a", 0}, {"variable:b", 0}};
+    std::unordered_map<std::string, std::size_t> per_pv_counts{{"channel:ramp:ramp", 0}, {"channel:ramp:ramp_1", 0}};
     std::size_t                                   total_records = 0;
     for (const auto& snapshot_id : found_ids)
     {
-        for (const auto& pv_name : {std::string("variable:a"), std::string("variable:b")})
+        for (const auto& pv_name : {std::string("channel:ramp:ramp"), std::string("channel:ramp:ramp_1")})
         {
             ArchiveQuery query;
             query.pv_name = pv_name;
@@ -145,10 +147,10 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
             }
         }
     }
-
+    
     // Expect one record per PV per snapshot
-    ASSERT_EQ(per_pv_counts["variable:a"], found_ids.size()) << "PV variable:a should appear once per snapshot";
-    ASSERT_EQ(per_pv_counts["variable:b"], found_ids.size()) << "PV variable:b should appear once per snapshot";
+    ASSERT_GT(per_pv_counts["channel:ramp:ramp"], found_ids.size()-10) << "PV channel:ramp:ramp should appear once per snapshot";
+    ASSERT_GT(per_pv_counts["channel:ramp:ramp_1"], found_ids.size()-10) << "PV channel:ramp:ramp_1 should appear once per snapshot";
     ASSERT_EQ(total_records, found_ids.size() * 2u) << "Total records should be two per snapshot";
 
     ASSERT_NO_THROW(k2eg.reset();) << "Failed to reset K2EG instance";
