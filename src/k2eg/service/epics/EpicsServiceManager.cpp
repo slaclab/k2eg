@@ -94,6 +94,11 @@ void EpicsServiceManager::addChannel(const std::string& pv_name_uri)
                     .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
                     .to_force = false,
                     .keep_alive = 1,
+                    .active = false,
+                    .pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>(
+                        this->config->pv_min_throttle_us,
+                        this->config->pv_max_throttle_us,
+                        this->config->pv_idle_threshold),
                 });
             if (!success)
             {
@@ -192,6 +197,11 @@ ConstMonitorOperationShrdPtr EpicsServiceManager::getMonitorOp(const std::string
             .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
             .to_force = false,
             .keep_alive = 0,
+            .active = false,
+            .pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>(
+                this->config->pv_min_throttle_us,
+                this->config->pv_max_throttle_us,
+                this->config->pv_idle_threshold),
         };
         result = channel.channel->monitor();
     }
@@ -219,6 +229,11 @@ ConstGetOperationUPtr EpicsServiceManager::getChannelData(const std::string& pv_
             .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
             .to_force = false,
             .keep_alive = 0,
+            .active = false,
+            .pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>(
+                this->config->pv_min_throttle_us,
+                this->config->pv_max_throttle_us,
+                this->config->pv_idle_threshold),
         };
         result = channel.channel->get();
     }
@@ -319,72 +334,109 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
         return;
 
     bool        had_events = false;
-    bool        to_delete = false;
+    bool        local_to_force = false;
+    bool        should_delete = false;
     const auto& pv_name = monitor_op->getPVName();
+    // keep per-thread throttling around for metrics, but we will prefer per-PV throttling below
     auto&       throttling = thread_throttling_vector[thread_index.value()];
+    std::shared_ptr<k2eg::common::ThrottlingManager> pv_throttle_ptr;
+
+    // Step 1: inspect and possibly update flags under lock
     {
-        // Lock channel_map for reading to check if the current monitor should be deleted or updated.
-        ChannelMapIterator it;
+        WriteLockCM lock(channel_map_mutex);
+        auto        it = channel_map.find(pv_name);
+        if (it == channel_map.end())
         {
-            ReadLockCM read_lock(channel_map_mutex);
-            it = channel_map.find(pv_name);
-            if (it == channel_map.end())
-            {
-                return;
-            }
+            return;
         }
-
-        // Copy info pointer to avoid holding reference after lock
-        auto* info = &(it->second);
-
-        to_delete = info->keep_alive == 0;
-        if (!to_delete)
+        should_delete = (it->second.keep_alive == 0);
+        if (!should_delete)
         {
-            if (info->to_force)
+            local_to_force = it->second.to_force;
+            if (local_to_force)
             {
-                monitor_op->forceUpdate();
-                info->to_force = false;
+                it->second.to_force = false; // clear under lock; apply force after unlocking
             }
-            // fetch the data from the monitor operation
-            monitor_op->poll(config->max_event_from_monitor_queue);
-
-            // check if the channel has got data
-            if (monitor_op->hasEvents() && !handler_broadcaster.targets.empty())
-            {
-                auto received_event = monitor_op->getEventData();
-                had_events = true;
-                // check if the channel is active or not
-                info->active = !received_event->event_data->empty() &&
-                               (received_event->event_cancel->empty() || received_event->event_disconnect->empty() ||
-                                received_event->event_fail->empty());
-                metric.incrementCounter(IEpicsMetricCounterType::MonitorData, received_event->event_data->size());
-                metric.incrementCounter(IEpicsMetricCounterType::MonitorCancel, received_event->event_cancel->size());
-                metric.incrementCounter(IEpicsMetricCounterType::MonitorDisconnect, received_event->event_disconnect->size());
-                metric.incrementCounter(IEpicsMetricCounterType::MonitorFail, received_event->event_fail->size());
-                // broadcast to handlers
-                handler_broadcaster.broadcast(received_event);
-            }
+            pv_throttle_ptr = it->second.pv_throttle; // copy shared_ptr under lock
+        }
+        else
+        {
+            // remove now under lock
+            channel_map.erase(it);
         }
     }
 
-    if (to_delete)
+    if (should_delete)
     {
-        WriteLockCM write_lock(channel_map_mutex);
-        // Remove the channel from the map if marked for deletion.
-        channel_map.erase(monitor_op->getPVName());
-        throttling.reset(); // Reset throttling stats for this thread.
-        return; // Exit without resubmitting task.
+        throttling.reset();
+        return;
     }
 
-    // manqage throtling
-    throttling.update(had_events);
+    if (local_to_force)
+    {
+        monitor_op->forceUpdate();
+    }
+
+    // Step 2: fetch bounded data from monitor
+    const auto drained = monitor_op->poll(config->max_event_from_monitor_queue);
+
+    // Step 3: if there are events and there are handlers, broadcast them
+    if (monitor_op->hasEvents() && !handler_broadcaster.targets.empty())
+    {
+        auto received_event = monitor_op->getEventData();
+        had_events = true;
+
+        // compute 'active' as: data present AND no errors
+        const bool is_active = !received_event->event_data->empty() &&
+                               received_event->event_cancel->empty() &&
+                               received_event->event_disconnect->empty() &&
+                               received_event->event_fail->empty();
+
+        // update active flag (and possibly delete) under lock
+        bool delete_after_broadcast = false;
+        {
+            WriteLockCM lock(channel_map_mutex);
+            auto        it2 = channel_map.find(pv_name);
+            if (it2 != channel_map.end())
+            {
+                it2->second.active = is_active;
+                if (it2->second.keep_alive == 0)
+                {
+                    channel_map.erase(it2);
+                    delete_after_broadcast = true;
+                }
+            }
+        }
+
+        // metrics and broadcast outside locks
+        metric.incrementCounter(IEpicsMetricCounterType::MonitorData, received_event->event_data->size());
+        metric.incrementCounter(IEpicsMetricCounterType::MonitorCancel, received_event->event_cancel->size());
+        metric.incrementCounter(IEpicsMetricCounterType::MonitorDisconnect, received_event->event_disconnect->size());
+        metric.incrementCounter(IEpicsMetricCounterType::MonitorFail, received_event->event_fail->size());
+
+        handler_broadcaster.broadcast(received_event);
+
+        if (delete_after_broadcast)
+        {
+            throttling.reset();
+            return;
+        }
+    }
+
+    // manage throttling: prefer per-PV throttling to avoid sleeping entire thread due to one idle PV
+    if (pv_throttle_ptr)
+    {
+        // Per-PV backoff in microseconds
+        pv_throttle_ptr->update(had_events);
+        auto t_stat = pv_throttle_ptr->getStats();
+        metric.incrementCounter(IEpicsMetricCounterType::PVThrottleGauge, t_stat.throttle_us, {{"pv", pv_name}});
+        // Backlog flag: if we hit the per-pass limit assume backlog remains
+        const double backlog_flag = drained >= static_cast<size_t>(config->max_event_from_monitor_queue) ? 1.0 : 0.0;
+        metric.incrementCounter(IEpicsMetricCounterType::PVBacklogGauge, backlog_flag, {{"pv", pv_name}});
+    }
 
     // resubmit the task to the thread pool
-    processing_pool->detach_task(
-        [this, monitor_op]
-        {
-            this->task(monitor_op);
-        });
+    processing_pool->detach_task([this, monitor_op] { this->task(monitor_op); });
 }
 
 void EpicsServiceManager::handleStatistic(TaskProperties& task_properties)
@@ -403,20 +455,23 @@ void EpicsServiceManager::handleStatistic(TaskProperties& task_properties)
     }
     metric.incrementCounter(IEpicsMetricCounterType::ActiveMonitorGauge, active_pv);
     metric.incrementCounter(IEpicsMetricCounterType::TotalMonitorGauge, total_pv);
-    auto& thread_throttling_vector = getThreadThrottlingInfo();
-    for (std::size_t i = 0; i < thread_throttling_vector.size(); ++i)
+    if (!config->disable_thread_throttle)
     {
-        const auto& throttling = thread_throttling_vector[i];
-        std::string thread_id = std::to_string(i);
-        auto        t_stat = throttling.getStats();
-        metric.incrementCounter(IEpicsMetricCounterType::ThrottlingIdleGauge, t_stat.idle_counter, {{"thread_id", thread_id}});
-        metric.incrementCounter(IEpicsMetricCounterType::ThrottlingEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
-        metric.incrementCounter(IEpicsMetricCounterType::ThrottlingDurationGauge, t_stat.total_idle_cycles, {{"thread_id", thread_id}});
-        metric.incrementCounter(IEpicsMetricCounterType::ThrottleGauge, t_stat.throttle_us, {{"thread_id", thread_id}});
+        auto& thread_throttling_vector = getThreadThrottlingInfo();
+        for (std::size_t i = 0; i < thread_throttling_vector.size(); ++i)
+        {
+            const auto& throttling = thread_throttling_vector[i];
+            std::string thread_id = std::to_string(i);
+            auto        t_stat = throttling.getStats();
+            metric.incrementCounter(IEpicsMetricCounterType::ThrottlingIdleGauge, t_stat.idle_counter, {{"thread_id", thread_id}});
+            metric.incrementCounter(IEpicsMetricCounterType::ThrottlingEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
+            metric.incrementCounter(IEpicsMetricCounterType::ThrottlingDurationGauge, t_stat.total_idle_cycles, {{"thread_id", thread_id}});
+            metric.incrementCounter(IEpicsMetricCounterType::ThrottleGauge, t_stat.throttle_us, {{"thread_id", thread_id}});
 
-        throttling_info += STRING_FORMAT(
-            "-Thr %1% - IdlCnt: %2%, ProcEvt: %3%, IdleCyc: %4%, TrtUsec: %5% us-",
-            thread_id % t_stat.idle_counter % t_stat.total_events_processed % t_stat.total_idle_cycles % t_stat.throttle_us);
+            throttling_info += STRING_FORMAT(
+                "-Thr %1% - IdlCnt: %2%, ProcEvt: %3%, IdleCyc: %4%, TrtUsec: %5% us-",
+                thread_id % t_stat.idle_counter % t_stat.total_events_processed % t_stat.total_idle_cycles % t_stat.throttle_us);
+        }
     }
     // Log the statistics
     logger->logMessage(STRING_FORMAT("EPICS Monitor Statistics: Active PVs: %1%, Total PVs: %2%, Thread Throttling: %3%", active_pv % total_pv % throttling_info), LogLevel::TRACE);
