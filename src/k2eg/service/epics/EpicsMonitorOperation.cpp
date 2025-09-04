@@ -51,7 +51,7 @@ size_t MonitorOperationImpl::poll(size_t element_to_fetch) const
     int fetched = 0;
     {
         std::lock_guard<std::mutex> l(ce_mtx);
-        while (!mon.complete()) // && (fetched < element_to_fetch)
+        while (!mon.complete() && (fetched < static_cast<int>(element_to_fetch)))
         {
             if (!mon.poll())
                 break;
@@ -108,39 +108,24 @@ void MonitorOperationImpl::connectEvent(const pvac::ConnectEvent& evt)
 void MonitorOperationImpl::monitorEvent(const pvac::MonitorEvent& evt)
 {
     // running on internal provider worker thread
-    // minimize work here.
-    unsigned                    fetched = 0;
+    // minimize work here. Avoid draining here to keep fairness; drain in poll().
     std::lock_guard<std::mutex> l(ce_mtx);
     switch (evt.event)
     {
-    // Subscription network/internal error
     case pvac::MonitorEvent::Fail:
         received_event->event_fail->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Fail, pv_name, evt.message, nullptr}));
         break;
-    // explicit call of 'mon.cancel' or subscription dropped
     case pvac::MonitorEvent::Cancel:
         if (mon.valid())
         {
-            // mon is valid so we can continue because this class is valid
             received_event->event_cancel->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Cancel, pv_name, evt.message, nullptr}));
         }
         break;
-    // Underlying channel becomes disconnected
     case pvac::MonitorEvent::Disconnect:
         received_event->event_disconnect->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Disconnec, pv_name, evt.message, nullptr}));
         break;
-    // Data queue becomes not-empty
     case pvac::MonitorEvent::Data:
-        // We drain event FIFO completely
-        while (!mon.complete())
-        {
-            if (!mon.poll())
-                break;
-            ++fetched;
-            auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
-            tmp_data->copy(*mon.root);
-            received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, "", {pv_name, tmp_data}}));
-        }
+        // Defer draining to poll() to bound work per cycle.
         break;
     }
 }

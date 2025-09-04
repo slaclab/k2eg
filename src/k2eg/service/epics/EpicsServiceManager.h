@@ -46,6 +46,14 @@ struct EpicsServiceManagerConfig
     // the maximum number of events to fetch from the monitor queue
     // this is used to limit the number of events to process
     std::int32_t max_event_from_monitor_queue = 100;
+
+    // Per-PV throttling configuration (microseconds)
+    std::int32_t pv_min_throttle_us = 50;    // minimal backoff for idle PVs
+    std::int32_t pv_max_throttle_us = 50000; // cap backoff to 50ms
+    std::int32_t pv_idle_threshold = 10;     // idle cycles before increasing backoff
+
+    // Disable per-thread throttling updates/metrics, prefer per-PV
+    bool disable_thread_throttle = true;
 };
 
 // describe a channel ellement in map per each PV
@@ -59,6 +67,8 @@ struct ChannelMapElement
     int keep_alive;
     // Indicates if the channel is currently active
     bool active = false;
+    // Per-PV throttling manager (shared to allow safe use outside locks)
+    std::shared_ptr<k2eg::common::ThrottlingManager> pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>();
 };
 DEFINE_PTR_TYPES(ChannelMapElement)
 typedef std::unique_lock<std::shared_mutex> WriteLockCM;
