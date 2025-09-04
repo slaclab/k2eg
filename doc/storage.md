@@ -13,12 +13,46 @@ This document describes how K2EG persists EPICS data and snapshots using the sto
 
 ---
 
+## Storage Cluster and Ownership
+
+K2EG deploys storage workers on multiple nodes for availability and throughput. Ownership of archiving for each snapshot is coordinated through Consul so only one node processes a given snapshot at a time.
+
+- Discovery: when the controller starts a snapshot, it marks it as “archive requested” in Consul. Storage workers periodically list snapshots to archive.
+- Acquisition: a worker attempts a Consul transaction to lock a per-snapshot key (e.g., `.../lock_storage`) bound to its session. In code: `tryAcquireSnapshot(snapshot_id, /*for_gateway=*/false)`. On success, it also initializes `archive/status/*` fields atomically (state=ARCHIVING, timestamps).
+- Single owner: only one node can hold the storage lock. Others observe the lock and skip the snapshot. If the owner dies or its Consul session expires, the lock releases and another node can take over automatically.
+- Archiving: the owner runs an archiver that consumes the snapshot topic (normalized from `snapshot_name`) using the configured subscriber (Kafka consumer group configurable), and persists records to MongoDB via the storage service.
+- Status: workers update `archive/status/*` as the process advances; operators can inspect these fields to monitor progress or errors.
+
+This provides per-snapshot leader election, failover, and horizontal scaling without duplicate writes.
+
 ## Collections and Document Shapes
 
 Collection names are configurable (defaults shown from `MongoDB` section):
 
 - `MongoDB.data_collection` (default: `epics_data`)
 - `MongoDB.snapshots-collection` (default: `snapshots`)
+
+### snapshots (snapshot metadata)
+
+One document per snapshot created by the archiver.
+
+Example:
+
+```json
+{
+  "_id": "669d8a9e5ee8e8399d71c9b2",
+  "snapshot_name": "BL1",
+  "created_at": {"$date": "2025-06-21T12:34:50Z"},
+  "search_key": "BL1:1750509290000:7"
+}
+```
+
+Field notes:
+
+- `_id`: Snapshot identifier (MongoDB ObjectId or string; code handles both).
+- `snapshot_name`: Human-readable name of the snapshot.
+- `created_at`: Creation time (UTC).
+- `search_key`: Unique key used for lookup (`name:header_ts_ms:iter_index`).
 
 ### epics_data (data records)
 
@@ -140,28 +174,6 @@ Field notes:
 - `ser_type`: Serialization type of `raw_value` (`msgpack`, `json`, ...).
 - `value` (optional): Parsed BSON projection of the payload. Included for batch inserts to facilitate queries.
 
-### snapshots (snapshot metadata)
-
-One document per snapshot created by the archiver.
-
-Example:
-
-```json
-{
-  "_id": "669d8a9e5ee8e8399d71c9b2",
-  "snapshot_name": "BL1",
-  "created_at": {"$date": "2025-06-21T12:34:50Z"},
-  "search_key": "BL1:1750509290000:7"
-}
-```
-
-Field notes:
-
-- `_id`: Snapshot identifier (MongoDB ObjectId or string; code handles both).
-- `snapshot_name`: Human-readable name of the snapshot.
-- `created_at`: Creation time (UTC).
-- `search_key`: Unique key used for lookup (`name:header_ts_ms:iter_index`).
-
 ---
 
 ## Snapshot Ingestion Flow
@@ -194,6 +206,13 @@ The archiver now explicitly tracks:
 and uses these to build consistent `search_key` and timestamps in stored records.
 
 ---
+
+## Iteration Ordering
+
+- Current behavior: iterations for a given `snapshot_name` are serialized. The node controller uses an iteration synchronizer to guarantee that Header(n+1) does not publish before Tail(n). Within an iteration, Header-before-Data and Data-before-Tail are enforced by SnapshotOpInfo guards.
+- Storage impact: for one logical iteration (identified by `search_key`), data is ingested and finalized before the next iteration starts. This yields clear iteration boundaries in `epics_data` and `snapshots`.
+- Future change: the controller may allow multiple iterations to be in-flight in parallel for the same `snapshot_name`. In that case, ingestion could observe interleaved `iter_index` values. The schema already supports this via `search_key = "<name>:<header_ts_ms>:<iter_index>"`; consumers should key lookups by `search_key` (or the tuple `(snapshot_name, header_timestamp, iter_index)`) rather than assuming strict sequential arrival.
+- Guidance: avoid relying on monotonic arrival order or timestamp-only grouping; always resolve the snapshot `_id` via `search_key` when joining data to a specific iteration.
 
 ## Indexes
 

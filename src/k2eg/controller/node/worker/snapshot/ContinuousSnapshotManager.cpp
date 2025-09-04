@@ -500,18 +500,31 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                         metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotEventCounter,
                                                  submission_shard_ptr->snapshot_events.size());
                     }
-
-                    // if i need to submit also the tail i need ot update the statistic
-                    if ((submission_shard_ptr->submission_type & SnapshotSubmissionType::Tail) != SnapshotSubmissionType::None)
+                    // Determine iteration id and set per-iteration gates/counters
+                    int64_t scheduled_iteration_id = 0;
+                    if ((submission_shard_ptr->submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
                     {
-                        // update statistics
-                        auto stat_counter = s_op_ptr->getStatisticCounter();
-                        // reusing the expiration time stamp
-                        auto stat = stat_counter->getStatistics(now);
-                        if (stat)
-                        {
-                            node_configuration->setSnapshotWeight(s_op_ptr->queue_name, std::to_string(stat->event_size), "bytes/sec");
-                        }
+                        scheduled_iteration_id = iteration_sync_->acquireIteration(s_op_ptr->cmd->snapshot_name);
+                        active_iteration_id_[s_op_ptr->cmd->snapshot_name] = scheduled_iteration_id;
+                        s_op_ptr->beginHeaderGate(scheduled_iteration_id);
+                    }
+                    else
+                    {
+                        auto it = active_iteration_id_.find(s_op_ptr->cmd->snapshot_name);
+                        if (it != active_iteration_id_.end())
+                            scheduled_iteration_id = it->second;
+                        else
+                            scheduled_iteration_id = 0; // should not happen if scheduling order is correct
+                    }
+
+                    // Always attach resolved iteration id to the submission for task-side use
+                    submission_shard_ptr->iteration_id = scheduled_iteration_id;
+
+                    // If Data is present, record it so Tail can wait later. Count per submission batch.
+                    if ((submission_shard_ptr->submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None &&
+                        !submission_shard_ptr->snapshot_events.empty())
+                    {
+                        s_op_ptr->dataScheduled(scheduled_iteration_id);
                     }
                     thread_pool->detach_task(
                         [this, s_op_ptr, submission_shard_ptr, last_submission]() mutable
@@ -521,6 +534,8 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                         });
                     if (to_continue)
                     {
+                        // Cleanup active iteration tracking for this snapshot
+                        active_iteration_id_.erase(s_op_ptr->cmd->snapshot_name);
                         continue; // Skip the increment, as we already erased the current item.
                     }
                 }
@@ -674,32 +689,21 @@ void SnapshotSubmissionTask::operator()()
     if (!thread_index.has_value())
         return;
 
-    int64_t current_iteration = 0;
     auto    snap_ts = CHRONO_TO_UNIX_INT64(submission_shrd_ptr->snap_time);
     auto    header_timestamp = CHRONO_TO_UNIX_INT64(submission_shrd_ptr->header_timestamp);
+    int64_t current_iteration = submission_shrd_ptr->iteration_id;
     auto    statistic_counter = snapshot_command_info->getStatisticCounter();
-
-    // HEADER: This is the start of a new logical iteration.
-    if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
+    // Iteration id is resolved at scheduling and attached to the submission.
+    if (current_iteration == 0)
     {
-        // Acquire the lock and get the new, unique iteration number.
-        current_iteration = iteration_sync_.acquireIteration(snapshot_command_info->cmd->snapshot_name);
-        // Store it in the shared atomic variable for other tasks to see.
-        snapshot_command_info->snapshot_iteration_index.store(current_iteration);
-        // calculate the distribution key that is the snapshot_queue+header_ts+iteration
-        // this permit to have all the message of the same iteration of the snapshot
-        // in the same partition
-        snapshot_command_info->snapshot_distribution_key = snapshot_command_info->queue_name + std::to_string(header_timestamp) + std::to_string(current_iteration);
-    }
-    else
-    {
-        // DATA or TAIL: This task belongs to an existing iteration. Load its number.
-        current_iteration = snapshot_command_info->snapshot_iteration_index.load();
+        logger->logMessage(STRING_FORMAT("Snapshot %1% missing iteration id on submission; skipping.", snapshot_command_info->cmd->snapshot_name), LogLevel::ERROR);
+        return;
     }
 
     // This guard ensures that this task is counted, and its completion is always registered.
     TaskGuard task_guard(iteration_sync_, snapshot_command_info->cmd->snapshot_name, current_iteration);
 
+    // HEADER: This is the start of a new logical iteration.
     if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
     {
         auto serialized_header_message = serialize(RepeatingSnaptshotHeader{0, snapshot_command_info->cmd->snapshot_name, snap_ts, current_iteration},
@@ -713,11 +717,16 @@ void SnapshotSubmissionTask::operator()()
                 ),
             {{"k2eg-ser-type", serialization_to_string(snapshot_command_info->cmd->serialization)}});
         logger->logMessage(STRING_FORMAT("[Header] Snapshot %1% iteration %2% started", snapshot_command_info->cmd->snapshot_name % current_iteration), LogLevel::DEBUG);
+
+        // Release header gate so Data submissions can proceed
+        snapshot_command_info->completeHeaderGate(current_iteration);
     }
 
-    if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None &&
-        !submission_shrd_ptr->snapshot_events.empty())
+    if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None)
     {
+        // Ensure header was published for this iteration before sending any data
+        snapshot_command_info->waitForHeaderGate(current_iteration);
+
         // Data processing logic is unchanged. It can run concurrently with other data tasks.
         std::set<std::string> pv_names_published;
         for (auto& event : submission_shrd_ptr->snapshot_events)
@@ -758,10 +767,14 @@ void SnapshotSubmissionTask::operator()()
                                          snapshot_command_info->cmd->snapshot_name % current_iteration %
                                              submission_shrd_ptr->snapshot_events.size() % pv_names_published.size() % get_pv_names(pv_names_published)),
                            LogLevel::DEBUG);
+        // Mark data submission as completed for this iteration
+        snapshot_command_info->dataCompleted(current_iteration);
     }
 
     if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Tail) != SnapshotSubmissionType::None)
     {
+        // Ensure all data submissions for this iteration are fully published before sending Tail
+        snapshot_command_info->waitDataDrained(current_iteration);
         logger->logMessage(STRING_FORMAT("[Tail] Snapshot %1% iteration %2% completed", snapshot_command_info->cmd->snapshot_name % current_iteration), LogLevel::DEBUG);
         auto serialized_completion_message = serialize(RepeatingSnaptshotCompletion{
                                                            2,
@@ -791,6 +804,8 @@ void SnapshotSubmissionTask::operator()()
             snapshot_command_info->removal_promise.set_value(); // Notify that the snapshot is fully removed.
         }
     }
+
+    // No explicit header gate clear is needed; gate resets on the next Header scheduling
 }
 
 #pragma region snapshot iteration synchronization
@@ -881,6 +896,8 @@ void SnapshotIterationSynchronizer::markTailProcessed(const std::string& snapsho
         }
     }
 }
+
+// dataStarted/dataCompleted/waitDataDrained now managed inside SnapshotOpInfo
 
 // Private helper to release the lock and notify the next waiting iteration.
 void SnapshotIterationSynchronizer::releaseLock(const std::string& snapshot_name, uint64_t iteration_id_to_clear)

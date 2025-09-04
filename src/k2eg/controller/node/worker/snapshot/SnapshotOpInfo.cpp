@@ -20,7 +20,7 @@ void SnapshotStatisticCounter::incrementEventCount(double count)
 SnapshotStatisticShrdPtr SnapshotStatisticCounter::getStatistics(const std::chrono::steady_clock::time_point& now) const
 {
     SnapshotStatisticShrdPtr result = std::make_shared<SnapshotStatistic>();
-    auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - start_sampling_time).count();
+    auto                     elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - start_sampling_time).count();
     if (elapsed > 0.0)
     {
         result->event_size = statistic.event_size / elapsed;
@@ -37,34 +37,28 @@ void SnapshotStatisticCounter::reset()
 }
 
 #pragma region SnapshotSubmission
-SnapshotSubmission::SnapshotSubmission(const std::chrono::steady_clock::time_point& snap_time, const std::chrono::steady_clock::time_point& header_timestamp, std::vector<service::epics_impl::MonitorEventShrdPtr>&& snapshot_events, SnapshotSubmissionType submission_type)
-        : snap_time(snap_time), header_timestamp(header_timestamp), snapshot_events(std::move(snapshot_events)), submission_type(submission_type)
-    {
-    }
 
-    /**
-     * @brief Move constructor.
-     * @param other SnapshotSubmission to move from.
-     */
-    SnapshotSubmission::SnapshotSubmission(SnapshotSubmission&& other) noexcept
-        : snapshot_events(std::move(other.snapshot_events)), submission_type(other.submission_type)
-    {
-    }
+SnapshotSubmission::SnapshotSubmission(const std::chrono::steady_clock::time_point& snap_time, const std::chrono::steady_clock::time_point& header_timestamp, std::vector<service::epics_impl::MonitorEventShrdPtr>&& snapshot_events, SnapshotSubmissionType submission_type, int64_t iteration_id)
+    : snap_time(snap_time), header_timestamp(header_timestamp), snapshot_events(std::move(snapshot_events)), submission_type(submission_type), iteration_id(iteration_id)
+{
+}
 
-    /**
-     * @brief Move assignment operator.
-     * @param other SnapshotSubmission to move from.
-     * @return Reference to this object.
-     */
-    SnapshotSubmission& SnapshotSubmission::operator=(SnapshotSubmission&& other) noexcept
+
+SnapshotSubmission::SnapshotSubmission(SnapshotSubmission&& other) noexcept
+    : snapshot_events(std::move(other.snapshot_events)), submission_type(other.submission_type)
+{
+}
+
+
+SnapshotSubmission& SnapshotSubmission::operator=(SnapshotSubmission&& other) noexcept
+{
+    if (this != &other)
     {
-        if (this != &other)
-        {
-            snapshot_events = std::move(other.snapshot_events);
-            submission_type = other.submission_type;
-        }
-        return *this;
+        snapshot_events = std::move(other.snapshot_events);
+        submission_type = other.submission_type;
     }
+    return *this;
+}
 
 #pragma region SnapshotOpInfo
 
@@ -97,6 +91,125 @@ bool SnapshotOpInfo::isTimeout(const std::chrono::steady_clock::time_point& now)
         return false;
     }
     return WorkerAsyncOperation::isTimeout(now);
+}
+
+// prepareNextSubmissionChain removed: Tail ordering handled by per-iteration drain.
+
+void SnapshotOpInfo::beginHeaderGate(int64_t iteration_id)
+{
+    std::shared_ptr<IterationSyncState> state;
+    {
+        std::lock_guard<std::mutex> lk(iteration_sync_mutex);
+        auto&                       slot = iteration_sync_states[iteration_id];
+        if (!slot)
+            slot = std::make_shared<IterationSyncState>();
+        state = slot;
+    }
+    state->header_promise = std::make_shared<std::promise<void>>();
+    state->header_future = state->header_promise->get_future().share();
+}
+
+void SnapshotOpInfo::completeHeaderGate(int64_t iteration_id)
+{
+    std::shared_ptr<std::promise<void>> p;
+    {
+        std::lock_guard<std::mutex> lk(iteration_sync_mutex);
+        auto                        it = iteration_sync_states.find(iteration_id);
+        if (it != iteration_sync_states.end() && it->second)
+        {
+            p = it->second->header_promise;
+        }
+    }
+    if (p)
+    {
+        try
+        {
+            p->set_value();
+        }
+        catch (...)
+        {
+        }
+    }
+}
+
+void SnapshotOpInfo::waitForHeaderGate(int64_t iteration_id)
+{
+    std::shared_future<void> f;
+    {
+        std::lock_guard<std::mutex> lk(iteration_sync_mutex);
+        auto                        it = iteration_sync_states.find(iteration_id);
+        if (it != iteration_sync_states.end() && it->second)
+        {
+            f = it->second->header_future;
+        }
+    }
+    if (f.valid())
+    {
+        try
+        {
+            f.wait();
+        }
+        catch (...)
+        {
+        }
+    }
+}
+
+void SnapshotOpInfo::dataScheduled(int64_t iteration_id)
+{
+    std::shared_ptr<IterationSyncState> state;
+    {
+        std::lock_guard<std::mutex> lk(iteration_sync_mutex);
+        auto&                       slot = iteration_sync_states[iteration_id];
+        if (!slot)
+            slot = std::make_shared<IterationSyncState>();
+        state = slot;
+    }
+    state->data_pending.fetch_add(1, std::memory_order_relaxed);
+}
+
+void SnapshotOpInfo::dataCompleted(int64_t iteration_id)
+{
+    std::shared_ptr<IterationSyncState> state;
+    {
+        std::lock_guard<std::mutex> lk(iteration_sync_mutex);
+        auto                        it = iteration_sync_states.find(iteration_id);
+        if (it != iteration_sync_states.end())
+            state = it->second;
+    }
+    if (!state)
+        return;
+    int new_val = state->data_pending.fetch_sub(1, std::memory_order_acq_rel) - 1;
+    if (new_val <= 0)
+    {
+        std::lock_guard<std::mutex> lk(state->data_mutex);
+        state->data_cv.notify_all();
+    }
+}
+
+void SnapshotOpInfo::waitDataDrained(int64_t iteration_id)
+{
+    std::shared_ptr<IterationSyncState> state;
+    {
+        std::lock_guard<std::mutex> lk(iteration_sync_mutex);
+        auto                        it = iteration_sync_states.find(iteration_id);
+        if (it != iteration_sync_states.end())
+            state = it->second;
+    }
+    if (!state)
+        return;
+
+    std::unique_lock<std::mutex> lk(state->data_mutex);
+    state->data_cv.wait(lk, [&]
+                        {
+                            return state->data_pending.load(std::memory_order_acquire) == 0;
+                        });
+
+    // Optional cleanup: remove iteration state after drain completes.
+    {
+        std::lock_guard<std::mutex> g(iteration_sync_mutex);
+        iteration_sync_states.erase(iteration_id);
+    }
 }
 
 const epics::pvData::PVStructure::const_shared_pointer SnapshotOpInfo::filterPVField(const epics::pvData::PVStructure::const_shared_pointer& src, const std::unordered_set<std::string>& fields_to_include)
@@ -135,6 +248,7 @@ const epics::pvData::PVStructure::const_shared_pointer SnapshotOpInfo::filterPVF
     return filteredPV;
 }
 
-SnapshotStatisticCounterShrdPtr SnapshotOpInfo::getStatisticCounter() {
+SnapshotStatisticCounterShrdPtr SnapshotOpInfo::getStatisticCounter()
+{
     return snapshot_statistic;
 }
