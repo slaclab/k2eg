@@ -1,9 +1,9 @@
 #include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
-#include <k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.h>
+#include <k2eg/controller/node/worker/snapshot/RepeatingSnapshotMessages.h>
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/common/utility.h>
 
-using namespace k2eg::service::log;;
+using namespace k2eg::service::log;
 using namespace k2eg::controller::node::worker::snapshot;
 
 SnapshotOpInfo::SnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd)
@@ -194,7 +194,7 @@ void SnapshotOpInfo::publishHeader(const std::shared_ptr<k2eg::service::pubsub::
                                    int64_t                                                   snap_ts,
                                    int64_t                                                   iteration_id) const
 {
-    auto serialized_header_message = serialize(RepeatingSnaptshotHeader{0, cmd->snapshot_name, snap_ts, iteration_id}, cmd->serialization);
+    auto serialized_header_message = serialize(RepeatingSnapshotHeader{0, cmd->snapshot_name, snap_ts, iteration_id}, cmd->serialization);
     if (!serialized_header_message)
     {
         logger->logMessage("Invalid serialized header message", LogLevel::ERROR);
@@ -213,7 +213,7 @@ std::uint64_t SnapshotOpInfo::publishData(const std::shared_ptr<k2eg::service::p
     std::uint64_t published = 0;
     for (auto& event : events)
     {
-        auto serialized_message = serialize(RepeatingSnaptshotData{1, snap_ts, iteration_id, MakeChannelDataShrdPtr(event->channel_data)}, cmd->serialization);
+        auto serialized_message = serialize(RepeatingSnapshotData{1, snap_ts, iteration_id, MakeChannelDataShrdPtr(event->channel_data)}, cmd->serialization);
         if (serialized_message)
         {
             publisher->pushMessage(MakeReplyPushableMessageUPtr(queue_name, "repeating-snapshot-events", cmd->snapshot_name, serialized_message),
@@ -234,7 +234,7 @@ void SnapshotOpInfo::publishTail(const std::shared_ptr<k2eg::service::pubsub::IP
                                  int64_t                                                   snap_ts,
                                  int64_t                                                   iteration_id) const
 {
-    auto serialized_completion_message = serialize(RepeatingSnaptshotCompletion{2, 0, "", cmd->snapshot_name, snap_ts, iteration_id}, cmd->serialization);
+    auto serialized_completion_message = serialize(RepeatingSnapshotCompletion{2, 0, "", cmd->snapshot_name, snap_ts, iteration_id}, cmd->serialization);
     if (!serialized_completion_message)
     {
         logger->logMessage("Invalid serialized tail message", k2eg::service::log::LogLevel::ERROR);

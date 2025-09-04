@@ -19,8 +19,8 @@ namespace k2eg::controller::node::worker {
 
 struct SnapshotCommandConfiguration
 {
-    // the cron stirng for schedule the monitor
-    snapshot::RepeatingSnaptshotConfiguration continuous_snapshot_configuration;
+    // Settings for scheduling and processing repeating snapshots
+    snapshot::RepeatingSnapshotConfiguration continuous_snapshot_configuration;
 };
 DEFINE_PTR_TYPES(SnapshotCommandConfiguration)
 
@@ -162,22 +162,23 @@ Is the worker that take care to manage the snapshot command
 and collect all the structure for the monitor operation
 for all the PV
 */
-class SnapshotOpInfo : public WorkerAsyncOperation
+// Simple snapshot operation context (non-repeating)
+class SimpleSnapshotOpInfo : public WorkerAsyncOperation
 {
 public:
-    // keep track of the comamnd specification
+    // keep track of the command specification
     k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd;
     // take track for all the monitor operation that have been processed
     boost::dynamic_bitset<> processed_index;
-    // contains the monitor async opration for all the PVs
+    // contains the monitor async operation for all the PVs
     std::vector<service::epics_impl::ConstMonitorOperationShrdPtr> v_mon_ops;
 
-    SnapshotOpInfo(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd, std::vector<service::epics_impl::ConstMonitorOperationShrdPtr> v_mon_ops, std::uint32_t tout_msc = 1000)
+    SimpleSnapshotOpInfo(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd, std::vector<service::epics_impl::ConstMonitorOperationShrdPtr> v_mon_ops, std::uint32_t tout_msc = 1000)
         : WorkerAsyncOperation(std::chrono::milliseconds(tout_msc)), processed_index(v_mon_ops.size()), cmd(cmd), v_mon_ops(std::move(v_mon_ops))
     {
     }
 };
-DEFINE_PTR_TYPES(SnapshotOpInfo)
+DEFINE_PTR_TYPES(SimpleSnapshotOpInfo)
 
 /**
  * Worker responsible for handling snapshot commands.
@@ -195,7 +196,7 @@ class SnapshotCommandWorker : public CommandWorker
     // Receive event from publisher
     void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
     // manage the snapshot command execution in a separate thread
-    void checkGetCompletion(std::shared_ptr<BS::light_thread_pool> thread_pool, SnapshotOpInfoShrdPtr snapshot_info);
+    void checkGetCompletion(std::shared_ptr<BS::light_thread_pool> thread_pool, SimpleSnapshotOpInfoShrdPtr snapshot_info);
     // send a faulty reply to the client
     void manageFaultyReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd);
     // send the snapshot reply to the client for a pv index
@@ -210,7 +211,7 @@ class SnapshotCommandWorker : public CommandWorker
     */
     void publishEndSnapshotReply(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd);
     /*
-        preparae and submit the single snapshot command to the thread pool
+        prepare and submit the single snapshot command to the thread pool
     */
     void submitSingleSnapshot(std::shared_ptr<BS::light_thread_pool> command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 

@@ -184,7 +184,7 @@ ProgramOptions::getNodeControllerConfiguration() {
                     .purge_queue_on_monitor_timeout = GET_OPTION(NC_MONITOR_PURGE_QUEUE_ON_EXP_TOUT, bool, true), 
                     .filter_out_regex = GET_OPTION(NC_MONITOR_CONSUMER_FILTEROUT_REGEX, std::vector<std::string>, std::vector<std::string>())}},
             .snapshot_command_configuration = SnapshotCommandConfiguration{
-                .continuous_snapshot_configuration = RepeatingSnaptshotConfiguration{
+                .continuous_snapshot_configuration = RepeatingSnapshotConfiguration{
                     .snapshot_processing_thread_count = GET_OPTION(SNAPSHOT_REPEATING_SCHEDULER_THREAD, std::size_t, 1)
                 }
             }

@@ -101,7 +101,7 @@ inline auto thread_namer = [](unsigned long idx)
     set_snapshot_thread_name(idx);
 };
 
-ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnaptshotConfiguration& repeating_snapshot_configuration, k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager)
+ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnapshotConfiguration& repeating_snapshot_configuration, k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager)
     : repeating_snapshot_configuration(repeating_snapshot_configuration)
     , logger(ServiceResolver<ILogger>::resolve())
     , publisher(ServiceResolver<IPublisher>::resolve())
@@ -142,9 +142,9 @@ ContinuousSnapshotManager::~ContinuousSnapshotManager()
 
 std::size_t ContinuousSnapshotManager::getRunningSnapshotCount() const
 {
-    std::unique_lock write_lock(snapshot_runinnig_mutex_);
+    std::unique_lock write_lock(snapshot_running_mutex_);
     // check if the snapshot is already stopped
-    return snapshot_runinnig_.size();
+    return snapshot_running_.size();
 }
 
 void ContinuousSnapshotManager::publishEvtCB(pubsub::EventType type, PublishMessage* const msg, const std::string& error_message)
@@ -195,11 +195,11 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
 {
     bool                                        faulty = false;
     std::vector<service::epics_impl::PVShrdPtr> sanitized_pv_name_list;
-    logger->logMessage(STRING_FORMAT("Perepare continuous(triggered %4%) snapshot ops for '%1%' on topic %2% with " "se" "rt" "yp" "e:" " %" "3" "%",
+    logger->logMessage(STRING_FORMAT("Prepare continuous (triggered %4%) snapshot ops for '%1%' on topic %2% with ser-type: %3%",
                                      snapsthot_command->snapshot_name % snapsthot_command->reply_topic %
                                          serialization_to_string(snapsthot_command->serialization) % snapsthot_command->triggered),
                        LogLevel::DEBUG);
-    // create the commmand operation info structure
+    // create the command operation info structure
 
     SnapshotOpInfoShrdPtr s_op_ptr = nullptr;
     switch (snapsthot_command->type)
@@ -226,15 +226,15 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
 
     // chekc if it is already spinned
     {
-        std::unique_lock write_lock(snapshot_runinnig_mutex_);
-        if (snapshot_runinnig_.find(s_op_ptr->queue_name) != snapshot_runinnig_.end())
+        std::unique_lock write_lock(snapshot_running_mutex_);
+        if (snapshot_running_.find(s_op_ptr->queue_name) != snapshot_running_.end())
         {
             manageReply(0, STRING_FORMAT("Snapshot %1% is already running", s_op_ptr->cmd->snapshot_name), snapsthot_command);
             return;
         }
     }
 
-    // check if all the command infromation are filled
+    // check if all the command information are filled
     if (s_op_ptr->cmd->pv_name_list.empty())
     {
         manageReply(-2, STRING_FORMAT("PV name list is empty for snapshot %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
@@ -258,7 +258,7 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
 
     for (const auto& pv_uri : s_op_ptr->cmd->pv_name_list)
     {
-        // get pv name saniutization
+        // get pv name sanitization
         auto sanitized_pv_name = epics_service_manager->sanitizePVName(pv_uri);
         if (!sanitized_pv_name)
         {
@@ -294,15 +294,15 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     // so we can start the snapshot
     // add the snapshot to the stopped snapshot list and to the pv list
     {
-        std::unique_lock write_lock(snapshot_runinnig_mutex_);
-        // assocaite the topi to the snapshot in the running list
-        snapshot_runinnig_.emplace(s_op_ptr->queue_name, s_op_ptr);
+        std::unique_lock write_lock(snapshot_running_mutex_);
+        // associate the topic to the snapshot in the running list
+        snapshot_running_.emplace(s_op_ptr->queue_name, s_op_ptr);
         for (auto& pv_uri : sanitized_pv_name_list)
         {
             logger->logMessage(
                 STRING_FORMAT("associate snapshot '%1%' to pv '%2%'", s_op_ptr->cmd->snapshot_name % pv_uri->name), LogLevel::DEBUG);
-            // associate snaphsot to each pv, so the epics handler can
-            // find the snapshot to fiil with data
+            // associate snapshot to each pv, so the epics handler can
+            // find the snapshot to fill with data
             pv_snapshot_map_.emplace(std::make_pair(pv_uri->name, s_op_ptr));
         }
     }
@@ -329,15 +329,15 @@ void ContinuousSnapshotManager::triggerSnapshot(command::cmd::ConstRepeatingSnap
         return;
     }
     {
-        // queue name, the nromalized version of the snapshot name is used has key to stop the snapshot
+        // queue name, the normalized version of the snapshot name is used as key to stop the snapshot
         auto queue_name = GET_QUEUE_FROM_SNAPSHOT_NAME(snapshot_trigger_command->snapshot_name);
         // acquire the write lock to stop the snapshot
-        std::unique_lock write_lock(snapshot_runinnig_mutex_);
+        std::unique_lock write_lock(snapshot_running_mutex_);
         // check if the snapshot is already stopped
-        auto it = snapshot_runinnig_.find(queue_name);
-        if (it != snapshot_runinnig_.end())
+        auto it = snapshot_running_.find(queue_name);
+        if (it != snapshot_running_.end())
         {
-            // set snaphsot as to stop
+            // set snapshot as to stop
             it->second->request_to_trigger = true;
             // send reply to app for submitted command
             manageReply(0, STRING_FORMAT("Snapshot '%1%' has been armed", snapshot_trigger_command->snapshot_name), snapshot_trigger_command);
@@ -354,7 +354,7 @@ void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapsho
 {
     std::future<void>               removal_future;
     std::shared_ptr<SnapshotOpInfo> s_to_stop;
-    // queue name, the nromalized version of the snapshot name is used has key to stop the snapshot
+    // queue name, the normalized version of the snapshot name is used as key to stop the snapshot
     auto queue_name = GET_QUEUE_FROM_SNAPSHOT_NAME(snapsthot_stop_command->snapshot_name);
 
     // we can set to stop
@@ -366,15 +366,15 @@ void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapsho
     }
     {
         // acquire the write lock to stop the snapshot
-        std::shared_lock write_lock(snapshot_runinnig_mutex_);
+        std::shared_lock write_lock(snapshot_running_mutex_);
         // check if the snapshot is already stopped
-        auto it = snapshot_runinnig_.find(queue_name);
-        if (it != snapshot_runinnig_.end())
+        auto it = snapshot_running_.find(queue_name);
+        if (it != snapshot_running_.end())
         {
             // Get the future before we mark it for stopping
             s_to_stop = it->second;
             removal_future = s_to_stop->removal_promise.get_future();
-            // set snaphsot as to stop
+            // set snapshot as to stop
             it->second->is_running = false;
         }
         else
@@ -400,7 +400,7 @@ void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapsho
 void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType event_received)
 {
     // prepare reading lock
-    std::shared_lock read_lock(snapshot_runinnig_mutex_);
+    std::shared_lock read_lock(snapshot_running_mutex_);
 
     // for (auto& event : *event_received->event_fail)
     // {
@@ -442,8 +442,8 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
     {
         auto now = std::chrono::steady_clock::now();
         {
-            std::unique_lock lock(snapshot_runinnig_mutex_);
-            for (auto it = snapshot_runinnig_.begin(); it != snapshot_runinnig_.end();)
+            std::unique_lock lock(snapshot_running_mutex_);
+            for (auto it = snapshot_running_.begin(); it != snapshot_running_.end();)
             {
                 auto& queue_name = it->first;
                 auto  s_op_ptr = it->second;
@@ -477,12 +477,12 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                             epics_service_manager->monitorChannel(pv_uri, false);
                         }
                         // Now erase the snapshot and advance the iterator correctly.
-                        it = snapshot_runinnig_.erase(it);
+                        it = snapshot_running_.erase(it);
                         logger->logMessage(STRING_FORMAT("Snapshot %1% is cancelled", queue_name_copy), LogLevel::INFO);
                         last_submission = to_continue = true; // exit this iteration, do not increment iterator
                     }
                     // also if the snapshot has been removed forward the last data and close the snapshot to the
-                    // client print log with submisison information
+                    // client print log with submission information
                     if ((submission_shard_ptr->submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None)
                     {
                         metrics.incrementCounter(k2eg::service::metric::INodeControllerMetricCounterType::SnapshotEventCounter,
@@ -556,8 +556,8 @@ void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const 
 
 #pragma region Submission Task
 
-SnapshotSubmissionTask::SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, IPublisherShrdPtr publisher, ILoggerShrdPtr logger, SnapshotIterationSynchronizer& iteration_sync, bool last_submition)
-    : snapshot_command_info(snapshot_command_info), submission_shrd_ptr(submission_shrd_ptr), publisher(std::move(publisher)), logger(std::move(logger)), iteration_sync_(iteration_sync), last_submition(last_submition)
+SnapshotSubmissionTask::SnapshotSubmissionTask(std::shared_ptr<SnapshotOpInfo> snapshot_command_info, SnapshotSubmissionShrdPtr submission_shrd_ptr, IPublisherShrdPtr publisher, ILoggerShrdPtr logger, SnapshotIterationSynchronizer& iteration_sync, bool last_submission)
+    : snapshot_command_info(snapshot_command_info), submission_shrd_ptr(submission_shrd_ptr), publisher(std::move(publisher)), logger(std::move(logger)), iteration_sync_(iteration_sync), last_submission(last_submission)
 {
 }
 
@@ -621,7 +621,7 @@ void SnapshotSubmissionTask::operator()()
         // or later when the last running Data task calls its TaskGuard destructor.
         iteration_sync_.markTailProcessed(snapshot_command_info->cmd->snapshot_name, current_iteration);
 
-        if (last_submition)
+        if (last_submission)
         {
             iteration_sync_.removeSnapshot(snapshot_command_info->cmd->snapshot_name);
             snapshot_command_info->removal_promise.set_value(); // Notify that the snapshot is fully removed.
