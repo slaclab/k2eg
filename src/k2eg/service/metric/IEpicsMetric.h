@@ -6,7 +6,23 @@
 namespace k2eg::service::metric {
 
 // epics counter types
-enum class IEpicsMetricCounterType { Get, Put, MonitorTimeout, MonitorData, MonitorFail, MonitorCancel, MonitorDisconnect, TotalMonitorGauge, ActiveMonitorGauge, ThrottlingIdleGauge, ThrottlingEventCounter, ThrottlingDurationGauge, ThrottleGauge};
+enum class IEpicsMetricCounterType {
+  Get,
+  Put,
+  MonitorTimeout,
+  MonitorData,
+  MonitorFail,
+  MonitorCancel,
+  MonitorDisconnect,
+  TotalMonitorGauge,
+  ActiveMonitorGauge,
+  ThrottlingIdleGauge,
+  ThrottlingEventCounter,
+  ThrottlingDurationGauge,
+  ThrottleGauge,
+  PVThrottleGauge,   // per-PV throttle in microseconds
+  PVBacklogGauge     // per-PV backlog indicator (0/1)
+};
 
 // Epics metric group
 class IEpicsMetric {
