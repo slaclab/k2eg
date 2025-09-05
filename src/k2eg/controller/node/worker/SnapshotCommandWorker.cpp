@@ -81,7 +81,7 @@ void SnapshotCommandWorker::submitSingleSnapshot(std::shared_ptr<BS::light_threa
     std::vector<service::epics_impl::ConstMonitorOperationShrdPtr> v_mon_ops;
     for (const auto& pv_uri : s_ptr->pv_name_list)
     {
-        logger->logMessage(STRING_FORMAT("Perepare snapshot ops for '%1%' on topic %2% with sertype: %3%",
+        logger->logMessage(STRING_FORMAT("Prepare snapshot ops for '%1%' on topic %2% with ser-type: %3%",
                                          pv_uri % s_ptr->reply_topic % serialization_to_string(s_ptr->serialization)),
                            LogLevel::DEBUG);
 
@@ -97,7 +97,7 @@ void SnapshotCommandWorker::submitSingleSnapshot(std::shared_ptr<BS::light_threa
         }
     }
     // submit snapshot to processing pool
-    auto s_op_ptr = std::make_shared<SnapshotOpInfo>(s_ptr, std::move(v_mon_ops), s_ptr->time_window_msec);
+    auto s_op_ptr = std::make_shared<SimpleSnapshotOpInfo>(s_ptr, std::move(v_mon_ops), s_ptr->time_window_msec);
     command_pool->detach_task(
         [this, command_pool, s_op_ptr]()
         {
@@ -126,7 +126,7 @@ void SnapshotCommandWorker::manageFaultyReply(const std::int8_t error_code, cons
     }
 }
 
-void SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::light_thread_pool> command_pool, SnapshotOpInfoShrdPtr snapshot_info)
+void SnapshotCommandWorker::checkGetCompletion(std::shared_ptr<BS::light_thread_pool> command_pool, SimpleSnapshotOpInfoShrdPtr snapshot_info)
 {
     if (!snapshot_info->isTimeout())
     {
