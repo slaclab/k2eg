@@ -1,16 +1,22 @@
 #ifndef K2EG_CONTROLLER_NODE_WORKER_SNAPSHOT_SNAPSHOTOPINFO_H_
 #define K2EG_CONTROLLER_NODE_WORKER_SNAPSHOT_SNAPSHOTOPINFO_H_
 
-#include "k2eg/common/types.h"
-#include "k2eg/service/epics/EpicsServiceManager.h"
-#include <atomic>
+#include <k2eg/common/types.h>
+#include <k2eg/service/epics/EpicsServiceManager.h>
+#include <k2eg/controller/command/cmd/SnapshotCommand.h>
+#include <k2eg/controller/node/worker/CommandWorker.h>
 #include <k2eg/service/epics/EpicsData.h>
 
 #include <condition_variable>
+
 #include <future>
-#include <k2eg/controller/node/worker/CommandWorker.h>
+#include <atomic>
 #include <mutex>
-#include <unordered_map>
+#include <cstdint>
+
+// Forward declarations to avoid heavy includes in header
+namespace k2eg::service::pubsub { class IPublisher; }
+namespace k2eg::service::log { class ILogger; }
 
 namespace k2eg::controller::node::worker::snapshot {
 
@@ -314,6 +320,24 @@ public:
      * @param iteration_id Iteration identifier to wait on.
      */
     void waitDataDrained(int64_t iteration_id);
+
+    // Centralized publishing helpers
+    void publishHeader(const std::shared_ptr<k2eg::service::pubsub::IPublisher>& publisher,
+                       const std::shared_ptr<k2eg::service::log::ILogger>&       logger,
+                       int64_t                                                   snap_ts,
+                       int64_t                                                   iteration_id) const;
+
+    // Returns number of data events successfully published
+    std::uint64_t publishData(const std::shared_ptr<k2eg::service::pubsub::IPublisher>&          publisher,
+                              const std::shared_ptr<k2eg::service::log::ILogger>&                logger,
+                              int64_t                                                            snap_ts,
+                              int64_t                                                            iteration_id,
+                              const std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr>& events) const;
+
+    void publishTail(const std::shared_ptr<k2eg::service::pubsub::IPublisher>& publisher,
+                     const std::shared_ptr<k2eg::service::log::ILogger>&       logger,
+                     int64_t                                                   snap_ts,
+                     int64_t                                                   iteration_id) const;
 };
 DEFINE_PTR_TYPES(SnapshotOpInfo)
 } // namespace k2eg::controller::node::worker::snapshot
