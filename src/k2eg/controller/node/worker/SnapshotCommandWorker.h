@@ -22,8 +22,8 @@ namespace k2eg::controller::node::worker {
  */
 struct SnapshotCommandConfiguration
 {
-    /** @brief Parameters for repeating/continuous snapshot engine. */
-    snapshot::RepeatingSnaptshotConfiguration continuous_snapshot_configuration;
+    // Settings for scheduling and processing repeating snapshots
+    snapshot::RepeatingSnapshotConfiguration continuous_snapshot_configuration;
 };
 DEFINE_PTR_TYPES(SnapshotCommandConfiguration)
 
@@ -169,22 +169,23 @@ inline void serializeMsgpackCompact(const ContinuousSnapshotCommandReply& reply,
  * Manages the monitor operations required to complete a one-off snapshot
  * over a set of PVs and coordinate their completion.
  */
-class SnapshotOpInfo : public WorkerAsyncOperation
+// Simple snapshot operation context (non-repeating)
+class SimpleSnapshotOpInfo : public WorkerAsyncOperation
 {
 public:
-    /** @brief Original snapshot command specification. */
+    // keep track of the command specification
     k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd;
     /** @brief Bitset tracking processed monitor operations. */
     boost::dynamic_bitset<> processed_index;
-    /** @brief Async monitor operations for all PVs. */
+    // contains the monitor async operation for all the PVs
     std::vector<service::epics_impl::ConstMonitorOperationShrdPtr> v_mon_ops;
 
-    SnapshotOpInfo(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd, std::vector<service::epics_impl::ConstMonitorOperationShrdPtr> v_mon_ops, std::uint32_t tout_msc = 1000)
+    SimpleSnapshotOpInfo(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd, std::vector<service::epics_impl::ConstMonitorOperationShrdPtr> v_mon_ops, std::uint32_t tout_msc = 1000)
         : WorkerAsyncOperation(std::chrono::milliseconds(tout_msc)), processed_index(v_mon_ops.size()), cmd(cmd), v_mon_ops(std::move(v_mon_ops))
     {
     }
 };
-DEFINE_PTR_TYPES(SnapshotOpInfo)
+DEFINE_PTR_TYPES(SimpleSnapshotOpInfo)
 
 /**
  * @brief Worker that handles snapshot commands (single-shot and continuous).
@@ -202,7 +203,7 @@ class SnapshotCommandWorker : public CommandWorker
     // Receive event from publisher
     void publishEvtCB(k2eg::service::pubsub::EventType type, k2eg::service::pubsub::PublishMessage* const msg, const std::string& error_message);
     // manage the snapshot command execution in a separate thread
-    void checkGetCompletion(std::shared_ptr<BS::light_thread_pool> thread_pool, SnapshotOpInfoShrdPtr snapshot_info);
+    void checkGetCompletion(std::shared_ptr<BS::light_thread_pool> thread_pool, SimpleSnapshotOpInfoShrdPtr snapshot_info);
     // send a faulty reply to the client
     void manageFaultyReply(const std::int8_t error_code, const std::string& error_message, k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd);
     /**
@@ -216,9 +217,9 @@ class SnapshotCommandWorker : public CommandWorker
      * @brief Publish the final message indicating snapshot completion.
      */
     void publishEndSnapshotReply(k2eg::controller::command::cmd::ConstSnapshotCommandShrdPtr cmd);
-    /**
-     * @brief Prepare and submit a single-shot snapshot to the thread pool.
-     */
+    /*
+        prepare and submit the single snapshot command to the thread pool
+    */
     void submitSingleSnapshot(std::shared_ptr<BS::light_thread_pool> command_pool, k2eg::controller::command::cmd::ConstCommandShrdPtr command);
 
 public:

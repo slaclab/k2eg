@@ -1,5 +1,9 @@
 #include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
+#include <k2eg/controller/node/worker/snapshot/RepeatingSnapshotMessages.h>
+#include <k2eg/service/pubsub/IPublisher.h>
+#include <k2eg/common/utility.h>
 
+using namespace k2eg::service::log;
 using namespace k2eg::controller::node::worker::snapshot;
 
 #pragma region SnapshotOpInfo
@@ -251,4 +255,60 @@ const epics::pvData::PVStructure::const_shared_pointer SnapshotOpInfo::filterPVF
 SnapshotStatisticCounterShrdPtr SnapshotOpInfo::getStatisticCounter()
 {
     return snapshot_statistic;
+}
+void SnapshotOpInfo::publishHeader(const std::shared_ptr<k2eg::service::pubsub::IPublisher>& publisher,
+                                   const std::shared_ptr<k2eg::service::log::ILogger>&       logger,
+                                   int64_t                                                   snap_ts,
+                                   int64_t                                                   iteration_id) const
+{
+    auto serialized_header_message = serialize(RepeatingSnapshotHeader{0, cmd->snapshot_name, snap_ts, iteration_id}, cmd->serialization);
+    if (!serialized_header_message)
+    {
+        logger->logMessage("Invalid serialized header message", LogLevel::ERROR);
+        return;
+    }
+    publisher->pushMessage(MakeReplyPushableMessageUPtr(queue_name, "repeating-snapshot-events", cmd->snapshot_name, serialized_header_message),
+                           {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
+}
+
+std::uint64_t SnapshotOpInfo::publishData(const std::shared_ptr<k2eg::service::pubsub::IPublisher>&          publisher,
+                                          const std::shared_ptr<k2eg::service::log::ILogger>&                logger,
+                                          int64_t                                                            snap_ts,
+                                          int64_t                                                            header_ts,
+                                          int64_t                                                            iteration_id,
+                                          const std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr>& events) const
+{
+    std::uint64_t published = 0;
+    for (auto& event : events)
+    {
+        auto serialized_message = serialize(RepeatingSnapshotData{1, snap_ts, header_ts, iteration_id, MakeChannelDataShrdPtr(event->channel_data)}, cmd->serialization);
+        if (serialized_message)
+        {
+            publisher->pushMessage(MakeReplyPushableMessageUPtr(queue_name, "repeating-snapshot-events", cmd->snapshot_name, serialized_message),
+                                   {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
+            ++published;
+        }
+        else
+        {
+            logger->logMessage(STRING_FORMAT("Failing serializing snapshot %1% for PV %2%", cmd->snapshot_name % event->channel_data.pv_name),
+                               k2eg::service::log::LogLevel::ERROR);
+        }
+    }
+    return published;
+}
+
+void SnapshotOpInfo::publishTail(const std::shared_ptr<k2eg::service::pubsub::IPublisher>& publisher,
+                                 const std::shared_ptr<k2eg::service::log::ILogger>&       logger,
+                                 int64_t                                                   snap_ts,
+                                 int64_t                                                   header_ts,
+                                 int64_t                                                   iteration_id) const
+{
+    auto serialized_completion_message = serialize(RepeatingSnapshotCompletion{2, 0, "", cmd->snapshot_name, snap_ts, header_ts, iteration_id}, cmd->serialization);
+    if (!serialized_completion_message)
+    {
+        logger->logMessage("Invalid serialized tail message", k2eg::service::log::LogLevel::ERROR);
+        return;
+    }
+    publisher->pushMessage(MakeReplyPushableMessageUPtr(queue_name, "repeating-snapshot-events", cmd->snapshot_name, serialized_completion_message),
+                           {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
 }
