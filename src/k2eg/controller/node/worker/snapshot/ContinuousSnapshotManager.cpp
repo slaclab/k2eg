@@ -142,7 +142,10 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnapshotConf
     expiration_thread_running = true;
     expiration_thread = std::thread(&ContinuousSnapshotManager::expirationCheckerLoop, this);
     pthread_setname_np(expiration_thread.native_handle(), "SnapshotExpirationChecker");
-    logger->logMessage(STRING_FORMAT("Continuous snapshot manager initialized with: %1%", repeating_snapshot_configuration.toString()), LogLevel::INFO);
+    logger->logMessage(
+        STRING_FORMAT("Continuous snapshot manager initialized (threads=%1%)",
+                       repeating_snapshot_configuration.snapshot_processing_thread_count),
+        LogLevel::INFO);
 
     auto task_restart_monitor = MakeTaskShrdPtr(CSM_RECURRING_CHECK_TASK_NAME, CSM_RECURRING_CHECK_TASK_CRON, std::bind(&ContinuousSnapshotManager::handlePeriodicTask, this, std::placeholders::_1),
                                                 -1 // start at application boot time
