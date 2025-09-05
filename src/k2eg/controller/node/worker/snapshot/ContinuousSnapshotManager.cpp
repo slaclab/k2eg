@@ -755,7 +755,7 @@ void SnapshotSubmissionTask::operator()()
 
         // Publish data via SnapshotOpInfo and aggregate counts for Tail logging
         const auto events_sent_this_batch = snapshot_command_info->publishData(
-            publisher, logger, snap_ts, current_iteration, submission_shrd_ptr->snapshot_events);
+            publisher, logger, snap_ts, header_timestamp, current_iteration, submission_shrd_ptr->snapshot_events);
         add_events_for_iteration(snapshot_command_info->cmd->snapshot_name, current_iteration, events_sent_this_batch);
         // Mark data submission as completed for this iteration
         snapshot_command_info->dataCompleted(current_iteration);
@@ -770,7 +770,7 @@ void SnapshotSubmissionTask::operator()()
         logger->logMessage(STRING_FORMAT("[Tail] Snapshot %1% iteration %2% completed, events=%3%",
                                          snapshot_command_info->cmd->snapshot_name % current_iteration % events_published),
                            LogLevel::DEBUG);
-        snapshot_command_info->publishTail(publisher, logger, snap_ts, current_iteration);
+        snapshot_command_info->publishTail(publisher, logger, snap_ts, header_timestamp, current_iteration);
 
         // Mark the tail as processed. The lock will be released by finishTask either now (if this is the last task)
         // or later when the last running Data task calls its TaskGuard destructor.

@@ -371,12 +371,14 @@ public:
     std::uint64_t publishData(const std::shared_ptr<k2eg::service::pubsub::IPublisher>&          publisher,
                               const std::shared_ptr<k2eg::service::log::ILogger>&                logger,
                               int64_t                                                            snap_ts,
+                              int64_t                                                            header_timestamp,
                               int64_t                                                            iteration_id,
                               const std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr>& events) const;
 
     void publishTail(const std::shared_ptr<k2eg::service::pubsub::IPublisher>& publisher,
                      const std::shared_ptr<k2eg::service::log::ILogger>&       logger,
                      int64_t                                                   snap_ts,
+                     int64_t                                                   header_timestamp,
                      int64_t                                                   iteration_id) const;
 };
 
