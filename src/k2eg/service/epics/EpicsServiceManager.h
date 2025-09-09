@@ -72,7 +72,7 @@ struct ChannelMapElement
 };
 DEFINE_PTR_TYPES(ChannelMapElement)
 typedef std::unique_lock<std::shared_mutex> WriteLockCM;
-typedef std::unique_lock<std::shared_mutex> ReadLockCM;
+typedef std::shared_lock<std::shared_mutex> ReadLockCM;
 
 DEFINE_PTR_TYPES(EpicsServiceManagerConfig)
 
