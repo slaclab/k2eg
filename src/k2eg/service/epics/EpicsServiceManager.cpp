@@ -463,9 +463,10 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
         pv_throttle_ptr->update(had_events);
         auto t_stat = pv_throttle_ptr->getStats();
         metric.incrementCounter(IEpicsMetricCounterType::PVThrottleGauge, t_stat.throttle_us, {{"pv", pv_name}});
-        // Backlog flag: if we hit the per-pass limit assume backlog remains
-        const double backlog_flag = drained >= static_cast<size_t>(config->max_event_from_monitor_queue) ? 1.0 : 0.0;
-        metric.incrementCounter(IEpicsMetricCounterType::PVBacklogGauge, backlog_flag, {{"pv", pv_name}});
+        // Backlog gauge: report number of drained items when backlog is present (hit per-pass cap), else 0
+        const auto   max_per_pass = static_cast<size_t>(config->max_event_from_monitor_queue);
+        const double backlog_count = drained >= max_per_pass ? static_cast<double>(drained) : 0.0;
+        metric.incrementCounter(IEpicsMetricCounterType::PVBacklogGauge, backlog_count, {{"pv", pv_name}});
     }
 
     // resubmit the task to the thread pool unless shutting down
