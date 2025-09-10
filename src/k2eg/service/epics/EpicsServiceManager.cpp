@@ -38,7 +38,12 @@ void set_thread_name(const std::size_t idx)
     const std::string name = oss.str();
     BS::this_thread::set_os_thread_name(name);
 }
-inline auto thread_namer = [](unsigned long idx) { set_thread_name(idx); };
+
+inline auto thread_namer = [](unsigned long idx)
+{
+    set_thread_name(idx);
+};
+
 EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config)
     : config(std::move(config))
     , end_processing(false)
@@ -96,9 +101,7 @@ void EpicsServiceManager::addChannel(const std::string& pv_name_uri)
                     .keep_alive = 1,
                     .active = false,
                     .pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>(
-                        this->config->pv_min_throttle_us,
-                        this->config->pv_max_throttle_us,
-                        this->config->pv_idle_threshold),
+                        this->config->pv_min_throttle_us, this->config->pv_max_throttle_us, this->config->pv_idle_threshold),
                 });
             if (!success)
             {
@@ -134,7 +137,7 @@ void EpicsServiceManager::addChannel(const std::string& pv_name_uri)
 StringVector EpicsServiceManager::getMonitoredChannels()
 {
     ReadLockCM read_lock(channel_map_mutex);
-    auto             kv = channel_map | std::views::transform(
+    auto       kv = channel_map | std::views::transform(
                                 [](auto const& kvp) -> const std::string&
                                 {
                                     return kvp.first;
@@ -167,13 +170,22 @@ void EpicsServiceManager::monitorChannel(const std::string& pv_identification, b
     }
 }
 
-void EpicsServiceManager::forceMonitorChannelUpdate(const std::string& pv_name_uri)
+void EpicsServiceManager::forceMonitorChannelUpdate(const std::string& pv_name_, bool is_uri)
 {
-    auto sanitized_pv = sanitizePVName(pv_name_uri);
-    if (!sanitized_pv)
-        return;
+    std::string pv_name;
+    if (is_uri)
+    {
+        auto sanitized_pv = sanitizePVName(pv_name_);
+        if (!sanitized_pv)
+            return;
+        pv_name = sanitized_pv->name;
+    }
+    else
+    {
+        pv_name = pv_name_;
+    }
     ReadLockCM read_lock(channel_map_mutex);
-    if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
+    if (auto search = channel_map.find(pv_name); search != channel_map.end())
     {
         search->second.to_force = true;
     }
@@ -199,9 +211,7 @@ ConstMonitorOperationShrdPtr EpicsServiceManager::getMonitorOp(const std::string
             .keep_alive = 0,
             .active = false,
             .pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>(
-                this->config->pv_min_throttle_us,
-                this->config->pv_max_throttle_us,
-                this->config->pv_idle_threshold),
+                this->config->pv_min_throttle_us, this->config->pv_max_throttle_us, this->config->pv_idle_threshold),
         };
         result = channel.channel->monitor();
     }
@@ -231,9 +241,7 @@ ConstGetOperationUPtr EpicsServiceManager::getChannelData(const std::string& pv_
             .keep_alive = 0,
             .active = false,
             .pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>(
-                this->config->pv_min_throttle_us,
-                this->config->pv_max_throttle_us,
-                this->config->pv_idle_threshold),
+                this->config->pv_min_throttle_us, this->config->pv_max_throttle_us, this->config->pv_idle_threshold),
         };
         result = channel.channel->get();
     }
@@ -338,7 +346,7 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
     bool        should_delete = false;
     const auto& pv_name = monitor_op->getPVName();
     // keep per-thread throttling around for metrics, but we will prefer per-PV throttling below
-    auto&       throttling = thread_throttling_vector[thread_index.value()];
+    auto&                                            throttling = thread_throttling_vector[thread_index.value()];
     std::shared_ptr<k2eg::common::ThrottlingManager> pv_throttle_ptr;
 
     // Step 1: inspect and possibly update flags under lock
@@ -415,27 +423,25 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
         {
             had_events = true;
 
-        // compute 'active' as: data present AND no errors
-        const bool is_active = !received_event->event_data->empty() &&
-                               received_event->event_cancel->empty() &&
-                               received_event->event_disconnect->empty() &&
-                               received_event->event_fail->empty();
+            // compute 'active' as: data present AND no errors
+            const bool is_active = !received_event->event_data->empty() && received_event->event_cancel->empty() &&
+                                   received_event->event_disconnect->empty() && received_event->event_fail->empty();
 
-        // update active flag (and possibly delete) under lock
-        bool delete_after_broadcast = false;
-        {
-            WriteLockCM lock(channel_map_mutex);
-            auto        it2 = channel_map.find(pv_name);
-            if (it2 != channel_map.end())
+            // update active flag (and possibly delete) under lock
+            bool delete_after_broadcast = false;
             {
-                it2->second.active = is_active;
-                if (it2->second.keep_alive == 0)
+                WriteLockCM lock(channel_map_mutex);
+                auto        it2 = channel_map.find(pv_name);
+                if (it2 != channel_map.end())
                 {
-                    channel_map.erase(it2);
-                    delete_after_broadcast = true;
+                    it2->second.active = is_active;
+                    if (it2->second.keep_alive == 0)
+                    {
+                        channel_map.erase(it2);
+                        delete_after_broadcast = true;
+                    }
                 }
             }
-        }
 
             // metrics and broadcast outside locks
             metric.incrementCounter(IEpicsMetricCounterType::MonitorData, received_event->event_data->size());
@@ -472,7 +478,11 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
     // resubmit the task to the thread pool unless shutting down
     if (!end_processing)
     {
-        processing_pool->detach_task([this, monitor_op] { this->task(monitor_op); });
+        processing_pool->detach_task(
+            [this, monitor_op]
+            {
+                this->task(monitor_op);
+            });
     }
 }
 

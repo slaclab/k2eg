@@ -59,10 +59,16 @@ SnapshotSubmissionShrdPtr SnapshotRepeatingOpInfo::getData()
     }
     // Resume taking data after snapshot collection.
     taking_data.store(true, std::memory_order_release);
-    return MakeSnapshotSubmissionShrdPtr(
-        std::chrono::steady_clock::now(),
-        std::move(result),
-        (SnapshotSubmissionType::Header | SnapshotSubmissionType::Data | SnapshotSubmissionType::Tail),
-        0 // scheduler assigns iteration id
+    return MakeSnapshotSubmissionShrdPtr(std::chrono::steady_clock::now(), std::move(result), (SnapshotSubmissionType::Header | SnapshotSubmissionType::Data | SnapshotSubmissionType::Tail),
+                                         0 // scheduler assigns iteration id
     );
 }
+
+std::vector<std::string> SnapshotRepeatingOpInfo::getPVsWithoutEvents() const
+{
+    return {}; // Not applicable for repeating snapshots
+};
+
+void SnapshotRepeatingOpInfo::onWindowTimeout(bool full_window) {
+    // Reset per-window statistics/state here if needed.
+};

@@ -109,7 +109,7 @@ public:
     void                         addChannel(const std::string& pv_name_uri);
     void                         removeChannel(const std::string& pv_name_uri);
     void                         monitorChannel(const std::string& pv_identification, bool activate);
-    void                         forceMonitorChannelUpdate(const std::string& pv_name_uri);
+    void                         forceMonitorChannelUpdate(const std::string& pv_name, bool is_uri = true);
     ConstMonitorOperationShrdPtr getMonitorOp(const std::string& pv_name_uri);
     ConstGetOperationUPtr        getChannelData(const std::string& pv_name_uri);
     ConstPutOperationUPtr putChannelData(const std::string& pv_name, std::unique_ptr<k2eg::common::MsgpackObject> value);

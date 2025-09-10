@@ -22,8 +22,8 @@
 #include <set>
 #include <string>
 #include <unistd.h>
-#include <utility>
 #include <unordered_map>
+#include <utility>
 
 using namespace k2eg::controller::command::cmd;
 using namespace k2eg::controller::node::worker;
@@ -44,8 +44,8 @@ using namespace k2eg::service::epics_impl;
 
 // Local aggregator to count events per snapshot iteration and log at Tail.
 namespace {
-std::mutex                                     g_tail_log_mutex;
-std::unordered_map<std::string, uint64_t>      g_tail_event_counters;
+std::mutex                                g_tail_log_mutex;
+std::unordered_map<std::string, uint64_t> g_tail_event_counters;
 
 inline std::string make_tail_key(const std::string& snapshot_name, int64_t iteration)
 {
@@ -454,8 +454,15 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                     // --- CAPTURE DATA BEFORE ERASE ---
                     std::string queue_name_copy = queue_name;
                     auto        submission_shard_ptr = s_op_ptr->getData();
+                    auto        non_updated_pvs = s_op_ptr->getPVsWithoutEvents();
                     bool        to_continue = false;
                     bool        last_submission = false;
+
+                    for (const auto& pv_name : non_updated_pvs) {
+                        // Forward the last data for each non-updated PV
+                        epics_service_manager->forceMonitorChannelUpdate(pv_name, false);
+                    }
+
                     // If the snapshot is not running, it must be cleaned up.
                     if (!s_op_ptr->is_running)
                     {
@@ -576,7 +583,8 @@ void SnapshotSubmissionTask::operator()()
     // Iteration id is resolved at scheduling and attached to the submission.
     if (current_iteration == 0)
     {
-        logger->logMessage(STRING_FORMAT("Snapshot %1% missing iteration id on submission; skipping.", snapshot_command_info->cmd->snapshot_name), LogLevel::ERROR);
+        logger->logMessage(
+            STRING_FORMAT("Snapshot %1% missing iteration id on submission; skipping.", snapshot_command_info->cmd->snapshot_name), LogLevel::ERROR);
         return;
     }
 
@@ -599,8 +607,8 @@ void SnapshotSubmissionTask::operator()()
         snapshot_command_info->waitForHeaderGate(current_iteration);
 
         // Publish data via SnapshotOpInfo and aggregate counts for Tail logging
-        const auto events_sent_this_batch = snapshot_command_info->publishData(
-            publisher, logger, snap_ts, current_iteration, submission_shrd_ptr->snapshot_events);
+        const auto events_sent_this_batch =
+            snapshot_command_info->publishData(publisher, logger, snap_ts, current_iteration, submission_shrd_ptr->snapshot_events);
         add_events_for_iteration(snapshot_command_info->cmd->snapshot_name, current_iteration, events_sent_this_batch);
         // Mark data submission as completed for this iteration
         snapshot_command_info->dataCompleted(current_iteration);
@@ -612,9 +620,8 @@ void SnapshotSubmissionTask::operator()()
         snapshot_command_info->waitDataDrained(current_iteration);
         // Emit a single tail log with aggregated event count for this iteration
         const auto events_published = take_events_for_iteration(snapshot_command_info->cmd->snapshot_name, current_iteration);
-        logger->logMessage(STRING_FORMAT("[Tail] Snapshot %1% iteration %2% completed, events=%3%",
-                                         snapshot_command_info->cmd->snapshot_name % current_iteration % events_published),
-                           LogLevel::DEBUG);
+        logger->logMessage(
+            STRING_FORMAT("[Tail] Snapshot %1% iteration %2% completed, events=%3%", snapshot_command_info->cmd->snapshot_name % current_iteration % events_published), LogLevel::DEBUG);
         snapshot_command_info->publishTail(publisher, logger, snap_ts, current_iteration);
 
         // Mark the tail as processed. The lock will be released by finishTask either now (if this is the last task)
