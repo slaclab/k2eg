@@ -48,7 +48,16 @@ BackTimedBufferedSnapshotOpInfo::~BackTimedBufferedSnapshotOpInfo()
 
 bool BackTimedBufferedSnapshotOpInfo::init(std::vector<PVShrdPtr>& sanitized_pv_name_list)
 {
-    // No initialization needed for PVs in this implementation.
+    // Initialize PV tracking sets
+    std::unique_lock lock(buffer_mutex);
+    all_pvs_.clear();
+    pvs_no_events_.clear();
+    events_per_pv_.clear();
+    for (const auto& pv : sanitized_pv_name_list)
+    {
+        all_pvs_.insert(pv->name);
+    }
+    pvs_no_events_ = all_pvs_;
     return true;
 }
 
@@ -85,9 +94,11 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout(const std::chrono::steady_clock:
         if (expired || force_fast_expire)
         {
             timeout = true;
+            if(expired){onWindowTimeout(true);}
             last_forced_expire = now;
             std::unique_lock lock(buffer_mutex);
             std::swap(acquiring_buffer, processing_buffer);
+
         }
     }
     return timeout;
@@ -98,6 +109,19 @@ void BackTimedBufferedSnapshotOpInfo::addData(MonitorEventShrdPtr event_data)
     // Always add new data to the acquiring buffer.
     std::unique_lock lock(buffer_mutex);
     acquiring_buffer->push(event_data, steady_clock::now());
+
+    // Track per-PV statistics for fast lookup of silent PVs
+    const auto& pv_name = event_data->channel_data.pv_name;
+    pvs_no_events_.erase(pv_name);
+    auto it = events_per_pv_.find(pv_name);
+    if (it == events_per_pv_.end())
+    {
+        events_per_pv_.emplace(pv_name, 1);
+    }
+    else
+    {
+        ++(it->second);
+    }
 }
 
 SnapshotSubmissionShrdPtr BackTimedBufferedSnapshotOpInfo::getData()
@@ -155,4 +179,23 @@ SnapshotSubmissionShrdPtr BackTimedBufferedSnapshotOpInfo::getData()
     }
     // Iteration id is assigned by the scheduler; initialize as 0 here.
     return MakeSnapshotSubmissionShrdPtr(std::chrono::steady_clock::now(), header_snapshot_time, std::move(result), type, 0);
+}
+
+void BackTimedBufferedSnapshotOpInfo::onWindowTimeout(bool /*full_window*/)
+{
+    // Reset per-window PV stats: mark all PVs as having no events, clear counters
+    pvs_no_events_ = all_pvs_;
+    events_per_pv_.clear();
+}
+
+std::vector<std::string> BackTimedBufferedSnapshotOpInfo::getPVsWithoutEvents() const
+{
+    std::shared_lock lock(buffer_mutex);
+    std::vector<std::string> res;
+    res.reserve(pvs_no_events_.size());
+    for (const auto& pv : pvs_no_events_)
+    {
+        res.emplace_back(pv);
+    }
+    return res;
 }

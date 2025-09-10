@@ -253,6 +253,15 @@ protected:
      */
     const epics::pvData::PVStructure::const_shared_pointer filterPVField(const epics::pvData::PVStructure::const_shared_pointer& src, const std::unordered_set<std::string>& fields_to_include);
 
+    /**
+     * @brief Hook invoked whenever a time window expires (full or partial).
+     * @details Implementations can override this to reset per-window statistics/state.
+     *          The bool parameter indicates whether the expiration corresponds to the
+     *          full configured time window (true) or a partial sub-window (false).
+     *          Default implementation is a no-op.
+     * @param full_window True if the full window expired, false if a partial sub-window expired.
+     */
+    virtual void onWindowTimeout(bool /*full_window*/) = 0;
 public:
     service::configuration::SnapshotConfigurationShrdPtr                 snapshot_configuration;     ///< Snapshot configuration for the operation.
     std::string                                                          snapshot_distribution_key;  ///< Unique identifier for the snapshot iteration.
@@ -298,6 +307,11 @@ public:
      * @return True if a submission should be produced.
      */
     virtual bool isTimeout(const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now()) override;
+
+    /**
+     * @brief Fast retrieval of PVs that received zero events in the current window.
+     */
+    virtual std::vector<std::string> getPVsWithoutEvents() const = 0;
 
     // Submission chaining removed: Tail now waits on per-iteration data drain.
 
