@@ -25,8 +25,8 @@
 #include <set>
 #include <string>
 #include <unistd.h>
-#include <utility>
 #include <unordered_map>
+#include <utility>
 
 using namespace k2eg::controller::command;
 using namespace k2eg::controller::command::cmd;
@@ -500,8 +500,15 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                     // --- CAPTURE DATA BEFORE ERASE ---
                     std::string queue_name_copy = queue_name;
                     auto        submission_shard_ptr = s_op_ptr->getData();
+                    auto        non_updated_pvs = s_op_ptr->getPVsWithoutEvents();
                     bool        to_continue = false;
                     bool        last_submission = false;
+
+                    for (const auto& pv_name : non_updated_pvs) {
+                        // Forward the last data for each non-updated PV
+                        epics_service_manager->forceMonitorChannelUpdate(pv_name, false);
+                    }
+
                     // If the snapshot is not running, it must be cleaned up.
                     if (!s_op_ptr->is_running)
                     {
@@ -730,7 +737,8 @@ void SnapshotSubmissionTask::operator()()
     // Iteration id is resolved at scheduling and attached to the submission.
     if (current_iteration == 0)
     {
-        logger->logMessage(STRING_FORMAT("Snapshot %1% missing iteration id on submission; skipping.", snapshot_command_info->cmd->snapshot_name), LogLevel::ERROR);
+        logger->logMessage(
+            STRING_FORMAT("Snapshot %1% missing iteration id on submission; skipping.", snapshot_command_info->cmd->snapshot_name), LogLevel::ERROR);
         return;
     }
 
@@ -740,7 +748,6 @@ void SnapshotSubmissionTask::operator()()
     // HEADER: This is the start of a new logical iteration.
     if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
     {
-        snapshot_command_info->publishHeader(publisher, logger, snap_ts, current_iteration);
         snapshot_command_info->publishHeader(publisher, logger, snap_ts, current_iteration);
         logger->logMessage(STRING_FORMAT("[Header] Snapshot %1% iteration %2% started", snapshot_command_info->cmd->snapshot_name % current_iteration), LogLevel::DEBUG);
 
@@ -754,8 +761,8 @@ void SnapshotSubmissionTask::operator()()
         snapshot_command_info->waitForHeaderGate(current_iteration);
 
         // Publish data via SnapshotOpInfo and aggregate counts for Tail logging
-        const auto events_sent_this_batch = snapshot_command_info->publishData(
-            publisher, logger, snap_ts, header_timestamp, current_iteration, submission_shrd_ptr->snapshot_events);
+        const auto events_sent_this_batch =
+            snapshot_command_info->publishData(publisher, logger, snap_ts, header_timestamp, current_iteration, submission_shrd_ptr->snapshot_events);
         add_events_for_iteration(snapshot_command_info->cmd->snapshot_name, current_iteration, events_sent_this_batch);
         // Mark data submission as completed for this iteration
         snapshot_command_info->dataCompleted(current_iteration);
@@ -767,10 +774,9 @@ void SnapshotSubmissionTask::operator()()
         snapshot_command_info->waitDataDrained(current_iteration);
         // Emit a single tail log with aggregated event count for this iteration
         const auto events_published = take_events_for_iteration(snapshot_command_info->cmd->snapshot_name, current_iteration);
-        logger->logMessage(STRING_FORMAT("[Tail] Snapshot %1% iteration %2% completed, events=%3%",
-                                         snapshot_command_info->cmd->snapshot_name % current_iteration % events_published),
-                           LogLevel::DEBUG);
-        snapshot_command_info->publishTail(publisher, logger, snap_ts, header_timestamp, current_iteration);
+        logger->logMessage(
+            STRING_FORMAT("[Tail] Snapshot %1% iteration %2% completed, events=%3%", snapshot_command_info->cmd->snapshot_name % current_iteration % events_published), LogLevel::DEBUG);
+        snapshot_command_info->publishTail(publisher, logger, snap_ts,  header_timestamp, current_iteration);
 
         // Mark the tail as processed. The lock will be released by finishTask either now (if this is the last task)
         // or later when the last running Data task calls its TaskGuard destructor.

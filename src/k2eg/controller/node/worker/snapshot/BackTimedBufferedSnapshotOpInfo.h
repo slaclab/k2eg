@@ -5,6 +5,10 @@
 #include <k2eg/common/types.h>
 #include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
 
+#include <atomic>
+#include <unordered_map>
+#include <unordered_set>
+
 namespace k2eg::controller::node::worker::snapshot {
 
 using MonitorEventBacktimeBuffer = k2eg::common::TimeWindowEventBuffer<k2eg::service::epics_impl::MonitorEvent>;
@@ -64,6 +68,10 @@ class BackTimedBufferedSnapshotOpInfo : public SnapshotOpInfo
     std::chrono::steady_clock::time_point header_snapshot_time; /**< Time point for the snapshot. */
     bool                                  win_time_expired = false;
     std::int64_t                          fast_expire_time_msec = 0; // fast expire time in milliseconds
+    // Per-window PV stats
+    std::unordered_set<std::string>                    all_pvs_;        // full PV set for this snapshot
+    std::unordered_set<std::string>                    pvs_no_events_;  // PVs that did not receive any event in the current window
+    std::unordered_map<std::string, std::uint64_t>     events_per_pv_;  // counter of events per PV in the current window
 public:
     // Buffer to store all received values during the time window
     std::map<std::string, std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr>> value_buffer;
@@ -100,6 +108,17 @@ public:
      * @return A vector of shared pointers to MonitorEvent objects.
      */
     SnapshotSubmissionShrdPtr getData() override;
+
+    /**
+     * @brief Fast retrieval of PVs that received zero events in the current window.
+     */
+    std::vector<std::string> getPVsWithoutEvents() const override;
+
+protected:
+    /**
+     * @brief Reset per-window counters when a window expires (full or partial).
+     */
+    void onWindowTimeout(bool full_window) override;
 };
 DEFINE_PTR_TYPES(BackTimedBufferedSnapshotOpInfo)
 } // namespace k2eg::controller::node::worker::snapshot

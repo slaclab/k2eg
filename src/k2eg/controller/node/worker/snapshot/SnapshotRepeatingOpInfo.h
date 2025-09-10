@@ -65,6 +65,17 @@ public:
      * @return Vector of shared pointers to monitor event data.
      */
     SnapshotSubmissionShrdPtr getData() override;
+
+    /**
+     * @brief Fast retrieval of PVs that received zero events in the current window.
+     */
+    std::vector<std::string> getPVsWithoutEvents() const override;
+
+protected:
+    /**
+     * @brief Reset per-window counters when a window expires (full or partial).
+     */
+    void onWindowTimeout(bool full_window) override;
 };
 DEFINE_PTR_TYPES(SnapshotRepeatingOpInfo)
 

@@ -63,8 +63,17 @@ SnapshotSubmissionShrdPtr SnapshotRepeatingOpInfo::getData()
     return MakeSnapshotSubmissionShrdPtr(
         submission_ts,
         submission_ts,
-        std::move(result),
+        std::move(result), 
         (SnapshotSubmissionType::Header | SnapshotSubmissionType::Data | SnapshotSubmissionType::Tail),
-        0 // scheduler assigns iteration id
+                                         0 // scheduler assigns iteration id
     );
 }
+
+std::vector<std::string> SnapshotRepeatingOpInfo::getPVsWithoutEvents() const
+{
+    return {}; // Not applicable for repeating snapshots
+};
+
+void SnapshotRepeatingOpInfo::onWindowTimeout(bool full_window) {
+    // Reset per-window statistics/state here if needed.
+};
