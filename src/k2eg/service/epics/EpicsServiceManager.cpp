@@ -44,8 +44,8 @@ inline auto thread_namer = [](unsigned long idx)
     set_thread_name(idx);
 };
 
-EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config)
-    : config(std::move(config))
+EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigShrdPtr config_)
+    : config(config_)
     , end_processing(false)
     , thread_throttling_vector(this->config->thread_count)
     , processing_pool(std::make_shared<BS::light_thread_pool>(this->config->thread_count, thread_namer))
