@@ -74,8 +74,6 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout(const std::chrono::steady_clock:
             // On timeout, swap the buffers so getData works on a stable snapshot.
             std::unique_lock lock(buffer_mutex);
             std::swap(acquiring_buffer, processing_buffer);
-            // Reset per-window stats for the new acquiring window
-            onWindowTimeout(true);
         }
     }
     else
