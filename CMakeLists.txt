@@ -30,6 +30,7 @@ set(ZLIB_VERSION v1.2.13)
 set(PROMETHEUS_VERSION v1.3.0)
 SET(CRONCPP_VERSION v2023.03.30)
 SET(OATPP_VERSION 1.3.0)
+set(MONGOCXX_VERSION r4.1.1)
 set(GTEST_VERSION 1.8.0)
 
 set(CMAKE_BINARY_DIR ${CMAKE_INSTALL_PREFIX}/bin)
@@ -54,8 +55,23 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/configuration/coverage.cmake)
 # ----------------------------------------------------
 if(${ENABLE_ASAN})
   message(STATUS "Enable address sanitizer")
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=address -static-libasan")
-  set (CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -ggdb -fno-omit-frame-pointer -fsanitize=address -static-libasan")
+  include(CheckCXXCompilerFlag)
+  # Base ASan flags (portable across compilers)
+  set(_ASAN_FLAGS "-g -fno-omit-frame-pointer -fsanitize=address")
+  # Add flags to C and C++
+  set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} ${_ASAN_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${_ASAN_FLAGS}")
+  set(CMAKE_EXE_LINKER_FLAGS   "${CMAKE_EXE_LINKER_FLAGS} ${_ASAN_FLAGS}")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${_ASAN_FLAGS}")
+
+  # Append -static-libasan only if the compiler supports it (typically GCC on Linux)
+  check_cxx_compiler_flag("-static-libasan" HAS_STATIC_LIBASAN)
+  if(HAS_STATIC_LIBASAN)
+    set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -static-libasan")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libasan")
+    set(CMAKE_EXE_LINKER_FLAGS   "${CMAKE_EXE_LINKER_FLAGS} -static-libasan")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libasan")
+  endif()
 else()
   message(STATUS "Disable address sanitizer")
 endif()
@@ -83,6 +99,10 @@ set(COMMON_SOURCE_FILES
 
   src/k2eg/service/data/DataStorage.cpp
   src/k2eg/service/data/repository/ChannelRepository.cpp
+
+  src/k2eg/service/storage/impl/MongoDBStorageService.cpp
+  src/k2eg/service/storage/impl/MsgpackToBsonConverter.cpp
+  src/k2eg/service/storage/StorageServiceFactory.cpp
 
   src/k2eg/service/epics/EpicsData.cpp
   src/k2eg/service/epics/PVStructureMerger.cpp
@@ -116,6 +136,7 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/scheduler/Scheduler.cpp
   src/k2eg/service/scheduler/Task.cpp
 
+  src/k2eg/service/configuration/INodeConfiguration.cpp
   src/k2eg/service/configuration/impl/consul/ConsulNodeConfiguration.cpp
 
   src/k2eg/controller/command/CMDController.cpp
@@ -133,6 +154,9 @@ set(COMMON_SOURCE_FILES
   src/k2eg/controller/node/worker/snapshot/SnapshotOpInfo.cpp
   src/k2eg/controller/node/worker/snapshot/SnapshotRepeatingOpInfo.cpp
   src/k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.cpp
+  src/k2eg/controller/node/worker/StorageWorker.cpp
+  src/k2eg/controller/node/worker/archiver/BaseArchiver.cpp
+  src/k2eg/controller/node/worker/archiver/SnapshotArchiver.cpp
 )
 
 set(SOURCE_FILES
@@ -165,23 +189,28 @@ TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib)
 set(TEST_SOURCE_FILES
   test/test.cpp
   test/k2eg.cpp
-  test/data/DataStorage.cpp
-  test/epics/epics.cpp
-  test/epics/epics_msgpack_converter.cpp
-  test/epics/epics_data_serialization.cpp
-  test/pubsub/kafka.cpp
+  test/k2eg_nodes.cpp
   test/common/ProgramOptions.cpp
   test/controller/CMDController.cpp
   test/controller/NodeController.cpp
   test/controller/NodeControllerSnapshot.cpp
   test/controller/NodeControllerMonitorChecker.cpp
   test/controller/NodeControllerReplyMessages.cpp
-  test/metric/EpicsMetric.cpp
-  test/metric/CMDMetric.cpp
-  test/metric/NodeControllerMetric.cpp
-  test/metric/NodeControllerSystemMetric.cpp
-  test/scheduler/Scheduler.cpp
-  test/configuration/ConsulConfigurationTest.cpp
+  test/controller/NodeControllerStorageSnapshotTest.cpp
+  test/service/data/DataStorage.cpp
+  test/service/epics/epics.cpp
+  test/service/epics/epics_msgpack_converter.cpp
+  test/service/epics/epics_data_serialization.cpp
+  test/service/pubsub/kafka.cpp
+  test/service/metric/EpicsMetric.cpp
+  test/service/metric/CMDMetric.cpp
+  test/service/metric/NodeControllerMetric.cpp
+  test/service/metric/NodeControllerSystemMetric.cpp
+  test/service/scheduler/Scheduler.cpp
+  test/service/configuration/ConsulConfigurationTest.cpp
+  test/service/configuration/ConsulConfigurationSnapshotStorageTest.cpp
+  test/service/configuration/ConsulConfigurationSnapshotGatewayTest.cpp
+  test/service/storage/mongodb/MsgpackToJsonConverter.cpp
   ${COMMON_SOURCE_FILES}
 )
 
@@ -358,7 +387,7 @@ ExternalProject_Add(
   GIT_TAG ${SQLITE_VERSION}
   GIT_REPOSITORY https://github.com/sqlite/sqlite.git
   BUILD_IN_SOURCE 1
-  CONFIGURE_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/sqlite/src/sqlite_dist/configure --enable-tempstore=yes --prefix=${CMAKE_INSTALL_PREFIX}
+  CONFIGURE_COMMAND /bin/sh -c "mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/sqlite/tmp && TMPDIR=${CMAKE_CURRENT_BINARY_DIR}/sqlite/tmp ${CMAKE_CURRENT_BINARY_DIR}/sqlite/src/sqlite_dist/configure --enable-tempstore=yes --prefix=${CMAKE_INSTALL_PREFIX} --build=${CMAKE_SYSTEM_PROCESSOR}-pc-linux-gnu --host=${CMAKE_SYSTEM_PROCESSOR}-pc-linux-gnu"
   INSTALL_COMMAND make install
 )
 
@@ -579,6 +608,43 @@ TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/i
 TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC  ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION})
 TARGET_LINK_DIRECTORIES(${PROJECT_NAME}-test PUBLIC  ${CMAKE_INSTALL_PREFIX}/lib/oatpp-${OATPP_VERSION})
 SET(BUILD_LIBRARY ${BUILD_LIBRARY} oatpp-consul oatpp-curl oatpp)
+
+
+# ----------------------------------------------------
+# Configure MongoDB CXX driver dependencies
+# ----------------------------------------------------
+MESSAGE(STATUS "Configure MongoDB CXX driver version ${MONGOCXX_VERSION}")
+ExternalProject_Add(
+  mongo-cxx-driver
+  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/mongo-cxx-driver
+  GIT_REPOSITORY https://github.com/mongodb/mongo-cxx-driver.git
+  GIT_TAG ${MONGOCXX_VERSION}
+  GIT_PROGRESS 1
+  LOG_DOWNLOAD 1
+  LOG_UPDATE 1
+  LOG_CONFIGURE 1
+  LOG_BUILD 1
+  LOG_INSTALL 1
+  CMAKE_ARGS
+    -DCMAKE_BUILD_TYPE=Release
+    -DBUILD_SHARED_LIBS=ON
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+    -DCMAKE_PREFIX_PATH=${CMAKE_INSTALL_PREFIX}
+    -DENABLE_TESTS=OFF
+    -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} 
+    -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+    -DCMAKE_CXX_STANDARD=17
+)
+
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/bsoncxx/v_noabi)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/include/mongocxx/v_noabi)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/bsoncxx/v_noabi)
+TARGET_INCLUDE_DIRECTORIES(${PROJECT_NAME}-test PUBLIC ${CMAKE_INSTALL_PREFIX}/include/mongocxx/v_noabi)
+
+
+SET(BUILD_LIBRARY ${BUILD_LIBRARY} mongocxx bsoncxx)
+ADD_DEPENDENCIES(${PROJECT_NAME} mongo-cxx-driver)
+ADD_DEPENDENCIES(${PROJECT_NAME}-test mongo-cxx-driver)
 
 # ----------------------------------------------------
 # Configure Google Test dependencies

@@ -47,6 +47,7 @@ SnapshotSubmissionShrdPtr SnapshotRepeatingOpInfo::getData()
     // Temporarily stop taking data while collecting the snapshot.
     taking_data.store(false, std::memory_order_release);
     std::vector<MonitorEventShrdPtr> result;
+    auto                             submission_ts = std::chrono::steady_clock::now();
     for (const auto& pair : element_data)
     {
         if (pair.second)

@@ -85,9 +85,9 @@ TEST(CMDController, CheckConfiguration) {
   setenv("EPICS_k2eg_cmd-input-topic", CMD_QUEUE, 1);
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   ASSERT_NO_THROW(opt->parse(argc, argv));
-  ServiceResolver<IMetricService>::registerService(std::make_shared<DummyMetricService>(opt->getMetricConfiguration()));
-  ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
-  ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(opt->getSubscriberConfiguration()));
+  ServiceResolver<IMetricService>::registerService<k2eg::service::metric::ConstMetricConfigurationShrdPtr, DummyMetricService>(opt->getMetricConfiguration());
+  ServiceResolver<ILogger>::registerService<k2eg::service::log::ConstLogConfigurationShrdPtr, BoostLogger>(opt->getloggerConfiguration());
+  ServiceResolver<ISubscriber>::registerService<k2eg::service::pubsub::ConstSubscriberConfigurationShrdPtr, RDKafkaSubscriber>(opt->getSubscriberConfiguration());
   std::unique_ptr<CMDController> cmd_controller = std::make_unique<CMDController>(opt->getCMDControllerConfiguration(), handler);
   EXPECT_STREQ(cmd_controller->configuration->topic_in.c_str(), CMD_QUEUE);
   ASSERT_NO_THROW(cmd_controller.reset(););
@@ -105,9 +105,9 @@ TEST(CMDController, InitFaultCheckWithNoQueue) {
   setenv("EPICS_k2eg_sub-server-address", KAFKA_ADDR, 1);
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   ASSERT_NO_THROW(opt->parse(argc, argv));
-  ServiceResolver<IMetricService>::registerService(std::make_shared<DummyMetricService>(opt->getMetricConfiguration()));
-  ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
-  ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(opt->getSubscriberConfiguration()));
+  ServiceResolver<IMetricService>::registerService<k2eg::service::metric::ConstMetricConfigurationShrdPtr, DummyMetricService>(opt->getMetricConfiguration());
+  ServiceResolver<ILogger>::registerService<k2eg::service::log::ConstLogConfigurationShrdPtr, BoostLogger>(opt->getloggerConfiguration());
+  ServiceResolver<ISubscriber>::registerService<k2eg::service::pubsub::ConstSubscriberConfigurationShrdPtr, RDKafkaSubscriber>(opt->getSubscriberConfiguration());
   ASSERT_ANY_THROW(std::make_unique<CMDController>(opt->getCMDControllerConfiguration(), handler););
   ServiceResolver<ISubscriber>::resolve().reset();
   ServiceResolver<ILogger>::resolve().reset();
@@ -124,9 +124,9 @@ TEST(CMDController, StartStop) {
   setenv("EPICS_k2eg_sub-server-address", KAFKA_ADDR, 1);
   std::unique_ptr<ProgramOptions> opt = std::make_unique<ProgramOptions>();
   ASSERT_NO_THROW(opt->parse(argc, argv));
-  ServiceResolver<IMetricService>::registerService(std::make_shared<DummyMetricService>(opt->getMetricConfiguration()));
-  ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
-  ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(opt->getSubscriberConfiguration()));
+  ServiceResolver<IMetricService>::registerService<k2eg::service::metric::ConstMetricConfigurationShrdPtr, DummyMetricService>(opt->getMetricConfiguration());
+  ServiceResolver<ILogger>::registerService<k2eg::service::log::ConstLogConfigurationShrdPtr, BoostLogger>(opt->getloggerConfiguration());
+  ServiceResolver<ISubscriber>::registerService<k2eg::service::pubsub::ConstSubscriberConfigurationShrdPtr, RDKafkaSubscriber>(opt->getSubscriberConfiguration());
   std::unique_ptr<CMDController> cmd_controller = std::make_unique<CMDController>(opt->getCMDControllerConfiguration(), handler);
   ASSERT_NO_THROW(cmd_controller.reset(););
   ServiceResolver<ISubscriber>::resolve().reset();
@@ -153,10 +153,10 @@ class CMDControllerCommandTestParametrized : public ::testing::TestWithParam<std
     setenv("EPICS_k2eg_sub-group-id", "", 1);
     opt = std::make_unique<ProgramOptions>();
     opt->parse(argc, argv);
-    ServiceResolver<IMetricService>::registerService(std::make_shared<DummyMetricService>(opt->getMetricConfiguration()));
-    ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(opt->getloggerConfiguration()));
-    ServiceResolver<ISubscriber>::registerService(std::make_shared<RDKafkaSubscriber>(opt->getSubscriberConfiguration()));
-    ServiceResolver<IPublisher>::registerService(std::make_shared<RDKafkaPublisher>(opt->getPublisherConfiguration()));
+    ServiceResolver<IMetricService>::registerService<k2eg::service::metric::ConstMetricConfigurationShrdPtr, DummyMetricService>(opt->getMetricConfiguration());
+    ServiceResolver<ILogger>::registerService<k2eg::service::log::ConstLogConfigurationShrdPtr, BoostLogger>(opt->getloggerConfiguration());
+    ServiceResolver<ISubscriber>::registerService<k2eg::service::pubsub::ConstSubscriberConfigurationShrdPtr, RDKafkaSubscriber>(opt->getSubscriberConfiguration());
+    ServiceResolver<IPublisher>::registerService<k2eg::service::pubsub::ConstPublisherConfigurationShrdPtr, RDKafkaPublisher>(opt->getPublisherConfiguration());
   }
 
   static void
@@ -330,7 +330,7 @@ CMDControllerCommandHandler recurring_snapshot_test = [](ConstCommandShrdPtrVec 
   ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->repeat_delay_msec, 1000);
   ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->time_window_msec, 1000);
   ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->triggered, false);
-  ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->type, SnapshotType::NORMAL);
+  ASSERT_EQ(reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->snapshot_type, SnapshotType::NORMAL);
   auto pv_field_filter_list = reinterpret_cast<const RepeatingSnapshotCommand*>(received_command[0].get())->pv_field_filter_list;
   ASSERT_TRUE(std::find(pv_field_filter_list.begin(), pv_field_filter_list.end(), "value") != pv_field_filter_list.end());
 };

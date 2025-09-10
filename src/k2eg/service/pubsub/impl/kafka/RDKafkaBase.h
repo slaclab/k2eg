@@ -7,8 +7,8 @@
 
 #include <librdkafka/rdkafkacpp.h>
 
-#include <string>
 #include <memory>
+#include <string>
 
 // macro utility
 #define RDK_LOG_AND_THROW(msg) \
@@ -23,20 +23,22 @@
         }                                                             \
     }
 
-namespace k2eg::service::pubsub::impl::kafka
+namespace k2eg::service::pubsub::impl::kafka {
+class RDKafkaBase
 {
-    class RDKafkaBase
-    {
-    protected:
-        std::unique_ptr<RdKafka::Conf> conf;
-        std::unique_ptr<RdKafka::Conf> t_conf;
+protected:
+    std::unique_ptr<RdKafka::Conf> conf;
+    std::unique_ptr<RdKafka::Conf> t_conf;
 
-    public:
-        RDKafkaBase();
-        ~RDKafkaBase();
-        void applyCustomConfiguration(k2eg::common::MapStrKV custom_impl_parameter);
-        int setOption(const std::string &key, const std::string &value);
-    };
-}
+public:
+    RDKafkaBase();
+    ~RDKafkaBase();
+    void applyCustomConfiguration(k2eg::common::MapStrKV custom_impl_parameter);
+    int  setOption(const std::string& key, const std::string& value);
+    void applyDefaultsThenOverrides(
+        const std::vector<std::pair<std::string, std::string>>& defaults,
+        const k2eg::common::MapStrKV&                           overrides);
+};
+} // namespace k2eg::service::pubsub::impl::kafka
 
 #endif
