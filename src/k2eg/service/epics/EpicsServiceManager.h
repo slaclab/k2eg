@@ -69,6 +69,8 @@ struct ChannelMapElement
     bool active = false;
     // Per-PV throttling manager (shared to allow safe use outside locks)
     std::shared_ptr<k2eg::common::ThrottlingManager> pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>();
+    // Last observed backlog count (0 if none). Updated by task(); read by handleStatistic().
+    double last_backlog_count = 0.0;
 };
 DEFINE_PTR_TYPES(ChannelMapElement)
 typedef std::unique_lock<std::shared_mutex> WriteLockCM;

@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <execution>
 #include <memory>
+#include <vector>
 #include <mutex>
 #include <ranges>
 #include <regex>
@@ -467,12 +468,18 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
     {
         // Per-PV backoff in microseconds
         pv_throttle_ptr->update(had_events);
-        auto t_stat = pv_throttle_ptr->getStats();
-        metric.incrementCounter(IEpicsMetricCounterType::PVThrottleGauge, t_stat.throttle_us, {{"pv", pv_name}});
-        // Backlog gauge: report number of drained items when backlog is present (hit per-pass cap), else 0
+        // Backlog gauge: report number of drained items when backlog is present (hit per-pass cap), else 0.
         const auto   max_per_pass = static_cast<size_t>(config->max_event_from_monitor_queue);
         const double backlog_count = drained >= max_per_pass ? static_cast<double>(drained) : 0.0;
-        metric.incrementCounter(IEpicsMetricCounterType::PVBacklogGauge, backlog_count, {{"pv", pv_name}});
+        // Store backlog count for periodic metric emission in handleStatistic().
+        {
+            WriteLockCM lock(channel_map_mutex);
+            auto        it = channel_map.find(pv_name);
+            if (it != channel_map.end())
+            {
+                it->second.last_backlog_count = backlog_count;
+            }
+        }
     }
 
     // resubmit the task to the thread pool unless shutting down
@@ -491,6 +498,9 @@ void EpicsServiceManager::handleStatistic(TaskProperties& task_properties)
     int         active_pv = 0;
     int         total_pv = 0;
     std::string throttling_info;
+    // Snapshot per-PV throttle and backlog to emit outside locks
+    struct PvMetricSnapshot { std::string pv; int throttle_us; double backlog; };
+    std::vector<PvMetricSnapshot> pv_metrics;
     {
         ReadLockCM read_lock(channel_map_mutex);
         active_pv = std::count_if(std::execution::par, channel_map.begin(), channel_map.end(),
@@ -499,9 +509,27 @@ void EpicsServiceManager::handleStatistic(TaskProperties& task_properties)
                                       return pair.second.active == true;
                                   });
         total_pv = channel_map.size();
+        pv_metrics.reserve(channel_map.size());
+        for (const auto& [pv_name, elem] : channel_map)
+        {
+            int    throttle_us = 0;
+            double backlog     = elem.last_backlog_count;
+            if (elem.pv_throttle)
+            {
+                auto t_stat = elem.pv_throttle->getStats();
+                throttle_us = t_stat.throttle_us;
+            }
+            pv_metrics.push_back(PvMetricSnapshot{pv_name, throttle_us, backlog});
+        }
     }
     metric.incrementCounter(IEpicsMetricCounterType::ActiveMonitorGauge, active_pv);
     metric.incrementCounter(IEpicsMetricCounterType::TotalMonitorGauge, total_pv);
+    // Emit per-PV metrics for throttle and backlog
+    for (const auto& m : pv_metrics)
+    {
+        metric.incrementCounter(IEpicsMetricCounterType::PVThrottleGauge, m.throttle_us, {{"pv", m.pv}});
+        metric.incrementCounter(IEpicsMetricCounterType::PVBacklogGauge, m.backlog, {{"pv", m.pv}});
+    }
     if (!config->disable_thread_throttle)
     {
         auto& thread_throttling_vector = getThreadThrottlingInfo();
