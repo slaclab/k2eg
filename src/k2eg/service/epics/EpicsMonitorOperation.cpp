@@ -1,5 +1,5 @@
-#include "k2eg/service/epics/PVStructureMerger.h"
-#include <iostream>
+#include <k2eg/service/epics/PVStructureMerger.h>
+
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
@@ -221,11 +221,13 @@ EventReceivedShrdPtr CombinedMonitorOperation::getEventData() const
 
 bool CombinedMonitorOperation::hasData() const
 {
+    std::lock_guard<std::mutex> lock(evt_mtx);
     return monitor_principal_request->hasData() && (monitor_additional_request->hasData() || last_additional_evt_received);
 }
 
 bool CombinedMonitorOperation::hasEvents() const
 {
+    std::lock_guard<std::mutex> lock(evt_mtx);
     return monitor_principal_request->hasEvents() && (monitor_additional_request->hasData() || last_additional_evt_received);
 }
 
