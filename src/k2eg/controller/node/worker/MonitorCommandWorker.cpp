@@ -333,6 +333,9 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
     // check fail to connect pv
     {
         std::shared_lock slock(channel_map_mtx);
+        if(channel_topics_map.size() == 0) {
+            return;
+        }   
         for (auto& event : *event_received->event_fail)
         {
             auto it = channel_topics_map.find(event->channel_data.pv_name);
@@ -378,7 +381,6 @@ void MonitorCommandWorker::epicsMonitorEvent(EpicsServiceManagerHandlerParamterT
                  {"k2eg-ser-type", serialization_to_string(static_cast<SerializationType>(monitor_info.event_serialization))}});
         }
     }
-    publisher->flush(100);
 }
 
 #pragma endregion MonitorMessage

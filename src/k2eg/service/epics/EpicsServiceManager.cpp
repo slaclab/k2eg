@@ -410,21 +410,19 @@ void EpicsServiceManager::task(ChannelTaskShrdPtr task_entry)
         }
     }
 
-    if (state->pv_throttle)
+    if (pv_stats_ptr)
     {
-        state->pv_throttle->update(had_events);
-        const auto   max_per_pass = static_cast<size_t>(config->max_event_from_monitor_queue);
-        const double backlog_count = drained >= max_per_pass ? static_cast<double>(drained) : 0.0;
-        if (pv_stats_ptr)
-        {
-            pv_stats_ptr->last_backlog_count.store(backlog_count, std::memory_order_relaxed);
-        }
+        pv_stats_ptr->last_backlog_count.store(static_cast<double>(drained), std::memory_order_relaxed);
     }
 
     recordTaskDuration(start_time, pv_stats_ptr);
 
     if (!end_processing)
     {
+        if (state->pv_throttle)
+        {
+            state->pv_throttle->update(had_events);
+        }
         processing_pool->detach_task(
             [this, task_entry]
             {

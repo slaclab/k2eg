@@ -73,13 +73,13 @@ inline uint64_t take_events_for_iteration(const std::string& snapshot_name, int6
 }
 } // namespace
 
-void set_snapshot_thread_name(const std::size_t idx)
+void set_snapshot_thread_name(const char* name, const std::size_t idx)
 {
     // Use a local variable, not static/global
     std::ostringstream oss;
-    oss << "Repeating Snapshot " << idx;
-    const std::string name = oss.str();
-    BS::this_thread::set_os_thread_name(name);
+    oss << name << idx;
+    const std::string name_ = oss.str();
+    BS::this_thread::set_os_thread_name(name_);
 }
 
 std::string get_pv_names(std::set<std::string> name_set)
@@ -96,9 +96,14 @@ std::string get_pv_names(std::set<std::string> name_set)
     return all_pv_names;
 }
 
-inline auto thread_namer = [](unsigned long idx)
+inline auto thread_namer_submission = [](unsigned long idx)
 {
-    set_snapshot_thread_name(idx);
+    set_snapshot_thread_name("Repeating Snapshot Submitting", idx);
+};
+
+inline auto thread_namer_daq_processing = [](unsigned long idx)
+{
+    set_snapshot_thread_name("Repeating Snapshot DAQ Processing", idx);
 };
 
 ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnapshotConfiguration& repeating_snapshot_configuration, k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager)
@@ -106,7 +111,8 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnapshotConf
     , logger(ServiceResolver<ILogger>::resolve())
     , publisher(ServiceResolver<IPublisher>::resolve())
     , epics_service_manager(epics_service_manager)
-    , thread_pool(std::make_shared<BS::light_thread_pool>(repeating_snapshot_configuration.snapshot_processing_thread_count, thread_namer))
+    , thread_pool_submitting(std::make_shared<BS::light_thread_pool>(repeating_snapshot_configuration.snapshot_processing_thread_count, thread_namer_submission))
+    , thread_pool_daq_processing(std::make_shared<BS::light_thread_pool>(1, thread_namer_daq_processing))
     , metrics(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric())
     , iteration_sync_(std::make_unique<SnapshotIterationSynchronizer>())
 {
@@ -136,7 +142,8 @@ ContinuousSnapshotManager::~ContinuousSnapshotManager()
     // remove epics monitor handler
     epics_handler_token.reset();
     // stop all the thread
-    thread_pool->wait();
+    thread_pool_daq_processing->wait();
+    thread_pool_submitting->wait();
     logger->logMessage("[ContinuousSnapshotManager] Continuous snapshot manager stopped");
 }
 
@@ -399,37 +406,29 @@ void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapsho
 
 void ContinuousSnapshotManager::epicsMonitorEvent(EpicsServiceManagerHandlerParamterType event_received)
 {
-    // prepare reading lock
-    std::shared_lock read_lock(snapshot_running_mutex_);
-
-    // for (auto& event : *event_received->event_fail)
-    // {
-    //     // set the channel as not active
-    //     auto it = snapshot_runinnig_.find(event->channel_data.pv_name);
-    //     if (it != snapshot_runinnig_.end())
-    //     {
-    //         it->second->addData(nullptr, std::memory_order_release);
-    //     }
-    // }
-
-    // manage the received data
-    std::set<std::string> pv_names;
-    for (auto& event : *event_received->event_data)
-    {
-        const std::string pv_name = event->channel_data.pv_name;
-        pv_names.insert(pv_name);
-        // store event on the global cache using the atomic pointer
-        auto range = pv_snapshot_map_.equal_range(pv_name);
-        for (auto it = range.first; it != range.second; ++it)
+    // process the received event in a separate thread to not block the epics thread
+    thread_pool_daq_processing->detach_task(
+        [this, event_received]() mutable
         {
-            if (it->second)
+            // prepare reading lock
+            std::shared_lock read_lock(snapshot_running_mutex_);
+            // manage the received data
+            std::set<std::string> pv_names;
+            for (auto& event : *event_received->event_data)
             {
-                it->second->addData(event);
+                const std::string pv_name = event->channel_data.pv_name;
+                pv_names.insert(pv_name);
+                // store event on the global cache using the atomic pointer
+                auto range = pv_snapshot_map_.equal_range(pv_name);
+                for (auto it = range.first; it != range.second; ++it)
+                {
+                    if (it->second)
+                    {
+                        it->second->addData(event);
+                    }
+                }
             }
-        }
-    }
-    // logger->logMessage(STRING_FORMAT("EPICS forwarded %1% data events for PVs: %2%",
-    // event_received->event_data->size() % get_pv_names(pv_names)), LogLevel::DEBUG);
+        });
 }
 
 void ContinuousSnapshotManager::expirationCheckerLoop()
@@ -458,7 +457,8 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                     bool        to_continue = false;
                     bool        last_submission = false;
 
-                    for (const auto& pv_name : non_updated_pvs) {
+                    for (const auto& pv_name : non_updated_pvs)
+                    {
                         // Forward the last data for each non-updated PV
                         epics_service_manager->forceMonitorChannelUpdate(pv_name, false);
                     }
@@ -521,7 +521,7 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
                     {
                         s_op_ptr->dataScheduled(scheduled_iteration_id);
                     }
-                    thread_pool->detach_task(
+                    thread_pool_submitting->detach_task(
                         [this, s_op_ptr, submission_shard_ptr, last_submission]() mutable
                         {
                             SnapshotSubmissionTask task(s_op_ptr, submission_shard_ptr, this->publisher, this->logger, *this->iteration_sync_, last_submission);

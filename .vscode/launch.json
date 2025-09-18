@@ -34,7 +34,7 @@
                 "--sub-impl-kv=max.poll.interval.ms:10000",
                 "--snapshot-repeating-scheduler-thread=8"
             ],
-            "stopAtEntry": false,
+            "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.vscode/.env",
             "environment": [
