@@ -14,6 +14,8 @@
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/scheduler/Scheduler.h>
 
+#include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -37,6 +39,15 @@ struct PV
 };
 DEFINE_PTR_TYPES(PV)
 
+struct PvRuntimeStats
+{
+    std::atomic<std::uint64_t> total_duration_ns{0};
+    std::atomic<std::uint64_t> invocation_count{0};
+    // Accumulates drained items since last metric flush
+    std::atomic<std::uint64_t> backlog_total_drained{0};
+};
+DEFINE_PTR_TYPES(PvRuntimeStats)
+
 struct EpicsServiceManagerConfig
 {
     // the number of thread for execute the poll
@@ -56,27 +67,30 @@ struct EpicsServiceManagerConfig
     bool disable_thread_throttle = true;
 };
 
-// describe a channel ellement in map per each PV
+// describe a channel element in map per each PV
 struct ChannelMapElement
 {
-    // this is the channel object
-    std::shared_ptr<EpicsChannel> channel;
-    // this is used to mark the channel as to be forced
-    bool to_force;
-    // this is used to mark the channel as to be removed when keep alive is 0
-    int keep_alive;
-    // Indicates if the channel is currently active
-    bool active = false;
-    // Per-PV throttling manager (shared to allow safe use outside locks)
-    std::shared_ptr<k2eg::common::ThrottlingManager> pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>();
+    std::shared_ptr<EpicsChannel>                    channel;
+    std::atomic<bool>                                to_force{false};
+    std::atomic<int>                                 keep_alive{0};
+    std::atomic<bool>                                active{false};
+    std::shared_ptr<k2eg::common::ThrottlingManager> pv_throttle;
+    std::shared_ptr<PvRuntimeStats>                  runtime_stats = std::make_shared<PvRuntimeStats>();
 };
 DEFINE_PTR_TYPES(ChannelMapElement)
+
+struct ChannelTask
+{
+    ChannelMapElementShrdPtr         state;
+    ConstMonitorOperationShrdPtr     monitor;
+};
+DEFINE_PTR_TYPES(ChannelTask)
 typedef std::unique_lock<std::shared_mutex> WriteLockCM;
 typedef std::shared_lock<std::shared_mutex> ReadLockCM;
 
 DEFINE_PTR_TYPES(EpicsServiceManagerConfig)
 
-DEFINE_MAP_FOR_TYPE(std::string, ChannelMapElement, ChannelMap)
+DEFINE_MAP_FOR_TYPE(std::string, ChannelTaskShrdPtr, ChannelMap)
 
 class EpicsServiceManager
 {
@@ -92,15 +106,24 @@ class EpicsServiceManager
     bool                                                              end_processing;
     std::shared_ptr<BS::light_thread_pool>                            processing_pool;
     k2eg::service::metric::IEpicsMetric&                              metric;
-    std::vector<k2eg::common::ThrottlingManager>                      thread_throttling_vector;
-    mutable std::mutex                                                thread_throttle_mutex;
+    
     /*
     @brief task is the main function for the thread pool
 
     @param monitor_op the monitor operation to execute
     @details this function is called by the thread pool
     */
-    void task(ConstMonitorOperationShrdPtr monitor_op);
+    void task(ChannelTaskShrdPtr task_entry);
+    inline void recordTaskDuration(const std::chrono::steady_clock::time_point& start_time,
+                                   const PvRuntimeStatsShrdPtr& pv_stats_ptr);
+    inline void cleanupAndErase(const std::string& pv_name,
+                                const ChannelTaskShrdPtr& task_entry,
+                                const ChannelMapElementShrdPtr& state,
+                                bool erase_from_map,
+                                bool record_duration,
+                                const std::chrono::steady_clock::time_point& start_time,
+                                const PvRuntimeStatsShrdPtr& pv_stats_ptr);
+    
     void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
 
 public:
@@ -133,8 +156,7 @@ public:
      */
     k2eg::common::BroadcastToken                        addHandler(EpicsServiceManagerHandler new_handler);
     size_t                                              getHandlerSize();
-    k2eg::common::StringVector                          getMonitoredChannels();
-    const std::vector<k2eg::common::ThrottlingManager>& getThreadThrottlingInfo() const;
+    k2eg::common::StringVector getMonitoredChannels();
 };
 
 DEFINE_PTR_TYPES(EpicsServiceManager)

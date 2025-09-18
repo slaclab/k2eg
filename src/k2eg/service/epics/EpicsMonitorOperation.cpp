@@ -1,5 +1,5 @@
-#include "k2eg/service/epics/PVStructureMerger.h"
-#include <iostream>
+#include <k2eg/service/epics/PVStructureMerger.h>
+
 #include <k2eg/service/epics/EpicsData.h>
 #include <k2eg/service/epics/EpicsGetOperation.h>
 #include <k2eg/service/epics/EpicsMonitorOperation.h>
@@ -79,12 +79,6 @@ size_t MonitorOperationImpl::poll(size_t element_to_fetch) const
             force_update = false;
         }
     }
-    else
-    {
-        // destroy the get operation
-        if (get_op)
-            get_op.reset();
-    }
     fetched = received_event->event_data->size() + received_event->event_cancel->size() +
               received_event->event_disconnect->size() + received_event->event_fail->size() +
               received_event->event_timeout->size();
@@ -125,22 +119,8 @@ void MonitorOperationImpl::monitorEvent(const pvac::MonitorEvent& evt)
         received_event->event_disconnect->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Disconnec, pv_name, evt.message, nullptr}));
         break;
     case pvac::MonitorEvent::Data:
-        // Quickly drain a bounded number of items here to avoid
-        // dropping/coalescing events under high-rate PVs. Remaining
-        // backlog (if any) is drained in poll().
-        {
-            int drained = 0;
-            constexpr int kMaxDrainPerCallback = 128;
-            while (!mon.complete() && drained < kMaxDrainPerCallback)
-            {
-                if (!mon.poll())
-                    break;
-                ++drained;
-                auto tmp_data = std::make_shared<epics::pvData::PVStructure>(mon.root->getStructure());
-                tmp_data->copy(*mon.root);
-                received_event->event_data->push_back(std::make_shared<MonitorEvent>(MonitorEvent{EventType::Data, "", {pv_name, tmp_data}}));
-            }
-        }
+        // to not overload the event queue, we do nothing here
+        // data will be fetched in poll()
         break;
     }
 }
@@ -221,11 +201,13 @@ EventReceivedShrdPtr CombinedMonitorOperation::getEventData() const
 
 bool CombinedMonitorOperation::hasData() const
 {
+    std::lock_guard<std::mutex> lock(evt_mtx);
     return monitor_principal_request->hasData() && (monitor_additional_request->hasData() || last_additional_evt_received);
 }
 
 bool CombinedMonitorOperation::hasEvents() const
 {
+    std::lock_guard<std::mutex> lock(evt_mtx);
     return monitor_principal_request->hasEvents() && (monitor_additional_request->hasData() || last_additional_evt_received);
 }
 

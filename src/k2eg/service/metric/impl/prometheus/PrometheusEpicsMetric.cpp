@@ -31,7 +31,8 @@ PrometheusEpicsMetric::PrometheusEpicsMetric()
                                   .Register(*registry))
     , throttle_gauge_family(BuildGauge().Name("k2eg_epics_thread_throttle_ms").Help("Current throttle delay per thread in ms").Register(*registry))
     , pv_throttle_gauge_family(BuildGauge().Name("k2eg_epics_pv_throttle_us").Help("Current throttle delay per PV in microseconds").Register(*registry))
-    , pv_backlog_gauge_family(BuildGauge().Name("k2eg_epics_pv_backlog_gauge").Help("Backlog gauge (number of items in backlog)").Register(*registry))
+    , pv_backlog_counter_family(BuildCounter().Name("k2eg_epics_pv_backlog_total").Help("Total number of items drained per PV").Register(*registry))
+    , pv_processing_duration_gauge_family(BuildGauge().Name("k2eg_epics_pv_processing_duration_us").Help("Mean processing duration per PV in microseconds").Register(*registry))
     , get_ok_counter(ioc_read_write.Add({{"op", "get"}}))
     , put_ok_counter(ioc_read_write.Add({{"op", "put"}}))
     , monitor_event_data(ioc_read_write.Add({{"op", "monitor"}, {"evt_type", "data"}}))
@@ -93,6 +94,7 @@ void PrometheusEpicsMetric::incrementCounter(IEpicsMetricCounterType type, const
     case IEpicsMetricCounterType::ThrottlingDurationGauge: duration_gauge_family.Add(label).Set(inc_value); break;
     case IEpicsMetricCounterType::ThrottleGauge: throttle_gauge_family.Add(label).Set(inc_value); break;
     case IEpicsMetricCounterType::PVThrottleGauge: pv_throttle_gauge_family.Add(label).Set(inc_value); break;
-    case IEpicsMetricCounterType::PVBacklogGauge: pv_backlog_gauge_family.Add(label).Set(inc_value); break;
+    case IEpicsMetricCounterType::PVBacklogCounter: pv_backlog_counter_family.Add(label).Increment(inc_value); break;
+    case IEpicsMetricCounterType::PVProcessingDurationGauge: pv_processing_duration_gauge_family.Add(label).Set(inc_value); break;
     }
 }

@@ -32,7 +32,7 @@
                 // "--pub-impl-kv=queue.buffering.max.ms:1",
                 "--sub-impl-kv=session.timeout.ms:6000",
                 "--sub-impl-kv=max.poll.interval.ms:10000",
-                "--snapshot-repeating-scheduler-thread=16"
+                "--snapshot-repeating-scheduler-thread=8"
             ],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
