@@ -56,12 +56,12 @@ public:
         , idle_threshold_(threshold)
         , last_update_time_(std::chrono::steady_clock::now()) {}
 
-    // Backward-compatible API: treat true as 1 event, false as 0
-    void update(bool had_events) { update(had_events ? 1 : 0); }
+    // Backward-compatible API: trigger internal accounting; returns computed delay
+    int update(bool had_events) { return computeDelayUs(had_events ? 1 : 0); }
 
-    // Adaptive update that considers the number of events processed in this cycle
-    // Sleep-based adaptive pacing that considers the number of events processed
-    void update(int events_count)
+    // Compute recommended delay in microseconds using EPS-based pacing.
+    // Does NOT sleep; callers decide how/when to schedule.
+    int computeDelayUs(int events_count)
     {
         // Normalize negative inputs
         if (events_count < 0) events_count = 0;
@@ -75,39 +75,39 @@ public:
         const double inst_eps = static_cast<double>(events_count) / dt_s;
         // Exponential moving average of EPS for stability
         ema_eps_ = ema_alpha_ * inst_eps + (1.0 - ema_alpha_) * ema_eps_;
-
-        if (events_count == 0 && ema_eps_ < eps_idle_threshold_)
-        {
-            // Completely idle cycle: ramp up throttle periodically
-            stats.idle_counter++;
-            stats.total_idle_cycles++;
-            if (stats.idle_counter >= idle_threshold_)
-            {
-                stats.throttle_us = std::min(stats.throttle_us * 2, max_throttle_us_);
-                stats.idle_counter = 0;
-            }
-            // Sleep based on current throttle when idle
-            if (stats.throttle_us > 0)
-            {
-                std::this_thread::sleep_for(std::chrono::microseconds(stats.throttle_us));
-            }
-            return;
-        }
+        samples_++;
 
         // Some activity detected (or recent activity per EMA)
         stats.total_events_processed.fetch_add(events_count, std::memory_order_relaxed);
-        // Compute desired pacing from EMA of events/second: aim to process ~target_events_per_poll_ per poll
+
+        // Warmup: keep minimum delay until we have enough samples
+        if (samples_ < warmup_samples_)
+        {
+            stats.throttle_us = min_throttle_us_;
+            stats.idle_counter = 0;
+            return stats.throttle_us;
+        }
+
+        // Compute desired pacing from EMA of events/second:
+        // aim to process ~target_events_per_poll_ per poll
         const double eps = std::max(ema_eps_, eps_floor_);
         const double desired_delay_us_d = 1'000'000.0 * (target_events_per_poll_ / eps);
-        const int    desired_delay_us = static_cast<int>(std::clamp(desired_delay_us_d, static_cast<double>(min_throttle_us_), static_cast<double>(max_throttle_us_)));
+        int          delay_us = static_cast<int>(std::clamp(desired_delay_us_d, static_cast<double>(min_throttle_us_), static_cast<double>(max_throttle_us_)));
 
-        stats.throttle_us = desired_delay_us;
-        stats.idle_counter = 0;
-        if (desired_delay_us > 0)
+        // For very low activity cycles with zero events, ease into backoff
+        if (events_count == 0 && ema_eps_ < eps_idle_threshold_)
         {
-            std::this_thread::sleep_for(std::chrono::microseconds(desired_delay_us));
+            delay_us = std::min(std::max(delay_us, stats.throttle_us + incremental_backoff_us_), max_throttle_us_);
+            stats.idle_counter++;
+            stats.total_idle_cycles++;
         }
-        return;
+        else
+        {
+            stats.idle_counter = 0;
+        }
+
+        stats.throttle_us = delay_us;
+        return stats.throttle_us;
     }
 
     ThrottlingStats getStats() const noexcept { 
@@ -140,6 +140,9 @@ private:
     double target_events_per_poll_ = 8.0; // target events handled per poll
     double eps_floor_ = 0.1;         // minimum EPS to avoid division by zero
     double eps_idle_threshold_ = 0.25; // below this EMA EPS, treat as idle when no events in the current cycle
+    std::uint32_t samples_ = 0;      // number of update samples seen
+    std::uint32_t warmup_samples_ = 5; // keep min delay during warmup
+    int incremental_backoff_us_ = 2000; // 2 ms additional backoff for low-activity cycles
 };
 
 DEFINE_PTR_TYPES(ThrottlingManager)

@@ -104,6 +104,7 @@ void EpicsServiceManager::addChannel(const std::string& pv_name_uri)
         new_state->channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name);
         new_state->pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>(
             this->config->pv_min_throttle_us, this->config->pv_max_throttle_us, this->config->pv_idle_threshold);
+        new_state->next_due = std::chrono::steady_clock::now();
         new_state->keep_alive.store(1, std::memory_order_relaxed);
 
         new_task = std::make_shared<ChannelTask>();
@@ -179,6 +180,7 @@ void EpicsServiceManager::forceMonitorChannelUpdate(const std::string& pv_name_,
     if (auto search = channel_map.find(pv_name); search != channel_map.end())
     {
         search->second->state->to_force.store(true, std::memory_order_relaxed);
+        search->second->state->next_due = std::chrono::steady_clock::now();
     }
 }
 
@@ -368,9 +370,22 @@ void EpicsServiceManager::task(ChannelTaskShrdPtr task_entry)
         return;
     }
 
-    if (state->to_force.exchange(false, std::memory_order_acq_rel))
+    const bool forced = state->to_force.exchange(false, std::memory_order_acq_rel);
+    if (forced)
     {
         monitor_op->forceUpdate();
+    }
+
+    // Skip processing if not yet due and not forced
+    const auto now_ts = std::chrono::steady_clock::now();
+    if (!forced && now_ts < state->next_due)
+    {
+        // Resubmit without processing to avoid aggressive polling
+        processing_pool->detach_task([this, task_entry]
+                                     {
+                                         this->task(task_entry);
+                                     });
+        return;
     }
 
     try
@@ -430,8 +445,9 @@ void EpicsServiceManager::task(ChannelTaskShrdPtr task_entry)
     {
         if (state->pv_throttle)
         {
-            // Use drained event count to adaptively throttle per PV
-            state->pv_throttle->update(static_cast<int>(drained));
+            // Use drained event count to compute next due time; favor busy PVs
+            const int delay_us = state->pv_throttle->computeDelayUs(static_cast<int>(drained));
+            state->next_due = std::chrono::steady_clock::now() + std::chrono::microseconds(std::max(0, delay_us));
         }
         processing_pool->detach_task(
             [this, task_entry]
