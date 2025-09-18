@@ -65,27 +65,12 @@ EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr conf
                                      this->config->thread_count % this->config->max_event_from_monitor_queue),
                        LogLevel::INFO);
 
-    // Start scheduling thread to dispatch PV polls at computed times
-    scheduler_thread_ = std::thread([this]
-                                    {
-                                        this->schedulingLoop();
-                                    });
 }
 
 EpicsServiceManager::~EpicsServiceManager()
 {
     // stop the statistic
     bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(EPICS_MANAGER_STAT_TASK_NAME);
-    // Stop scheduling thread
-    scheduler_stop_.store(true, std::memory_order_relaxed);
-    {
-        std::lock_guard lk(scheduler_mtx_);
-        scheduler_cv_.notify_all();
-    }
-    if (scheduler_thread_.joinable())
-    {
-        scheduler_thread_.join();
-    }
     // Stop processing monitor tasks and wait for scheduled tasks to finish.
     end_processing = true;
     processing_pool->wait();
@@ -127,13 +112,12 @@ void EpicsServiceManager::addChannel(const std::string& pv_name_uri)
 
         channel_map.emplace(sanitized_pv->name, new_task);
     }
-    // Schedule immediately
-    {
-        std::lock_guard lk(scheduler_mtx_);
-        new_task->state->next_due = std::chrono::steady_clock::now();
-        new_task->state->scheduled.store(false, std::memory_order_relaxed);
-        scheduler_cv_.notify_all();
-    }
+    // Start processing immediately
+    processing_pool->detach_task(
+        [this, new_task]
+        {
+            this->task(new_task);
+        });
 }
 
 StringVector EpicsServiceManager::getMonitoredChannels()
@@ -195,12 +179,6 @@ void EpicsServiceManager::forceMonitorChannelUpdate(const std::string& pv_name_,
     if (auto search = channel_map.find(pv_name); search != channel_map.end())
     {
         search->second->state->to_force.store(true, std::memory_order_relaxed);
-        // Expedite scheduling so the force happens ASAP
-        search->second->state->next_due = std::chrono::steady_clock::now();
-        {
-            std::lock_guard lk(scheduler_mtx_);
-            scheduler_cv_.notify_all();
-        }
     }
 }
 
@@ -452,16 +430,14 @@ void EpicsServiceManager::task(ChannelTaskShrdPtr task_entry)
     {
         if (state->pv_throttle)
         {
-            // Use drained event count to adaptively compute next schedule
-            const int delay_us = state->pv_throttle->update(static_cast<int>(drained));
-            state->next_due = std::chrono::steady_clock::now() + std::chrono::microseconds(std::max(0, delay_us));
+            // Use drained event count to adaptively throttle per PV
+            state->pv_throttle->update(static_cast<int>(drained));
         }
-        // Mark as not scheduled and notify scheduler loop to consider rescheduling
-        state->scheduled.store(false, std::memory_order_relaxed);
-        {
-            std::lock_guard lk(scheduler_mtx_);
-            scheduler_cv_.notify_all();
-        }
+        processing_pool->detach_task(
+            [this, task_entry]
+            {
+                this->task(task_entry);
+            });
     }
 }
 
@@ -531,59 +507,4 @@ void EpicsServiceManager::handleStatistic(TaskProperties& task_properties)
     logger->logMessage(STRING_FORMAT("EPICS Monitor Statistics: Active PVs: %1%, Total PVs: %2%", active_pv % total_pv), LogLevel::TRACE);
 }
 
-void EpicsServiceManager::schedulingLoop()
-{
-    using clock = std::chrono::steady_clock;
-    while (!scheduler_stop_.load(std::memory_order_relaxed))
-    {
-        clock::time_point next_wakeup = clock::now() + std::chrono::milliseconds(100);
-        ChannelTaskShrdPtr due_task;
-
-        // Scan current channels to find one due now, and compute the soonest wakeup
-        {
-            ReadLockCM read_lock(channel_map_mutex);
-            for (auto& [pv_name, task_ptr] : channel_map)
-            {
-                if (!task_ptr || !task_ptr->state)
-                    continue;
-                auto& st = task_ptr->state;
-                // Skip if not alive or already scheduled
-                if (st->keep_alive.load(std::memory_order_relaxed) <= 0)
-                    continue;
-                if (st->scheduled.load(std::memory_order_relaxed))
-                    continue;
-
-                if (st->next_due <= clock::now())
-                {
-                    due_task = task_ptr;
-                    break; // schedule one at a time; loop again for fairness
-                }
-                else
-                {
-                    if (st->next_due < next_wakeup)
-                    {
-                        next_wakeup = st->next_due;
-                    }
-                }
-            }
-        }
-
-        if (due_task)
-        {
-            // Mark and dispatch
-            due_task->state->scheduled.store(true, std::memory_order_relaxed);
-            processing_pool->detach_task([this, task = due_task]
-                                         {
-                                             this->task(task);
-                                         });
-            continue; // loop again immediately
-        }
-
-        // Wait until next wakeup or external notification
-        std::unique_lock<std::mutex> lk(scheduler_mtx_);
-        scheduler_cv_.wait_until(lk, next_wakeup, [this]
-                                 {
-                                     return scheduler_stop_.load(std::memory_order_relaxed);
-                                 });
-    }
-}
+ 

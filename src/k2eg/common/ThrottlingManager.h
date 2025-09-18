@@ -57,11 +57,11 @@ public:
         , last_update_time_(std::chrono::steady_clock::now()) {}
 
     // Backward-compatible API: treat true as 1 event, false as 0
-    int update(bool had_events) { return update(had_events ? 1 : 0); }
+    void update(bool had_events) { update(had_events ? 1 : 0); }
 
     // Adaptive update that considers the number of events processed in this cycle
-    // Returns recommended delay in microseconds for next poll
-    int update(int events_count)
+    // Sleep-based adaptive pacing that considers the number of events processed
+    void update(int events_count)
     {
         // Normalize negative inputs
         if (events_count < 0) events_count = 0;
@@ -86,7 +86,12 @@ public:
                 stats.throttle_us = std::min(stats.throttle_us * 2, max_throttle_us_);
                 stats.idle_counter = 0;
             }
-            return stats.throttle_us;
+            // Sleep based on current throttle when idle
+            if (stats.throttle_us > 0)
+            {
+                std::this_thread::sleep_for(std::chrono::microseconds(stats.throttle_us));
+            }
+            return;
         }
 
         // Some activity detected (or recent activity per EMA)
@@ -98,7 +103,11 @@ public:
 
         stats.throttle_us = desired_delay_us;
         stats.idle_counter = 0;
-        return stats.throttle_us;
+        if (desired_delay_us > 0)
+        {
+            std::this_thread::sleep_for(std::chrono::microseconds(desired_delay_us));
+        }
+        return;
     }
 
     ThrottlingStats getStats() const noexcept { 

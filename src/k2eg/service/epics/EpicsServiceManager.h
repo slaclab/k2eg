@@ -21,7 +21,6 @@
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
-#include <condition_variable>
 
 namespace k2eg::service::epics_impl {
 
@@ -77,9 +76,6 @@ struct ChannelMapElement
     std::atomic<bool>                                active{false};
     std::shared_ptr<k2eg::common::ThrottlingManager> pv_throttle;
     std::shared_ptr<PvRuntimeStats>                  runtime_stats = std::make_shared<PvRuntimeStats>();
-    // Scheduling state for non-blocking throttling
-    std::atomic<bool>                                scheduled{false};
-    std::chrono::steady_clock::time_point            next_due{std::chrono::steady_clock::now()};
 };
 DEFINE_PTR_TYPES(ChannelMapElement)
 
@@ -110,11 +106,6 @@ class EpicsServiceManager
     bool                                                              end_processing;
     std::shared_ptr<BS::light_thread_pool>                            processing_pool;
     k2eg::service::metric::IEpicsMetric&                              metric;
-    // Non-blocking per-PV scheduling
-    std::thread                                                       scheduler_thread_;
-    std::atomic<bool>                                                 scheduler_stop_{false};
-    std::condition_variable                                           scheduler_cv_;
-    std::mutex                                                        scheduler_mtx_;
     
     /*
     @brief task is the main function for the thread pool
@@ -132,7 +123,7 @@ class EpicsServiceManager
                                 bool record_duration,
                                 const std::chrono::steady_clock::time_point& start_time,
                                 const PvRuntimeStatsShrdPtr& pv_stats_ptr);
-    void schedulingLoop();
+    
     void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
 
 public:
