@@ -76,8 +76,6 @@ struct ChannelMapElement
     std::atomic<bool>                                active{false};
     std::shared_ptr<k2eg::common::ThrottlingManager> pv_throttle;
     std::shared_ptr<PvRuntimeStats>                  runtime_stats = std::make_shared<PvRuntimeStats>();
-    // Next time this PV should be processed; used to skip unnecessary polls
-    std::chrono::steady_clock::time_point            next_due{std::chrono::steady_clock::now()};
 };
 DEFINE_PTR_TYPES(ChannelMapElement)
 
