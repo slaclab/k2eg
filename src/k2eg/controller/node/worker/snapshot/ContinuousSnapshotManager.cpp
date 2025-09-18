@@ -1,18 +1,21 @@
 
 
+#include "boost/json/parse.hpp"
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
-#include <k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.h>
-#include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
-#include <k2eg/service/metric/INodeControllerMetric.h>
 
 #include <k2eg/service/ServiceResolver.h>
 #include <k2eg/service/epics/EpicsData.h>
+#include <k2eg/service/metric/INodeControllerMetric.h>
 
 #include <k2eg/controller/command/cmd/SnapshotCommand.h>
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
+#include <k2eg/controller/node/worker/snapshot/BackTimedBufferedSnapshotOpInfo.h>
 #include <k2eg/controller/node/worker/snapshot/ContinuousSnapshotManager.h>
+#include <k2eg/controller/node/worker/snapshot/SnapshotOpInfo.h>
 #include <k2eg/controller/node/worker/snapshot/SnapshotRepeatingOpInfo.h>
+
+#include <boost/json.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -25,6 +28,7 @@
 #include <unordered_map>
 #include <utility>
 
+using namespace k2eg::controller::command;
 using namespace k2eg::controller::command::cmd;
 using namespace k2eg::controller::node::worker;
 using namespace k2eg::controller::node::worker::snapshot;
@@ -35,12 +39,26 @@ using namespace k2eg::service::pubsub;
 using namespace k2eg::service::metric;
 using namespace k2eg::service::scheduler;
 using namespace k2eg::service::epics_impl;
+using namespace k2eg::service::configuration;
 
+#define CSM_RECURRING_CHECK_TASK_NAME       "csm-recurring-check-task"
+#define CSM_RECURRING_CHECK_TASK_CRON       "1 * * * * *"
+
+#pragma region Utility
 #define GET_QUEUE_FROM_SNAPSHOT_NAME(snapshot_name) ([](const std::string& name) { \
     std::string norm = std::regex_replace(name, std::regex(R"([^A-Za-z0-9\-])"), "_"); \
     std::transform(norm.begin(), norm.end(), norm.begin(), ::tolower); \
     return norm; \
 })(snapshot_name)
+
+const std::string now_in_gmt()
+{
+    auto        now = std::chrono::system_clock::now();
+    std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+    char        timestamp_buf[32];
+    std::strftime(timestamp_buf, sizeof(timestamp_buf), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now_time_t));
+    return timestamp_buf;
+}
 
 // Local aggregator to count events per snapshot iteration and log at Tail.
 namespace {
@@ -106,9 +124,12 @@ inline auto thread_namer_daq_processing = [](unsigned long idx)
     set_snapshot_thread_name("Repeating Snapshot DAQ Processing", idx);
 };
 
+#pragma region Implementation
+
 ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnapshotConfiguration& repeating_snapshot_configuration, k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager)
     : repeating_snapshot_configuration(repeating_snapshot_configuration)
     , logger(ServiceResolver<ILogger>::resolve())
+    , node_configuration(ServiceResolver<service::configuration::INodeConfiguration>::resolve())
     , publisher(ServiceResolver<IPublisher>::resolve())
     , epics_service_manager(epics_service_manager)
     , thread_pool_submitting(std::make_shared<BS::light_thread_pool>(repeating_snapshot_configuration.snapshot_processing_thread_count, thread_namer_submission))
@@ -116,6 +137,7 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnapshotConf
     , metrics(ServiceResolver<IMetricService>::resolve()->getNodeControllerMetric())
     , iteration_sync_(std::make_unique<SnapshotIterationSynchronizer>())
 {
+    logger->logMessage("Initializing continuous snapshot manager", LogLevel::INFO);
     // add epics manager monitor handler
     epics_handler_token = epics_service_manager->addHandler(std::bind(&ContinuousSnapshotManager::epicsMonitorEvent, this, std::placeholders::_1));
     // set the publisher callback
@@ -127,16 +149,34 @@ ContinuousSnapshotManager::ContinuousSnapshotManager(const RepeatingSnapshotConf
     expiration_thread_running = true;
     expiration_thread = std::thread(&ContinuousSnapshotManager::expirationCheckerLoop, this);
     pthread_setname_np(expiration_thread.native_handle(), "SnapshotExpirationChecker");
+    logger->logMessage(
+        STRING_FORMAT("Continuous snapshot manager initialized (threads=%1%)",
+                       repeating_snapshot_configuration.snapshot_processing_thread_count),
+        LogLevel::INFO);
+
+    auto task_restart_monitor = MakeTaskShrdPtr(CSM_RECURRING_CHECK_TASK_NAME, CSM_RECURRING_CHECK_TASK_CRON, std::bind(&ContinuousSnapshotManager::handlePeriodicTask, this, std::placeholders::_1),
+                                                -1 // start at application boot time
+    );
+    ServiceResolver<Scheduler>::resolve()->addTask(task_restart_monitor);
 }
 
 ContinuousSnapshotManager::~ContinuousSnapshotManager()
 {
-    logger->logMessage("[ContinuousSnapshotManager] Stopping continuous snapshot manager");
+    logger->logMessage("Stopping continuous snapshot manager");
+
+    // remove the periodic task
+    logger->logMessage("Remove periodic task from scheduler");
+    bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(CSM_RECURRING_CHECK_TASK_NAME);
+    logger->logMessage(STRING_FORMAT("Removed periodic maintanance : %1%", erased));
+
+    // stop the expiration thread
+    logger->logMessage("Stopping expiration thread");
     expiration_thread_running = false;
     if (expiration_thread.joinable())
     {
         expiration_thread.join();
     }
+    logger->logMessage("Expiration thread stopped");
     // set the run flag to false
     run_flag = false;
     // remove epics monitor handler
@@ -207,9 +247,8 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
                                          serialization_to_string(snapsthot_command->serialization) % snapsthot_command->triggered),
                        LogLevel::DEBUG);
     // create the command operation info structure
-
     SnapshotOpInfoShrdPtr s_op_ptr = nullptr;
-    switch (snapsthot_command->type)
+    switch (snapsthot_command->snapshot_type)
     {
     case SnapshotType::unknown:
         {
@@ -260,6 +299,13 @@ void ContinuousSnapshotManager::startSnapshot(command::cmd::ConstRepeatingSnapsh
     if (s_op_ptr->cmd->snapshot_name.empty())
     {
         manageReply(-5, STRING_FORMAT("The snapshot name is not valid %1%", s_op_ptr->cmd->snapshot_name), snapsthot_command);
+        return;
+    }
+
+    // try to gain the ownership of the snapshot
+    if (!tryToConfigureSnapshotStart(*s_op_ptr))
+    {
+        manageReply(-8, STRING_FORMAT("The snapshot %1% is already running by %2%", s_op_ptr->cmd->snapshot_name % node_configuration->getSnapshotGateway(s_op_ptr->queue_name)), snapsthot_command);
         return;
     }
 
@@ -399,7 +445,10 @@ void ContinuousSnapshotManager::stopSnapshot(command::cmd::ConstRepeatingSnapsho
         removal_future.wait();
         logger->logMessage(STRING_FORMAT("Snapshot '%1%' has been fully decommissioned.", snapsthot_stop_command->snapshot_name), LogLevel::DEBUG);
     }
+    // Now we can safely remove the snapshot from the running list
+    releaseSnapshotForStop(*s_to_stop);
     s_to_stop.reset(); // Clear the pointer to ensure no dangling references.
+
     // send reply to app for submitted command
     manageReply(0, STRING_FORMAT("Snapshot '%1%' has been stopped", snapsthot_stop_command->snapshot_name), snapsthot_stop_command);
 }
@@ -545,6 +594,42 @@ void ContinuousSnapshotManager::expirationCheckerLoop()
     }
 }
 
+void ContinuousSnapshotManager::handlePeriodicTask(TaskProperties& task_properties)
+{
+    logger->logMessage("Handle periodic task for recurring snapshot management", LogLevel::DEBUG);
+    // check for snapshot to reboot using configuration service
+    if (!node_configuration)
+    {
+        logger->logMessage("Node configuration service not available", LogLevel::ERROR);
+        return;
+    }
+    // get the list of snapshots to be restarted
+    auto snapshots_to_restart = node_configuration->getAvailableSnapshot();
+    if (snapshots_to_restart.empty())
+    {
+        logger->logMessage("No snapshots available for restart", LogLevel::DEBUG);
+        return;
+    }
+
+    logger->logMessage(STRING_FORMAT("Restart first of %1% snapshots to restart", snapshots_to_restart.size()), LogLevel::DEBUG);
+    auto snapshot_id = snapshots_to_restart.front();
+    auto snapshot_config = node_configuration->getSnapshotConfiguration(snapshot_id);
+    if (!snapshot_config)
+    {
+        logger->logMessage(STRING_FORMAT("Snapshot configuration for '%1%' not found", snapshot_id), LogLevel::ERROR);
+        return;
+    }
+    // Submit the command to start the snapshot
+    logger->logMessage(STRING_FORMAT("Submitting repeating snapshot command for '%1%' with cmd: %2%", snapshot_id % snapshot_config->config_json), LogLevel::DEBUG);
+    // create empty command
+    auto snapshot_command = MakeRepeatingSnapshotCommandShrdPtr(RepeatingSnapshotCommand{});
+    // create boost json object from snapshot configuration
+    from_json(snapshot_config->config_json, *snapshot_command);
+    // on auto-restart we need to remove away the reply id and topic
+    // ok we can submit the command
+    submitSnapshot(snapshot_command);
+}
+
 void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const std::string& error_message, ConstCommandShrdPtr cmd, const std::string& publishing_topic)
 {
     logger->logMessage(error_message, error_code == 0 ? LogLevel::INFO : LogLevel::ERROR);
@@ -559,6 +644,76 @@ void ContinuousSnapshotManager::manageReply(const std::int8_t error_code, const 
             publisher->pushMessage(MakeReplyPushableMessageUPtr(cmd->reply_topic, "repeating-snapshot-events", "repeating-snapshot-events", serialized_message), {{"k2eg-ser-type", serialization_to_string(cmd->serialization)}});
         }
     }
+}
+
+#pragma region Configuration
+
+bool ContinuousSnapshotManager::tryToConfigureSnapshotStart(SnapshotOpInfo& snapshot_ops_info)
+{
+    // This method should attempt to configure the snapshot start using the node configuration.
+    // Return true if configuration was successful, false otherwise.
+    bool result = false;
+    try
+    {
+        logger->logMessage(STRING_FORMAT("Attempting to acquire ownership of snapshot '%1%'", snapshot_ops_info.queue_name), LogLevel::INFO);
+        // Attempt to configure using the node_configuration interface.
+        // The actual implementation depends on your INodeConfiguration interface.
+        // Here, we assume it returns a bool indicating success.
+        if (!node_configuration)
+        {
+            logger->logMessage("Node configuration service not available", LogLevel::ERROR);
+            return result;
+        }
+
+        result = node_configuration->tryAcquireSnapshot(snapshot_ops_info.queue_name, true);
+        if (!result)
+        {
+            // acquistion has not been successful
+            logger->logMessage(STRING_FORMAT("Snapshot '%1%' cannot be acquired by '%2%'", snapshot_ops_info.queue_name % node_configuration->getNodeName()), LogLevel::INFO);
+            return result;
+        }
+
+        // If the snapshot is acquired, we can proceed to configure it.
+        logger->logMessage(STRING_FORMAT("Snapshot '%1%' acquired by '%2%'", snapshot_ops_info.queue_name % node_configuration->getNodeName()), LogLevel::INFO);
+
+        // create json description for ConstRepeatingSnapshotCommandShrdPtr
+        snapshot_ops_info.snapshot_configuration = MakeSnapshotConfigurationShrdPtr(
+            SnapshotConfiguration{
+                .weight = 0,
+                .weight_unit = "eps",
+                .update_timestamp = now_in_gmt(),
+                .config_json = to_json_string_cmd_ptr(snapshot_ops_info.cmd)});
+        result = node_configuration->setSnapshotConfiguration(snapshot_ops_info.queue_name, snapshot_ops_info.snapshot_configuration);
+        // set the snapshot as running
+        node_configuration->setSnapshotRunning(snapshot_ops_info.queue_name, true);
+        node_configuration->setSnapshotArchiveRequested(snapshot_ops_info.queue_name, true);
+    }
+    catch (const std::exception& ex)
+    {
+        logger->logMessage(
+            STRING_FORMAT("Exception during tryToConfigureSnapshotStart for '%1%': %2%", snapshot_ops_info.queue_name % ex.what()),
+            LogLevel::ERROR);
+    }
+    return result;
+}
+
+bool ContinuousSnapshotManager::releaseSnapshotForStop(SnapshotOpInfo& snapshot_ops_info)
+{
+    if (!node_configuration)
+    {
+        logger->logMessage("Node configuration service not available", LogLevel::ERROR);
+        return false;
+    }
+    logger->logMessage(STRING_FORMAT("Setting snapshot '%1%' running status to %2%", snapshot_ops_info.queue_name % false), LogLevel::INFO);
+    // Update the snapshot's running status in the node configuration.
+    node_configuration->setSnapshotRunning(snapshot_ops_info.queue_name, false);
+
+    // release the snapshot ownership
+    if (!node_configuration->releaseSnapshot(snapshot_ops_info.queue_name, true))
+    {
+        logger->logMessage(STRING_FORMAT("Failed to release snapshot '%1%'", snapshot_ops_info.queue_name), LogLevel::ERROR);
+    }
+    return true;
 }
 
 #pragma region Submission Task
@@ -577,9 +732,11 @@ void SnapshotSubmissionTask::operator()()
     const auto thread_index = BS::this_thread::get_index();
     if (!thread_index.has_value())
         return;
-    auto    snap_ts = CHRONO_TO_UNIX_INT64(submission_shrd_ptr->snap_time);
-    int64_t current_iteration = submission_shrd_ptr->iteration_id;
 
+    auto    snap_ts = CHRONO_TO_UNIX_INT64(submission_shrd_ptr->snap_time);
+    auto    header_timestamp = CHRONO_TO_UNIX_INT64(submission_shrd_ptr->header_timestamp);
+    int64_t current_iteration = submission_shrd_ptr->iteration_id;
+    auto    statistic_counter = snapshot_command_info->getStatisticCounter();
     // Iteration id is resolved at scheduling and attached to the submission.
     if (current_iteration == 0)
     {
@@ -591,6 +748,7 @@ void SnapshotSubmissionTask::operator()()
     // This guard ensures that this task is counted, and its completion is always registered.
     TaskGuard task_guard(iteration_sync_, snapshot_command_info->cmd->snapshot_name, current_iteration);
 
+    // HEADER: This is the start of a new logical iteration.
     if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Header) != SnapshotSubmissionType::None)
     {
         snapshot_command_info->publishHeader(publisher, logger, snap_ts, current_iteration);
@@ -600,15 +758,14 @@ void SnapshotSubmissionTask::operator()()
         snapshot_command_info->completeHeaderGate(current_iteration);
     }
 
-    if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None &&
-        !submission_shrd_ptr->snapshot_events.empty())
+    if ((submission_shrd_ptr->submission_type & SnapshotSubmissionType::Data) != SnapshotSubmissionType::None)
     {
         // Ensure header was published for this iteration before sending any data
         snapshot_command_info->waitForHeaderGate(current_iteration);
 
         // Publish data via SnapshotOpInfo and aggregate counts for Tail logging
         const auto events_sent_this_batch =
-            snapshot_command_info->publishData(publisher, logger, snap_ts, current_iteration, submission_shrd_ptr->snapshot_events);
+            snapshot_command_info->publishData(publisher, logger, snap_ts, header_timestamp, current_iteration, submission_shrd_ptr->snapshot_events);
         add_events_for_iteration(snapshot_command_info->cmd->snapshot_name, current_iteration, events_sent_this_batch);
         // Mark data submission as completed for this iteration
         snapshot_command_info->dataCompleted(current_iteration);
@@ -622,7 +779,7 @@ void SnapshotSubmissionTask::operator()()
         const auto events_published = take_events_for_iteration(snapshot_command_info->cmd->snapshot_name, current_iteration);
         logger->logMessage(
             STRING_FORMAT("[Tail] Snapshot %1% iteration %2% completed, events=%3%", snapshot_command_info->cmd->snapshot_name % current_iteration % events_published), LogLevel::DEBUG);
-        snapshot_command_info->publishTail(publisher, logger, snap_ts, current_iteration);
+        snapshot_command_info->publishTail(publisher, logger, snap_ts,  header_timestamp, current_iteration);
 
         // Mark the tail as processed. The lock will be released by finishTask either now (if this is the last task)
         // or later when the last running Data task calls its TaskGuard destructor.

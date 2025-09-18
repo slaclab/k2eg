@@ -1,24 +1,42 @@
-# Message format and serialization
+# Message Format and Serialization
 
-# Message type
-Every message managed by k2eg has a destination topic that is the topic where the message, generated for that command, are sent. Usually a client that send comamnd to k2eg use a single topic for receive that message. K2EG can manage different type of serialization, so each message has different structure depending to the type of the serailziaiton choosen by the client. The serializaation type for the answer is choosen by the client when the command is sent to the k2eg.
+## Message Types
+Every message produced by K2EG is sent to a destination topic. A client typically uses a single reply topic to receive responses. K2EG supports multiple serialization formats; the wire shape of messages depends on the chosen serialization. The serialization for responses is specified by the client in the command.
 
-# Command Structure
-Each command has a minimum set of attributes that are the ones below:
+## Command Structure
+Each command has a common set of attributes:
 ```json
 {
-    "command": "command string desceription",
+    "command": "<command name>",
     "serialization": "json|msgpack",
-    "pv_name": "channel description",
-    "reply_topic": "reply-destination-topic",
-    "reply_id":"reply id",
+    "pv_name": "<pv name>",
+    "reply_topic": "<reply topic>",
+    "reply_id": "<correlation id>"
 }
 ```
-The 'serialization' field is keeped in consideration only for the command that generate a data flow form EPICS to kafka, or generally speaking for all those command that has a read behaviour. For the command kind that have a write behaviour this field is keepd in consideration only if the write operation require a message for an answer.
-Actually k2eg support two different serialization JSON or Msgpack for message from EPICS to kafka and JSON for the command submition, bellowe there is the description of the message input and output structure related to each serialization type. <span style="color:#59afe1">The Msgpack serialization will be described using json notation for simplification.</span>
+Notes:
+- `serialization` applies to commands that produce EPICS data (read-like operations). For write-like operations, it matters only if a payload is returned.
+- K2EG supports JSON and MessagePack payloads. Commands are submitted in JSON. For brevity, MessagePack is illustrated using JSON-like notation below.
 
-# Epics value serialization
-Each epics single value is serialized in different way depending of serialization type:
+### Common Fields and Base Reply
+
+- `reply_topic`: Kafka topic where the gateway publishes the response or stream of events for the request.
+- `reply_id`: Correlation id chosen by the client; echoed back on replies to allow matching.
+- `protocol`: EPICS protocol for PV access (`pva` or `ca`) when applicable.
+- `pv_name`: EPICS process variable name (without protocol prefix unless otherwise noted).
+
+Base reply envelope (used for acks and simple responses):
+```json
+{
+  "error": 0,
+  "reply_id": "<correlation id>",
+  "message": "<optional info>"
+}
+```
+Where `error` is `0` on success; non-zero indicates an error with details in `message`.
+
+## EPICS Value Serialization
+EPICS values are serialized differently depending on the format:
 
 ## JSON Serialization (json)
 ```json
@@ -67,8 +85,8 @@ Each epics single value is serialized in different way depending of serializatio
 }
 ```
 
-## MSGPack serialization (msgpack)
-The msgpack serializaion use a map to represent data like a json structure. At level-0 there is a map where the key is the pv name and as value there is another map that contains the sublevel keys value, alarm, timeStamp, display, control, valueAlarm:
+## MessagePack serialization (msgpack)
+MessagePack uses a map analogous to the JSON structure. At level-0 the key is the PV name and the value is a map with sub-keys `value`, `alarm`, `timeStamp`, `display`, `control`, `valueAlarm`:
 ```
 MAP( "<pv name>", MAP(
     "value": scalar | scalar array,
@@ -111,15 +129,11 @@ MAP( "<pv name>", MAP(
     )
 ))
 ```
-## MSGPack Compact serialization (msgpack-compact)
-The msgpack compact, instead of a map, use an array to serialize all the values, leaving out the key. At the first position there is the pv name the other values are positionally equal to the position on the json and msgpack structure.
-```
-VECTOR(<channle name>,< scalar | scalar array>, <severity>, <status>, <message>, <secondsPastEpoch>, <nanoseconds>, <userTag>, <limitLow>, <limitHigh>, <description>, <units>, <precision>, <index>, <contorl limitLow>, <constrol limitHigh>, <control minStep>, <active>, <lowAlarmLimit>, <lowWarningLimit>, <highWarningLimit>, <highAlarmLimit>, <lowAlarmSeverity>, <lowWarningSeverity>, <highWarningSeverity>, <highAlarmSeverity>, <hysteresis>)
-```
+ 
 
-# Get Command
-The **get** command permit to retrive the current value of an epics pv, so it generate a single message with the following schema
-## JSON Structure
+## Get Command
+Retrieve the current value of an EPICS PV; produces a single reply message.
+### JSON Structure
 ```json
 {
     "command": "get",
@@ -127,51 +141,80 @@ The **get** command permit to retrive the current value of an epics pv, so it ge
     "protocol": "pva|ca",
     "pv_name": "channel::a",
     "reply_topic": "reply-destination-topic",
-    "reply_id":"reply id",
+    "reply_id": "<reply id>"
+}
+```
+Reply example (JSON serialization):
+```json
+{
+  "error": 0,
+  "reply_id": "<reply id>",
+  "BPMS:LTUH:250:X": {
+    "value": 0.123,
+    "timeStamp": { "secondsPastEpoch": 1750509, "nanoseconds": 123000000 },
+    "alarm": { "severity": 0, "status": 0, "message": "NO_ALARM" }
+  }
 }
 ```
 
-# Monitor Command
-The **monitor** command permits to enable or disable the update notification, for a specific EPICS pv, into a specific kafka topic. K2eg permit to enable the monitoring of the same channel and forward event message on different topics and in different serializaton format for the specific topic. The message received for the event monitor is the same as the **get** command:
-## JSON Structure
-### Activation
+## Monitor Command
+Enable or disable update notifications for a specific EPICS PV on a Kafka topic. The monitor event payload matches the Get response schema.
+### JSON Structure — Activation
 ```json
 {
     "command": "monitor",
     "serialization": "json|msgpack",
     "protocol": "pva|ca",
-    "pv_name": "pv name",
+    "pv_name": "<pv name>",
     "reply_topic": "reply-destination-topic",
-    "reply_id":"reply id",
+    "reply_id": "<reply id>",
     "activate": true
 }
 ```
-### Deactivation
+### JSON Structure — Deactivation
 
 ```json
 {
     "command": "monitor",
-    "pv_name": "pv name",
+    "pv_name": "<pv name>",
     "reply_topic": "reply-destination-topic",
-    "reply_id":"reply id",
+    "reply_id": "<reply id>",
     "activate": false
 }
 ```
-# Put Command
-Put command is ismilar to caput or pvput epics command, it permit to applya a value to a pv. In case the it is a scalar array, each value need to be separated by a space, like in the example below.
-## JSON Structure
+Ack example:
+```json
+{ "error": 0, "reply_id": "<reply id>" }
+```
+Event example (published to `reply_topic` while active):
+```json
+{
+  "BPMS:LTUH:250:X": {
+    "value": 0.127,
+    "timeStamp": { "secondsPastEpoch": 1750510, "nanoseconds": 321000000 },
+    "alarm": { "severity": 0, "status": 0, "message": "NO_ALARM" }
+  }
+}
+```
+## Put Command
+Apply a value to a PV (similar to caput/pvput). For scalar arrays, provide values separated by spaces.
+### JSON Structure
 ```json
 {
     "command": "put",
     "protocol": "pva|ca",
-    "pv_name": "pv name",
-    "value": "<value>|<value> <value> <value> <value>",
+    "pv_name": "<pv name>",
+    "value": "<value>" | "<v1> <v2> <v3>",
     "reply_topic": "reply-destination-topic",
-    "reply_id":"reply id",
+    "reply_id": "<reply id>",
 }
 ```
+Ack example:
+```json
+{ "error": 0, "reply_id": "<reply id>", "message": "applied" }
+```
 
-### Snapshot Command
+## Snapshot Command
 
 The **snapshot** command performs a one-time or continuous data acquisition (DAQ) of multiple EPICS PVs. Its structure is as follows:
 
@@ -197,8 +240,8 @@ The **snapshot** command performs a one-time or continuous data acquisition (DAQ
 - Each PV's data is sent asynchronously to the client as it arrives—no need to wait for the full time window.
 - A final **completion message** is sent after the time window elapses.
 
-**Reply Format:**
-- **One message per PV**:
+Reply Format (one-shot):
+- One message per PV:
   ```json
   {
     "error": 0,
@@ -206,51 +249,99 @@ The **snapshot** command performs a one-time or continuous data acquisition (DAQ
     "<pv name>": { "value": 0, ... }
   }
   ```
-- **Completion message**:
+- Completion message:
   ```json
   {
-    "error": 1,
+    "error": 0,
     "reply_id": "<reply id>"
   }
   ```
 
-**Continuous Mode (`is_continuous: true`)**:
+Continuous Mode (`is_continuous: true`):
 - The snapshot is repeatedly triggered.
 - After each snapshot completes, it waits for `repeat_delay_msec` before starting a new one.
 - `snapshot_name` is used as a unique identifier and also defines the topic where data is published.
 
-**Field Descriptions**:
+Field Descriptions:
 - `repeat_delay_msec`: Delay between two snapshots (in milliseconds).
 - `time_window_msec`: Duration of the window to gather PV updates after a snapshot is triggered.
 - `snapshot_name`: Unique name used for identification and topic routing.
 
-**Reply Format(Continuous Mode):**
-- **Header message**:
+Reply Format (Continuous Mode):
+- Header message:
   ```json
   {
-    "type": 0,  ==> identify the header
-    "iter_index": <number of current snapshot trigger starting from 0>
-    "timestamp": "<snapshot timestamp>",
-    "snapshot_name": "the name of the snapshot"
+    "message_type": 0,
+    "iter_index": <iteration index starting from 0>,
+    "timestamp": <header timestamp (ms since epoch)>,
+    "snapshot_name": "<snapshot name>"
   }
   ```
-- **Data message** (one for each pv data):
+- Data message (one per PV sample):
   ```json
   {
-    "type": 1,  ==> identify the data event
-    "iter_index": <number of current snapshot trigger starting from 0>,
-    "timestamp": "<snapshot timestamp>",
-    "pv_name": {pv data object}
+    "message_type": 1,
+    "iter_index": <iteration index>,
+    "timestamp": <pv sample timestamp (ms since epoch)>,
+    "header_timestamp": <header timestamp (ms since epoch)>,
+    "pv_data": { /* EPICS value object as above */ }
   }
   ```
-- **Completion message**:
+  - Completion (Tail) message:
   ```json
   {
-    "type": 2,  ==> identify the completion
+    "message_type": 2,
     "error": 0,
-    "error_message":"in case there has been some issuer during snapshot",
-    "iter_index": <number of current snapshot trigger starting from 0>,
-    "timestamp": "<snapshot timestamp>",
-    "snapshot_name": "the name of the snapshot"
+    "error_message": "<optional error description>",
+    "iter_index": <iteration index>,
+    "timestamp": <completion timestamp (ms since epoch)>,
+    "header_timestamp": <header timestamp (ms since epoch)>,
+    "snapshot_name": "<snapshot name>"
   }
   ```
+
+Notes:
+- The exact wire layout for MessagePack follows the same field semantics; JSON above is illustrative.
+- A metadata header `k2eg-ser-type` accompanies each published message to indicate the serialization type.
+
+### Examples
+
+Header (type 0):
+```json
+{
+  "message_type": 0,
+  "snapshot_name": "my_snapshot",
+  "timestamp": 1750509290000,
+  "iter_index": 7
+}
+```
+
+Data (type 1):
+```json
+{
+  "message_type": 1,
+  "timestamp": 1750509290123,
+  "header_timestamp": 1750509290000,
+  "iter_index": 7,
+  "pv_data": {
+    "BPMS:LTUH:250:X": {
+      "value": 0.123,
+      "timeStamp": { "secondsPastEpoch": 1750509, "nanoseconds": 123000000 },
+      "alarm": { "severity": 0, "status": 0, "message": "NO_ALARM" }
+    }
+  }
+}
+```
+
+Completion / Tail (type 2):
+```json
+{
+  "message_type": 2,
+  "error": 0,
+  "error_message": "",
+  "snapshot_name": "my_snapshot",
+  "timestamp": 1750509290999,
+  "header_timestamp": 1750509290000,
+  "iter_index": 7
+}
+```

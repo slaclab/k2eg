@@ -1,9 +1,7 @@
 #ifndef K2EG_COMMON_TIMEWINDOWEVENTBUFFER_H_
 #define K2EG_COMMON_TIMEWINDOWEVENTBUFFER_H_
 
-#include "k2eg/common/types.h"
 #include <chrono>
-#include <iostream>
 #include <memory>
 #include <vector>
 #include <mutex>

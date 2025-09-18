@@ -9,7 +9,7 @@
 #include <msgpack/v3/object_fwd_decl.hpp>
 #include <map>
 
-#include "../epics/epics.h"
+#include "../service/epics/epics.h"
 
 using namespace k2eg::common;
 using namespace k2eg::controller::node::worker;
