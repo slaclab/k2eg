@@ -10,12 +10,14 @@
 #include <k2eg/service/epics/EpicsPutOperation.h>
 #include <k2eg/service/epics/EpicsServiceManager.h>
 
+#include <chrono>
 #include <cstddef>
 #include <execution>
 #include <memory>
 #include <mutex>
 #include <ranges>
 #include <regex>
+#include <vector>
 
 using namespace k2eg::common;
 
@@ -47,7 +49,6 @@ inline auto thread_namer = [](unsigned long idx)
 EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config)
     : config(std::move(config))
     , end_processing(false)
-    , thread_throttling_vector(this->config->thread_count)
     , processing_pool(std::make_shared<BS::light_thread_pool>(this->config->thread_count, thread_namer))
     , metric(ServiceResolver<IMetricService>::resolve()->getEpicsMetric())
 {
@@ -63,6 +64,7 @@ EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr conf
     logger->logMessage(STRING_FORMAT("[EpicsServiceManager] Epics Service Manager started [tthread_cout=%1%, poll_to=%2%]",
                                      this->config->thread_count % this->config->max_event_from_monitor_queue),
                        LogLevel::INFO);
+
 }
 
 EpicsServiceManager::~EpicsServiceManager()
@@ -87,51 +89,35 @@ void EpicsServiceManager::addChannel(const std::string& pv_name_uri)
     if (!sanitized_pv)
         return;
 
-    bool inserted = false;
-    try
+    ChannelTaskShrdPtr new_task;
     {
-        std::shared_ptr<EpicsChannel> channel_ptr;
+        WriteLockCM write_lock(channel_map_mutex);
+        if (auto it = channel_map.find(sanitized_pv->name); it != channel_map.end())
         {
-            WriteLockCM write_lock(channel_map_mutex);
-            auto [it, success] = channel_map.emplace(
-                sanitized_pv->name,
-                ChannelMapElement{
-                    .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
-                    .to_force = false,
-                    .keep_alive = 1,
-                    .active = false,
-                    .pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>(
-                        this->config->pv_min_throttle_us, this->config->pv_max_throttle_us, this->config->pv_idle_threshold),
-                });
-            if (!success)
-            {
-                // Already exists, increment keep_alive and set to_force
-                it->second.keep_alive++;
-                it->second.to_force = true;
-                return;
-            }
-            channel_ptr = it->second.channel;
-            inserted = true;
+            auto& existing_task = it->second;
+            existing_task->state->keep_alive.fetch_add(1, std::memory_order_relaxed);
+            existing_task->state->to_force.store(true, std::memory_order_relaxed);
+            return;
         }
 
-        // Only monitor if we actually inserted a new channel
-        ConstMonitorOperationShrdPtr monitor_operation = channel_ptr->monitor();
-        processing_pool->detach_task(
-            [this, monitor_operation]
-            {
-                this->task(monitor_operation);
-            });
+        auto new_state = std::make_shared<ChannelMapElement>();
+        new_state->channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name);
+        new_state->pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>(
+            this->config->pv_min_throttle_us, this->config->pv_max_throttle_us, this->config->pv_idle_threshold);
+        new_state->keep_alive.store(1, std::memory_order_relaxed);
+
+        new_task = std::make_shared<ChannelTask>();
+        new_task->state = std::move(new_state);
+        new_task->monitor = new_task->state->channel->monitor();
+
+        channel_map.emplace(sanitized_pv->name, new_task);
     }
-    catch (...)
-    {
-        // Only erase if we actually inserted
-        if (inserted)
+    // Start processing immediately
+    processing_pool->detach_task(
+        [this, new_task]
         {
-            WriteLockCM write_lock(channel_map_mutex);
-            channel_map.erase(sanitized_pv->name);
-        }
-        throw;
-    }
+            this->task(new_task);
+        });
 }
 
 StringVector EpicsServiceManager::getMonitoredChannels()
@@ -154,7 +140,12 @@ void EpicsServiceManager::removeChannel(const std::string& pv_name_uri)
     ReadLockCM read_lock(channel_map_mutex);
     if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
     {
-        search->second.keep_alive--;
+        auto& keep_alive = search->second->state->keep_alive;
+        int   previous = keep_alive.fetch_sub(1, std::memory_order_relaxed);
+        if (previous <= 1)
+        {
+            keep_alive.store(0, std::memory_order_relaxed);
+        }
     }
 }
 
@@ -187,7 +178,7 @@ void EpicsServiceManager::forceMonitorChannelUpdate(const std::string& pv_name_,
     ReadLockCM read_lock(channel_map_mutex);
     if (auto search = channel_map.find(pv_name); search != channel_map.end())
     {
-        search->second.to_force = true;
+        search->second->state->to_force.store(true, std::memory_order_relaxed);
     }
 }
 
@@ -197,31 +188,20 @@ ConstMonitorOperationShrdPtr EpicsServiceManager::getMonitorOp(const std::string
     if (!sanitized_pv)
         return ConstMonitorOperationUPtr();
 
-    ConstMonitorOperationShrdPtr result;
-    ReadLockCM                   read_lock(channel_map_mutex);
+    ReadLockCM read_lock(channel_map_mutex);
     if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
     {
-        result = channel_map[sanitized_pv->name].channel->monitor();
+        return search->second->monitor;
     }
-    else
-    {
-        auto channel = ChannelMapElement{
-            .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
-            .to_force = false,
-            .keep_alive = 0,
-            .active = false,
-            .pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>(
-                this->config->pv_min_throttle_us, this->config->pv_max_throttle_us, this->config->pv_idle_threshold),
-        };
-        result = channel.channel->monitor();
-    }
-    return result;
+
+    auto channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name);
+    return channel->monitor();
 }
 
 ConstGetOperationUPtr EpicsServiceManager::getChannelData(const std::string& pv_name_uri)
 {
     ConstGetOperationUPtr result;
-    WriteLockCM           write_lock(channel_map_mutex);
+    ReadLockCM            read_lock(channel_map_mutex);
     auto                  sanitized_pv = sanitizePVName(pv_name_uri);
     // give a sanitization on pvname, the value will be not used cause k2eg return always all information
     if (!sanitized_pv)
@@ -230,20 +210,12 @@ ConstGetOperationUPtr EpicsServiceManager::getChannelData(const std::string& pv_
     }
     if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
     {
-        // allocate channel and return data
-        result = channel_map[sanitized_pv->name].channel->get();
+        result = search->second->state->channel->get();
     }
     else
     {
-        auto channel = ChannelMapElement{
-            .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
-            .to_force = false,
-            .keep_alive = 0,
-            .active = false,
-            .pv_throttle = std::make_shared<k2eg::common::ThrottlingManager>(
-                this->config->pv_min_throttle_us, this->config->pv_max_throttle_us, this->config->pv_idle_threshold),
-        };
-        result = channel.channel->get();
+        auto channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name);
+        result = channel->get();
     }
     return result;
 }
@@ -251,7 +223,7 @@ ConstGetOperationUPtr EpicsServiceManager::getChannelData(const std::string& pv_
 ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_name_uri, std::unique_ptr<MsgpackObject> value)
 {
     ConstPutOperationUPtr result;
-    WriteLockCM           write_lock(channel_map_mutex);
+    ReadLockCM            read_lock(channel_map_mutex);
     auto                  sanitized_pv = sanitizePVName(pv_name_uri);
     if (!sanitized_pv)
     {
@@ -259,17 +231,12 @@ ConstPutOperationUPtr EpicsServiceManager::putChannelData(const std::string& pv_
     }
     if (auto search = channel_map.find(sanitized_pv->name); search != channel_map.end())
     {
-        // allocate channel and return data
-        result = channel_map[sanitized_pv->name].channel->put(std::move(value));
+        result = search->second->state->channel->put(std::move(value));
     }
     else
     {
-        auto channel = ChannelMapElement{
-            .channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name),
-            .to_force = false,
-            .keep_alive = 0,
-        };
-        result = channel.channel->put(std::move(value));
+        auto channel = std::make_shared<EpicsChannel>(SELECT_PROVIDER(sanitized_pv->protocol), sanitized_pv->name);
+        result = channel->put(std::move(value));
     }
     return result;
 }
@@ -328,68 +295,84 @@ PVUPtr EpicsServiceManager::sanitizePVName(const std::string& pv_name)
     return std::make_unique<PV>(PV{protocol, base_pv_name, field_name});
 }
 
-const std::vector<ThrottlingManager>& EpicsServiceManager::getThreadThrottlingInfo() const
+inline void EpicsServiceManager::recordTaskDuration(const std::chrono::steady_clock::time_point& start_time, const PvRuntimeStatsShrdPtr& pv_stats_ptr)
 {
-    return thread_throttling_vector;
+    const auto elapsed_ns =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start_time).count();
+    if (pv_stats_ptr)
+    {
+        pv_stats_ptr->total_duration_ns.fetch_add(static_cast<std::uint64_t>(elapsed_ns), std::memory_order_relaxed);
+        pv_stats_ptr->invocation_count.fetch_add(1, std::memory_order_relaxed);
+    }
 }
 
-void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
+inline void EpicsServiceManager::cleanupAndErase(const std::string& pv_name, const ChannelTaskShrdPtr& task_entry, const ChannelMapElementShrdPtr& state, bool erase_from_map, bool record_duration, const std::chrono::steady_clock::time_point& start_time, const PvRuntimeStatsShrdPtr& pv_stats_ptr)
 {
-    if (end_processing)
-        return;
-    const auto thread_index = BS::this_thread::get_index();
-    if (!thread_index.has_value())
-        return;
-
-    bool        had_events = false;
-    bool        local_to_force = false;
-    bool        should_delete = false;
-    const auto& pv_name = monitor_op->getPVName();
-    // keep per-thread throttling around for metrics, but we will prefer per-PV throttling below
-    auto&                                            throttling = thread_throttling_vector[thread_index.value()];
-    std::shared_ptr<k2eg::common::ThrottlingManager> pv_throttle_ptr;
-
-    // Step 1: inspect and possibly update flags under lock
+    // Flush any pending backlog delta for the counter before resetting stats
+    if (pv_stats_ptr)
+    {
+        const auto delta = pv_stats_ptr->backlog_total_drained.exchange(0, std::memory_order_acq_rel);
+        if (delta > 0)
+        {
+            metric.incrementCounter(IEpicsMetricCounterType::PVBacklogCounter, static_cast<double>(delta), {{"pv", pv_name}});
+        }
+    }
+    metric.incrementCounter(IEpicsMetricCounterType::PVThrottleGauge, 0.0, {{"pv", pv_name}});
+    metric.incrementCounter(IEpicsMetricCounterType::PVProcessingDurationGauge, 0.0, {{"pv", pv_name}});
+    if (record_duration)
+    {
+        recordTaskDuration(start_time, pv_stats_ptr);
+    }
+    if (pv_stats_ptr)
+    {
+        pv_stats_ptr->total_duration_ns.store(0, std::memory_order_relaxed);
+        pv_stats_ptr->invocation_count.store(0, std::memory_order_relaxed);
+        pv_stats_ptr->backlog_total_drained.store(0, std::memory_order_relaxed);
+    }
+    if (state)
+    {
+        state->active.store(false, std::memory_order_relaxed);
+    }
+    if (erase_from_map)
     {
         WriteLockCM lock(channel_map_mutex);
         auto        it = channel_map.find(pv_name);
-        if (it == channel_map.end())
+        if (it != channel_map.end() && it->second.get() == task_entry.get())
         {
-            return;
-        }
-        should_delete = (it->second.keep_alive == 0);
-        if (!should_delete)
-        {
-            local_to_force = it->second.to_force;
-            if (local_to_force)
-            {
-                it->second.to_force = false; // clear under lock; apply force after unlocking
-            }
-            pv_throttle_ptr = it->second.pv_throttle; // copy shared_ptr under lock
-        }
-        else
-        {
-            // remove now under lock
             channel_map.erase(it);
+            logger->logMessage(STRING_FORMAT("Removed PV '%1%' from monitoring", pv_name), LogLevel::INFO);
         }
     }
+}
 
-    if (should_delete)
+void EpicsServiceManager::task(ChannelTaskShrdPtr task_entry)
+{
+    if (end_processing || !task_entry)
+        return;
+
+    ConstMonitorOperationShrdPtr monitor_op = task_entry->monitor;
+    auto                         state = task_entry->state;
+    if (!monitor_op || !state)
+        return;
+
+    size_t drained = 0;        // number of events drained from the monitor queue
+    bool   had_events = false; // true if we had events to process
+
+    const auto  start_time = std::chrono::steady_clock::now(); // start time for duration measurement
+    auto        pv_stats_ptr = state->runtime_stats;           // pointer to runtime stats
+    const auto& pv_name = monitor_op->getPVName();             // PV name
+
+    if (state->keep_alive.load(std::memory_order_acquire) == 0)
     {
-        // Emit zero to clear per-PV gauges when the PV is removed
-        metric.incrementCounter(IEpicsMetricCounterType::PVThrottleGauge, 0.0, {{"pv", pv_name}});
-        metric.incrementCounter(IEpicsMetricCounterType::PVBacklogGauge, 0.0, {{"pv", pv_name}});
-        throttling.reset();
+        cleanupAndErase(pv_name, task_entry, state, true, true, start_time, pv_stats_ptr);
         return;
     }
 
-    if (local_to_force)
+    if (state->to_force.exchange(false, std::memory_order_acq_rel))
     {
         monitor_op->forceUpdate();
     }
 
-    // Step 2: fetch bounded data from monitor (robust to provider exceptions)
-    size_t drained = 0;
     try
     {
         drained = monitor_op->poll(config->max_event_from_monitor_queue);
@@ -403,7 +386,6 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
         logger->logMessage(STRING_FORMAT("[EpicsServiceManager::task] poll() failed for PV '%1%' with unknown error", pv_name), LogLevel::ERROR);
     }
 
-    // Step 3: if there are events, broadcast them
     if (monitor_op->hasEvents())
     {
         EventReceivedShrdPtr received_event;
@@ -419,107 +401,110 @@ void EpicsServiceManager::task(ConstMonitorOperationShrdPtr monitor_op)
         {
             logger->logMessage(STRING_FORMAT("[EpicsServiceManager::task] getEventData() failed for PV '%1%' with unknown error", pv_name), LogLevel::ERROR);
         }
+
         if (received_event)
         {
             had_events = true;
-
-            // compute 'active' as: data present AND no errors
             const bool is_active = !received_event->event_data->empty() && received_event->event_cancel->empty() &&
                                    received_event->event_disconnect->empty() && received_event->event_fail->empty();
-
-            // update active flag (and possibly delete) under lock
-            bool delete_after_broadcast = false;
-            {
-                WriteLockCM lock(channel_map_mutex);
-                auto        it2 = channel_map.find(pv_name);
-                if (it2 != channel_map.end())
-                {
-                    it2->second.active = is_active;
-                    if (it2->second.keep_alive == 0)
-                    {
-                        channel_map.erase(it2);
-                        delete_after_broadcast = true;
-                    }
-                }
-            }
-
-            // metrics and broadcast outside locks
+            // set the active state
+            state->active.store(is_active, std::memory_order_relaxed);
+            //
+            handler_broadcaster.broadcast(received_event);
+            // update the metric
             metric.incrementCounter(IEpicsMetricCounterType::MonitorData, received_event->event_data->size());
             metric.incrementCounter(IEpicsMetricCounterType::MonitorCancel, received_event->event_cancel->size());
             metric.incrementCounter(IEpicsMetricCounterType::MonitorDisconnect, received_event->event_disconnect->size());
             metric.incrementCounter(IEpicsMetricCounterType::MonitorFail, received_event->event_fail->size());
-
-            handler_broadcaster.broadcast(received_event);
-
-            if (delete_after_broadcast)
-            {
-                // Emit zero to clear per-PV gauges when the PV is removed
-                metric.incrementCounter(IEpicsMetricCounterType::PVThrottleGauge, 0.0, {{"pv", pv_name}});
-                metric.incrementCounter(IEpicsMetricCounterType::PVBacklogGauge, 0.0, {{"pv", pv_name}});
-                throttling.reset();
-                return;
-            }
         }
     }
 
-    // manage throttling: prefer per-PV throttling to avoid sleeping entire thread due to one idle PV
-    if (pv_throttle_ptr)
+    if (pv_stats_ptr && drained > 0)
     {
-        // Per-PV backoff in microseconds
-        pv_throttle_ptr->update(had_events);
-        auto t_stat = pv_throttle_ptr->getStats();
-        metric.incrementCounter(IEpicsMetricCounterType::PVThrottleGauge, t_stat.throttle_us, {{"pv", pv_name}});
-        // Backlog gauge: report number of drained items when backlog is present (hit per-pass cap), else 0
-        const auto   max_per_pass = static_cast<size_t>(config->max_event_from_monitor_queue);
-        const double backlog_count = drained >= max_per_pass ? static_cast<double>(drained) : 0.0;
-        metric.incrementCounter(IEpicsMetricCounterType::PVBacklogGauge, backlog_count, {{"pv", pv_name}});
+        pv_stats_ptr->backlog_total_drained.fetch_add(static_cast<std::uint64_t>(drained), std::memory_order_relaxed);
     }
 
-    // resubmit the task to the thread pool unless shutting down
+    recordTaskDuration(start_time, pv_stats_ptr);
+
     if (!end_processing)
     {
+        if (state->pv_throttle)
+        {
+            // Classic boolean-based throttling
+            state->pv_throttle->update(had_events);
+        }
         processing_pool->detach_task(
-            [this, monitor_op]
+            [this, task_entry]
             {
-                this->task(monitor_op);
+                this->task(task_entry);
             });
     }
 }
 
 void EpicsServiceManager::handleStatistic(TaskProperties& task_properties)
 {
-    int         active_pv = 0;
-    int         total_pv = 0;
-    std::string throttling_info;
+    int active_pv = 0;
+    int total_pv = 0;
+
+    // Snapshot per-PV throttle and backlog to emit outside locks
+    struct PvMetricSnapshot
+    {
+        std::string pv;
+        int         throttle_us;
+        double      processing_us;
+    };
+
+    std::vector<PvMetricSnapshot> pv_metrics;
     {
         ReadLockCM read_lock(channel_map_mutex);
         active_pv = std::count_if(std::execution::par, channel_map.begin(), channel_map.end(),
                                   [](const auto& pair)
                                   {
-                                      return pair.second.active == true;
+                                      const auto& state = pair.second->state;
+                                      return state && state->active.load(std::memory_order_relaxed);
                                   });
         total_pv = channel_map.size();
+        pv_metrics.reserve(channel_map.size());
+        for (const auto& [pv_name, task_ptr] : channel_map)
+        {
+            auto elem = task_ptr->state;
+            if (!elem)
+                continue;
+            int    throttle_us = 0;
+            double processing_us = 0.0;
+            if (elem->pv_throttle)
+            {
+                auto t_stat = elem->pv_throttle->getStats();
+                throttle_us = t_stat.throttle_us;
+            }
+            if (elem->runtime_stats)
+            {
+                const auto total_ns = elem->runtime_stats->total_duration_ns.load(std::memory_order_relaxed);
+                const auto invocations = elem->runtime_stats->invocation_count.load(std::memory_order_relaxed);
+                if (invocations > 0)
+                {
+                    processing_us = static_cast<double>(total_ns) / static_cast<double>(invocations) / 1000.0;
+                }
+                // Flush backlog delta to counter for this PV (accumulates since last statistic)
+                const auto delta = elem->runtime_stats->backlog_total_drained.exchange(0, std::memory_order_acq_rel);
+                if (delta > 0)
+                {
+                    metric.incrementCounter(IEpicsMetricCounterType::PVBacklogCounter, static_cast<double>(delta), {{"pv", pv_name}});
+                }
+            }
+            pv_metrics.push_back(PvMetricSnapshot{pv_name, throttle_us, processing_us});
+        }
     }
     metric.incrementCounter(IEpicsMetricCounterType::ActiveMonitorGauge, active_pv);
     metric.incrementCounter(IEpicsMetricCounterType::TotalMonitorGauge, total_pv);
-    if (!config->disable_thread_throttle)
+    // Emit per-PV metrics for throttle and backlog
+    for (const auto& m : pv_metrics)
     {
-        auto& thread_throttling_vector = getThreadThrottlingInfo();
-        for (std::size_t i = 0; i < thread_throttling_vector.size(); ++i)
-        {
-            const auto& throttling = thread_throttling_vector[i];
-            std::string thread_id = std::to_string(i);
-            auto        t_stat = throttling.getStats();
-            metric.incrementCounter(IEpicsMetricCounterType::ThrottlingIdleGauge, t_stat.idle_counter, {{"thread_id", thread_id}});
-            metric.incrementCounter(IEpicsMetricCounterType::ThrottlingEventCounter, t_stat.total_events_processed, {{"thread_id", thread_id}});
-            metric.incrementCounter(IEpicsMetricCounterType::ThrottlingDurationGauge, t_stat.total_idle_cycles, {{"thread_id", thread_id}});
-            metric.incrementCounter(IEpicsMetricCounterType::ThrottleGauge, t_stat.throttle_us, {{"thread_id", thread_id}});
-
-            throttling_info += STRING_FORMAT(
-                "-Thr %1% - IdlCnt: %2%, ProcEvt: %3%, IdleCyc: %4%, TrtUsec: %5% us-",
-                thread_id % t_stat.idle_counter % t_stat.total_events_processed % t_stat.total_idle_cycles % t_stat.throttle_us);
-        }
+        metric.incrementCounter(IEpicsMetricCounterType::PVThrottleGauge, m.throttle_us, {{"pv", m.pv}});
+        metric.incrementCounter(IEpicsMetricCounterType::PVProcessingDurationGauge, m.processing_us, {{"pv", m.pv}});
     }
-    // Log the statistics
-    logger->logMessage(STRING_FORMAT("EPICS Monitor Statistics: Active PVs: %1%, Total PVs: %2%, Thread Throttling: %3%", active_pv % total_pv % throttling_info), LogLevel::TRACE);
+
+    logger->logMessage(STRING_FORMAT("EPICS Monitor Statistics: Active PVs: %1%, Total PVs: %2%", active_pv % total_pv), LogLevel::TRACE);
 }
+
+ 

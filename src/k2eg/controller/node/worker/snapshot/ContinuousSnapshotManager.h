@@ -166,7 +166,10 @@ class ContinuousSnapshotManager
     PVSnapshotMap pv_snapshot_map_;
 
     // Thread pool for processing snapshot operations
-    std::shared_ptr<BS::light_thread_pool> thread_pool;
+    std::shared_ptr<BS::light_thread_pool> thread_pool_submitting;
+
+    // Thread pool for DAQ processing (if needed)
+    std::shared_ptr<BS::light_thread_pool> thread_pool_daq_processing;
 
     // Shared pointer to the EPICS service manager
     k2eg::service::epics_impl::EpicsServiceManagerShrdPtr epics_service_manager;
