@@ -49,8 +49,12 @@ public:
         : stats{0, 0, 0, min_throttle_us} {}
 
     ThrottlingManager(int min_us, int max_us, int threshold) noexcept
-        : stats{0, 0, 0, min_us}, min_throttle_us_(min_us), max_throttle_us_(max_us), idle_threshold_(threshold) {}
+        : stats{0, 0, 0, min_us}
+        , min_throttle_us_(min_us)
+        , max_throttle_us_(max_us)
+        , idle_threshold_(threshold) {}
 
+    // Boolean-based API: back off when idle, reset when events
     void update(bool had_events)
     {
         if (!had_events)
