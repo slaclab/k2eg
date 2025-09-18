@@ -30,7 +30,7 @@ class PrometheusEpicsMetric : public IEpicsMetric
     prometheus::Family<prometheus::Gauge>&   idle_gauge_family;
     prometheus::Family<prometheus::Gauge>&   throttle_gauge_family;
     prometheus::Family<prometheus::Gauge>&   pv_throttle_gauge_family;
-    prometheus::Family<prometheus::Gauge>&   pv_backlog_gauge_family;
+    prometheus::Family<prometheus::Counter>& pv_backlog_counter_family;
     prometheus::Family<prometheus::Gauge>&   pv_processing_duration_gauge_family;
     prometheus::Counter&                     get_ok_counter;
     prometheus::Counter&                     put_ok_counter;

@@ -46,30 +46,59 @@ public:
     constexpr static int idle_threshold = 10;
 
     ThrottlingManager() noexcept
-        : stats{0, 0, 0, min_throttle_us} {}
+        : stats{0, 0, 0, min_throttle_us}
+        , last_update_time_(std::chrono::steady_clock::now()) {}
 
     ThrottlingManager(int min_us, int max_us, int threshold) noexcept
-        : stats{0, 0, 0, min_us}, min_throttle_us_(min_us), max_throttle_us_(max_us), idle_threshold_(threshold) {}
+        : stats{0, 0, 0, min_us}
+        , min_throttle_us_(min_us)
+        , max_throttle_us_(max_us)
+        , idle_threshold_(threshold)
+        , last_update_time_(std::chrono::steady_clock::now()) {}
 
-    void update(bool had_events)
+    // Backward-compatible API: treat true as 1 event, false as 0
+    int update(bool had_events) { return update(had_events ? 1 : 0); }
+
+    // Adaptive update that considers the number of events processed in this cycle
+    // Returns recommended delay in microseconds for next poll
+    int update(int events_count)
     {
-        if (!had_events)
+        // Normalize negative inputs
+        if (events_count < 0) events_count = 0;
+
+        // Calculate elapsed time since last update and instantaneous EPS
+        auto now = std::chrono::steady_clock::now();
+        double dt_s = std::chrono::duration<double>(now - last_update_time_).count();
+        if (dt_s <= 0.0) dt_s = 1e-6; // guard against zero or negative deltas
+        last_update_time_ = now;
+
+        const double inst_eps = static_cast<double>(events_count) / dt_s;
+        // Exponential moving average of EPS for stability
+        ema_eps_ = ema_alpha_ * inst_eps + (1.0 - ema_alpha_) * ema_eps_;
+
+        if (events_count == 0 && ema_eps_ < eps_idle_threshold_)
         {
+            // Completely idle cycle: ramp up throttle periodically
             stats.idle_counter++;
             stats.total_idle_cycles++;
             if (stats.idle_counter >= idle_threshold_)
             {
                 stats.throttle_us = std::min(stats.throttle_us * 2, max_throttle_us_);
-                std::this_thread::sleep_for(std::chrono::microseconds(stats.throttle_us));
                 stats.idle_counter = 0;
             }
+            return stats.throttle_us;
         }
-        else
-        {
-            stats.idle_counter = 0;
-            stats.total_events_processed++;
-            stats.throttle_us = min_throttle_us_;
-        }
+
+        // Some activity detected (or recent activity per EMA)
+        stats.total_events_processed.fetch_add(events_count, std::memory_order_relaxed);
+        // Compute desired pacing from EMA of events/second: aim to process ~target_events_per_poll_ per poll
+        const double eps = std::max(ema_eps_, eps_floor_);
+        const double desired_delay_us_d = 1'000'000.0 * (target_events_per_poll_ / eps);
+        const int    desired_delay_us = static_cast<int>(std::clamp(desired_delay_us_d, static_cast<double>(min_throttle_us_), static_cast<double>(max_throttle_us_)));
+
+        stats.throttle_us = desired_delay_us;
+        stats.idle_counter = 0;
+        return stats.throttle_us;
     }
 
     ThrottlingStats getStats() const noexcept { 
@@ -95,6 +124,13 @@ private:
     int min_throttle_us_ = min_throttle_us;
     int max_throttle_us_ = max_throttle_us;
     int idle_threshold_ = idle_threshold;
+    // Event rate tracking
+    std::chrono::steady_clock::time_point last_update_time_{};
+    double ema_eps_ = 0.0;           // exponential moving average of events per second
+    double ema_alpha_ = 0.2;         // smoothing factor for EMA
+    double target_events_per_poll_ = 8.0; // target events handled per poll
+    double eps_floor_ = 0.1;         // minimum EPS to avoid division by zero
+    double eps_idle_threshold_ = 0.25; // below this EMA EPS, treat as idle when no events in the current cycle
 };
 
 DEFINE_PTR_TYPES(ThrottlingManager)

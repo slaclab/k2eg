@@ -64,12 +64,28 @@ EpicsServiceManager::EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr conf
     logger->logMessage(STRING_FORMAT("[EpicsServiceManager] Epics Service Manager started [tthread_cout=%1%, poll_to=%2%]",
                                      this->config->thread_count % this->config->max_event_from_monitor_queue),
                        LogLevel::INFO);
+
+    // Start scheduling thread to dispatch PV polls at computed times
+    scheduler_thread_ = std::thread([this]
+                                    {
+                                        this->schedulingLoop();
+                                    });
 }
 
 EpicsServiceManager::~EpicsServiceManager()
 {
     // stop the statistic
     bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(EPICS_MANAGER_STAT_TASK_NAME);
+    // Stop scheduling thread
+    scheduler_stop_.store(true, std::memory_order_relaxed);
+    {
+        std::lock_guard lk(scheduler_mtx_);
+        scheduler_cv_.notify_all();
+    }
+    if (scheduler_thread_.joinable())
+    {
+        scheduler_thread_.join();
+    }
     // Stop processing monitor tasks and wait for scheduled tasks to finish.
     end_processing = true;
     processing_pool->wait();
@@ -111,12 +127,13 @@ void EpicsServiceManager::addChannel(const std::string& pv_name_uri)
 
         channel_map.emplace(sanitized_pv->name, new_task);
     }
-
-    processing_pool->detach_task(
-        [this, new_task]
-        {
-            this->task(new_task);
-        });
+    // Schedule immediately
+    {
+        std::lock_guard lk(scheduler_mtx_);
+        new_task->state->next_due = std::chrono::steady_clock::now();
+        new_task->state->scheduled.store(false, std::memory_order_relaxed);
+        scheduler_cv_.notify_all();
+    }
 }
 
 StringVector EpicsServiceManager::getMonitoredChannels()
@@ -178,6 +195,12 @@ void EpicsServiceManager::forceMonitorChannelUpdate(const std::string& pv_name_,
     if (auto search = channel_map.find(pv_name); search != channel_map.end())
     {
         search->second->state->to_force.store(true, std::memory_order_relaxed);
+        // Expedite scheduling so the force happens ASAP
+        search->second->state->next_due = std::chrono::steady_clock::now();
+        {
+            std::lock_guard lk(scheduler_mtx_);
+            scheduler_cv_.notify_all();
+        }
     }
 }
 
@@ -307,8 +330,16 @@ inline void EpicsServiceManager::recordTaskDuration(const std::chrono::steady_cl
 
 inline void EpicsServiceManager::cleanupAndErase(const std::string& pv_name, const ChannelTaskShrdPtr& task_entry, const ChannelMapElementShrdPtr& state, bool erase_from_map, bool record_duration, const std::chrono::steady_clock::time_point& start_time, const PvRuntimeStatsShrdPtr& pv_stats_ptr)
 {
+    // Flush any pending backlog delta for the counter before resetting stats
+    if (pv_stats_ptr)
+    {
+        const auto delta = pv_stats_ptr->backlog_total_drained.exchange(0, std::memory_order_acq_rel);
+        if (delta > 0)
+        {
+            metric.incrementCounter(IEpicsMetricCounterType::PVBacklogCounter, static_cast<double>(delta), {{"pv", pv_name}});
+        }
+    }
     metric.incrementCounter(IEpicsMetricCounterType::PVThrottleGauge, 0.0, {{"pv", pv_name}});
-    metric.incrementCounter(IEpicsMetricCounterType::PVBacklogGauge, 0.0, {{"pv", pv_name}});
     metric.incrementCounter(IEpicsMetricCounterType::PVProcessingDurationGauge, 0.0, {{"pv", pv_name}});
     if (record_duration)
     {
@@ -316,9 +347,9 @@ inline void EpicsServiceManager::cleanupAndErase(const std::string& pv_name, con
     }
     if (pv_stats_ptr)
     {
-        pv_stats_ptr->last_backlog_count.store(0.0, std::memory_order_relaxed);
         pv_stats_ptr->total_duration_ns.store(0, std::memory_order_relaxed);
         pv_stats_ptr->invocation_count.store(0, std::memory_order_relaxed);
+        pv_stats_ptr->backlog_total_drained.store(0, std::memory_order_relaxed);
     }
     if (state)
     {
@@ -410,9 +441,9 @@ void EpicsServiceManager::task(ChannelTaskShrdPtr task_entry)
         }
     }
 
-    if (pv_stats_ptr)
+    if (pv_stats_ptr && drained > 0)
     {
-        pv_stats_ptr->last_backlog_count.store(static_cast<double>(drained), std::memory_order_relaxed);
+        pv_stats_ptr->backlog_total_drained.fetch_add(static_cast<std::uint64_t>(drained), std::memory_order_relaxed);
     }
 
     recordTaskDuration(start_time, pv_stats_ptr);
@@ -421,13 +452,16 @@ void EpicsServiceManager::task(ChannelTaskShrdPtr task_entry)
     {
         if (state->pv_throttle)
         {
-            state->pv_throttle->update(had_events);
+            // Use drained event count to adaptively compute next schedule
+            const int delay_us = state->pv_throttle->update(static_cast<int>(drained));
+            state->next_due = std::chrono::steady_clock::now() + std::chrono::microseconds(std::max(0, delay_us));
         }
-        processing_pool->detach_task(
-            [this, task_entry]
-            {
-                this->task(task_entry);
-            });
+        // Mark as not scheduled and notify scheduler loop to consider rescheduling
+        state->scheduled.store(false, std::memory_order_relaxed);
+        {
+            std::lock_guard lk(scheduler_mtx_);
+            scheduler_cv_.notify_all();
+        }
     }
 }
 
@@ -441,7 +475,6 @@ void EpicsServiceManager::handleStatistic(TaskProperties& task_properties)
     {
         std::string pv;
         int         throttle_us;
-        double      backlog;
         double      processing_us;
     };
 
@@ -462,7 +495,6 @@ void EpicsServiceManager::handleStatistic(TaskProperties& task_properties)
             if (!elem)
                 continue;
             int    throttle_us = 0;
-            double backlog = 0.0;
             double processing_us = 0.0;
             if (elem->pv_throttle)
             {
@@ -471,15 +503,20 @@ void EpicsServiceManager::handleStatistic(TaskProperties& task_properties)
             }
             if (elem->runtime_stats)
             {
-                backlog = elem->runtime_stats->last_backlog_count.load(std::memory_order_relaxed);
                 const auto total_ns = elem->runtime_stats->total_duration_ns.load(std::memory_order_relaxed);
                 const auto invocations = elem->runtime_stats->invocation_count.load(std::memory_order_relaxed);
                 if (invocations > 0)
                 {
                     processing_us = static_cast<double>(total_ns) / static_cast<double>(invocations) / 1000.0;
                 }
+                // Flush backlog delta to counter for this PV (accumulates since last statistic)
+                const auto delta = elem->runtime_stats->backlog_total_drained.exchange(0, std::memory_order_acq_rel);
+                if (delta > 0)
+                {
+                    metric.incrementCounter(IEpicsMetricCounterType::PVBacklogCounter, static_cast<double>(delta), {{"pv", pv_name}});
+                }
             }
-            pv_metrics.push_back(PvMetricSnapshot{pv_name, throttle_us, backlog, processing_us});
+            pv_metrics.push_back(PvMetricSnapshot{pv_name, throttle_us, processing_us});
         }
     }
     metric.incrementCounter(IEpicsMetricCounterType::ActiveMonitorGauge, active_pv);
@@ -488,9 +525,65 @@ void EpicsServiceManager::handleStatistic(TaskProperties& task_properties)
     for (const auto& m : pv_metrics)
     {
         metric.incrementCounter(IEpicsMetricCounterType::PVThrottleGauge, m.throttle_us, {{"pv", m.pv}});
-        metric.incrementCounter(IEpicsMetricCounterType::PVBacklogGauge, m.backlog, {{"pv", m.pv}});
         metric.incrementCounter(IEpicsMetricCounterType::PVProcessingDurationGauge, m.processing_us, {{"pv", m.pv}});
     }
 
     logger->logMessage(STRING_FORMAT("EPICS Monitor Statistics: Active PVs: %1%, Total PVs: %2%", active_pv % total_pv), LogLevel::TRACE);
+}
+
+void EpicsServiceManager::schedulingLoop()
+{
+    using clock = std::chrono::steady_clock;
+    while (!scheduler_stop_.load(std::memory_order_relaxed))
+    {
+        clock::time_point next_wakeup = clock::now() + std::chrono::milliseconds(100);
+        ChannelTaskShrdPtr due_task;
+
+        // Scan current channels to find one due now, and compute the soonest wakeup
+        {
+            ReadLockCM read_lock(channel_map_mutex);
+            for (auto& [pv_name, task_ptr] : channel_map)
+            {
+                if (!task_ptr || !task_ptr->state)
+                    continue;
+                auto& st = task_ptr->state;
+                // Skip if not alive or already scheduled
+                if (st->keep_alive.load(std::memory_order_relaxed) <= 0)
+                    continue;
+                if (st->scheduled.load(std::memory_order_relaxed))
+                    continue;
+
+                if (st->next_due <= clock::now())
+                {
+                    due_task = task_ptr;
+                    break; // schedule one at a time; loop again for fairness
+                }
+                else
+                {
+                    if (st->next_due < next_wakeup)
+                    {
+                        next_wakeup = st->next_due;
+                    }
+                }
+            }
+        }
+
+        if (due_task)
+        {
+            // Mark and dispatch
+            due_task->state->scheduled.store(true, std::memory_order_relaxed);
+            processing_pool->detach_task([this, task = due_task]
+                                         {
+                                             this->task(task);
+                                         });
+            continue; // loop again immediately
+        }
+
+        // Wait until next wakeup or external notification
+        std::unique_lock<std::mutex> lk(scheduler_mtx_);
+        scheduler_cv_.wait_until(lk, next_wakeup, [this]
+                                 {
+                                     return scheduler_stop_.load(std::memory_order_relaxed);
+                                 });
+    }
 }
