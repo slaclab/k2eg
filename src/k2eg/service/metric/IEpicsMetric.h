@@ -21,7 +21,8 @@ enum class IEpicsMetricCounterType {
   ThrottlingDurationGauge,
   ThrottleGauge,
   PVThrottleGauge,   // per-PV throttle in microseconds
-  PVBacklogGauge     // per-PV backlog indicator (0/1)
+  PVBacklogCounter,  // per-PV total items drained (counter)
+  PVProcessingDurationGauge // mean processing duration per PV in microseconds
 };
 
 // Epics metric group
