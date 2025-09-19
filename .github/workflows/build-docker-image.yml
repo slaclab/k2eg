@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      #- '**'
     tags:
       - v*
   workflow_dispatch:
@@ -37,6 +36,16 @@ jobs:
           popd
           tools/manage-version.sh src/k2eg/version.h
           more src/k2eg/version.h
+      - name: Extract app version
+        id: app_version
+        run: |
+          VERSION=$(sed -n 's/^#define k2eg_VERSION "\(.*\)"/\1/p' src/k2eg/version.h)
+          if [ -z "$VERSION" ]; then
+            echo "Failed to extract version from src/k2eg/version.h" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "App version: $VERSION"
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -67,5 +76,7 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.variant }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.variant }}:${{ steps.app_version.outputs.version }}
           labels: ${{ steps.meta.outputs.labels }}
