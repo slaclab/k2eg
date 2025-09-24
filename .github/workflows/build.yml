@@ -71,21 +71,17 @@ jobs:
               run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DENABLE_ASAN=1
             - run: git config --global --add safe.directory '*'
             - name: Build
+              id: build
               run: cmake --build build --config ${{env.BUILD_TYPE}} --target install
+            # Upload build logs even when the job fails. Use `always()` and allow the step to continue on error
+            # so the overall job doesn't abort due to artifact upload issues.
             - name: Get log on failure
-              if: ${{ failure() }}
+              if: ${{ steps.build.outcome == 'failure' }}
+              continue-on-error: true
               uses: actions/upload-artifact@v4
               with:
                 name: ${{env.ARTIFACT_NAME}}-log
                 path: build/**/*.log
-                retention-days: 1
-            # Upload .lo object files for post‑mortem debugging when the build fails
-            - name: Upload lo files on failure
-              if: ${{ failure() }}
-              uses: actions/upload-artifact@v4
-              with:
-                name: ${{env.ARTIFACT_NAME}}-lo
-                path: build/**/*.lo
                 retention-days: 1
             - name: Archive artifacts
               uses: actions/upload-artifact@v4
