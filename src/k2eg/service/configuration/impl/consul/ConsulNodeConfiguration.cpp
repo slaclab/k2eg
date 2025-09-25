@@ -262,9 +262,9 @@ bool ConsulNodeConfiguration::createSession()
     try
     {
         // Create session request body as JSON string manually
-        std::string node_name = getNodeName(); // Should match a registered Consul node
+        std::string node_name = getNodeName(); // used for naming only; don't send Node to agent
         std::string sessionJson = STRING_FORMAT(
-            R"({"Name": "k2eg-gateway-%1%", "Node": "%1%", "TTL": "30s", "Behavior": "delete"})",
+            R"({"Name": "k2eg-gateway-%1%", "TTL": "30s", "Behavior": "delete"})",
             node_name);
 
         auto sessionJsonStr = oatpp::String(sessionJson);
