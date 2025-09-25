@@ -188,7 +188,6 @@ TARGET_LINK_DIRECTORIES(${PROJECT_NAME} PUBLIC ${CMAKE_INSTALL_PREFIX}/lib)
 # ----------------------------------------------------
 set(TEST_SOURCE_FILES
   test/test.cpp
-  test/k2eg.cpp
   test/k2eg_nodes.cpp
   test/common/ProgramOptions.cpp
   test/controller/CMDController.cpp
