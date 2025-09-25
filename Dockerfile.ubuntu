@@ -4,8 +4,10 @@ LABEL maintainer="bisegni@slac.stanford.edu"
 LABEL org.opencontainers.image.description="Kafka To Epics Gateway"
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN     apt update \
-    &&  apt install -y build-essential cmake git tclsh ninja-build gdb lcov libssl-dev libsasl2-dev curl libcurl4-openssl-dev valgrind libicu-dev jq file sudo pkg-config
+RUN apt update && \
+    apt install -y build-essential cmake git tclsh ninja-build gdb lcov libssl-dev \
+    libsasl2-dev curl libcurl4-openssl-dev valgrind libicu-dev jq file sudo pkg-config \
+    python3 python3-venv python3-pip python-is-python3
 
 COPY src /opt/app/src
 COPY test /opt/app/test
