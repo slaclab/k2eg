@@ -87,6 +87,10 @@ void RDKafkaPublisher::init(const k2eg::common::MapStrKV& overrides)
     {
         throw std::runtime_error("Logger service is not initialized");
     }
+    if (!configuration || configuration->server_address.empty())
+    {
+        throw std::runtime_error("Kafka publisher requires a non-empty server_address (bootstrap.servers)");
+    }
     std::string errstr;
     logger->logMessage(STRING_FORMAT("Initializing RDKafkaPublisher with server address: %1% ", configuration->server_address), LogLevel::INFO);
 
