@@ -77,7 +77,7 @@ jobs:
       # Upload build logs even when the job fails. Use `always()` and allow the step to continue on error
       # so the overall job doesn't abort due to artifact upload issues.
       - name: Get log on failure
-        if: ${{ steps.build.outcome == 'failure' }}
+        if: ${{ always() && steps.build.outcome == 'failure' }}
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
