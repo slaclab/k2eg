@@ -11,166 +11,169 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-    check-changed-file:
-      runs-on: ubuntu-latest
-      name: Test changed source file
-      outputs:
-        source_changed: ${{ steps.changed-src.outputs.any_changed }}
-      steps:
-        - uses: actions/checkout@v3
-          with:
-            fetch-depth: 2
-        - name: Get changed files in the source folder
-          id: changed-src
-          uses: tj-actions/changed-files@v35
-          with:
-            files: |
-              CMakeLists.txt
-              src/**
-              test/**
-        - name: Set Build Ubuntu to success
-          if: steps.changed-src.outputs.any_changed == 'false'
-          uses: ouzi-dev/commit-status-updater@v2
-          with:
-            name: Build Ubuntu
-            status: success
-        - name: Set Test Ubuntu / test_build to success
-          if: steps.changed-src.outputs.any_changed == 'false'
-          uses: ouzi-dev/commit-status-updater@v2
-          with:
-            name: Test Ubuntu / test_build
-            status: success
-        build_ubuntu:
-        name: Build Ubuntu
-        needs: check-changed-file
-        if: needs.check-changed-file.outputs.source_changed == 'true'
-        runs-on: ubuntu-latest
-        container: docker.io/ubuntu:noble
-        env:
-          BUILD_IMAGE: ubuntu:noble
-          ARTIFACT_NAME: artifact-gcc-ubuntu
-          BUILD_TYPE: Debug
-        outputs:
-          build_image: ${{ env.BUILD_IMAGE }}
-          artifact_name: ${{ env.ARTIFACT_NAME}}  
-        steps:
-            - name: Setup bild system
-              run: |
-                export DEBIAN_FRONTEND=noninteractive
-                apt update
-                apt install -y build-essential cmake git tclsh ninja-build gdb lcov libssl-dev libsasl2-dev curl libcurl4-openssl-dev valgrind libicu-dev jq file sudo pkg-config
-            - name: Checkout source code
-              uses: actions/checkout@v3
-            - name: Restore cached build directory
-              id: cache-build-restore
-              uses: actions/cache@v3
-              with:
-               path: build
-               key: ubuntu-noble-${{ hashFiles('CMakeLists.txt') }}
-            - name: Configure CMake
-              run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DENABLE_ASAN=1
-            - run: git config --global --add safe.directory '*'
-            - name: Build
-              id: build
-              run: cmake --build build --config ${{env.BUILD_TYPE}} --target install
-            # Upload build logs even when the job fails. Use `always()` and allow the step to continue on error
-            # so the overall job doesn't abort due to artifact upload issues.
-            - name: Get log on failure
-              if: ${{ steps.build.outcome == 'failure' }}
-              continue-on-error: true
-              uses: actions/upload-artifact@v4
-              with:
-                name: ${{env.ARTIFACT_NAME}}-log
-                path: build/**/*.log
-                retention-days: 1
-            - name: Archive artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                name: ${{env.ARTIFACT_NAME}}
-                path: |
-                    build/local/lib
-                    build/local/bin
-                retention-days: 1
-            - name: Set job status
-              uses: ouzi-dev/commit-status-updater@v2
-              with:
-                status: success
-    test_ubuntu:
-      name: Test Ubuntu 
-      needs: [build_ubuntu] 
-      uses: ./.github/workflows/test.yml
-      with:
-        build_image: ${{ needs.build_ubuntu.outputs.build_image }}
-        artifact_name: ${{ needs.build_ubuntu.outputs.artifact_name }}
-        docker_compose_profile: app-ubuntu
-      secrets: inherit
-    build_pr_docker_image:
-      name: Build PR Docker Image
-      needs: check-changed-file
-      if: needs.check-changed-file.outputs.source_changed == 'true'
-      runs-on: ubuntu-latest
-      env:
-        GITVERSION_VERSION: 5.12.0
-        REGISTRY: ghcr.io
-        IMAGE_NAME: ${{ github.repository }}
-      strategy:
-        fail-fast: false
-        matrix:
-          include:
-            - dockerfile: Dockerfile.ubuntu
-              variant: ubuntu
-      steps:
-        - name: Check out repository code
-          uses: actions/checkout@v3
-          with:
-            fetch-depth: 0
-        - name: Install GitVersion
-          run: |
-            set -euo pipefail
-            pushd /tmp
-            wget https://github.com/GitTools/GitVersion/releases/download/$GITVERSION_VERSION/gitversion-linux-x64-$GITVERSION_VERSION.tar.gz
-            tar zxvf gitversion-linux-x64-$GITVERSION_VERSION.tar.gz
-            echo "/tmp" >> "$GITHUB_PATH"
-            popd
-        - name: Determine PR version
-          id: gitversion
-          run: |
-            set -euo pipefail
-            VERSION_JSON=$(gitversion /output json)
-            echo "$VERSION_JSON"
-            PR_VERSION=$(echo "$VERSION_JSON" | jq -r '.SemVer')
-            echo "pr_version=$PR_VERSION" >> "$GITHUB_OUTPUT"
-            echo "PR_VERSION=$PR_VERSION" >> "$GITHUB_ENV"
-        - name: Manage version header
-          run: |
-            tools/manage-version.sh src/k2eg/version.h
-            cat src/k2eg/version.h
-        - name: Set up Docker Buildx
-          uses: docker/setup-buildx-action@v3
-        - name: Log in to the Container registry
-          uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
-          with:
-            registry: ${{ env.REGISTRY }}
-            username: ${{ github.actor }}
-            password: ${{ secrets.GITHUB_TOKEN }}
-        - name: Docker meta
-          id: meta
-          uses: docker/metadata-action@v5
-          with:
-            images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.variant }}
-            tags: |
-              type=raw,value=${{ env.PR_VERSION }}
-              type=raw,value=pr-${{ github.event.pull_request.number }}
-            labels: |
-              maintainer=bisegni@slac.stanford.edu
-              org.opencontainers.image.title=K2EG
-              org.opencontainers.image.description=Kafka To Epics Gateway
-              org.opencontainers.image.vendor=SLAC National Accelerator Laboratory
-        - name: Build and push Docker image
-          uses: docker/build-push-action@v6
-          with:
-            context: .
-            file: ${{ matrix.dockerfile }}
-            push: true
-            tags: ${{ steps.meta.outputs.tags }}
-            labels: ${{ steps.meta.outputs.labels }}
+  check-changed-file:
+    runs-on: ubuntu-latest
+    name: Test changed source file
+    outputs:
+      source_changed: ${{ steps.changed-src.outputs.any_changed }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - name: Get changed files in the source folder
+        id: changed-src
+        uses: tj-actions/changed-files@v35
+        with:
+          files: |
+            CMakeLists.txt
+            src/**
+            test/**
+      - name: Set Build Ubuntu to success
+        if: steps.changed-src.outputs.any_changed == 'false'
+        uses: ouzi-dev/commit-status-updater@v2
+        with:
+          name: Build Ubuntu
+          status: success
+      - name: Set Test Ubuntu / test_build to success
+        if: steps.changed-src.outputs.any_changed == 'false'
+        uses: ouzi-dev/commit-status-updater@v2
+        with:
+          name: Test Ubuntu / test_build
+          status: success
+
+  build_ubuntu:
+    name: Build Ubuntu
+    needs: check-changed-file
+    if: needs.check-changed-file.outputs.source_changed == 'true'
+    runs-on: ubuntu-latest
+    container: docker.io/ubuntu:noble
+    env:
+      BUILD_IMAGE: ubuntu:noble
+      ARTIFACT_NAME: artifact-gcc-ubuntu
+      BUILD_TYPE: Debug
+    outputs:
+      build_image: ${{ env.BUILD_IMAGE }}
+      artifact_name: ${{ env.ARTIFACT_NAME }}
+    steps:
+      - name: Setup build system
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt update
+          apt install -y build-essential cmake git tclsh ninja-build gdb lcov libssl-dev libsasl2-dev curl libcurl4-openssl-dev valgrind libicu-dev jq file sudo pkg-config
+      - name: Checkout source code
+        uses: actions/checkout@v3
+      - name: Restore cached build directory
+        id: cache-build-restore
+        uses: actions/cache@v3
+        with:
+          path: build
+          key: ubuntu-noble-${{ hashFiles('CMakeLists.txt') }}
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DENABLE_ASAN=1
+      - run: git config --global --add safe.directory '*'
+      - name: Build
+        id: build
+        run: cmake --build build --config ${{env.BUILD_TYPE}} --target install
+      # Upload build logs even when the job fails. Use `always()` and allow the step to continue on error
+      # so the overall job doesn't abort due to artifact upload issues.
+      - name: Get log on failure
+        if: ${{ steps.build.outcome == 'failure' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{env.ARTIFACT_NAME}}-log
+          path: build/**/*.log
+          retention-days: 1
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{env.ARTIFACT_NAME}}
+          path: |
+            build/local/lib
+            build/local/bin
+          retention-days: 1
+      - name: Set job status
+        uses: ouzi-dev/commit-status-updater@v2
+        with:
+          status: success
+
+  test_ubuntu:
+    name: Test Ubuntu 
+    needs: [build_ubuntu] 
+    uses: ./.github/workflows/test.yml
+    with:
+      build_image: ${{ needs.build_ubuntu.outputs.build_image }}
+      artifact_name: ${{ needs.build_ubuntu.outputs.artifact_name }}
+      docker_compose_profile: app-ubuntu
+    secrets: inherit
+
+  build_pr_docker_image:
+    name: Build PR Docker Image
+    needs: check-changed-file
+    if: needs.check-changed-file.outputs.source_changed == 'true'
+    runs-on: ubuntu-latest
+    env:
+      GITVERSION_VERSION: 5.12.0
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dockerfile: Dockerfile.ubuntu
+            variant: ubuntu
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Install GitVersion
+        run: |
+          set -euo pipefail
+          pushd /tmp
+          wget https://github.com/GitTools/GitVersion/releases/download/$GITVERSION_VERSION/gitversion-linux-x64-$GITVERSION_VERSION.tar.gz
+          tar zxvf gitversion-linux-x64-$GITVERSION_VERSION.tar.gz
+          echo "/tmp" >> "$GITHUB_PATH"
+          popd
+      - name: Determine PR version
+        id: gitversion
+        run: |
+          set -euo pipefail
+          VERSION_JSON=$(gitversion /output json)
+          echo "$VERSION_JSON"
+          PR_VERSION=$(echo "$VERSION_JSON" | jq -r '.SemVer')
+          echo "pr_version=$PR_VERSION" >> "$GITHUB_OUTPUT"
+          echo "PR_VERSION=$PR_VERSION" >> "$GITHUB_ENV"
+      - name: Manage version header
+        run: |
+          tools/manage-version.sh src/k2eg/version.h
+          cat src/k2eg/version.h
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to the Container registry
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.variant }}
+          tags: |
+            type=raw,value=${{ env.PR_VERSION }}
+            type=raw,value=pr-${{ github.event.pull_request.number }}
+          labels: |
+            maintainer=bisegni@slac.stanford.edu
+            org.opencontainers.image.title=K2EG
+            org.opencontainers.image.description=Kafka To Epics Gateway
+            org.opencontainers.image.vendor=SLAC National Accelerator Laboratory
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
