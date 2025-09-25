@@ -49,7 +49,7 @@ initChecker(IPublisherShrdPtr pub, bool clear_data = true, bool enable_debug_log
   opt->parse(argc, argv);
   ServiceResolver<sconf::INodeConfiguration>::registerService<k2eg::service::configuration::ConstConfigurationServiceConfigShrdPtr, sconf::impl::consul::ConsulNodeConfiguration>(opt->getConfigurationServiceConfiguration());
   ServiceResolver<ILogger>::registerService<k2eg::service::log::ConstLogConfigurationShrdPtr, BoostLogger>(opt->getloggerConfiguration());
-  ServiceResolver<IPublisher>::registerService<k2eg::service::pubsub::ConstPublisherConfigurationShrdPtr, k2eg::service::pubsub::impl::kafka::RDKafkaPublisher>(opt->getPublisherConfiguration());
+  ServiceResolver<IPublisher>::registerFactory([pub]() -> IPublisherShrdPtr { return pub; });
   DataStorageShrdPtr storage = std::make_shared<DataStorage>(fs::path(fs::current_path()) / "test.sqlite");
   auto node_configuration = std::make_shared<k2eg::controller::node::configuration::NodeConfiguration>(storage);
   // init configuration
