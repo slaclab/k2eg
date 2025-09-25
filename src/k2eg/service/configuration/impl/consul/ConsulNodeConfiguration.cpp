@@ -1,5 +1,5 @@
 
-#include <k2eg/common/Base64.h>
+#include <k2eg/common/base64.h>
 #include <k2eg/common/utility.h>
 
 #include <k2eg/service/ServiceResolver.h>
