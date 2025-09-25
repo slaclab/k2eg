@@ -197,5 +197,4 @@ TEST(k2egateway, CommandSubmission)
     // neeed to contains the pv name
     ASSERT_TRUE(get_json_reply_obj.contains("variable:a"));
 }
-
 #endif //__linux__

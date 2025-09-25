@@ -7,7 +7,7 @@ services:
       context: ../
       dockerfile: docker/Dockerfile.ubuntu_test
     environment:
-      WAIT_HOSTS: kafka:9092
+      WAIT_HOSTS: kafka:9092,consul:8500, mongodb:27017
     working_dir: /app
     command: 
         - /bin/bash
