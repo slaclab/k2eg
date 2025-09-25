@@ -40,7 +40,7 @@ jobs:
           with:
             name: Test Ubuntu / test_build
             status: success
-    build_ubuntu:
+        build_ubuntu:
         name: Build Ubuntu
         needs: check-changed-file
         if: needs.check-changed-file.outputs.source_changed == 'true'

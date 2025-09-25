@@ -5,7 +5,7 @@ LABEL org.opencontainers.image.description="Kafka To Epics Gateway"
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN     apt update \
-    &&  apt install -y build-essential cmake git tclsh ninja-build libsasl2-dev libssl-dev curl libcurl4-openssl-dev pkg-config
+    &&  apt install -y build-essential cmake git tclsh ninja-build gdb lcov libssl-dev libsasl2-dev curl libcurl4-openssl-dev valgrind libicu-dev jq file sudo pkg-config
 
 COPY src /opt/app/src
 COPY test /opt/app/test
