@@ -47,12 +47,15 @@ jobs:
                 chmod +x docker/build/local/bin/k2eg
                 chmod +x docker/build/local/bin/k2eg-test
                 chmod 777 docker/run-test.sh
+                echo "test for consul connection"
+                curl http://consul:8500/v1/status/leader
                 echo "Create test environment from $TEST_IMAGE"
                 docker compose --profile ${{ inputs.docker_compose_profile  }} -f docker/docker-compose.yml -f docker/docker-compose-app.yml build --build-arg TEST_IMAGE=${{ inputs.build_image  }}
                 docker compose --profile ${{ inputs.docker_compose_profile  }} -f docker/docker-compose.yml -f docker/docker-compose-app.yml up --attach ${{ inputs.docker_compose_profile  }} --exit-code-from ${{ inputs.docker_compose_profile  }}
             - name: Clean resources
               if: always()
               run: |
+                docker compose -f docker/docker-compose.yml -f docker/docker-compose-app.yml logs
                 docker compose -f docker/docker-compose.yml -f docker/docker-compose-app.yml down -v --rmi all
             - uses: ouzi-dev/commit-status-updater@v2
               with:
