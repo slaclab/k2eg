@@ -71,7 +71,7 @@ services:
       - ../test:/app
   zookeeper:
     platform: linux/amd64
-    image: bitnami/zookeeper:3.8.1
+    image: bitnami/zookeeper:3.9.0
     # ports:
     #   - 2181:2181
     environment:
@@ -79,7 +79,7 @@ services:
 
   kafka:
     platform: linux/amd64
-    image: bitnami/kafka:3.4.0
+    image: bitnami/kafka:3.9.0
     # ports:
     #   - 9092:9092
     #   - 9093:9093
