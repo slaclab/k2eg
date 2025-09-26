@@ -174,7 +174,17 @@ public:
             k2eg::service::pubsub::SubscriberConfiguration{
                 po->getSubscriberConfiguration()->server_address,
                 std::string("subscriber-random-test-") + k2eg::common::UUID::generateUUIDLite(),
-                k2eg::common::MapStrKV{{{"client.id", std::any(std::string(client_name + "-" + k2eg::common::UUID::generateUUIDLite()))}}}
+                // Add conservative consumer timing settings to avoid heartbeat expiration
+                // during long test sleeps / rebalances in CI environments.
+                k2eg::common::MapStrKV{
+                    {"client.id", std::any(std::string(client_name + "-" + k2eg::common::UUID::generateUUIDLite()))},
+                    {"session.timeout.ms", std::any(std::string("60000"))},
+                    {"heartbeat.interval.ms", std::any(std::string("3000"))},
+                    {"max.poll.interval.ms", std::any(std::string("300000"))},
+                    // If the consumer subscribes after the first message is produced,
+                    // prefer earliest so test consumers don't miss replies due to 'latest'.
+                    {"auto.offset.reset", std::any(std::string("earliest"))}
+                }
             });
 
         auto subscriber = k2eg::service::pubsub::impl::kafka::MakeRDKafkaSubscriberShrdPtr(sub_conf);
