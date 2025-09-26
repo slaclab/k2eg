@@ -30,8 +30,8 @@
 #include <memory>
 #include <string>
 #include <thread>
-#include <unordered_set>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 /**
@@ -153,13 +153,31 @@ public:
     }
 
     /**
+     * @brief Create a Kafka publisher with custom configuration.
+     * @param configuration Publisher configuration to use.
+     * @return Shared pointer to publisher.
+     */
+    k2eg::service::pubsub::IPublisherShrdPtr getPublisherInstance(k2eg::service::pubsub::ConstPublisherConfigurationShrdPtr configuration)
+    {
+        return k2eg::service::pubsub::impl::kafka::MakeRDKafkaPublisherShrdPtr(configuration);
+    }
+
+    /**
      * @brief Create a Kafka subscriber bound to test config.
      * @param queue Optional queue to subscribe immediately.
      * @return Shared pointer to subscriber.
      */
-    k2eg::service::pubsub::ISubscriberShrdPtr getSubscriberInstance(const std::string& queue = "")
+    k2eg::service::pubsub::ISubscriberShrdPtr getSubscriberInstance(const std::string& queue, const std::string& client_name="generaic-test-subscriber-prefix")
     {
-        auto subscriber = k2eg::service::pubsub::impl::kafka::MakeRDKafkaSubscriberShrdPtr(po->getSubscriberConfiguration());
+        // Build a const SubscriberConfiguration with a random group id and custom client.id
+        auto sub_conf = std::make_shared<const k2eg::service::pubsub::SubscriberConfiguration>(
+            k2eg::service::pubsub::SubscriberConfiguration{
+                po->getSubscriberConfiguration()->server_address,
+                std::string("subscriber-random-test-") + k2eg::common::UUID::generateUUIDLite(),
+                k2eg::common::MapStrKV{{{"client.id", std::any(std::string(client_name + "-" + k2eg::common::UUID::generateUUIDLite()))}}}
+            });
+
+        auto subscriber = k2eg::service::pubsub::impl::kafka::MakeRDKafkaSubscriberShrdPtr(sub_conf);
         if (!queue.empty())
             subscriber->setQueue({queue});
         return subscriber;
@@ -348,9 +366,13 @@ public:
      */
     struct MsgpackMapView
     {
-        msgpack::object_handle                                   handle;
-        std::unordered_map<std::string, msgpack::object>         map;
-        bool                                                     valid() const { return handle.get().type != msgpack::type::NIL || !map.empty(); }
+        msgpack::object_handle                           handle;
+        std::unordered_map<std::string, msgpack::object> map;
+
+        bool valid() const
+        {
+            return handle.get().type != msgpack::type::NIL || !map.empty();
+        }
     };
 
     /**
@@ -360,7 +382,7 @@ public:
      */
     MsgpackMapView getMsgpackObject(const k2eg::service::pubsub::SubscriberInterfaceElement& message)
     {
-        MsgpackMapView out;
+        MsgpackMapView             out;
         std::vector<unsigned char> buff(message.data_len);
         std::memcpy(buff.data(), message.data.get(), message.data_len);
         try
@@ -410,7 +432,14 @@ public:
                     if (it != mv.map.end())
                     {
                         std::string rid;
-                        try { it->second.convert(rid); } catch (...) { rid.clear(); }
+                        try
+                        {
+                            it->second.convert(rid);
+                        }
+                        catch (...)
+                        {
+                            rid.clear();
+                        }
                         if (rid == reply_id)
                         {
                             return msg;
@@ -491,18 +520,20 @@ public:
  * @endcode
  */
 inline std::shared_ptr<K2EGTestEnv> startK2EG(
-    int&                                        tcp_port,
-    k2eg::controller::node::NodeType            type,
-    bool                                        enable_debug_log = false,
-    bool                                        reset_conf = true,
+    int&                                                tcp_port,
+    k2eg::controller::node::NodeType                    type,
+    bool                                                enable_debug_log = false,
+    bool                                                reset_conf = true,
     const std::unordered_map<std::string, std::string>& env_overrides = {})
 {
     clearenv();
-    auto get_override = [&](const std::string& key, const std::string& defval) -> std::string {
+    auto get_override = [&](const std::string& key, const std::string& defval) -> std::string
+    {
         auto it = env_overrides.find(key);
         return it != env_overrides.end() ? it->second : defval;
     };
-    auto set_env_for = [&](const std::string& key, const std::string& defval) {
+    auto set_env_for = [&](const std::string& key, const std::string& defval)
+    {
         auto val = get_override(key, defval);
         setenv(key.c_str(), val.c_str(), 1);
     };
@@ -557,7 +588,6 @@ inline std::shared_ptr<K2EGTestEnv> startK2EG(
     set_env_for("EPICS_k2eg_" + std::string(METRIC_HTTP_PORT), std::to_string(tcp_port));
     set_env_for("EPICS_k2eg_" + std::string(PUB_SERVER_ADDRESS), "kafka:9092");
     set_env_for("EPICS_k2eg_" + std::string(SUB_SERVER_ADDRESS), "kafka:9092");
-    set_env_for("EPICS_k2eg_" + std::string(SUB_GROUP_ID), k2eg::common::UUID::generateUUIDLite());
     return std::make_shared<K2EGTestEnv>();
 }
 

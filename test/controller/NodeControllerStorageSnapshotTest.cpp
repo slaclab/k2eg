@@ -5,6 +5,7 @@
 #include "k2eg/service/pubsub/IPublisher.h"
 #include "gtest/gtest.h"
 
+#include <any>
 #include <unistd.h>
 #include <unordered_map>
 
@@ -34,7 +35,8 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
         true,
         // override storage worker group id to be randomly generate to not get the old not acquired data
         std::unordered_map<std::string, std::string>{
-            {"EPICS_k2eg_storage-worker-consumer-group-id", UUID::generateUUIDLite()}
+            {"EPICS_k2eg_" + std::string(SUB_GROUP_ID), UUID::generateUUIDLite()},
+            {"EPICS_k2eg_" + std::string(PUB_IMPL_KV), "client.id:publisher-StartRecording-test"}
         }
     );
     ASSERT_NE(k2eg, nullptr) << "Failed to create K2EG instance";
@@ -44,17 +46,22 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
 
     auto& node_controller = k2eg->getNodeControllerReference();
 
-    auto publisher = k2eg->getPublisherInstance();
+    auto publisher = k2eg->getPublisherInstance(
+        MakePublisherConfigurationShrdPtr(
+            PublisherConfiguration{
+                "kafka:9092",
+                500,
+                k2eg::common::MapStrKV{{"client.id", std::any(std::string("publisher-StartRecording-test"))}}
+            }
+        )
+    );
     publisher->createQueue(QueueDescription{SNAPSHOT_NAME, 1, 1, 10000000, 10000000});
     publisher->createQueue(QueueDescription{REPLY_TOPIC, 1, 1, 10000000, 10000000});
 
     ASSERT_NE(publisher, nullptr) << "Failed to get publisher instance";
 
-    auto subscriber_reply = k2eg->getSubscriberInstance(REPLY_TOPIC);
+    auto subscriber_reply = k2eg->getSubscriberInstance(REPLY_TOPIC, "subscriber-StartRecording-test");
     ASSERT_NE(subscriber_reply, nullptr) << "Failed to get subscriber instance for reply";
-
-    // auto subscriber_snapshot = k2eg->getSubscriberInstance(SNAPSHOT_NAME);
-    // ASSERT_NE(subscriber_snapshot, nullptr) << "Failed to get subscriber instance for snapshot";
 
     auto storage_service = k2eg->getStorageServiceInstance();
     ASSERT_NE(storage_service, nullptr) << "Failed to get storage service instance";
