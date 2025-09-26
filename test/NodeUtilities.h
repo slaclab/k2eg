@@ -557,6 +557,7 @@ inline std::shared_ptr<K2EGTestEnv> startK2EG(
     set_env_for("EPICS_k2eg_" + std::string(METRIC_HTTP_PORT), std::to_string(tcp_port));
     set_env_for("EPICS_k2eg_" + std::string(PUB_SERVER_ADDRESS), "kafka:9092");
     set_env_for("EPICS_k2eg_" + std::string(SUB_SERVER_ADDRESS), "kafka:9092");
+    set_env_for("EPICS_k2eg_" + std::string(PUB_GROUP_ID), k2eg::common::UUID::generateUUIDLite());
     return std::make_shared<K2EGTestEnv>();
 }
 
