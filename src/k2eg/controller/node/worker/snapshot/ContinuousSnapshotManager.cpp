@@ -1,6 +1,5 @@
 
 
-#include "boost/json/parse.hpp"
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
 
@@ -172,6 +171,11 @@ ContinuousSnapshotManager::~ContinuousSnapshotManager()
     // stop the expiration thread
     logger->logMessage("Stopping expiration thread");
     expiration_thread_running = false;
+    // Wake any threads waiting on iteration condition variables to allow clean shutdown
+    if (iteration_sync_)
+    {
+        iteration_sync_->notifyAll();
+    }
     if (expiration_thread.joinable())
     {
         expiration_thread.join();
@@ -926,5 +930,17 @@ void SnapshotIterationSynchronizer::removeSnapshot(const std::string& snapshot_n
         iteration_in_progress_.erase(snapshot_name);
         iteration_cv_.erase(snapshot_name); // now nobody can be waiting on it
         iteration_states_.erase(snapshot_name);
+    }
+}
+
+void SnapshotIterationSynchronizer::notifyAll()
+{
+    std::lock_guard<std::shared_mutex> lk(iteration_mutex_);
+    for (auto &kv : iteration_cv_)
+    {
+        if (kv.second)
+        {
+            kv.second->notify_all();
+        }
     }
 }

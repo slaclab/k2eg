@@ -117,6 +117,11 @@ public:
      * @param snapshot_name Snapshot name.
      */
     void removeSnapshot(const std::string& snapshot_name);
+
+    /**
+     * @brief Notify all condition variables to wake any waiting threads. Used during shutdown.
+     */
+    void notifyAll();
 };
 
 // RAII helper to ensure startTask/finishTask are always paired for exception safety.

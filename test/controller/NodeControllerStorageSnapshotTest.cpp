@@ -2,6 +2,7 @@
 #include "k2eg/common/BaseSerialization.h"
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
 #include "k2eg/common/uuid.h"
+#include "k2eg/service/pubsub/IPublisher.h"
 #include "gtest/gtest.h"
 
 #include <unistd.h>
@@ -44,6 +45,9 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     auto& node_controller = k2eg->getNodeControllerReference();
 
     auto publisher = k2eg->getPublisherInstance();
+    publisher->createQueue(QueueDescription{SNAPSHOT_NAME, 1, 1, 10000000, 10000000});
+    publisher->createQueue(QueueDescription{REPLY_TOPIC, 1, 1, 10000000, 10000000});
+
     ASSERT_NE(publisher, nullptr) << "Failed to get publisher instance";
 
     auto subscriber_reply = k2eg->getSubscriberInstance(REPLY_TOPIC);

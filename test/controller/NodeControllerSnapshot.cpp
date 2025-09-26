@@ -323,7 +323,7 @@ TEST(NodeControllerSnapshot, RepeatingSnapshotRestartAfterCrash)
 
     // restart the node controller
     publisher = std::make_shared<TopicCountedTargetPublisher>();
-    node_controller = initGatewayBackend(ncs_tcp_port, publisher, true, true);
+    node_controller = initGatewayBackend(ncs_tcp_port, publisher, true, false);
     node_configuration_service = ServiceResolver<INodeConfiguration>::resolve();
 
     // wait until snapshot is restarted

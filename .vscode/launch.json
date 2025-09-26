@@ -540,7 +540,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/k2eg-test",
-            "args": ["--gtest_filter=NodeControllerSnapshot.*"],
+            "args": ["--gtest_filter=NodeControllerSnapshot.RepeatingSnapshotRestartAfterCrash*"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
