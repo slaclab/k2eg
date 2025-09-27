@@ -35,6 +35,7 @@ public:
     virtual void commit(const bool& async = false);
     virtual void commit(const std::shared_ptr<const void>& handle, const bool& async = false);
     virtual int  getMsg(SubscriberInterfaceElementVector& dataVector, unsigned int m_num, unsigned int timeo = 250);
+    virtual bool waitForAssignment(int timeout_ms = 5000) override;
 };
 DEFINE_PTR_TYPES(RDKafkaSubscriber)
 } // namespace k2eg::service::pubsub::impl::kafka

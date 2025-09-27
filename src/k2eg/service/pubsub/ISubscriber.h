@@ -107,6 +107,17 @@ public:
      * @return 0 on success; implementation-defined error code otherwise
      */
     virtual int getMsg(SubscriberInterfaceElementVector& dataVector, unsigned int m_num, unsigned int timeo = 10) = 0;
+    /**
+     * @brief Wait until the underlying consumer has been assigned partitions.
+     *
+     * Implementations may block up to timeout_ms and return true when the
+     * consumer has been assigned at least one partition. Default implementation
+     * is a no-op that returns true so non-kafka implementations are unaffected.
+     *
+     * @param timeout_ms maximum time to wait in milliseconds
+     * @return true if assigned, false on timeout or error
+     */
+    virtual bool waitForAssignment(int timeout_ms = 5000) { return true; }
 };
 DEFINE_PTR_TYPES(ISubscriber)
 } // namespace k2eg::service::pubsub

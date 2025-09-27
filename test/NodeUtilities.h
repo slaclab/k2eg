@@ -189,7 +189,12 @@ public:
 
         auto subscriber = k2eg::service::pubsub::impl::kafka::MakeRDKafkaSubscriberShrdPtr(sub_conf);
         if (!queue.empty())
+        {
             subscriber->setQueue({queue});
+            // Wait for the consumer to be assigned partitions to avoid race where
+            // the test publishes messages before the consumer is ready.
+            subscriber->waitForAssignment(10000);
+        }
         return subscriber;
     }
 

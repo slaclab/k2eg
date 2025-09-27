@@ -8,6 +8,7 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <thread>
 
 using namespace k2eg::common;
 using namespace k2eg::service::pubsub::impl::kafka;
@@ -84,6 +85,31 @@ void RDKafkaSubscriber::setQueue(const k2eg::common::StringVector& queue)
     {
         throw std::runtime_error("Error creating kafka producer (" + RdKafka::err2str(err) + ")");
     }
+}
+
+bool RDKafkaSubscriber::waitForAssignment(int timeout_ms)
+{
+    if (!consumer)
+        return false;
+
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+    std::vector<RdKafka::TopicPartition*> partitions;
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        // Drive the internal librdkafka state machine by polling with a short timeout
+        // This helps completing the group join and partition assignment.
+        // Drive librdkafka internal state (group join / rebalance callbacks) without
+        // actually consuming messages off the application queue.
+        consumer->poll(10);
+
+        auto err = consumer->assignment(partitions);
+        if (err == RdKafka::ERR_NO_ERROR && !partitions.empty())
+        {
+            return true;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    return false;
 }
 
 void RDKafkaSubscriber::addQueue(const k2eg::common::StringVector& queue)
