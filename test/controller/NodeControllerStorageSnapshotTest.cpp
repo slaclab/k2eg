@@ -30,7 +30,7 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     SubscriberInterfaceElementVector received_msg;
 
     // ensure needed topics exist
-    ensureKafkaTopicExists("kafka:9092", "cmd_in_topic", 1, 1);
+    ensureKafkaTopicExists("kafka:9092", "cmd-in-topic", 1, 1);
     ensureKafkaTopicExists("kafka:9092", SNAPSHOT_NAME, 1, 1);
     ensureKafkaTopicExists("kafka:9092", REPLY_TOPIC, 1, 1);
 
