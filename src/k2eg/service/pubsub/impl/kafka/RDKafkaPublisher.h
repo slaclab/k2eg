@@ -120,14 +120,14 @@ public:
     RDKafkaPublisher(ConstPublisherConfigurationShrdPtr               configuration,
                      const std::unordered_map<std::string, std::any>& overrides);
     virtual ~RDKafkaPublisher();
-    virtual int               createQueue(const QueueDescription& new_queue);
-    virtual int               deleteQueue(const std::string& queue_name);
-    virtual QueueMetadataUPtr getQueueMetadata(const std::string& queue_name);
-    virtual void              setAutoPoll(bool autopoll);
-    virtual int               flush(const int timeo = 10000);
-    virtual int               pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& headers = PublisherHeaders());
-    virtual int               pushMessages(PublisherMessageVector& messages, const PublisherHeaders& headers = PublisherHeaders());
-    virtual size_t            getQueueMessageSize();
+    virtual int               createQueue(const QueueDescription& new_queue) override;
+    virtual int               deleteQueue(const std::string& queue_name) override;
+    virtual QueueMetadataUPtr getQueueMetadata(const std::string& queue_name) override;
+    virtual void              setAutoPoll(bool autopoll) override;
+    virtual int               flush(const int timeo = 10000) override;
+    virtual int               pushMessage(PublishMessageUniquePtr message, const PublisherHeaders& headers = PublisherHeaders()) override;
+    virtual int               pushMessages(PublisherMessageVector& messages, const PublisherHeaders& headers = PublisherHeaders()) override;
+    virtual size_t            getQueueMessageSize() override;
 };
 
 DEFINE_PTR_TYPES(RDKafkaPublisher)

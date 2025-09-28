@@ -4,6 +4,7 @@
 #include "boost/json/object.hpp"
 #include "k2eg/common/BaseSerialization.h"
 #include "k2eg/common/types.h"
+#include "k2eg/service/log/ILogger.h"
 #include <cstddef>
 #include <gtest/gtest.h>
 #include <k2eg/k2eg.h>
@@ -375,6 +376,11 @@ public:
     ~K2EGTestEnv()
     {
         deinit();
+    }
+
+    k2eg::service::log::ILoggerShrdPtr getLoggerReference()
+    {
+        return k2eg::service::ServiceResolver<k2eg::service::log::ILogger>::resolve();
     }
 
     k2eg::controller::node::NodeController& getNodeControllerReference()

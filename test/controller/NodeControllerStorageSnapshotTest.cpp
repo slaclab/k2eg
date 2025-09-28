@@ -51,6 +51,9 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
 
     sleep(2);
 
+    k2eg->getLoggerReference()->logMessage("------------------------------Start StartRecording Test-----------------------------", k2eg::service::log::LogLevel::INFO);
+
+
     auto& node_controller = k2eg->getNodeControllerReference();
 
     // create publisher and queues
@@ -63,11 +66,11 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
             }
         )
     );
-
     ASSERT_NE(publisher, nullptr) << "Failed to get publisher instance";
 
     auto subscriber_reply = k2eg->getSubscriberInstance(REPLY_TOPIC, "subscriber-StartRecording-test");
     ASSERT_NE(subscriber_reply, nullptr) << "Failed to get subscriber instance for reply";
+    ASSERT_TRUE(subscriber_reply->waitForAssignment(10000, REPLY_TOPIC)) << "Subscriber instance for reply is not valid";
 
     auto storage_service = k2eg->getStorageServiceInstance();
     ASSERT_NE(storage_service, nullptr) << "Failed to get storage service instance";

@@ -31,11 +31,11 @@ public:
                       const std::unordered_map<std::string, std::any>& overrides);
     RDKafkaSubscriber() = delete;
     virtual ~RDKafkaSubscriber();
-    virtual void setQueue(const k2eg::common::StringVector& queue);
-    virtual void addQueue(const k2eg::common::StringVector& queue);
-    virtual void commit(const bool& async = false);
-    virtual void commit(const std::shared_ptr<const void>& handle, const bool& async = false);
-    virtual int  getMsg(SubscriberInterfaceElementVector& dataVector, unsigned int m_num, unsigned int timeo = 250);
+    virtual void setQueue(const k2eg::common::StringVector& queue) override;
+    virtual void addQueue(const k2eg::common::StringVector& queue) override;
+    virtual void commit(const bool& async = false) override;
+    virtual void commit(const std::shared_ptr<const void>& handle, const bool& async = false) override;
+    virtual int  getMsg(SubscriberInterfaceElementVector& dataVector, unsigned int m_num, unsigned int timeo = 250) override;
     virtual bool waitForAssignment(int timeout_ms = 5000, const std::optional<std::string>& topic = std::nullopt) override;
 };
 DEFINE_PTR_TYPES(RDKafkaSubscriber)

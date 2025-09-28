@@ -41,7 +41,7 @@ jobs:
                 export WAIT_HOSTS=kafka:9092
                 export PATH=$PATH:$PWD/build/local/bin
                 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/build/local/lib:$PWD/build/local/lib/linux-x86_64
-                wget  https://github.com/ufoscout/docker-compose-wait/releases/download/2.9.0/wait -P docker/build/local/bin
+                wget  https://github.com/ufoscout/docker-compose-wait/releases/download/2.12.0/wait -P docker/build/local/bin
                 chmod +x docker/build/local/bin/wait
                 chmod +x docker/build/local/bin/linux-x86_64/pvget
                 chmod +x docker/build/local/bin/k2eg
