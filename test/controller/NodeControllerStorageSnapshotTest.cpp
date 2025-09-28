@@ -28,6 +28,13 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     int64_t                          error = -1;
     std::string                      topic = "";
     SubscriberInterfaceElementVector received_msg;
+
+    // ensure needed topics exist
+    ensureKafkaTopicExists("kafka:9092", "cmd_in_topic", 1, 1);
+    ensureKafkaTopicExists("kafka:9092", SNAPSHOT_NAME, 1, 1);
+    ensureKafkaTopicExists("kafka:9092", REPLY_TOPIC, 1, 1);
+
+    // ok we can go, start K2EG
     auto                             k2eg = startK2EG(
         k2eg_controller_storage_snapshot_test_port,
         NodeType::FULL,
@@ -46,6 +53,7 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
 
     auto& node_controller = k2eg->getNodeControllerReference();
 
+    // create publisher and queues
     auto publisher = k2eg->getPublisherInstance(
         MakePublisherConfigurationShrdPtr(
             PublisherConfiguration{
@@ -55,9 +63,6 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
             }
         )
     );
-    publisher->createQueue(QueueDescription{"cmd_in_topic", 1, 1, 10000000, 10000000});
-    publisher->createQueue(QueueDescription{SNAPSHOT_NAME, 1, 1, 10000000, 10000000});
-    publisher->createQueue(QueueDescription{REPLY_TOPIC, 1, 1, 10000000, 10000000});
 
     ASSERT_NE(publisher, nullptr) << "Failed to get publisher instance";
 

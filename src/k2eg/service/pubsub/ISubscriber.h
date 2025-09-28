@@ -3,11 +3,12 @@
 
 #include <k2eg/common/types.h>
 
+#include <any>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
-#include <any>
 
 namespace k2eg::service::pubsub {
 
@@ -115,9 +116,10 @@ public:
      * is a no-op that returns true so non-kafka implementations are unaffected.
      *
      * @param timeout_ms maximum time to wait in milliseconds
+     * @param topic optional topic name that must appear in the assignment
      * @return true if assigned, false on timeout or error
      */
-    virtual bool waitForAssignment(int timeout_ms = 5000) { return true; }
+    virtual bool waitForAssignment(int timeout_ms = 5000, const std::optional<std::string>& topic = std::nullopt) { return true; }
 };
 DEFINE_PTR_TYPES(ISubscriber)
 } // namespace k2eg::service::pubsub

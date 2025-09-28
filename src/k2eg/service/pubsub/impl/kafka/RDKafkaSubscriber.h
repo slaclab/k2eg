@@ -6,6 +6,7 @@
 #include <any>
 #include <librdkafka/rdkafkacpp.h>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -35,7 +36,7 @@ public:
     virtual void commit(const bool& async = false);
     virtual void commit(const std::shared_ptr<const void>& handle, const bool& async = false);
     virtual int  getMsg(SubscriberInterfaceElementVector& dataVector, unsigned int m_num, unsigned int timeo = 250);
-    virtual bool waitForAssignment(int timeout_ms = 5000) override;
+    virtual bool waitForAssignment(int timeout_ms = 5000, const std::optional<std::string>& topic = std::nullopt) override;
 };
 DEFINE_PTR_TYPES(RDKafkaSubscriber)
 } // namespace k2eg::service::pubsub::impl::kafka

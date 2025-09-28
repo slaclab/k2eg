@@ -87,7 +87,7 @@ void RDKafkaSubscriber::setQueue(const k2eg::common::StringVector& queue)
     }
 }
 
-bool RDKafkaSubscriber::waitForAssignment(int timeout_ms)
+bool RDKafkaSubscriber::waitForAssignment(int timeout_ms, const std::optional<std::string>& topic)
 {
     if (!consumer)
         return false;
@@ -103,7 +103,25 @@ bool RDKafkaSubscriber::waitForAssignment(int timeout_ms)
         consumer->poll(10);
 
         auto err = consumer->assignment(partitions);
-        if (err == RdKafka::ERR_NO_ERROR && !partitions.empty())
+        bool has_assignment = err == RdKafka::ERR_NO_ERROR && !partitions.empty();
+        if (has_assignment && topic.has_value())
+        {
+            has_assignment = false;
+            for (const auto* partition : partitions)
+            {
+                if (partition != nullptr && partition->topic() == *topic)
+                {
+                    has_assignment = true;
+                    break;
+                }
+            }
+        }
+        if (!partitions.empty())
+        {
+            // `assignment` allocates TopicPartition objects that must be destroyed explicitly.
+            RdKafka::TopicPartition::destroy(partitions);
+        }
+        if (has_assignment)
         {
             return true;
         }

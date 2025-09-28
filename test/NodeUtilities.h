@@ -23,6 +23,7 @@
 #include <k2eg/service/storage/StorageServiceFactory.h>
 #include <k2eg/service/storage/impl/MongoDBStorageService.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -110,6 +111,244 @@ public:
         return request_type;
     }
 };
+
+/**
+ * @brief Create a Kafka topic using librdkafka admin APIs and wait until brokers report it.
+ *
+ * Tests can call this helper before booting a node to ensure required topics exist.
+ * The function tolerates pre-existing topics and fails the current test on other errors.
+ */
+inline void ensureKafkaTopicExists(
+    const std::string&                                      bootstrap_servers,
+    const std::string&                                      topic_name,
+    int                                                     partitions = 1,
+    int                                                     replication_factor = 1,
+    const std::unordered_map<std::string, std::string>&     topic_config = {},
+    std::chrono::milliseconds                               admin_timeout = std::chrono::seconds(30),
+    std::chrono::milliseconds                               readiness_timeout = std::chrono::seconds(30),
+    std::chrono::milliseconds                               poll_interval = std::chrono::milliseconds(250))
+{
+    const int         errstr_cnt = 512;
+    char              errstr[errstr_cnt];
+    std::string       conf_errstr;
+
+    // Create an admin-capable producer handle.
+    std::unique_ptr<RdKafka::Conf> admin_conf(RdKafka::Conf::create(RdKafka::Conf::CONF_GLOBAL));
+    if (!admin_conf)
+    {
+        ADD_FAILURE() << "Failed to allocate librdkafka admin configuration";
+        return;
+    }
+    if (admin_conf->set("bootstrap.servers", bootstrap_servers, conf_errstr) != RdKafka::Conf::CONF_OK)
+    {
+        ADD_FAILURE() << "Failed to set bootstrap servers for admin client: " << conf_errstr;
+        return;
+    }
+    if (admin_conf->set("client.id", "k2eg-topic-preparer", conf_errstr) != RdKafka::Conf::CONF_OK)
+    {
+        ADD_FAILURE() << "Failed to set client.id for admin client: " << conf_errstr;
+        return;
+    }
+
+    auto producer = std::unique_ptr<RdKafka::Producer>(RdKafka::Producer::create(admin_conf.get(), conf_errstr));
+    if (!producer)
+    {
+        ADD_FAILURE() << "Failed to create librdkafka producer for admin operations: " << conf_errstr;
+        return;
+    }
+
+    std::unique_ptr<rd_kafka_NewTopic_t*, k2eg::service::pubsub::impl::kafka::RdKafkaNewTopicArrayDeleter> new_topics(
+        static_cast<rd_kafka_NewTopic_t**>(malloc(sizeof(rd_kafka_NewTopic_t*))),
+        k2eg::service::pubsub::impl::kafka::RdKafkaNewTopicArrayDeleter(1));
+    if (!new_topics)
+    {
+        ADD_FAILURE() << "Failed to allocate topic descriptor array";
+        return;
+    }
+
+    new_topics.get()[0] = rd_kafka_NewTopic_new(
+        topic_name.c_str(),
+        partitions > 0 ? partitions : 1,
+        replication_factor > 0 ? replication_factor : 1,
+        errstr,
+        errstr_cnt);
+    if (!new_topics.get()[0])
+    {
+        ADD_FAILURE() << "Failed to initialise topic descriptor: " << errstr;
+        return;
+    }
+
+    for (const auto& [key, value] : topic_config)
+    {
+        auto err = rd_kafka_NewTopic_set_config(new_topics.get()[0], key.c_str(), value.c_str());
+        if (err != RD_KAFKA_RESP_ERR_NO_ERROR)
+        {
+            ADD_FAILURE() << "Failed to set topic configuration '" << key << "': " << rd_kafka_err2str(err);
+            return;
+        }
+    }
+
+    std::unique_ptr<rd_kafka_AdminOptions_t, k2eg::service::pubsub::impl::kafka::RdKafkaAdminOptionDeleter> admin_options(
+        rd_kafka_AdminOptions_new(producer->c_ptr(), RD_KAFKA_ADMIN_OP_CREATETOPICS),
+        k2eg::service::pubsub::impl::kafka::RdKafkaAdminOptionDeleter());
+    if (!admin_options)
+    {
+        ADD_FAILURE() << "Failed to allocate admin options";
+        return;
+    }
+
+    const int request_timeout_ms = static_cast<int>(admin_timeout.count());
+    const int operation_timeout_ms = std::max(1000, request_timeout_ms - 1000);
+    if (auto err = rd_kafka_AdminOptions_set_request_timeout(admin_options.get(), request_timeout_ms, errstr, errstr_cnt);
+        err != RD_KAFKA_RESP_ERR_NO_ERROR)
+    {
+        ADD_FAILURE() << "Failed to set admin request timeout: " << errstr;
+        return;
+    }
+    if (auto err = rd_kafka_AdminOptions_set_operation_timeout(admin_options.get(), operation_timeout_ms, errstr, errstr_cnt);
+        err != RD_KAFKA_RESP_ERR_NO_ERROR)
+    {
+        ADD_FAILURE() << "Failed to set admin operation timeout: " << errstr;
+        return;
+    }
+
+    std::unique_ptr<rd_kafka_queue_t, k2eg::service::pubsub::impl::kafka::RdKafkaQueueDeleter> queue(
+        rd_kafka_queue_new(producer->c_ptr()),
+        k2eg::service::pubsub::impl::kafka::RdKafkaQueueDeleter());
+    if (!queue)
+    {
+        ADD_FAILURE() << "Failed to allocate librdkafka queue";
+        return;
+    }
+
+    rd_kafka_CreateTopics(producer->c_ptr(), new_topics.get(), 1, admin_options.get(), queue.get());
+
+    std::unique_ptr<rd_kafka_event_t, k2eg::service::pubsub::impl::kafka::RdKafkaEventDeleter> event;
+    const auto                                             admin_deadline = std::chrono::steady_clock::now() + admin_timeout;
+    while (std::chrono::steady_clock::now() < admin_deadline)
+    {
+        rd_kafka_event_t* raw_event = rd_kafka_queue_poll(queue.get(), 100);
+        if (!raw_event)
+        {
+            continue;
+        }
+        event.reset(raw_event);
+        if (rd_kafka_event_type(event.get()) == RD_KAFKA_EVENT_CREATETOPICS_RESULT)
+        {
+            break;
+        }
+        // Log unexpected errors and keep polling until deadline.
+        if (rd_kafka_event_error(event.get()) != RD_KAFKA_RESP_ERR_NO_ERROR)
+        {
+            std::cerr << "[WARN] unexpected admin event error: " << rd_kafka_event_error_string(event.get()) << std::endl;
+        }
+        event.reset();
+    }
+
+    if (!event)
+    {
+        ADD_FAILURE() << "Timed out waiting for CreateTopics result for '" << topic_name << "'";
+        return;
+    }
+
+    const rd_kafka_CreateTopics_result_t* result = rd_kafka_event_CreateTopics_result(event.get());
+    size_t                                topic_count = 0;
+    const rd_kafka_topic_result_t**       topic_results = rd_kafka_CreateTopics_result_topics(result, &topic_count);
+    bool                                  creation_ok = false;
+    for (size_t i = 0; i < topic_count; ++i)
+    {
+        const auto* tres = topic_results[i];
+        auto        err = rd_kafka_topic_result_error(tres);
+        if (err == RD_KAFKA_RESP_ERR_NO_ERROR || err == RD_KAFKA_RESP_ERR_TOPIC_ALREADY_EXISTS)
+        {
+            creation_ok = true;
+            continue;
+        }
+        ADD_FAILURE() << "Failed to create topic '" << rd_kafka_topic_result_name(tres) << "': "
+                      << rd_kafka_err2name(err) << " - " << rd_kafka_topic_result_error_string(tres);
+        return;
+    }
+
+    if (!creation_ok)
+    {
+        ADD_FAILURE() << "CreateTopics returned no usable results for '" << topic_name << "'";
+        return;
+    }
+
+    // Poll metadata until the topic reports ready.
+    std::unique_ptr<RdKafka::Conf> consumer_conf(RdKafka::Conf::create(RdKafka::Conf::CONF_GLOBAL));
+    if (!consumer_conf)
+    {
+        ADD_FAILURE() << "Failed to allocate metadata consumer configuration";
+        return;
+    }
+    conf_errstr.clear();
+    if (consumer_conf->set("bootstrap.servers", bootstrap_servers, conf_errstr) != RdKafka::Conf::CONF_OK)
+    {
+        ADD_FAILURE() << "Failed to set bootstrap servers for metadata consumer: " << conf_errstr;
+        return;
+    }
+    if (consumer_conf->set("group.id", "k2eg-metadata-" + k2eg::common::UUID::generateUUIDLite(), conf_errstr) != RdKafka::Conf::CONF_OK)
+    {
+        ADD_FAILURE() << "Failed to set group.id for metadata consumer: " << conf_errstr;
+        return;
+    }
+    if (consumer_conf->set("enable.auto.commit", "false", conf_errstr) != RdKafka::Conf::CONF_OK)
+    {
+        ADD_FAILURE() << "Failed to disable auto commit for metadata consumer: " << conf_errstr;
+        return;
+    }
+
+    auto consumer = std::unique_ptr<RdKafka::KafkaConsumer>(RdKafka::KafkaConsumer::create(consumer_conf.get(), conf_errstr));
+    if (!consumer)
+    {
+        ADD_FAILURE() << "Failed to create metadata consumer: " << conf_errstr;
+        return;
+    }
+
+    const auto ready_deadline = std::chrono::steady_clock::now() + readiness_timeout;
+    bool       ready = false;
+    while (std::chrono::steady_clock::now() < ready_deadline)
+    {
+        RdKafka::Metadata* metadata = nullptr;
+        auto               md_err = consumer->metadata(true, nullptr, &metadata, static_cast<int>(admin_timeout.count()));
+        if (md_err == RdKafka::ERR_NO_ERROR && metadata)
+        {
+            const auto* topics = metadata->topics();
+            if (topics != nullptr)
+            {
+                for (const auto* topic_md : *topics)
+                {
+                    if (!topic_md)
+                    {
+                        continue;
+                    }
+                    if (topic_md->topic() == topic_name && topic_md->err() == RdKafka::ERR_NO_ERROR)
+                    {
+                        ready = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (metadata)
+        {
+            RdKafka::Metadata::destroy(metadata);
+        }
+        if (ready)
+        {
+            break;
+        }
+        std::this_thread::sleep_for(poll_interval);
+    }
+
+    consumer->close();
+
+    if (!ready)
+    {
+        ADD_FAILURE() << "Timed out waiting for topic '" << topic_name << "' to appear in metadata";
+    }
+}
 
 /**
  * @brief Test environment bootstrapping K2EG for integration tests.
