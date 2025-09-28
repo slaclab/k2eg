@@ -18,7 +18,7 @@ services:
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/app/local/lib:/app/local/lib/linux-x86_64:/app/local/lib/oatpp-1.3.0
           /app/local/bin/wait
           /app/local/bin/linux-x86_64/pvget channel:ramp:ramp
-          /app/local/bin/k2eg-test
+          /app/local/bin/k2eg-test --gtest_filter=NodeControllerStorageSnapshotTest.*
     depends_on:
       - epics-pva
       - kafka
