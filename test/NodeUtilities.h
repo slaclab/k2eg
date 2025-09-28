@@ -333,7 +333,7 @@ inline void ensureKafkaTopicExists(
         }
         if (metadata)
         {
-            RdKafka::Metadata::destroy(metadata);
+            delete metadata;
         }
         if (ready)
         {
