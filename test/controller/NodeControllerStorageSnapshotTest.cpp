@@ -55,6 +55,7 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
             }
         )
     );
+    publisher->createQueue(QueueDescription{"cmd_in_topic", 1, 1, 10000000, 10000000});
     publisher->createQueue(QueueDescription{SNAPSHOT_NAME, 1, 1, 10000000, 10000000});
     publisher->createQueue(QueueDescription{REPLY_TOPIC, 1, 1, 10000000, 10000000});
 
@@ -69,7 +70,7 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     // remove all data
     storage_service->clearAllData();
 
-    sleep(2);
+    sleep(10);
 
     // start a snapshot
     auto start_snapshot_cmd = MakeRepeatingSnapshotCommandShrdPtr(
