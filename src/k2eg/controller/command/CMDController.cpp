@@ -102,7 +102,8 @@ CMDController::start() {
   logger->logMessage("Receive command message from: " + configuration->topic_in);
   subscriber->setQueue({configuration->topic_in});
   if(!subscriber->waitForAssignment(10000, configuration->topic_in)) {
-    throw std::runtime_error("Timeout waiting for topic assignment");
+    logger->logMessage("Timeout waiting assignment for: "+configuration->topic_in, LogLevel::ERROR);
+    //throw std::runtime_error("Timeout waiting for topic assignment");
   }
   run          = true;
   t_subscriber = std::thread(&CMDController::consume, this);
