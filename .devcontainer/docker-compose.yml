@@ -71,7 +71,7 @@ services:
       - ../test:/app
   zookeeper:
     platform: linux/amd64
-    image: bitnami/zookeeper:3.8.1
+    image: bitnami/zookeeper:3.9.0
     # ports:
     #   - 2181:2181
     environment:
@@ -79,7 +79,7 @@ services:
 
   kafka:
     platform: linux/amd64
-    image: bitnami/kafka:3.4.0
+    image: bitnami/kafka:3.9.0
     # ports:
     #   - 9092:9092
     #   - 9093:9093
@@ -93,5 +93,18 @@ services:
       - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
       - KAFKA_CFG_MESSAGE_MAX_BYTES=256000
+
+  mongodb-primary:
+    image: ghcr.io/zcube/bitnami-compat/mongodb:6.0.5
+    restart: on-failure
+    environment:
+      - MONGODB_ROOT_USER=admin
+      - MONGODB_ROOT_PASSWORD=admin
+      - BITNAMI_DEBUG=true
+      - MONGODB_REPLICA_SET_MODE=primary
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb-primary
+      - MONGODB_REPLICA_SET_KEY=replicasetkey123
+    ports:
+      - "27017:27017"
 volumes:
   consul_data: {}

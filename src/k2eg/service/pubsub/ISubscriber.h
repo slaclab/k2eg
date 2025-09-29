@@ -3,29 +3,58 @@
 
 #include <k2eg/common/types.h>
 
+#include <any>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
+#include <unordered_map>
 
 namespace k2eg::service::pubsub {
 
-// publisher configuration
+/**
+ * @brief Subscriber configuration parameters.
+ */
 struct SubscriberConfiguration {
-    // subscriber broker address
+    /** @brief Subscriber broker address (host:port). */
     std::string server_address;
-    // subscriber group id
+    /** @brief Subscriber group id. */
     std::string group_id;
-    // custom k/v string map for implementation parameter
+    /**
+     * @brief Implementation-specific overrides.
+     *
+     * Keys and values are implementation-defined; values are stored as
+     * scalar types in std::any (commonly std::string, integers, bool).
+     */
     k2eg::common::MapStrKV custom_impl_parameter;
 };
 DEFINE_PTR_TYPES(SubscriberConfiguration)
 
 DEFINE_MAP_FOR_TYPE(std::string, std::string, SubscriberHeaders)
+/**
+ * @brief Message received from a subscriber.
+ *
+ * Owns payload memory and exposes optional commit handle.
+ */
 typedef struct SubscriberInterfaceElement {
     SubscriberHeaders header;
     const std::string key;
     const size_t data_len;
     std::unique_ptr<const char[]> data;
+    /**
+     * @brief Commit handle for acknowledging a single message.
+     *
+     * The underlying implementation may populate partition/offset and execute
+     * an optional action when the message is committed.
+     */
+    struct CommitHandle
+    {
+        std::string topic;
+        int32_t partition{0};
+        int64_t offset_to_commit{0};
+        std::function<void()> on_commit_action; // optional
+    };
+    std::shared_ptr<CommitHandle> commit_handle;
 } SubscriberInterfaceElement;
 
 DEFINE_VECTOR_FOR_TYPE(std::shared_ptr<const SubscriberInterfaceElement>, SubscriberInterfaceElementVector);
@@ -34,31 +63,65 @@ typedef std::function<void(SubscriberInterfaceElement&)> SubscriberInterfaceHand
 
 typedef enum ConsumerInterfaceEventType { ONDELIVERY, ONARRIVE, ONERROR } ConsumerInterfaceEventType;
 
-/*
-
+/**
+ * @brief Abstract subscriber interface.
+ *
+ * Implementations should honor configuration and optional runtime overrides.
  */
 class ISubscriber {
 protected:
     DEFINE_MAP_FOR_TYPE(ConsumerInterfaceEventType, SubscriberInterfaceHandler, handlers)
-    const ConstSubscriberConfigurationUPtr configuration;
+    const ConstSubscriberConfigurationShrdPtr configuration;
+    std::unordered_map<std::string, std::any> runtime_overrides_;
 public:
-    ISubscriber(ConstSubscriberConfigurationUPtr configuration);
+    /**
+     * @brief Construct with configuration.
+     * @param configuration shared immutable subscriber configuration
+     */
+    ISubscriber(ConstSubscriberConfigurationShrdPtr configuration);
+    /**
+     * @brief Construct with configuration and runtime overrides.
+     * @param configuration shared immutable subscriber configuration
+     * @param overrides implementation-specific runtime overrides
+     */
+    ISubscriber(ConstSubscriberConfigurationShrdPtr configuration, const std::unordered_map<std::string, std::any>& overrides);
     virtual ~ISubscriber() = default;
+    /** @brief Access provided runtime overrides. */
+    const std::unordered_map<std::string, std::any>& getRuntimeOverrides() const { return runtime_overrides_; }
     /**
      * @brief Set the Topics where the consumer need to fetch data
      *
      * @param topics
      */
     virtual void setQueue(const k2eg::common::StringVector& queue) = 0;
+    /** @brief Add topics to the existing subscription set. */
     virtual void addQueue(const k2eg::common::StringVector& queue) = 0;
+    /** @brief Commit current offsets; async when true. */
     virtual void commit(const bool& async = false) = 0;
-    //! Fetch in synchronous way the message
+    /** @brief Commit a single message using its opaque handle. */
+    virtual void commit(const std::shared_ptr<const void>& handle, const bool& async = false) = 0;
     /**
-         waith until the request number of message are not received keeping in mind the timeout
+     * @brief Fetch messages synchronously.
+     * @param dataVector destination vector
+     * @param m_num number of messages to wait for
+     * @param timeo timeout in milliseconds
+     * @return 0 on success; implementation-defined error code otherwise
      */
     virtual int getMsg(SubscriberInterfaceElementVector& dataVector, unsigned int m_num, unsigned int timeo = 10) = 0;
+    /**
+     * @brief Wait until the underlying consumer has been assigned partitions.
+     *
+     * Implementations may block up to timeout_ms and return true when the
+     * consumer has been assigned at least one partition. Default implementation
+     * is a no-op that returns true so non-kafka implementations are unaffected.
+     *
+     * @param timeout_ms maximum time to wait in milliseconds
+     * @param topic optional topic name that must appear in the assignment
+     * @return true if assigned, false on timeout or error
+     */
+    virtual bool waitForAssignment(int timeout_ms = 5000, const std::optional<std::string>& topic = std::nullopt) { return true; }
 };
-
+DEFINE_PTR_TYPES(ISubscriber)
 } // namespace k2eg::service::pubsub
 
 #endif

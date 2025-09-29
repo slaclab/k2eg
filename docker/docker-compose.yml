@@ -17,6 +17,22 @@ services:
           tmux new-session -d "python /app/update_iocs.py"
           tail -f /dev/null
 
+  epics_updater:
+    platform: linux/amd64
+    image: python:3.10
+    command: 
+        - /bin/bash
+        - -c
+        - |
+          apt update
+          apt install -y tmux
+          pip install --upgrade pip
+          pip install numpy p4p pyepics
+          tmux new-session -d "python3 /app/update_iocs.py"
+          tail -f /dev/null
+    volumes:
+      - ../test:/app
+
   consul:
     image: consul:1.15
     ports:
@@ -27,14 +43,12 @@ services:
       - consul_data:/consul/data  # Optional persistent storage for Consul data
 
   zookeeper:
-    image: bitnami/zookeeper:3.8.1
+    image: bitnami/zookeeper:3.9.0
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
-    logging:
-      driver: none
 
   kafka:
-    image: bitnami/kafka:3.4.0
+    image: bitnami/kafka:3.9.0
     ports:
       - 9092:9092
       - 9093:9093
@@ -48,13 +62,25 @@ services:
       - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
       - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
+      - KAFKA_CFG_GROUP_INITIAL_REBALANCE_DELAY_MS=0
     volumes:
       - kafka-data:/bitnami/kafka
     depends_on:
       - zookeeper
-    logging:
-      driver: none
 
+  mongodb-primary:
+    image: ghcr.io/zcube/bitnami-compat/mongodb:6.0.5
+    restart: on-failure
+    environment:
+      - MONGODB_ROOT_USER=admin
+      - MONGODB_ROOT_PASSWORD=admin
+      - BITNAMI_DEBUG=true
+      - MONGODB_REPLICA_SET_MODE=primary
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb-primary
+      - MONGODB_REPLICA_SET_KEY=replicasetkey123
+    ports:
+      - "27017:27017"
+      
 volumes:
   kafka-data:
   consul_data:
