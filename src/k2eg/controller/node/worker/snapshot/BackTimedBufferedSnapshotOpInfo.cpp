@@ -58,6 +58,8 @@ bool BackTimedBufferedSnapshotOpInfo::init(std::vector<PVShrdPtr>& sanitized_pv_
         all_pvs_.insert(pv->name);
     }
     pvs_no_events_ = all_pvs_;
+    pending_pvs_without_events_.clear();
+    pending_pvs_without_events_ready_ = false;
     return true;
 }
 
@@ -93,9 +95,19 @@ bool BackTimedBufferedSnapshotOpInfo::isTimeout(const std::chrono::steady_clock:
         if (expired || force_fast_expire)
         {
             timeout = true;
-            if(expired){onWindowTimeout(true);}
             last_forced_expire = now;
             std::unique_lock lock(buffer_mutex);
+            if (expired)
+            {
+                pending_pvs_without_events_.assign(pvs_no_events_.begin(), pvs_no_events_.end());
+                pending_pvs_without_events_ready_ = true;
+                onWindowTimeout(true);
+            }
+            else
+            {
+                pending_pvs_without_events_.clear();
+                pending_pvs_without_events_ready_ = false;
+            }
             std::swap(acquiring_buffer, processing_buffer);
 
         }
@@ -187,12 +199,21 @@ void BackTimedBufferedSnapshotOpInfo::onWindowTimeout(bool /*full_window*/)
 
 std::vector<std::string> BackTimedBufferedSnapshotOpInfo::getPVsWithoutEvents() const
 {
-    std::shared_lock lock(buffer_mutex);
+    std::unique_lock lock(buffer_mutex);
     std::vector<std::string> res;
-    res.reserve(pvs_no_events_.size());
-    for (const auto& pv : pvs_no_events_)
+    if (pending_pvs_without_events_ready_)
     {
-        res.emplace_back(pv);
+        res = pending_pvs_without_events_;
+        pending_pvs_without_events_.clear();
+        pending_pvs_without_events_ready_ = false;
+    }
+    else
+    {
+        res.reserve(pvs_no_events_.size());
+        for (const auto& pv : pvs_no_events_)
+        {
+            res.emplace_back(pv);
+        }
     }
     return res;
 }
