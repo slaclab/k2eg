@@ -11,8 +11,8 @@
 
 namespace k2eg::controller::node::worker::snapshot {
 
-using MonitoEventBacktimeBuffer = k2eg::common::TimeWindowEventBuffer<k2eg::service::epics_impl::MonitorEvent>;
-DEFINE_PTR_TYPES(MonitoEventBacktimeBuffer)
+using MonitorEventBacktimeBuffer = k2eg::common::TimeWindowEventBuffer<k2eg::service::epics_impl::MonitorEvent>;
+DEFINE_PTR_TYPES(MonitorEventBacktimeBuffer)
 
 /*
 @brief Double-buffered back-timed snapshot operation for EPICS PV monitoring.
@@ -56,14 +56,16 @@ specified fields if requested.
 */
 
 #define FAST_EXPIRE_TIME_MSEC 1000
+
 class BackTimedBufferedSnapshotOpInfo : public SnapshotOpInfo
 {
     // define when the snapshot is acquiring data
     mutable std::shared_mutex             buffer_mutex;
-    MonitoEventBacktimeBufferUPtr         acquiring_buffer;
-    MonitoEventBacktimeBufferUPtr         processing_buffer;
+    MonitorEventBacktimeBufferShrdPtr     acquiring_buffer;
+    MonitorEventBacktimeBufferShrdPtr     processing_buffer;
     std::chrono::steady_clock::time_point last_forced_expire = std::chrono::steady_clock::now();
     bool                                  header_sent = false;
+    std::chrono::steady_clock::time_point header_snapshot_time; /**< Time point for the snapshot. */
     bool                                  win_time_expired = false;
     std::int64_t                          fast_expire_time_msec = 0; // fast expire time in milliseconds
     // Per-window PV stats

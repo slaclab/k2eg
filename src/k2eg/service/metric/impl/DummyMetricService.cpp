@@ -13,7 +13,7 @@ using namespace prometheus;
 using namespace k2eg::service::metric;
 using namespace k2eg::service::metric::impl;
 
-DummyMetricService::DummyMetricService(ConstMetricConfigurationUPtr metric_configuration) : IMetricService(std::move(metric_configuration)) {}
+DummyMetricService::DummyMetricService(ConstMetricConfigurationShrdPtr metric_configuration) : IMetricService(std::move(metric_configuration)) {}
 
 DummyMetricService::~DummyMetricService() {}
 
