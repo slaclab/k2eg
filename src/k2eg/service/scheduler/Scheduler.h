@@ -28,7 +28,7 @@ DEFINE_PTR_TYPES(SchedulerConfiguration)
     Permits to execute handler specifying cronjob timing string
 */
 class Scheduler {
-  ConstSchedulerConfigurationUPtr configuration;
+  ConstSchedulerConfigurationShrdPtr configuration;
   std::mutex                      tasks_queue_mtx;
   std::mutex                      thread_wait_mtx;
   std::condition_variable         cv;
@@ -46,7 +46,7 @@ class Scheduler {
   std::chrono::system_clock::time_point getNewWaitUntilTimePoint();
 
  public:
-  Scheduler(ConstSchedulerConfigurationUPtr configuration);
+  Scheduler(ConstSchedulerConfigurationShrdPtr configuration);
   ~Scheduler();
   void start();
   void stop();

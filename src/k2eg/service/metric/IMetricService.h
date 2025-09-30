@@ -2,6 +2,7 @@
 #define K2EG_SERVICE_METRIC_IMETRICSERVICE_H_
 
 #include "k2eg/service/metric/INodeControllerSystemMetric.h"
+#include "k2eg/service/metric/IStorageNodeMetric.h"
 #include <k2eg/common/types.h>
 
 #include <k2eg/service/metric/IEpicsMetric.h>
@@ -18,16 +19,17 @@ DEFINE_PTR_TYPES(MetricConfiguration)
 // abstra the metric implementation
 class IMetricService {
  protected:
-  ConstMetricConfigurationUPtr metric_configuration;
+  ConstMetricConfigurationShrdPtr metric_configuration;
 
  public:
-  IMetricService(ConstMetricConfigurationUPtr metric_configuration);
+  IMetricService(ConstMetricConfigurationShrdPtr metric_configuration);
   virtual ~IMetricService() = default;
 
   virtual IEpicsMetric& getEpicsMetric() = 0;
   virtual ICMDControllerMetric& getCMDControllerMetric() = 0;
   virtual INodeControllerMetric& getNodeControllerMetric() = 0;
   virtual INodeControllerSystemMetric& getNodeControllerSystemMetric() = 0;
+  virtual IStorageNodeMetric& getStorageNodeMetric() = 0;
 };
 DEFINE_PTR_TYPES(IMetricService)
 

@@ -3,6 +3,7 @@
 #define TYPES_H
 #include <boost/json.hpp>
 #include <map>
+#include <any>
 #include <msgpack.hpp>
 #include <string>
 #include <vector>
@@ -50,6 +51,7 @@ inline x##ShrdPtr Make##x##ShrdPtr(Args&&... __args) \
 
 DEFINE_VECTOR_FOR_TYPE(std::string, StringVector);
 
-DEFINE_MAP_FOR_TYPE(std::string, std::string, MapStrKV);
+// Generic key/value map where values may be various scalar types, stored as std::any.
+DEFINE_MAP_FOR_TYPE(std::string, std::any, MapStrKV);
 } // namespace k2eg::common
 #endif // __TYPES_H__

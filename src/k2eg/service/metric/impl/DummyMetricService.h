@@ -7,6 +7,7 @@
 #include <k2eg/service/metric/ICMDControllerMetric.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/metric/INodeControllerMetric.h>
+#include <k2eg/service/metric/IStorageNodeMetric.h>
 
 #include <prometheus/exposer.h>
 #include <prometheus/registry.h>
@@ -46,6 +47,29 @@ DEFINE_METRIC(IEpicsMetric, IEpicsMetricCounterType)
 DEFINE_METRIC(ICMDControllerMetric, ICMDControllerMetricCounterType)
 DEFINE_METRIC(INodeControllerMetric, INodeControllerMetricCounterType)
 DEFINE_METRIC(INodeControllerSystemMetric, INodeControllerSystemMetricType)
+// Custom Dummy for IStorageNodeMetric supporting both gauge and counter
+class DummyIStorageNodeMetric : public IStorageNodeMetric {
+  friend class DummyMetricService;
+  DummyIStorageNodeMetric() = default;
+ public:
+  std::map<IStorageNodeMetricType, std::atomic<double>> gauges;
+  std::map<IStorageNodeMetricType, std::atomic<double>> counters;
+  virtual ~DummyIStorageNodeMetric() = default;
+  void incrementCounter(IStorageNodeMetricType type, const double inc_value = 1.0,
+                        const std::map<std::string, std::string>& label = {}) override final {
+    switch (type) {
+      case IStorageNodeMetricType::RunningArchiversGauge:
+        gauges[type] = inc_value;
+        break;
+      case IStorageNodeMetricType::RecordedPVRecords:
+        counters[type] = counters[type] + inc_value;
+        break;
+      case IStorageNodeMetricType::RecordedSnapshotRecords:
+        counters[type] = counters[type] + inc_value;
+        break;
+    }
+  }
+};
 
 // Dummy Metric services implementation
 class DummyMetricService : public IMetricService
@@ -55,9 +79,10 @@ class DummyMetricService : public IMetricService
     std::shared_ptr<ICMDControllerMetric>        cmd_controller_metric;
     std::shared_ptr<INodeControllerMetric>       node_controller_metric;
     std::shared_ptr<INodeControllerSystemMetric> node_controller_system_metric;
+    std::shared_ptr<IStorageNodeMetric>          storage_node_metric;
 
 public:
-    DummyMetricService(ConstMetricConfigurationUPtr metric_configuration);
+    DummyMetricService(ConstMetricConfigurationShrdPtr metric_configuration);
     virtual ~DummyMetricService();
     DummyMetricService(const DummyMetricService&) = delete;
     DummyMetricService& operator=(const DummyMetricService&) = delete;
@@ -66,6 +91,7 @@ public:
     ICMDControllerMetric&        getCMDControllerMetric() override final;
     INodeControllerMetric&       getNodeControllerMetric() override final;
     INodeControllerSystemMetric& getNodeControllerSystemMetric() override final;
+    IStorageNodeMetric&          getStorageNodeMetric() override final;
 };
 } // namespace k2eg::service::metric::impl
 

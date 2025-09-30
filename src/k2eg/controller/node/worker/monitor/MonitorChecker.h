@@ -19,29 +19,28 @@
 
 namespace k2eg::controller::node::worker::monitor {
 
+/**
+ * @brief Configuration for MonitorChecker behavior.
+ */
 struct MonitorCheckerConfiguration {
-  // represent the seconds timeout where a monitor queue is  not conusmed
-  // ater these second are expired, the monitor that push on the specific
-  // queue is stopped
+  /** @brief Seconds of inactivity after which a monitor is considered stale. */
   int64_t monitor_expiration_timeout;
-  // if true the queue is pruged when monitor is stopped
+  /** @brief Whether to purge the queue when a monitor times out. */
   bool purge_queue_on_monitor_timeout;
-
-  // regex to filterout consumer for which used to count
-  // when a queue is used or not
+  /** @brief Consumer group name regexes to exclude from activity checks. */
   std::vector<std::string> filter_out_regex;
 };
 
-// the type of the monitor events
+/** @brief Type of monitor lifecycle event. */
 enum class MonitorHandlerAction { Start, Stop };
 
-// the struct that describe the monitor event
+/** @brief Monitor lifecycle event payload. */
 typedef struct {
   MonitorHandlerAction                                action;
   k2eg::service::data::repository::ChannelMonitorType monitor_type;
 } MonitorHandlerData;
 
-// handler to call when a new monitor is needed (PV Name, protocol, destination topic)
+/** @brief Callback invoked on monitor start/stop decisions. */
 typedef std::function<void(MonitorHandlerData)> CheckerEventHandler;
 
 struct ChannelMonitorTypeComparator {
@@ -51,10 +50,12 @@ struct ChannelMonitorTypeComparator {
   }
 };
 
-// class that manage the checking of the activated monitor, when some criteria will
-// encountered the monitor will be stopped, the checker inform the parent class for
-// start and stop monitor needs according to the above rules. At each restart the
-// database is check to see if there are monitor to be started
+/**
+ * @brief Checks active monitors and emits start/stop events based on activity.
+ *
+ * Periodically evaluates consumer activity to stop stale monitors and restarts
+ * required ones by inspecting the configuration database.
+ */
 class MonitorChecker {
   const MonitorCheckerConfiguration             monitor_checker_configuration;
   service::pubsub::IPublisherShrdPtr            publisher;
@@ -70,22 +71,26 @@ class MonitorChecker {
   bool isTimeoutExperid(const k2eg::service::data::repository::ChannelMonitorType& monitor_info);
   bool excludeConsumer(std::string consumer_group_name);
  public:
+  /** @brief Construct a MonitorChecker with configuration and node DB. */
   MonitorChecker(const MonitorCheckerConfiguration& monitor_checker_configuration, configuration::NodeConfigurationShrdPtr node_configuration_db);
   ~MonitorChecker();
   /**
-  the returned token needs to be maintaned until event are neede
-  */
+   * @brief Register a handler to receive lifecycle events.
+   * @return A token that must be held while receiving events.
+   */
   k2eg::common::BroadcastToken addHandler(CheckerEventHandler handler);
+  /** @brief Persist the latest monitor state snapshot. */
   void                         storeMonitorData(const k2eg::controller::node::configuration::ChannelMonitorTypeConstVector& monitor_info);
-  // scann element for automatic disable the monitoring
+  /** @brief Scan a subset of items, stopping monitors that appear idle. */
   size_t                       scanForMonitorToStop(size_t element_to_process = 10);
-  // scann element for restart the monitor
+  /** @brief Scan a subset of items, restarting monitors that should run. */
   size_t                       scanForRestart(size_t element_to_process = 10);
+  /** @brief Reset internal lists of monitors to process. */
   void                         resetMonitorToProcess();
   /**
-  Update the configured value for the expiration timeout of the active monitor
-  if expiration_timeout is < 0 the default configured value will be restored
-  */
+   * @brief Override expiration timeout for active monitors.
+   * @param expiration_timeout New timeout in seconds (<0 to restore default).
+   */
   void setPurgeTimeout(int64_t expiration_timeout);
 };
 

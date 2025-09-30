@@ -30,21 +30,28 @@ namespace k2eg::controller::command {
 DEFINE_MAP_FOR_TYPE(std::string, std::any, FieldValuesMap)
 typedef std::unique_ptr<FieldValuesMap> FieldValuesMapUPtr;
 
-#define BOOST_JSON_TO_STRIN(t, x) boost::json::serialize(boost::json::value_from(*static_pointer_cast<const t>(c)));
+#define BOOST_JSON_TO_STRING(x) boost::json::serialize(boost::json::value_from(x));
+#define BOOST_JSON_TO_STRING_WITH_TYPE(t, x) BOOST_JSON_TO_STRING(*static_pointer_cast<const t>(x));
+
+template <typename T>
+inline const std::string to_json_string_cmd_ptr(T object) 
+{
+    return boost::json::serialize(boost::json::value_from(*object));
+}
 
 static const std::string to_json_string(cmd::ConstCommandShrdPtr c)
 {
     switch (c->type)
     {
-    case cmd::CommandType::get: return BOOST_JSON_TO_STRIN(cmd::GetCommand, c);
-    case cmd::CommandType::info: return BOOST_JSON_TO_STRIN(cmd::InfoCommand, c);
-    case cmd::CommandType::monitor: return BOOST_JSON_TO_STRIN(cmd::MonitorCommand, c);
-    case cmd::CommandType::multi_monitor: return BOOST_JSON_TO_STRIN(cmd::MultiMonitorCommand, c);
-    case cmd::CommandType::put: return BOOST_JSON_TO_STRIN(cmd::PutCommand, c);
-    case cmd::CommandType::snapshot: return BOOST_JSON_TO_STRIN(cmd::SnapshotCommand, c);
-    case cmd::CommandType::repeating_snapshot: return BOOST_JSON_TO_STRIN(cmd::RepeatingSnapshotCommand, c);
-    case cmd::CommandType::repeating_snapshot_stop: return BOOST_JSON_TO_STRIN(cmd::RepeatingSnapshotStopCommand, c);
-    case cmd::CommandType::repeating_snapshot_trigger: return BOOST_JSON_TO_STRIN(cmd::RepeatingSnapshotTriggerCommand, c);
+    case cmd::CommandType::get: return BOOST_JSON_TO_STRING_WITH_TYPE(cmd::GetCommand, c);
+    case cmd::CommandType::info: return BOOST_JSON_TO_STRING_WITH_TYPE(cmd::InfoCommand, c);
+    case cmd::CommandType::monitor: return BOOST_JSON_TO_STRING_WITH_TYPE(cmd::MonitorCommand, c);
+    case cmd::CommandType::multi_monitor: return BOOST_JSON_TO_STRING_WITH_TYPE(cmd::MultiMonitorCommand, c);
+    case cmd::CommandType::put: return BOOST_JSON_TO_STRING_WITH_TYPE(cmd::PutCommand, c);
+    case cmd::CommandType::snapshot: return BOOST_JSON_TO_STRING_WITH_TYPE(cmd::SnapshotCommand, c);
+    case cmd::CommandType::repeating_snapshot: return BOOST_JSON_TO_STRING_WITH_TYPE(cmd::RepeatingSnapshotCommand, c);
+    case cmd::CommandType::repeating_snapshot_stop: return BOOST_JSON_TO_STRING_WITH_TYPE(cmd::RepeatingSnapshotStopCommand, c);
+    case cmd::CommandType::repeating_snapshot_trigger: return BOOST_JSON_TO_STRING_WITH_TYPE(cmd::RepeatingSnapshotTriggerCommand, c);
     case cmd::CommandType::unknown: return "Unknown";
     }
     return "Unknown";

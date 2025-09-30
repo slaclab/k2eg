@@ -95,7 +95,7 @@ DEFINE_MAP_FOR_TYPE(std::string, ChannelTaskShrdPtr, ChannelMap)
 class EpicsServiceManager
 {
     k2eg::service::log::ILoggerShrdPtr                                logger;
-    ConstEpicsServiceManagerConfigUPtr                                config;
+    ConstEpicsServiceManagerConfigShrdPtr                              config;
     std::shared_mutex                                                 channel_map_mutex;
     ChannelMap                                                        channel_map;
     std::set<std::string>                                             pv_to_remove;
@@ -127,7 +127,7 @@ class EpicsServiceManager
     void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
 
 public:
-    explicit EpicsServiceManager(ConstEpicsServiceManagerConfigUPtr config = std::make_unique<EpicsServiceManagerConfig>());
+    explicit EpicsServiceManager(ConstEpicsServiceManagerConfigShrdPtr config = std::make_shared<const EpicsServiceManagerConfig>());
     ~EpicsServiceManager();
     void                         addChannel(const std::string& pv_name_uri);
     void                         removeChannel(const std::string& pv_name_uri);

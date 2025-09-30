@@ -10,6 +10,7 @@
 #include <boost/json.hpp>
 
 #include <chrono>
+#include <optional>
 
 using namespace k2eg::controller::command;
 using namespace k2eg::controller::command::cmd;
@@ -49,6 +50,7 @@ CMDController::consume() {
         bs::error_code  ec;
         bj::object      command_description;
         bj::string_view value_str = bj::string_view(message->data.get(), message->data_len);
+        logger->logMessage(STRING_FORMAT("Received command: %1%", std::string(message->data.get(), message->data_len)), LogLevel::DEBUG);
         try {
           command_description = bj::parse(value_str, ec).as_object();
           // increment receving command metric
@@ -99,6 +101,10 @@ CMDController::start() {
   if (configuration->topic_in.empty()) { throw std::runtime_error("The message queue is mandatory"); }
   logger->logMessage("Receive command message from: " + configuration->topic_in);
   subscriber->setQueue({configuration->topic_in});
+  if(!subscriber->waitForAssignment(10000, configuration->topic_in)) {
+    logger->logMessage("Timeout waiting assignment for: "+configuration->topic_in, LogLevel::ERROR);
+    //throw std::runtime_error("Timeout waiting for topic assignment");
+  }
   run          = true;
   t_subscriber = std::thread(&CMDController::consume, this);
 }

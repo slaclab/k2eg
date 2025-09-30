@@ -1,6 +1,7 @@
 #ifndef k2eg_CONTROLLER_NODE_NODECONTROLLER_H_
 #define k2eg_CONTROLLER_NODE_NODECONTROLLER_H_
 
+#include "k2eg/controller/node/worker/StorageWorker.h"
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/ObjectFactory.h>
 #include <k2eg/common/ProcSystemMetrics.h>
@@ -28,14 +29,40 @@ namespace k2eg::controller::node {
 enum class NodeType
 {
     GATEWAY,
-    STORAGE
+    STORAGE,
+    FULL
 };
 
+/**
+ * @brief Output stream operator for BackendType
+ *
+ * This allows printing the BackendType to an output stream.
+ * Useful for logging and debugging purposes.
+ */
+inline std::ostream& operator<<(std::ostream& os, const NodeType& type)
+{
+    switch (type)
+    {
+    case NodeType::GATEWAY: return os << "Gateway";
+    case NodeType::STORAGE: return os << "Storage";
+    case NodeType::FULL:    return os << "Full";
+    default:                return os << "Unknown";
+    }
+}
+
+
+/**
+ * @brief Node controller configuration
+ *
+ * This structure holds the configuration for the node controller,
+ * including command worker configurations and storage worker settings.
+ */
 struct NodeControllerConfiguration
 {
-    NodeType                                     node_type;
-    worker::monitor::MonitorCommandConfiguration monitor_command_configuration;
-    worker::SnapshotCommandConfiguration         snapshot_command_configuration;
+    NodeType                                       node_type;
+    worker::monitor::MonitorCommandConfiguration   monitor_command_configuration;
+    worker::SnapshotCommandConfiguration           snapshot_command_configuration;
+    worker::ConstStorageWorkerConfigurationShrdPtr storage_worker_configuration;
 };
 DEFINE_PTR_TYPES(NodeControllerConfiguration)
 
@@ -67,12 +94,19 @@ class NodeController
     /// Reference to the node controller system metric service.
     k2eg::service::metric::INodeControllerSystemMetric& system_metrics;
 
+    // storage worker configuration
+    worker::StorageWorkerShrdPtr storage_worker;
+
     /**
      * @brief Handles the collection and reporting of statistics for a given task.
      * @param task_properties Properties of the task to process statistics for.
      */
     void handleStatistic(k2eg::service::scheduler::TaskProperties& task_properties);
 
+    void startAsGateway();
+    void performGatewayPeriodicTask();
+    void startAsStorage();
+    void performStoragePeriodicTask();
 public:
     /**
      * @brief Constructs a NodeController with the given configuration and data storage.
@@ -124,7 +158,6 @@ public:
 DEFINE_PTR_TYPES(NodeController)
 } // namespace k2eg::controller::node
 
-
 namespace boost {
 template <>
 inline std::string lexical_cast<std::string, k2eg::controller::node::NodeType>(const k2eg::controller::node::NodeType& type)
@@ -133,8 +166,9 @@ inline std::string lexical_cast<std::string, k2eg::controller::node::NodeType>(c
     {
     case k2eg::controller::node::NodeType::GATEWAY: return "gateway";
     case k2eg::controller::node::NodeType::STORAGE: return "storage";
+    case k2eg::controller::node::NodeType::FULL:    return "full";
     }
-    throw boost::bad_lexical_cast(); // fallback
+    throw boost::bad_lexical_cast();
 }
 
 template <>
@@ -144,9 +178,10 @@ inline k2eg::controller::node::NodeType lexical_cast<k2eg::controller::node::Nod
         return k2eg::controller::node::NodeType::GATEWAY;
     if (str == "storage")
         return k2eg::controller::node::NodeType::STORAGE;
-    throw boost::bad_lexical_cast(); // fallback
+    if (str == "full")
+        return k2eg::controller::node::NodeType::FULL;
+    throw boost::bad_lexical_cast();
 }
 } // namespace boost
-
 
 #endif // k2eg_CONTROLLER_NODE_NODECONTROLLER_H_

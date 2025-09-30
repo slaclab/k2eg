@@ -2,7 +2,9 @@
 #include <k2eg/service/epics/EpicsChannel.h>
 
 #include <cstdlib>
-#include <iomanip>
+#include <csignal>
+#include <iostream>
+#include <csignal>
 #include <iostream>
 
 // Place the macro code here:
@@ -14,7 +16,7 @@
     #endif
 #endif
 
-k2eg::K2EGateway g;
+k2eg::K2EG g;
 
 #ifdef K2EG_USE_ASAN
 extern "C" void __lsan_do_leak_check();
@@ -41,26 +43,33 @@ void event_handler(int signum)
     }
 }
 
-int main(int argc, char* argv[])
+int main(int argc, const char* argv[])
 {
+// Install a signal handler via sigaction
+auto install_handler = [](int sig, void (*handler)(int)) {
+    struct sigaction sa{};
+    sa.sa_handler = handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    return sigaction(sig, &sa, nullptr) == 0;
+};
+// Register handlers
 #ifdef K2EG_USE_ASAN
-    signal(SIGUSR1, handle_signal);
+    install_handler(SIGUSR1, handle_signal);
 #endif
-    if (signal((int)SIGINT, event_handler) == SIG_ERR)
-    {
-        std::cerr << "SIGINT Signal handler registration error";
+    if (!install_handler(SIGINT, event_handler)) {
+        std::cerr << "SIGINT handler registration error" << '\n';
         return EXIT_FAILURE;
     }
-
-    if (signal((int)SIGTERM, event_handler) == SIG_ERR)
-    {
-        std::cerr << "SIGTERM Signal handler registration error";
+    if (!install_handler(SIGTERM, event_handler)) {
+        std::cerr << "SIGTERM handler registration error" << '\n';
         return EXIT_FAILURE;
     }
-    // init ca epics support
-    k2eg::service::epics_impl::EpicsChannel::init();
-    int ret = g.run(argc, const_cast<const char**>(argv));
-    // init deinit epics support
-    k2eg::service::epics_impl::EpicsChannel::deinit();
+    // RAII guard for EPICS init/deinit
+    struct EpicsGuard {
+        EpicsGuard() { k2eg::service::epics_impl::EpicsChannel::init(); }
+        ~EpicsGuard() { k2eg::service::epics_impl::EpicsChannel::deinit(); }
+    } epics;
+    int ret = g.run(argc, argv);
     return ret;
 }
