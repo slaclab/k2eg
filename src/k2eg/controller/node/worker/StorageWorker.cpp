@@ -12,6 +12,7 @@
 #include <k2eg/controller/node/worker/archiver/SnapshotArchiver.h>
 
 #include <functional>
+#include <chrono>
 
 using namespace k2eg::common;
 
@@ -155,6 +156,20 @@ StorageWorker::StorageWorker(const ConstStorageWorkerConfigurationShrdPtr& confi
         throw std::runtime_error("Node configuration is not available");
     }
 
+    // Resolve metric service and cache storage metric reference
+    try
+    {
+        metric_service = ServiceResolver<IMetricService>::resolve();
+        if (metric_service)
+        {
+            storage_node_metric = &metric_service->getStorageNodeMetric();
+        }
+    }
+    catch (...)
+    {
+        // metrics optional; leave storage_node_metric as nullptr
+    }
+
     auto task_restart_monitor = MakeTaskShrdPtr(
         DISCOVER_TASK_NAME,
         DISCOVER_TASK_NAME_DEFAULT_CRON,
@@ -231,19 +246,11 @@ void StorageWorker::executePeriodicTask(TaskProperties& task_properties)
     }
 
     // Update storage metric: running archivers gauge
-    try
+    if (storage_node_metric)
     {
-        auto metric_service = ServiceResolver<IMetricService>::resolve();
-        if (metric_service)
-        {
-            metric_service->getStorageNodeMetric().incrementCounter(
-                IStorageNodeMetricGaugeType::RunningArchivers,
-                static_cast<double>(running_archivers.load(std::memory_order_relaxed)));
-        }
-    }
-    catch (...)
-    {
-        // metrics are optional; ignore failures
+        storage_node_metric->incrementCounter(
+            IStorageNodeMetricType::RunningArchiversGauge,
+            static_cast<double>(running_archivers.load(std::memory_order_relaxed)));
     }
 }
 
@@ -255,10 +262,15 @@ void StorageWorker::processArchiver(archiver::BaseArchiverShrdPtr archiver)
         running_archivers.fetch_sub(1, std::memory_order_relaxed);
         return;
     }
-    // give time to archive
-    // logger->logMessage("----------------------------start process archiving---------------------------", LogLevel::DEBUG);
-    archiver->performWork(std::chrono::milliseconds(config->batch_timeout));
-    // logger->logMessage("----------------------------end process archiving---------------------------", LogLevel::DEBUG);
+    // Perform work and collect processed record count
+    std::size_t processed = archiver->performWork(std::chrono::milliseconds(config->batch_timeout));
+    if (processed > 0 && storage_node_metric)
+    {
+        storage_node_metric->incrementCounter(
+            IStorageNodeMetricType::RecordedSnapshotRecords,
+            static_cast<double>(processed),
+            {{"snapshot", archiver->params.snapshot_queue_name}});
+    }
     if (archiver->canCheckConfig())
     {
         // chek if the snapshot is still running

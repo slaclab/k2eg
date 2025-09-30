@@ -7,11 +7,14 @@
 namespace k2eg::service::metric {
 
 /**
- * @brief Storage node metric gauge types
+ * @brief Storage node metric types (gauge and counter)
  */
-enum class IStorageNodeMetricGaugeType {
-  /** Current number of running archivers (gauge) */
-  RunningArchivers
+enum class IStorageNodeMetricType {
+  // Gauges
+  RunningArchiversGauge,
+  // Counters
+  RecordedPVRecords,
+  RecordedSnapshotRecords
 };
 
 /**
@@ -28,7 +31,7 @@ class IStorageNodeMetric {
    * @param inc_value Value to set or increment (implementation-defined)
    * @param label Optional labels
    */
-  virtual void incrementCounter(IStorageNodeMetricGaugeType type,
+  virtual void incrementCounter(IStorageNodeMetricType type,
                                 const double inc_value = 1.0,
                                 const std::map<std::string, std::string>& label = {}) = 0;
 };

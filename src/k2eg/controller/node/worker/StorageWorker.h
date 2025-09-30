@@ -78,6 +78,8 @@ class StorageWorker
     k2eg::service::pubsub::ISubscriberShrdPtr subscriber;
     // Metric service for reporting metrics
     k2eg::service::metric::IMetricServiceShrdPtr metric_service;
+    // Cached pointer to storage node metric interface (owned by metric_service)
+    k2eg::service::metric::IStorageNodeMetric*    storage_node_metric = nullptr;
     void                                         processArchiver(archiver::BaseArchiverShrdPtr archiver);
 
 public:

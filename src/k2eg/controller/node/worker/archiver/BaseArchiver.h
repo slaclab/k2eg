@@ -80,7 +80,12 @@ public:
      *          respecting the provided timeout.
      * @param timeout Maximum time to wait for new work before returning.
      */
-    virtual void performWork(std::chrono::milliseconds timeout) = 0;
+    /**
+     * @brief Perform a unit of work for the archiver.
+     * @param timeout Maximum time to wait/process before returning.
+     * @return Number of records successfully processed (stored) during this call.
+     */
+    virtual std::size_t performWork(std::chrono::milliseconds timeout) = 0;
 
     /**
      */

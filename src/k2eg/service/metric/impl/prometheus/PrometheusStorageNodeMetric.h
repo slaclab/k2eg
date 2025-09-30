@@ -4,6 +4,7 @@
 #include <k2eg/service/metric/IStorageNodeMetric.h>
 
 #include <prometheus/gauge.h>
+#include <prometheus/counter.h>
 #include <prometheus/registry.h>
 
 #include <memory>
@@ -19,13 +20,15 @@ class PrometheusStorageNodeMetric : public IStorageNodeMetric {
   friend class PrometheusMetricService;
 
   std::shared_ptr<prometheus::Registry> registry;
-  prometheus::Family<prometheus::Gauge>& running_archivers_gauge_family;
+  prometheus::Family<prometheus::Gauge>&   running_archivers_gauge_family;
+  prometheus::Family<prometheus::Counter>& pv_recorded_counter_family;
+  prometheus::Family<prometheus::Counter>& snapshot_recorded_counter_family;
 
   PrometheusStorageNodeMetric();
 
  public:
   virtual ~PrometheusStorageNodeMetric() = default;
-  void incrementCounter(IStorageNodeMetricGaugeType type,
+  void incrementCounter(IStorageNodeMetricType type,
                         const double inc_value = 1.0,
                         const std::map<std::string, std::string>& label = {}) override final;
 };

@@ -2,6 +2,8 @@
 #include <k2eg/common/utility.h>
 #include <k2eg/controller/node/worker/StorageWorker.h>
 #include <k2eg/controller/node/worker/archiver/SnapshotArchiver.h>
+#include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/metric/IMetricService.h>
 
 #include <chrono>
 #include <unordered_map>
@@ -62,7 +64,7 @@ bool SnapshotArchiver::canCheckConfig(const std::chrono::time_point<std::chrono:
     return expired;
 }
 
-void SnapshotArchiver::performWork(std::chrono::milliseconds timeout)
+std::size_t SnapshotArchiver::performWork(std::chrono::milliseconds timeout)
 {
     using namespace std::chrono;
     const auto batch_sz = static_cast<unsigned int>(params.engine_config->batch_size);
@@ -76,6 +78,7 @@ void SnapshotArchiver::performWork(std::chrono::milliseconds timeout)
     std::unordered_map<std::string, std::string> created_snapshots;
 
     // Keep working until we run out of time.
+    std::size_t total_records_processed = 0;
     while (steady_clock::now() < deadline)
     {
         // If no backlog is present, fetch a new batch while respecting the
@@ -132,7 +135,8 @@ void SnapshotArchiver::performWork(std::chrono::milliseconds timeout)
         }
 
         // Process as many pending messages as the remaining time allows.
-        size_t processed_count = 0;
+        size_t msgs_processed = 0;
+        size_t records_processed = 0;
         // Process a fixed initial burst without checking time to reduce
         // deadline-check overhead and guarantee some progress even under
         // tight budgets. Keep the burst strictly less than batch size when possible.
@@ -150,13 +154,12 @@ void SnapshotArchiver::performWork(std::chrono::milliseconds timeout)
             if (!m)
                 continue;
 
-            processMessage(*m, created_snapshots);
-
-            ++processed_count;
+            records_processed += processMessage(*m, created_snapshots);
+            ++msgs_processed;
 
             // Periodically re-check the deadline only after the initial burst
             // to avoid excessive time checking overhead.
-            if (idx >= burst_target && (processed_count % 50 == 0) && steady_clock::now() > deadline)
+            if (idx >= burst_target && (msgs_processed % 50 == 0) && steady_clock::now() > deadline)
             {
                 break;
             }
@@ -164,22 +167,24 @@ void SnapshotArchiver::performWork(std::chrono::milliseconds timeout)
 
         // Remove the processed messages from the front of the backlog so the
         // next iteration continues with the remaining ones or fetches new data.
-        if (processed_count > 0)
+        if (msgs_processed > 0)
         {
-            if (processed_count >= pending_messages.size())
+            if (msgs_processed >= pending_messages.size())
                 pending_messages.clear();
             else
-                pending_messages.erase(pending_messages.begin(), pending_messages.begin() + processed_count);
+                pending_messages.erase(pending_messages.begin(), pending_messages.begin() + msgs_processed);
         }
 
         // If we couldn't process anything (likely due to timeout), exit.
-        if (processed_count == 0)
+        total_records_processed += records_processed;
+        if (msgs_processed == 0)
             break;
     }
+    return total_records_processed;
 }
 
-void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInterfaceElement& m,
-                                      std::unordered_map<std::string, std::string>&            created_snapshots)
+std::size_t SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInterfaceElement& m,
+                                             std::unordered_map<std::string, std::string>&            created_snapshots)
 {
     // Parse the message payload (encapsulated helper)
     k2eg::common::SerializationType ser;
@@ -201,13 +206,12 @@ void SnapshotArchiver::processMessage(const k2eg::service::pubsub::SubscriberInt
     {
     case 0: // header
         handleHeaderMessage(m, iter_index, payload_ts, snapshot_name, key, created_snapshots);
-        break;
+        return 0;
     case 1: // data
-        handleDataMessage(m, ser, iter_index, payload_ts, header_timestamp, snapshot_name, pv_name, key, created_snapshots);
-        break;
+        return handleDataMessage(m, ser, iter_index, payload_ts, header_timestamp, snapshot_name, pv_name, key, created_snapshots) ? 1 : 0;
     default: // ignore/ack other types
         handleTailMessage(m);
-        break;
+        return 0;
     }
 }
 
@@ -316,7 +320,7 @@ void SnapshotArchiver::handleHeaderMessage(const k2eg::service::pubsub::Subscrib
     }
 }
 
-void SnapshotArchiver::handleDataMessage(const k2eg::service::pubsub::SubscriberInterfaceElement& m,
+bool SnapshotArchiver::handleDataMessage(const k2eg::service::pubsub::SubscriberInterfaceElement& m,
                                          k2eg::common::SerializationType                          ser,
                                          int64_t                                                  iter_index,
                                          int64_t                                                  payload_ts,
@@ -399,7 +403,7 @@ void SnapshotArchiver::handleDataMessage(const k2eg::service::pubsub::Subscriber
                     logger->logMessage(STRING_FORMAT("SnapshotArchiver commit exception (discard): %1%", ex.what()), LogLevel::ERROR);
             }
         }
-        return;
+        return false;
     }
 
     // Build ArchiveRecord
@@ -431,6 +435,17 @@ void SnapshotArchiver::handleDataMessage(const k2eg::service::pubsub::Subscriber
     try
     {
         storage_service->store(rec);
+        try {
+            auto metric_service = k2eg::service::ServiceResolver<k2eg::service::metric::IMetricService>::resolve();
+            if (metric_service) {
+                metric_service->getStorageNodeMetric().incrementCounter(
+                    k2eg::service::metric::IStorageNodeMetricType::RecordedPVRecords,
+                    1.0,
+                    {{"pv", rec.pv_name}});
+            }
+        } catch (...) {
+            // ignore metric failures
+        }
         if (m.commit_handle)
         {
             try
@@ -443,11 +458,13 @@ void SnapshotArchiver::handleDataMessage(const k2eg::service::pubsub::Subscriber
                     logger->logMessage(STRING_FORMAT("SnapshotArchiver commit exception (data): %1%", ex.what()), LogLevel::ERROR);
             }
         }
+        return true;
     }
     catch (const std::exception& ex)
     {
         if (logger)
             logger->logMessage(STRING_FORMAT("SnapshotArchiver store exception: %1%", ex.what()), LogLevel::ERROR);
+        return false;
     }
 }
 

@@ -73,8 +73,9 @@ class SnapshotArchiver : public BaseArchiver
 
     // Process a single message: build record, manage snapshot lifecycle,
     // store it, and commit on success. Updates created_snapshots cache.
-    void processMessage(const service::pubsub::SubscriberInterfaceElement& m,
-                        std::unordered_map<std::string, std::string>&      created_snapshots);
+    // Returns number of records stored for this message (0 or 1)
+    std::size_t processMessage(const service::pubsub::SubscriberInterfaceElement& m,
+                               std::unordered_map<std::string, std::string>&      created_snapshots);
 
     // Handle a header message: create snapshot if needed, update context.
     void handleHeaderMessage(const service::pubsub::SubscriberInterfaceElement& m,
@@ -85,7 +86,8 @@ class SnapshotArchiver : public BaseArchiver
                              std::unordered_map<std::string, std::string>&      created_snapshots);
 
     // Handle a data message: process the snapshot data.
-    void handleDataMessage(const service::pubsub::SubscriberInterfaceElement& m,
+    // Returns true if a record was stored successfully
+    bool handleDataMessage(const service::pubsub::SubscriberInterfaceElement& m,
                            k2eg::common::SerializationType                    ser,
                            int64_t                                            iter_index,
                            int64_t                                            payload_ts,
@@ -120,7 +122,7 @@ public:
      * @brief Performs the work of the SnapshotArchiver.
      * @param timeout The timeout for the work to be performed.
      */
-    void performWork(std::chrono::milliseconds timeout) override;
+    std::size_t performWork(std::chrono::milliseconds timeout) override;
     
     /**
         

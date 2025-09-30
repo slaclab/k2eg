@@ -122,8 +122,38 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     // give a ticken to the maintanace task
     node_controller.performManagementTask();
 
-    // give some time for acquire data
-    sleep(30);
+    // During DAQ, poll metrics to print bandwidth (records/sec) for this snapshot
+    {
+        using namespace std::chrono;
+        const std::string metric_name = std::string("k2eg_storage_recorded_snapshot_total{snapshot=\"") + SNAPSHOT_NAME + "\"}";
+        auto              start_ts = steady_clock::now();
+        auto              last_ts = start_ts;
+        double            last_val = 0.0;
+        bool              have_last = false;
+        for (int i = 0; i < 30; ++i) // ~15 seconds of sampling
+        {
+            auto now = steady_clock::now();
+            auto val_opt = download_and_extract_metric<double>(k2eg_controller_storage_snapshot_test_port, metric_name);
+            if (val_opt)
+            {
+                double v = *val_opt;
+                if (have_last)
+                {
+                    double dt = duration<double>(now - last_ts).count();
+                    if (dt > 0)
+                    {
+                        double rate = (v - last_val) / dt;
+                        k2eg->getLoggerReference()->logMessage(
+                            STRING_FORMAT("====>DAQ bandwidth: %1% rec/s (snapshot '%2%')<======", rate % SNAPSHOT_NAME), k2eg::service::log::LogLevel::INFO);
+                    }
+                }
+                last_val = v;
+                last_ts = now;
+                have_last = true;
+            }
+            sleep(1);
+        }
+    }
 
     // stop the snapshot
     auto stop_snapshot_cmd = MakeRepeatingSnapshotStopCommandShrdPtr(
