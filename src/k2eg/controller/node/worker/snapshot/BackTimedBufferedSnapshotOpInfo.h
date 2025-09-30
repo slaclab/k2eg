@@ -72,6 +72,9 @@ class BackTimedBufferedSnapshotOpInfo : public SnapshotOpInfo
     std::unordered_set<std::string>                    all_pvs_;        // full PV set for this snapshot
     std::unordered_set<std::string>                    pvs_no_events_;  // PVs that did not receive any event in the current window
     std::unordered_map<std::string, std::uint64_t>     events_per_pv_;  // counter of events per PV in the current window
+    // Snapshot of silent PVs captured before stats reset on full window expiration
+    mutable std::vector<std::string>                   pending_pvs_without_events_;
+    mutable bool                                       pending_pvs_without_events_ready_ = false;
 public:
     // Buffer to store all received values during the time window
     std::map<std::string, std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr>> value_buffer;
