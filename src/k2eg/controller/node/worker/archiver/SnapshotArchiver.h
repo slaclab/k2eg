@@ -3,9 +3,34 @@
 
 #include <k2eg/common/types.h>
 #include <k2eg/controller/node/worker/archiver/BaseArchiver.h>
+
+#include <chrono>
 #include <unordered_map>
 
 namespace k2eg::controller::node::worker::archiver {
+
+/**
+
+*/
+struct IterationContext
+{
+    bool        valid{false};
+    std::string key;           // snapshot_name:timestamp:iter_index
+    std::string snapshot_id;   // resolved/created snapshot id
+    std::string snapshot_name; // cached for convenience
+    int64_t     iter_index{0};
+    int64_t     key_timestamp{0};
+
+    void reset()
+    {
+        valid = false;
+        key.clear();
+        snapshot_id.clear();
+        snapshot_name.clear();
+        iter_index = 0;
+        key_timestamp = 0;
+    }
+};
 
 /**
  * @brief Constructs a new SnapshotArchiver object.
@@ -24,25 +49,10 @@ class SnapshotArchiver : public BaseArchiver
     // consumer. With publisher guaranteeing in-order delivery of all messages
     // belonging to the same iteration on a partition, most messages will hit
     // this cache and avoid storage lookups and map accesses.
-    struct IterationContext
-    {
-        bool        valid{false};
-        std::string key;           // snapshot_name:timestamp:iter_index
-        std::string snapshot_id;   // resolved/created snapshot id
-        std::string snapshot_name; // cached for convenience
-        int64_t     iter_index{0};
-        int64_t     key_timestamp{0};
+    IterationContext current_iter;
 
-        void reset()
-        {
-            valid = false;
-            key.clear();
-            snapshot_id.clear();
-            snapshot_name.clear();
-            iter_index = 0;
-            key_timestamp = 0;
-        }
-    } current_iter;
+    // the time for the next config checks
+    std::chrono::time_point<std::chrono::steady_clock> next_snap_config_check;
 
     /**
      * @brief Parses a snapshot message and extracts relevant information.
@@ -111,6 +121,11 @@ public:
      * @param timeout The timeout for the work to be performed.
      */
     void performWork(std::chrono::milliseconds timeout) override;
+    
+    /**
+        
+    */
+    bool canCheckConfig(const std::chrono::time_point<std::chrono::steady_clock>& now = std::chrono::steady_clock::now()) override;
 };
 
 DEFINE_PTR_TYPES(SnapshotArchiver)

@@ -1,5 +1,6 @@
 #include "../NodeUtilities.h"
 #include "k2eg/common/BaseSerialization.h"
+#include "NodeControllerCommon.h"
 #include "k2eg/controller/command/cmd/SnapshotCommand.h"
 #include "k2eg/common/uuid.h"
 #include "k2eg/service/pubsub/IPublisher.h"
@@ -136,6 +137,23 @@ TEST(NodeControllerStorageSnapshotTest, StartRecording)
     // wait for ack
     auto reply_msg_stop_snapshot = k2eg->waitForReplyID(subscriber_reply, "rep-id-1", SerializationType::Msgpack, 60000);
     ASSERT_NE(reply_msg_stop_snapshot, nullptr) << "Failed to get reply message";
+
+    // Wait until storage archiver gauge goes to 0
+    {
+        const std::string metric_name = "k2eg_storage_running_archivers";
+        bool               is_zero = false;
+        for (int i = 0; i < 60; ++i) // up to ~60 seconds
+        {
+            auto val = download_and_extract_metric<double>(k2eg_controller_storage_snapshot_test_port, metric_name);
+            if (val && *val == 0.0)
+            {
+                is_zero = true;
+                break;
+            }
+            sleep(1);
+        }
+        ASSERT_TRUE(is_zero) << "Expected metric '" << metric_name << "' to reach 0 after stopping snapshot";
+    }
 
     // for each found snapshot, check that two value has been recorded
     auto found_ids = k2eg->waitForSnapshotIdsInRange(storage_service);

@@ -9,7 +9,11 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
+#include <any>
 #include <string>
+#include <sstream>
+#include <type_traits>
 
 #include <boost/json/object.hpp>
 #include <k2eg/common/MsgpackSerialization.h>
@@ -26,6 +30,7 @@
 #include <k2eg/service/log/impl/BoostLogger.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusMetricService.h>
+#include "../service/metric/metric.h"
 #include <k2eg/service/pubsub/IPublisher.h>
 #include <k2eg/service/pubsub/pubsub.h>
 #include <k2eg/service/scheduler/Scheduler.h>
@@ -127,6 +132,98 @@ public:
         return counter;
     }
 };
+
+// Download Prometheus metrics and extract a single metric value by prefix.
+// Example metric_id: "k2eg_storage_running_archivers" or
+// "k2eg_epics_pv_backlog_total{pv=\"somepv\"}"
+template <typename T>
+inline std::optional<T> download_and_extract_metric(unsigned int http_port, const std::string& metric_id)
+{
+    const std::string url = METRIC_URL_FROM_PORT(http_port);
+    const std::string body = getUrl(url);
+    if (body.empty()) return std::nullopt;
+
+    std::istringstream iss(body);
+    std::string         line;
+    while (std::getline(iss, line))
+    {
+        if (line.empty() || line[0] == '#') continue; // skip comments
+        if (line.rfind(metric_id, 0) == 0)
+        {
+            // Parse numeric value at line end (after last space)
+            auto pos = line.find_last_of(' ');
+            if (pos == std::string::npos || pos + 1 >= line.size()) continue;
+            const std::string token = line.substr(pos + 1);
+            try
+            {
+                if constexpr (std::is_same_v<T, std::string>)
+                {
+                    return token;
+                }
+                else if constexpr (std::is_floating_point_v<T>)
+                {
+                    return static_cast<T>(std::stod(token));
+                }
+                else if constexpr (std::is_integral_v<T>)
+                {
+                    // Try integer first; fallback to double then cast
+                    try {
+                        long long v = std::stoll(token);
+                        return static_cast<T>(v);
+                    } catch (...) {
+                        return static_cast<T>(std::stod(token));
+                    }
+                }
+                else
+                {
+                    static_assert(!sizeof(T*), "download_and_extract_metric<T>: unsupported T");
+                }
+            }
+            catch (...)
+            {
+                // ignore malformed lines
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+inline std::optional<std::any> download_and_extract_metric_any(unsigned int http_port, const std::string& metric_id)
+{
+    const std::string url = METRIC_URL_FROM_PORT(http_port);
+    const std::string body = getUrl(url);
+    if (body.empty()) return std::nullopt;
+
+    std::istringstream iss(body);
+    std::string         line;
+    while (std::getline(iss, line))
+    {
+        if (line.empty() || line[0] == '#') continue;
+        if (line.rfind(metric_id, 0) == 0)
+        {
+            auto pos = line.find_last_of(' ');
+            if (pos == std::string::npos || pos + 1 >= line.size()) continue;
+            const std::string token = line.substr(pos + 1);
+            try
+            {
+                // Heuristic: if token has '.' or exponent, treat as double; else integer
+                if (token.find_first_of(".eE") != std::string::npos)
+                {
+                    return std::any(std::stod(token));
+                }
+                else
+                {
+                    return std::any(std::stoll(token));
+                }
+            }
+            catch (...)
+            {
+                // ignore malformed lines
+            }
+        }
+    }
+    return std::nullopt;
+}
 
 class ControllerConsumerDummyPublisher : public IPublisher
 {

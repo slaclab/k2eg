@@ -44,15 +44,16 @@ class BaseArchiver
     std::atomic<bool> is_archiving{false};
 
 protected:
-    // Aggregated parameters available to all derived archivers
-    const ArchiverParameters params;
     // Logger for the archiver.
     k2eg::service::log::ILoggerShrdPtr logger;
     // Subscriber for the archiver.
     k2eg::service::pubsub::ISubscriberShrdPtr subscriber;
     // Storage service for the archiver.
     k2eg::service::storage::IStorageServiceShrdPtr storage_service;
+
 public:
+    // Aggregated parameters available to all derived archivers
+    const ArchiverParameters params;
     /**
      * @brief Construct a BaseArchiver with required dependencies.
      * @param params Aggregated archiver parameters (engine config, queue name).
@@ -80,6 +81,10 @@ public:
      * @param timeout Maximum time to wait for new work before returning.
      */
     virtual void performWork(std::chrono::milliseconds timeout) = 0;
+
+    /**
+     */
+    virtual bool canCheckConfig(const std::chrono::time_point<std::chrono::steady_clock>& now = std::chrono::steady_clock::now()) = 0;
 };
 DEFINE_PTR_TYPES(BaseArchiver)
 } // namespace k2eg::controller::node::worker::archiver

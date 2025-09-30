@@ -129,6 +129,7 @@ set(COMMON_SOURCE_FILES
   src/k2eg/service/metric/impl/prometheus/PrometheusCMDControllerMetric.cpp
   src/k2eg/service/metric/impl/prometheus/PrometheusNodeControllerMetric.cpp
   src/k2eg/service/metric/impl/prometheus/PrometheusNodeControllerSystemMetric.cpp
+  src/k2eg/service/metric/impl/prometheus/PrometheusStorageNodeMetric.cpp
   src/k2eg/service/metric/impl/DummyMetricService.cpp
 
   src/k2eg/service/log/impl/BoostLogger.cpp

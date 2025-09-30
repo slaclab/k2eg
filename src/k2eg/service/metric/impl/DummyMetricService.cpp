@@ -46,3 +46,12 @@ DummyMetricService::getNodeControllerSystemMetric(){
   }
   return *node_controller_system_metric;
 }
+
+IStorageNodeMetric&
+DummyMetricService::getStorageNodeMetric() {
+  std::lock_guard<std::mutex> lk(service_mux);
+  if (!storage_node_metric) {
+    storage_node_metric = std::shared_ptr<DummyIStorageNodeMetric>(new DummyIStorageNodeMetric());
+  }
+  return *storage_node_metric;
+}

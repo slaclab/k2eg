@@ -1,9 +1,11 @@
 #include "k2eg/service/pubsub/ISubscriber.h"
+#include <cstddef>
 #include <k2eg/common/BaseSerialization.h>
 #include <k2eg/common/utility.h>
 #include <k2eg/service/scheduler/Task.h>
 
 #include <k2eg/service/ServiceResolver.h>
+#include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/scheduler/Scheduler.h>
 
 #include <k2eg/controller/node/worker/StorageWorker.h>
@@ -181,14 +183,9 @@ StorageWorker::~StorageWorker()
 void StorageWorker::executePeriodicTask(TaskProperties& task_properties)
 {
     logger->logMessage("Check if there are some snapshot to acquire", LogLevel::DEBUG);
+
     // get all running snapshot that have been requested to be archived but are not associated to any archiver
     auto available_snapshots = node_config->getRunningSnapshotToArchive();
-    if (available_snapshots.empty())
-    {
-        logger->logMessage("No available snapshots to acquire", LogLevel::DEBUG);
-        return;
-    }
-
     for (const auto& snapshot_id : available_snapshots)
     {
         auto snapshot = node_config->isSnapshotArchiveRequested(snapshot_id);
@@ -216,6 +213,8 @@ void StorageWorker::executePeriodicTask(TaskProperties& task_properties)
                             this->storage_service);
                         // set snapshot as archiving
                         node_config->setSnapshotArchiveStatus(snapshot_id, ArchiveStatusInfo{ArchiveStatus::ARCHIVING});
+                        // increment running archivers count
+                        this->running_archivers.fetch_add(1, std::memory_order_relaxed);
                         // start processing the acquired snapshot
                         processArchiver(archiver);
                     }
@@ -230,16 +229,50 @@ void StorageWorker::executePeriodicTask(TaskProperties& task_properties)
             logger->logMessage(STRING_FORMAT("Failed to acquire snapshot: %1%", snapshot_id), LogLevel::ERROR);
         }
     }
+
+    // Update storage metric: running archivers gauge
+    try
+    {
+        auto metric_service = ServiceResolver<IMetricService>::resolve();
+        if (metric_service)
+        {
+            metric_service->getStorageNodeMetric().incrementCounter(
+                IStorageNodeMetricGaugeType::RunningArchivers,
+                static_cast<double>(running_archivers.load(std::memory_order_relaxed)));
+        }
+    }
+    catch (...)
+    {
+        // metrics are optional; ignore failures
+    }
 }
 
 void StorageWorker::processArchiver(archiver::BaseArchiverShrdPtr archiver)
 {
     if (stop)
+    {
+        // worker shutting down, account for finishing archiver
+        running_archivers.fetch_sub(1, std::memory_order_relaxed);
         return;
+    }
     // give time to archive
     // logger->logMessage("----------------------------start process archiving---------------------------", LogLevel::DEBUG);
     archiver->performWork(std::chrono::milliseconds(config->batch_timeout));
     // logger->logMessage("----------------------------end process archiving---------------------------", LogLevel::DEBUG);
+    if (archiver->canCheckConfig())
+    {
+        // chek if the snapshot is still running
+        auto is_running = node_config->isSnapshotRunning(archiver->params.snapshot_queue_name);
+        if (!is_running)
+        {
+            logger->logMessage(STRING_FORMAT("Snapshot '%1%' is no longer running, stopping archiver", archiver->params.snapshot_queue_name), LogLevel::INFO);
+            // set snapshot as not archiving
+            node_config->setSnapshotArchiveStatus(archiver->params.snapshot_queue_name, ArchiveStatusInfo{ArchiveStatus::STOPPED});
+            // decrement running archivers count
+            running_archivers.fetch_sub(1, std::memory_order_relaxed);
+            return; // do not resubmit
+        }
+    }
     // resubmit to scheduler
     thread_pool->detach_task(
         [this, archiver]() mutable

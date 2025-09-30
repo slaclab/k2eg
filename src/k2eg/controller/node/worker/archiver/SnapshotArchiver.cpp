@@ -12,6 +12,8 @@ using namespace k2eg::service::storage;
 
 using namespace k2eg::controller::node::worker::archiver;
 
+#define NEXT_CHECK_DELAY 5000 // 5 sec
+
 SnapshotArchiver::SnapshotArchiver(
     const ArchiverParameters&                      params_,
     k2eg::service::log::ILoggerShrdPtr             logger_,
@@ -45,9 +47,20 @@ SnapshotArchiver::SnapshotArchiver(
             logger->logMessage(STRING_FORMAT("SnapshotArchiver failed to subscribe to queue: %1%", ex.what()), LogLevel::ERROR);
         throw;
     }
+
+    // init the next check
+    next_snap_config_check = std::chrono::steady_clock::now() + std::chrono::milliseconds(NEXT_CHECK_DELAY);
 }
 
 SnapshotArchiver::~SnapshotArchiver() {}
+
+bool SnapshotArchiver::canCheckConfig(const std::chrono::time_point<std::chrono::steady_clock>& now) {
+    bool expired = false;
+    if((expired = (next_snap_config_check <= now))) {
+        next_snap_config_check = now + std::chrono::milliseconds(NEXT_CHECK_DELAY);
+    }
+    return expired;
+}
 
 void SnapshotArchiver::performWork(std::chrono::milliseconds timeout)
 {

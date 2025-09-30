@@ -3,6 +3,8 @@
 
 #include "k2eg/controller/node/worker/archiver/BaseArchiver.h"
 #include "k2eg/service/configuration/INodeConfiguration.h"
+#include <cstddef>
+#include <atomic>
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/types.h>
 
@@ -60,6 +62,8 @@ class StorageWorker
 {
     // signal the worker to stop
     bool stop = false;
+    // Current number of running archivers
+    std::atomic<std::size_t> running_archivers{0};
     // Configuration for the storage worker
     ConstStorageWorkerConfigurationShrdPtr config;
     // Thread pool for managing worker threads

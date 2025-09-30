@@ -7,6 +7,7 @@
 #include <k2eg/service/metric/ICMDControllerMetric.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/metric/INodeControllerMetric.h>
+#include <k2eg/service/metric/IStorageNodeMetric.h>
 
 #include <prometheus/exposer.h>
 #include <prometheus/registry.h>
@@ -46,6 +47,7 @@ DEFINE_METRIC(IEpicsMetric, IEpicsMetricCounterType)
 DEFINE_METRIC(ICMDControllerMetric, ICMDControllerMetricCounterType)
 DEFINE_METRIC(INodeControllerMetric, INodeControllerMetricCounterType)
 DEFINE_METRIC(INodeControllerSystemMetric, INodeControllerSystemMetricType)
+DEFINE_METRIC(IStorageNodeMetric, IStorageNodeMetricGaugeType)
 
 // Dummy Metric services implementation
 class DummyMetricService : public IMetricService
@@ -55,6 +57,7 @@ class DummyMetricService : public IMetricService
     std::shared_ptr<ICMDControllerMetric>        cmd_controller_metric;
     std::shared_ptr<INodeControllerMetric>       node_controller_metric;
     std::shared_ptr<INodeControllerSystemMetric> node_controller_system_metric;
+    std::shared_ptr<IStorageNodeMetric>          storage_node_metric;
 
 public:
     DummyMetricService(ConstMetricConfigurationShrdPtr metric_configuration);
@@ -66,6 +69,7 @@ public:
     ICMDControllerMetric&        getCMDControllerMetric() override final;
     INodeControllerMetric&       getNodeControllerMetric() override final;
     INodeControllerSystemMetric& getNodeControllerSystemMetric() override final;
+    IStorageNodeMetric&          getStorageNodeMetric() override final;
 };
 } // namespace k2eg::service::metric::impl
 
