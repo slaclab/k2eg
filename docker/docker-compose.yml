@@ -17,6 +17,22 @@ services:
           tmux new-session -d "python /app/update_iocs.py"
           tail -f /dev/null
 
+  epics_updater:
+    platform: linux/amd64
+    image: python:3.10
+    command: 
+        - /bin/bash
+        - -c
+        - |
+          apt update
+          apt install -y tmux
+          pip install --upgrade pip
+          pip install numpy p4p pyepics
+          tmux new-session -d "python3 /app/update_iocs.py"
+          tail -f /dev/null
+    volumes:
+      - ../test:/app
+
   consul:
     image: consul:1.15
     ports:
@@ -43,6 +59,19 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_NUM_PARTITIONS: 1
 
+  mongodb-primary:
+    image: ghcr.io/zcube/bitnami-compat/mongodb:6.0.5
+    restart: on-failure
+    environment:
+      - MONGODB_ROOT_USER=admin
+      - MONGODB_ROOT_PASSWORD=admin
+      - BITNAMI_DEBUG=true
+      - MONGODB_REPLICA_SET_MODE=primary
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb-primary
+      - MONGODB_REPLICA_SET_KEY=replicasetkey123
+    ports:
+      - "27017:27017"
+      
 volumes:
   kafka-data:
   consul_data:

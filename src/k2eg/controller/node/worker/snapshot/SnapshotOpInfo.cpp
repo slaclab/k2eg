@@ -6,8 +6,68 @@
 using namespace k2eg::service::log;
 using namespace k2eg::controller::node::worker::snapshot;
 
+#pragma region SnapshotOpInfo
+
+SnapshotStatisticCounter::SnapshotStatisticCounter()
+    : start_sampling_time(std::chrono::steady_clock::now()) {}
+
+void SnapshotStatisticCounter::incrementEventSize(double amount)
+{
+    statistic.event_size.fetch_add(amount, std::memory_order_relaxed);
+}
+
+void SnapshotStatisticCounter::incrementEventCount(double count)
+{
+    statistic.event_count.fetch_add(count, std::memory_order_relaxed);
+}
+
+SnapshotStatisticShrdPtr SnapshotStatisticCounter::getStatistics(const std::chrono::steady_clock::time_point& now) const
+{
+    SnapshotStatisticShrdPtr result = std::make_shared<SnapshotStatistic>();
+    auto                     elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - start_sampling_time).count();
+    if (elapsed > 0.0)
+    {
+        result->event_size = statistic.event_size / elapsed;
+        result->event_count = statistic.event_count / elapsed;
+    }
+    return result;
+}
+
+void SnapshotStatisticCounter::reset()
+{
+    statistic.event_count = 0;
+    statistic.event_size = 0;
+    start_sampling_time = std::chrono::steady_clock::now();
+}
+
+#pragma region SnapshotSubmission
+
+SnapshotSubmission::SnapshotSubmission(const std::chrono::steady_clock::time_point& snap_time, const std::chrono::steady_clock::time_point& header_timestamp, std::vector<service::epics_impl::MonitorEventShrdPtr>&& snapshot_events, SnapshotSubmissionType submission_type, int64_t iteration_id)
+    : snap_time(snap_time), header_timestamp(header_timestamp), snapshot_events(std::move(snapshot_events)), submission_type(submission_type), iteration_id(iteration_id)
+{
+}
+
+
+SnapshotSubmission::SnapshotSubmission(SnapshotSubmission&& other) noexcept
+    : snapshot_events(std::move(other.snapshot_events)), submission_type(other.submission_type)
+{
+}
+
+
+SnapshotSubmission& SnapshotSubmission::operator=(SnapshotSubmission&& other) noexcept
+{
+    if (this != &other)
+    {
+        snapshot_events = std::move(other.snapshot_events);
+        submission_type = other.submission_type;
+    }
+    return *this;
+}
+
+#pragma region SnapshotOpInfo
+
 SnapshotOpInfo::SnapshotOpInfo(const std::string& queue_name, k2eg::controller::command::cmd::ConstRepeatingSnapshotCommandShrdPtr cmd)
-    : WorkerAsyncOperation(std::chrono::milliseconds(cmd->time_window_msec)), queue_name(queue_name), cmd(cmd), is_triggered(cmd->triggered)
+    : WorkerAsyncOperation(std::chrono::milliseconds(cmd->time_window_msec)), snapshot_statistic(MakeSnapshotStatisticCounterShrdPtr()), queue_name(queue_name), cmd(cmd), is_triggered(cmd->triggered)
 {
 }
 
@@ -44,7 +104,7 @@ void SnapshotOpInfo::beginHeaderGate(int64_t iteration_id)
     std::shared_ptr<IterationSyncState> state;
     {
         std::lock_guard<std::mutex> lk(iteration_sync_mutex);
-        auto& slot = iteration_sync_states[iteration_id];
+        auto&                       slot = iteration_sync_states[iteration_id];
         if (!slot)
             slot = std::make_shared<IterationSyncState>();
         state = slot;
@@ -58,7 +118,7 @@ void SnapshotOpInfo::completeHeaderGate(int64_t iteration_id)
     std::shared_ptr<std::promise<void>> p;
     {
         std::lock_guard<std::mutex> lk(iteration_sync_mutex);
-        auto it = iteration_sync_states.find(iteration_id);
+        auto                        it = iteration_sync_states.find(iteration_id);
         if (it != iteration_sync_states.end() && it->second)
         {
             p = it->second->header_promise;
@@ -81,7 +141,7 @@ void SnapshotOpInfo::waitForHeaderGate(int64_t iteration_id)
     std::shared_future<void> f;
     {
         std::lock_guard<std::mutex> lk(iteration_sync_mutex);
-        auto it = iteration_sync_states.find(iteration_id);
+        auto                        it = iteration_sync_states.find(iteration_id);
         if (it != iteration_sync_states.end() && it->second)
         {
             f = it->second->header_future;
@@ -104,7 +164,7 @@ void SnapshotOpInfo::dataScheduled(int64_t iteration_id)
     std::shared_ptr<IterationSyncState> state;
     {
         std::lock_guard<std::mutex> lk(iteration_sync_mutex);
-        auto& slot = iteration_sync_states[iteration_id];
+        auto&                       slot = iteration_sync_states[iteration_id];
         if (!slot)
             slot = std::make_shared<IterationSyncState>();
         state = slot;
@@ -117,7 +177,7 @@ void SnapshotOpInfo::dataCompleted(int64_t iteration_id)
     std::shared_ptr<IterationSyncState> state;
     {
         std::lock_guard<std::mutex> lk(iteration_sync_mutex);
-        auto it = iteration_sync_states.find(iteration_id);
+        auto                        it = iteration_sync_states.find(iteration_id);
         if (it != iteration_sync_states.end())
             state = it->second;
     }
@@ -136,7 +196,7 @@ void SnapshotOpInfo::waitDataDrained(int64_t iteration_id)
     std::shared_ptr<IterationSyncState> state;
     {
         std::lock_guard<std::mutex> lk(iteration_sync_mutex);
-        auto it = iteration_sync_states.find(iteration_id);
+        auto                        it = iteration_sync_states.find(iteration_id);
         if (it != iteration_sync_states.end())
             state = it->second;
     }
@@ -144,7 +204,10 @@ void SnapshotOpInfo::waitDataDrained(int64_t iteration_id)
         return;
 
     std::unique_lock<std::mutex> lk(state->data_mutex);
-    state->data_cv.wait(lk, [&] { return state->data_pending.load(std::memory_order_acquire) == 0; });
+    state->data_cv.wait(lk, [&]
+                        {
+                            return state->data_pending.load(std::memory_order_acquire) == 0;
+                        });
 
     // Optional cleanup: remove iteration state after drain completes.
     {
@@ -189,6 +252,10 @@ const epics::pvData::PVStructure::const_shared_pointer SnapshotOpInfo::filterPVF
     return filteredPV;
 }
 
+SnapshotStatisticCounterShrdPtr SnapshotOpInfo::getStatisticCounter()
+{
+    return snapshot_statistic;
+}
 void SnapshotOpInfo::publishHeader(const std::shared_ptr<k2eg::service::pubsub::IPublisher>& publisher,
                                    const std::shared_ptr<k2eg::service::log::ILogger>&       logger,
                                    int64_t                                                   snap_ts,
@@ -207,13 +274,14 @@ void SnapshotOpInfo::publishHeader(const std::shared_ptr<k2eg::service::pubsub::
 std::uint64_t SnapshotOpInfo::publishData(const std::shared_ptr<k2eg::service::pubsub::IPublisher>&          publisher,
                                           const std::shared_ptr<k2eg::service::log::ILogger>&                logger,
                                           int64_t                                                            snap_ts,
+                                          int64_t                                                            header_ts,
                                           int64_t                                                            iteration_id,
                                           const std::vector<k2eg::service::epics_impl::MonitorEventShrdPtr>& events) const
 {
     std::uint64_t published = 0;
     for (auto& event : events)
     {
-        auto serialized_message = serialize(RepeatingSnapshotData{1, snap_ts, iteration_id, MakeChannelDataShrdPtr(event->channel_data)}, cmd->serialization);
+        auto serialized_message = serialize(RepeatingSnapshotData{1, snap_ts, header_ts, iteration_id, MakeChannelDataShrdPtr(event->channel_data)}, cmd->serialization);
         if (serialized_message)
         {
             publisher->pushMessage(MakeReplyPushableMessageUPtr(queue_name, "repeating-snapshot-events", cmd->snapshot_name, serialized_message),
@@ -232,9 +300,10 @@ std::uint64_t SnapshotOpInfo::publishData(const std::shared_ptr<k2eg::service::p
 void SnapshotOpInfo::publishTail(const std::shared_ptr<k2eg::service::pubsub::IPublisher>& publisher,
                                  const std::shared_ptr<k2eg::service::log::ILogger>&       logger,
                                  int64_t                                                   snap_ts,
+                                 int64_t                                                   header_ts,
                                  int64_t                                                   iteration_id) const
 {
-    auto serialized_completion_message = serialize(RepeatingSnapshotCompletion{2, 0, "", cmd->snapshot_name, snap_ts, iteration_id}, cmd->serialization);
+    auto serialized_completion_message = serialize(RepeatingSnapshotCompletion{2, 0, "", cmd->snapshot_name, snap_ts, header_ts, iteration_id}, cmd->serialization);
     if (!serialized_completion_message)
     {
         logger->logMessage("Invalid serialized tail message", k2eg::service::log::LogLevel::ERROR);

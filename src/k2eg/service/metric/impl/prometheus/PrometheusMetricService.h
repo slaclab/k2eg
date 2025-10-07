@@ -7,6 +7,7 @@
 #include <k2eg/service/metric/IEpicsMetric.h>
 #include <k2eg/service/metric/IMetricService.h>
 #include <k2eg/service/metric/INodeControllerMetric.h>
+#include <k2eg/service/metric/IStorageNodeMetric.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusCMDControllerMetric.h>
 
 #include <prometheus/exposer.h>
@@ -26,9 +27,10 @@ class PrometheusMetricService : public IMetricService
     std::shared_ptr<ICMDControllerMetric>        cmd_controller_metric;
     std::shared_ptr<INodeControllerMetric>       node_controller_metric;
     std::shared_ptr<INodeControllerSystemMetric> node_controller_system_metric;
+    std::shared_ptr<IStorageNodeMetric>          storage_node_metric;
 
 public:
-    PrometheusMetricService(ConstMetricConfigurationUPtr metric_configuration);
+    PrometheusMetricService(ConstMetricConfigurationShrdPtr metric_configuration);
     virtual ~PrometheusMetricService();
     PrometheusMetricService(const PrometheusMetricService&) = delete;
     PrometheusMetricService& operator=(const PrometheusMetricService&) = delete;
@@ -37,6 +39,7 @@ public:
     ICMDControllerMetric&        getCMDControllerMetric() override final;
     INodeControllerMetric&       getNodeControllerMetric() override final;
     INodeControllerSystemMetric& getNodeControllerSystemMetric() override final;
+    IStorageNodeMetric&          getStorageNodeMetric() override final;
 };
 } // namespace k2eg::service::metric::impl::prometheus_impl
 
