@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <cstdint>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -91,50 +92,50 @@ ProgramOptions::ProgramOptions() {
 
 // clang-format on
 
-void ProgramOptions::parse(int argc, const char* argv[])
-{
-    try
-    {
-        po::store(po::command_line_parser(argc, argv)
-                      .options(options)
-                      .allow_unregistered()
-                      .run(),
-                  vm);
+void ProgramOptions::parse(int argc, const char *argv[]) {
+  try {
+    po::store(po::command_line_parser(argc, argv)
+                  .options(options)
+                  .allow_unregistered()
+                  .run(),
+              vm);
+    // Map environment variables to option names: EPICS_k2eg_FOO_BAR -> foo-bar
+    auto env_mapper = [](const std::string& env) -> std::string {
+      static const std::string prefix_low = "EPICS_k2eg_";
+      static const std::string prefix_up  = "EPICS_K2EG_";
+      std::string k;
+      if (env.rfind(prefix_low, 0) == 0) {
+        k = env.substr(prefix_low.size());
+      } else if (env.rfind(prefix_up, 0) == 0) {
+        k = env.substr(prefix_up.size());
+      } else {
+        return ""; // skip others
+      }
 
-        po::store(po::parse_environment(options, "EPICS_k2eg_"), vm);
-        po::notify(vm);
+      // UPPER_SNAKE -> lower-kebab (A_B_C -> a-b-c)
+      for (char& c : k) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      std::replace(k.begin(), k.end(), '_', '-');
+      return k;
+    };
 
-        // check if we need to load further option from file
-        if (vm[CONF_FILE].as<bool>())
-        {
-            const std::string conf_file_name = vm[CONF_FILE_NAME].as<std::string>();
-            if (conf_file_name.empty())
-            {
-                throw std::runtime_error("configuration file has nott been specifyed");
-            }
-            // load from file
-            std::ifstream option_file_stream;
-            option_file_stream.open(conf_file_name.c_str(), std::ifstream::in);
-            if (!option_file_stream)
-            {
-                throw std::runtime_error("Error opening configuration file");
-            }
+    po::store(po::parse_environment(options, env_mapper), vm);
+    po::notify(vm);
 
-            po::store(po::parse_config_file(option_file_stream, options), vm);
-            po::notify(vm);
-        }
-    }
-    catch (po::too_many_positional_options_error& e)
-    {
-        // A positional argument like `opt2=option_value_2` was given
-        std::cerr << e.what() << std::endl;
-        throw std::runtime_error(e.what());
-    }
-    catch (po::error_with_option_name& e)
-    {
-        // Another usage error occurred
-        std::cerr << e.what() << std::endl;
-        throw std::runtime_error(e.what());
+    // check if we need to load further option from file
+    if (vm[CONF_FILE].as<bool>()) {
+      const std::string conf_file_name = vm[CONF_FILE_NAME].as<std::string>();
+      if (conf_file_name.empty()) {
+        throw std::runtime_error("configuration file has nott been specifyed");
+      }
+      // load from file
+      std::ifstream option_file_stream;
+      option_file_stream.open(conf_file_name.c_str(), std::ifstream::in);
+      if (!option_file_stream) {
+        throw std::runtime_error("Error opening configuration file");
+      }
+
+      po::store(po::parse_config_file(option_file_stream, options), vm);
+      po::notify(vm);
     }
 }
 
