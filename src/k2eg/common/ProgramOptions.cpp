@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <cstdint>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -88,8 +89,26 @@ void ProgramOptions::parse(int argc, const char *argv[]) {
                   .allow_unregistered()
                   .run(),
               vm);
+    // Map environment variables to option names: EPICS_k2eg_FOO_BAR -> foo-bar
+    auto env_mapper = [](const std::string& env) -> std::string {
+      static const std::string prefix_low = "EPICS_k2eg_";
+      static const std::string prefix_up  = "EPICS_K2EG_";
+      std::string k;
+      if (env.rfind(prefix_low, 0) == 0) {
+        k = env.substr(prefix_low.size());
+      } else if (env.rfind(prefix_up, 0) == 0) {
+        k = env.substr(prefix_up.size());
+      } else {
+        return ""; // skip others
+      }
 
-    po::store(po::parse_environment(options, "EPICS_k2eg_"), vm);
+      // UPPER_SNAKE -> lower-kebab (A_B_C -> a-b-c)
+      for (char& c : k) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      std::replace(k.begin(), k.end(), '_', '-');
+      return k;
+    };
+
+    po::store(po::parse_environment(options, env_mapper), vm);
     po::notify(vm);
 
     // check if we need to load further option from file
