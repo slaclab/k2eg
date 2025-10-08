@@ -137,6 +137,9 @@ void ProgramOptions::parse(int argc, const char *argv[]) {
       po::store(po::parse_config_file(option_file_stream, options), vm);
       po::notify(vm);
     }
+  } catch (const std::exception& e) {
+    throw std::runtime_error("Error parsing program options: " + std::string(e.what()));
+  }
 }
 
 bool ProgramOptions::optionConfigure(const std::string& name)
