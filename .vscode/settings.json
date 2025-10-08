@@ -112,5 +112,4 @@
         "cassert": "cpp"
     },
     "git.ignoreLimitWarning": true,
-    "c-cpp-flylint.enable": false
 }

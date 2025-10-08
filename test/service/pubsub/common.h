@@ -39,8 +39,6 @@ class Message : public k2eg::service::pubsub::PublishMessage {
     }
   };
 
-  ;
-
 // Class that owns ProcSystemMetrics and provides refresh, printHeader, and printSample
 class SystemResourcePrinter {
     k2eg::common::ProcSystemMetrics metrics;

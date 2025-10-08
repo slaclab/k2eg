@@ -54,3 +54,17 @@ useCoverage:
       short: No Coverage 
       settings: 
         ENABLE_COVERAGE: no
+verboseMakefile:
+  default: off
+  description: "Verbose Makefile output"
+  choices:
+    on:
+      short: Verbose
+      long: Enable verbose makefile output
+      settings:
+        CMAKE_VERBOSE_MAKEFILE: ON
+    off:
+      short: Quiet
+      long: Disable verbose makefile output
+      settings:
+        CMAKE_VERBOSE_MAKEFILE: OFF

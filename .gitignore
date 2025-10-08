@@ -22,3 +22,4 @@ kafka-producer.kafka
 *.log
 src/k2eg/config.h
 debug.conf
+k2eg.conf

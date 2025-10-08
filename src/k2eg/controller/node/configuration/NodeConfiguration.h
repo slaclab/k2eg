@@ -13,13 +13,19 @@ namespace k2eg::controller::node::configuration {
     typedef std::function<void(const k2eg::service::data::repository::ChannelMonitorType&, int&)> ChannelMonitorTypeHandler;
 
 /**
- * Abstract the node configuration
+ * @brief Facade over node configuration storage and helpers.
+ *
+ * Loads configuration, manages monitor entries, and exposes iteration helpers
+ * used by workers. Backed by shared DataStorage and configuration service.
  */
 class NodeConfiguration {
     const k2eg::service::data::DataStorageShrdPtr data_storage;
     k2eg::service::configuration::NodeConfigurationShrdPtr node_configuration;
     k2eg::service::configuration::INodeConfigurationShrdPtr node_configuration_service;
 public:
+    /**
+     * @brief Construct with backing data storage.
+     */
     NodeConfiguration(k2eg::service::data::DataStorageShrdPtr data_storage);
     NodeConfiguration() = delete;
     NodeConfiguration(const NodeConfiguration&) = delete;
@@ -27,32 +33,34 @@ public:
     ~NodeConfiguration() = default;
 
     /**
-     * Load the node configuration from the global shared
-     * cluster configuration management
+     * @brief Load node configuration from the cluster configuration service.
      */
     void loadNodeConfiguration();
 
     /**
-     * Add a monitor configuration for a determinated channel for a destination topic
-     return for each monitor type if the record has been inserted or not
+     * @brief Add monitor configurations for channels and destination topics.
+     * @param channel_descriptions List of channel monitor descriptors to add.
+     * @return For each descriptor, whether a new record was inserted.
      */
     std::vector<bool> addChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions);
 
     /**
-     * Remove a monitor configuration for a determinated channel for a destination topic
+     * @brief Remove monitor configurations for the given channels/topics.
      */
     void removeChannelMonitor(const ChannelMonitorTypeConstVector& channel_descriptions);
 
-    // iterate over monitor for general purphose logic
+    /** @brief Iterate a fixed number of monitor records applying a handler. */
     size_t iterateAllChannelMonitor(size_t element_to_process, ChannelMonitorTypeHandler handle);
 
-    // interato over all registered monitor for manage the stop of these that respect some logic drivern
-    // by the handler
+    /**
+     * @brief Iterate over registered monitors to evaluate stop conditions.
+     */
     size_t iterateAllChannelMonitorForAction(size_t element_to_process, ChannelMonitorTypeHandler handle);
 
-    // reset all channel monitor check
+    /** @brief Reset monitoring checks for all channels. */
     void resetAllChannelMonitorCheck();
 
+    /** @brief Return current node name. */
     const std::string getNodeName() const;
 };
 DEFINE_PTR_TYPES(NodeConfiguration)

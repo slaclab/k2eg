@@ -13,7 +13,7 @@ using namespace prometheus;
 using namespace k2eg::service::metric;
 using namespace k2eg::service::metric::impl;
 
-DummyMetricService::DummyMetricService(ConstMetricConfigurationUPtr metric_configuration) : IMetricService(std::move(metric_configuration)) {}
+DummyMetricService::DummyMetricService(ConstMetricConfigurationShrdPtr metric_configuration) : IMetricService(std::move(metric_configuration)) {}
 
 DummyMetricService::~DummyMetricService() {}
 
@@ -45,4 +45,13 @@ DummyMetricService::getNodeControllerSystemMetric(){
     node_controller_system_metric = std::shared_ptr<DummyINodeControllerSystemMetric>(new DummyINodeControllerSystemMetric());
   }
   return *node_controller_system_metric;
+}
+
+IStorageNodeMetric&
+DummyMetricService::getStorageNodeMetric() {
+  std::lock_guard<std::mutex> lk(service_mux);
+  if (!storage_node_metric) {
+    storage_node_metric = std::shared_ptr<DummyIStorageNodeMetric>(new DummyIStorageNodeMetric());
+  }
+  return *storage_node_metric;
 }

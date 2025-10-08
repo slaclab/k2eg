@@ -1,0 +1,24 @@
+# Conventional Commits template
+#
+# Subject: use `type(scope)!: concise summary` in imperative mood.
+# - Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+# - Scope: optional (module or area), e.g., epics, controller, storage
+# - Use `!` for breaking changes and add a BREAKING CHANGE section below.
+
+type(scope)!: concise summary
+
+# Body (optional): explain what and why, wrap at ~72 chars per line.
+# Include relevant context, rationale, or side effects.
+
+Changes by file:
+- path/to/file: one-line description of change
+- another/path: one-line description of change
+
+# If this includes a breaking change, describe it here.
+BREAKING CHANGE: <description of the breaking change and migration steps>
+
+# Footer (optional): link issues or add metadata.
+Fixes: #123
+Refs: #456
+Co-authored-by: Full Name <email@example.com>
+

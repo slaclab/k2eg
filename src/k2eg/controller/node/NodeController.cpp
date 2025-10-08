@@ -1,3 +1,4 @@
+#include "k2eg/service/storage/IStorageService.h"
 #include <k2eg/common/BS_thread_pool.hpp>
 #include <k2eg/common/utility.h>
 
@@ -11,6 +12,7 @@
 #include <k2eg/controller/node/worker/MonitorCommandWorker.h>
 #include <k2eg/controller/node/worker/PutCommandWorker.h>
 #include <k2eg/controller/node/worker/SnapshotCommandWorker.h>
+#include <k2eg/controller/node/worker/StorageWorker.h>
 
 using namespace k2eg::controller::node;
 using namespace k2eg::controller::node::worker;
@@ -33,6 +35,7 @@ using namespace k2eg::service::scheduler;
 
 const std::map<std::string, std::string> submitted_command_labels = {{"op", "command_submitted"}};
 const std::map<std::string, std::string> submitted_command_no_workef_found_labels = {{"op", "no_worker_found"}};
+
 NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_controller_configuration, DataStorageShrdPtr data_storage)
     : node_controller_configuration(std::move(node_controller_configuration))
     , node_configuration(std::make_shared<NodeConfiguration>(data_storage))
@@ -45,39 +48,31 @@ NodeController::NodeController(ConstNodeControllerConfigurationUPtr node_control
     logger = ServiceResolver<ILogger>::resolve();
 
     // load current node configuration
-    logger->logMessage("Load node configuration", LogLevel::INFO);
-    node_configuration->loadNodeConfiguration();
+    logger->logMessage(STRING_FORMAT("Starting k2eg %1% node", this->node_controller_configuration->node_type), LogLevel::INFO);
 
-    // register worker for command type
-    // Each command type gets its own worker instance as needed
-    logger->logMessage("Configure command executor", LogLevel::INFO);
-    auto monitor_command_worker = std::make_shared<MonitorCommandWorker>(this->node_controller_configuration->monitor_command_configuration, epics_service_manager_shrd_ptr, node_configuration);
-    if (!monitor_command_worker)
+    // check which kind of node controller we are
+    switch (this->node_controller_configuration->node_type)
     {
-        throw std::runtime_error("Failed to create SnapshotCommandWorker");
+    case NodeType::GATEWAY:
+        startAsGateway();
+        break;
+    case NodeType::STORAGE:
+        startAsStorage();
+        break;
+    case NodeType::FULL:
+        startAsGateway();
+        startAsStorage();
+        break;
+    default:
+        throw std::runtime_error("Unknown node type in NodeController configuration");
     }
-    worker_resolver.registerObjectInstance(CommandType::monitor, monitor_command_worker);
-    worker_resolver.registerObjectInstance(CommandType::multi_monitor, monitor_command_worker);
-
-    worker_resolver.registerObjectInstance(CommandType::get, std::make_shared<GetCommandWorker>(epics_service_manager_shrd_ptr));
-    worker_resolver.registerObjectInstance(CommandType::put, std::make_shared<PutCommandWorker>(epics_service_manager_shrd_ptr));
-
-    auto snapshotCommandWorker = std::make_shared<SnapshotCommandWorker>(this->node_controller_configuration->snapshot_command_configuration, epics_service_manager_shrd_ptr);
-    if (!snapshotCommandWorker)
-    {
-        throw std::runtime_error("Failed to create SnapshotCommandWorker");
-    }
-    worker_resolver.registerObjectInstance(CommandType::snapshot, snapshotCommandWorker);
-    worker_resolver.registerObjectInstance(CommandType::repeating_snapshot, snapshotCommandWorker);
-    worker_resolver.registerObjectInstance(CommandType::repeating_snapshot_trigger, snapshotCommandWorker);
-    worker_resolver.registerObjectInstance(CommandType::repeating_snapshot_stop, snapshotCommandWorker);
 
     // Add periodic statistics management task to the scheduler.
     // This task is responsible for collecting and reporting system metrics.
-    auto statistic_task = MakeTaskShrdPtr(NODE_CONTROLLER_STAT_TASK_NAME, // name of the task
-                                          NODE_CONTROLLER_STAT_TASK_CRON, // cron expression
-                                          std::bind(&NodeController::handleStatistic, this, std::placeholders::_1), // task handler
-                                          -1 // start at application boot time
+    auto statistic_task = MakeTaskShrdPtr(NODE_CONTROLLER_STAT_TASK_NAME,                                       // name of the task
+                                          NODE_CONTROLLER_STAT_TASK_CRON,                                                   // cron expression
+                                          std::bind(&NodeController::handleStatistic, this, std::placeholders::_1),     // task handler
+                                          -1                                                                             // start at application boot time
     );
     ServiceResolver<Scheduler>::resolve()->addTask(statistic_task);
 }
@@ -86,20 +81,32 @@ NodeController::~NodeController()
 {
     // Remove the periodic statistics task from the scheduler.
     bool erased = ServiceResolver<Scheduler>::resolve()->removeTaskByName(NODE_CONTROLLER_STAT_TASK_NAME);
-    logger->logMessage(STRING_FORMAT("[NodeController] Remove statistic task : %1%", erased));
-    logger->logMessage("[NodeController] Stopping node controller");
+    logger->logMessage(STRING_FORMAT("Remove statistic task : %1%", erased));
+    logger->logMessage("Stopping node controller");
     // Wait for all processing tasks to finish before shutdown.
     processing_pool->wait();
     // Clear all registered workers.
     worker_resolver.clear();
-    logger->logMessage("[NodeController] Node controller stopped", LogLevel::INFO);
+    logger->logMessage("Node controller stopped", LogLevel::INFO);
 }
 
 void NodeController::performManagementTask()
 {
-    // Only the monitor worker supports periodic management tasks.
-    auto monitor_worker = worker_resolver.resolve(CommandType::monitor);
-    dynamic_cast<MonitorCommandWorker*>(monitor_worker.get())->executePeriodicTask();
+    switch (this->node_controller_configuration->node_type)
+    {
+    case NodeType::GATEWAY:
+        performGatewayPeriodicTask();
+        break;
+    case NodeType::STORAGE:
+        performStoragePeriodicTask();
+        break;
+    case NodeType::FULL:
+        performGatewayPeriodicTask();
+        performStoragePeriodicTask();
+        break;
+    default:
+        throw std::runtime_error("Unknown node type in NodeController configuration");
+    }
 }
 
 void NodeController::waitForTaskCompletion()
@@ -187,3 +194,58 @@ void NodeController::handleStatistic(TaskProperties& task_properties)
 }
 
 // clang-format on
+
+void NodeController::startAsGateway()
+{
+    node_configuration->loadNodeConfiguration();
+
+    // register worker for command type
+    // Each command type gets its own worker instance as needed
+    logger->logMessage("Configure command executor", LogLevel::INFO);
+    auto monitor_command_worker = std::make_shared<MonitorCommandWorker>(this->node_controller_configuration->monitor_command_configuration, epics_service_manager_shrd_ptr, node_configuration);
+    if (!monitor_command_worker)
+    {
+        throw std::runtime_error("Failed to create SnapshotCommandWorker");
+    }
+    worker_resolver.registerObjectInstance(CommandType::monitor, monitor_command_worker);
+    worker_resolver.registerObjectInstance(CommandType::multi_monitor, monitor_command_worker);
+
+    worker_resolver.registerObjectInstance(CommandType::get, std::make_shared<GetCommandWorker>(epics_service_manager_shrd_ptr));
+    worker_resolver.registerObjectInstance(CommandType::put, std::make_shared<PutCommandWorker>(epics_service_manager_shrd_ptr));
+
+    auto snapshotCommandWorker = std::make_shared<SnapshotCommandWorker>(this->node_controller_configuration->snapshot_command_configuration, epics_service_manager_shrd_ptr);
+    if (!snapshotCommandWorker)
+    {
+        throw std::runtime_error("Failed to create SnapshotCommandWorker");
+    }
+    worker_resolver.registerObjectInstance(CommandType::snapshot, snapshotCommandWorker);
+    worker_resolver.registerObjectInstance(CommandType::repeating_snapshot, snapshotCommandWorker);
+    worker_resolver.registerObjectInstance(CommandType::repeating_snapshot_trigger, snapshotCommandWorker);
+    worker_resolver.registerObjectInstance(CommandType::repeating_snapshot_stop, snapshotCommandWorker);
+}
+
+void NodeController::performGatewayPeriodicTask()
+{
+    // Only the monitor worker supports periodic management tasks.
+    auto monitor_worker = worker_resolver.resolve(CommandType::monitor);
+    dynamic_cast<MonitorCommandWorker*>(monitor_worker.get())->executePeriodicTask();
+}
+
+void NodeController::startAsStorage()
+{
+    logger->logMessage("Allocating storage worker", LogLevel::INFO);
+    storage_worker = std::make_shared<StorageWorker>(this->node_controller_configuration->storage_worker_configuration, ServiceResolver<storage::IStorageService>::resolve());
+}
+
+void NodeController::performStoragePeriodicTask()
+{
+    TaskProperties task_properties;
+    if (storage_worker)
+    {
+        storage_worker->executePeriodicTask(task_properties);
+    }
+    else
+    {
+        logger->logMessage("Storage worker is not initialized", LogLevel::ERROR);
+    }
+}

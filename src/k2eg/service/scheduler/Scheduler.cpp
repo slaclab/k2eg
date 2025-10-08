@@ -11,7 +11,7 @@
 using namespace k2eg::service::scheduler;
 using namespace std::chrono;
 
-Scheduler::Scheduler(ConstSchedulerConfigurationUPtr configuration)
+Scheduler::Scheduler(ConstSchedulerConfigurationShrdPtr configuration)
     : configuration(std::move(configuration)),
       running_task_vector(this->configuration->thread_number, nullptr),
       stop_wait_var(false),

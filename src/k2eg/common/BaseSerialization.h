@@ -2,8 +2,10 @@
 #define K2EG_COMMON_BASESERIALIZATION_H_
 
 #include <k2eg/common/types.h>
-#include <iostream>
-#include <ostream>
+
+#include <algorithm>
+#include <cctype>
+
 namespace k2eg::common {
 enum class SerializationType : std::uint8_t { Unknown, Msgpack, MsgpackCompact, JSON};
 inline constexpr const char *
@@ -15,6 +17,24 @@ serialization_to_string(SerializationType t) noexcept {
     case SerializationType::Unknown: return "unknown";
   }
   return "undefined";
+}
+
+
+
+inline constexpr SerializationType
+serialization_from_string(const std::string& t) noexcept {
+  auto to_lower = [](const std::string& str) {
+    std::string lower = str;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    return lower;
+  };
+  std::string lt = to_lower(t);
+  if (lt == "json") return SerializationType::JSON;
+  if (lt == "msgpack") return SerializationType::Msgpack;
+  if (lt == "msgpack-compact") return SerializationType::MsgpackCompact;
+  if (lt == "unknown") return SerializationType::Unknown;
+  return SerializationType::Unknown;
 }
 
 static void

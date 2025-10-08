@@ -6,6 +6,7 @@
 #include <k2eg/service/metric/impl/prometheus/PrometheusCMDControllerMetric.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusNodeControllerMetric.h>
 #include <k2eg/service/metric/impl/prometheus/PrometheusNodeControllerSystemMetric.h>
+#include <k2eg/service/metric/impl/prometheus/PrometheusStorageNodeMetric.h>
 
 #include <memory>
 #include <cassert>
@@ -21,7 +22,7 @@ auto tmp = std::shared_ptr<type>(new type()); \
 var = tmp; \
 exposer->RegisterCollectable(tmp->registry);
 
-PrometheusMetricService::PrometheusMetricService(ConstMetricConfigurationUPtr metric_configuration) : IMetricService(std::move(metric_configuration)) {
+PrometheusMetricService::PrometheusMetricService(ConstMetricConfigurationShrdPtr metric_configuration) : IMetricService(std::move(metric_configuration)) {
   std::string uri = "0.0.0.0:" + std::to_string(this->metric_configuration->tcp_port);
   exposer_uptr    = std::make_unique<Exposer>(uri);
 }
@@ -66,4 +67,14 @@ PrometheusMetricService::getNodeControllerSystemMetric() {
   }
   assert(node_controller_system_metric);
   return *node_controller_system_metric;
+}
+
+IStorageNodeMetric&
+PrometheusMetricService::getStorageNodeMetric() {
+  std::lock_guard<std::mutex> lk(service_mux);
+  if (!storage_node_metric) {
+    INSTANTIATE_METRIC(PrometheusStorageNodeMetric, exposer_uptr, storage_node_metric)
+  }
+  assert(storage_node_metric);
+  return *storage_node_metric;
 }
