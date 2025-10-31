@@ -138,8 +138,7 @@ Retrieve the current value of an EPICS PV; produces a single reply message.
 {
     "command": "get",
     "serialization": "json|msgpack",
-    "protocol": "pva|ca",
-    "pv_name": "channel::a",
+    "pv_name": "(pva|ca)://<pv name>",
     "reply_topic": "reply-destination-topic",
     "reply_id": "<reply id>"
 }
@@ -173,6 +172,7 @@ Enable or disable update notifications for a specific EPICS PV on a Kafka topic.
 ```
 ### JSON Structure — Deactivation
 
+Multiple PVs:
 ```json
 {
     "command": "monitor",
