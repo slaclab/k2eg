@@ -170,12 +170,12 @@ Retrieve the value of a PV.
 ```
 
 #### Put Command
-Update the value of a PV.  
+Update the value of a PV. The `value` field must contain a base64-encoded MsgPack MAP with keys matching PV fields (for simple PVs typically `{ "value": <scalar|array> }`).  
 ```json
 {
   "command": "put",
   "pv_name": "(pva|ca)://<pv name>.attribute",
-  "value": "pv new value",
+  "value": "<base64 of msgpack MAP>",
   "reply_topic": "reply-destination-topic",
   "reply_id": "reply id"
 }

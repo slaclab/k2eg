@@ -1,24 +1,24 @@
-# Message format and serialization
+# Message Format and Serialization
 
-# Message type
-Every message managed by k2eg has a destination topic that is the topic where the message, generated for that command, are sent. Usually a client that send comamnd to k2eg use a single topic for receive that message. K2EG can manage different type of serialization, so each message has different structure depending to the type of the serailziaiton choosen by the client. The serializaation type for the answer is choosen by the client when the command is sent to the k2eg.
+# Message Type
+Every message managed by K2EG has a destination topic where replies are sent. Usually a client uses a single topic to receive replies. K2EG supports multiple serializations, so each message can have a different structure depending on the serialization chosen by the client. The reply serialization is chosen by the client when the command is sent to K2EG.
 
 # Command Structure
-Each command has a minimum set of attributes that are the ones below:
+Each command includes the following minimum attributes (commands are always sent as JSON; `serialization` selects the reply format):
 ```json
 {
-    "command": "command string desceription",
+    "command": "<command>",
     "serialization": "json|msgpack",
-    "pv_name": "channel description",
+    "pv_name": "(pva|ca)://<pv name>",
     "reply_topic": "reply-destination-topic",
-    "reply_id":"reply id",
+    "reply_id": "reply id"
 }
 ```
-The 'serialization' field is keeped in consideration only for the command that generate a data flow form EPICS to kafka, or generally speaking for all those command that has a read behaviour. For the command kind that have a write behaviour this field is keepd in consideration only if the write operation require a message for an answer.
-Actually k2eg support two different serialization JSON or Msgpack for message from EPICS to kafka and JSON for the command submition, bellowe there is the description of the message input and output structure related to each serialization type. <span style="color:#59afe1">The Msgpack serialization will be described using json notation for simplification.</span>
+The `serialization` field applies to commands that produce data (read behavior, e.g., get/monitor/snapshot) and selects the reply serialization only. Commands themselves are always JSON. For write commands (e.g., put), it applies only to the optional reply message.
+K2EG supports JSON and MsgPack for replies. Below is the description of EPICS value payloads for each serialization. The MsgPack structure is shown using JSON-like notation for clarity.
 
-# Epics value serialization
-Each epics single value is serialized in different way depending of serialization type:
+# EPICS Value Serialization
+EPICS values are serialized differently depending on the reply serialization type:
 
 ## JSON Serialization (json)
 ```json
@@ -67,8 +67,8 @@ Each epics single value is serialized in different way depending of serializatio
 }
 ```
 
-## MSGPack serialization (msgpack)
-The msgpack serializaion use a map to represent data like a json structure. At level-0 there is a map where the key is the pv name and as value there is another map that contains the sublevel keys value, alarm, timeStamp, display, control, valueAlarm:
+## MsgPack serialization (msgpack)
+MsgPack uses a map mirroring the JSON structure. At level 0 there is a map where the key is the PV name and the value is another map containing the sub-keys value, alarm, timeStamp, display, control, valueAlarm:
 ```
 MAP( "<pv name>", MAP(
     "value": scalar | scalar array,
@@ -111,65 +111,77 @@ MAP( "<pv name>", MAP(
     )
 ))
 ```
-## MSGPack Compact serialization (msgpack-compact)
-The msgpack compact, instead of a map, use an array to serialize all the values, leaving out the key. At the first position there is the pv name the other values are positionally equal to the position on the json and msgpack structure.
-```
-VECTOR(<channle name>,< scalar | scalar array>, <severity>, <status>, <message>, <secondsPastEpoch>, <nanoseconds>, <userTag>, <limitLow>, <limitHigh>, <description>, <units>, <precision>, <index>, <contorl limitLow>, <constrol limitHigh>, <control minStep>, <active>, <lowAlarmLimit>, <lowWarningLimit>, <highWarningLimit>, <highAlarmLimit>, <lowAlarmSeverity>, <lowWarningSeverity>, <highWarningSeverity>, <highAlarmSeverity>, <hysteresis>)
-```
+
 
 # Get Command
-The **get** command permit to retrive the current value of an epics pv, so it generate a single message with the following schema
-## JSON Structure
+The get command retrieves the current value of an EPICS PV and generates a single reply message.
+## JSON Structure (request)
 ```json
 {
     "command": "get",
     "serialization": "json|msgpack",
-    "protocol": "pva|ca",
-    "pv_name": "channel::a",
+    "pv_name": "(pva|ca)://<pv name>",
     "reply_topic": "reply-destination-topic",
-    "reply_id":"reply id",
+    "reply_id": "reply id"
 }
 ```
 
 # Monitor Command
-The **monitor** command permits to enable or disable the update notification, for a specific EPICS pv, into a specific kafka topic. K2eg permit to enable the monitoring of the same channel and forward event message on different topics and in different serializaton format for the specific topic. The message received for the event monitor is the same as the **get** command:
-## JSON Structure
-### Activation
-```json
-{
-    "command": "monitor",
-    "serialization": "json|msgpack",
-    "protocol": "pva|ca",
-    "pv_name": "pv name",
-    "reply_topic": "reply-destination-topic",
-    "reply_id":"reply id",
-    "activate": true
-}
-```
-### Deactivation
+The monitor command enables streaming updates for one or more EPICS PVs to a Kafka topic. The reply messages have the same schema as the get command.
 
+## JSON Structure (request)
+Single PV:
 ```json
 {
-    "command": "monitor",
-    "pv_name": "pv name",
-    "reply_topic": "reply-destination-topic",
-    "reply_id":"reply id",
-    "activate": false
+  "command": "monitor",
+  "serialization": "json|msgpack",
+  "pv_name": "(pva|ca)://<pv name>",
+  "reply_topic": "reply-destination-topic",
+  "reply_id": "reply id",
+  "monitor_destination_topic": "optional-topic-for-monitor-events"
 }
 ```
+
+Multiple PVs:
+```json
+{
+  "command": "monitor",
+  "serialization": "json|msgpack",
+  "pv_name": ["(pva|ca)://<pv1>", "(pva|ca)://<pv2>", "..."],
+  "reply_topic": "reply-destination-topic",
+  "reply_id": "reply id",
+  "monitor_destination_topic": "optional-topic-for-monitor-events"
+}
+```
+
+Notes:
+- If `monitor_destination_topic` is omitted, the system uses `reply_topic` for event delivery.
+- Deactivation is handled by controller logic and configuration; there is no `activate` field in the request.
 # Put Command
-Put command is ismilar to caput or pvput epics command, it permit to applya a value to a pv. In case the it is a scalar array, each value need to be separated by a space, like in the example below.
-## JSON Structure
+The put command is similar to EPICS caput/pvput. It applies one or more field updates to a PV.
+
+Important: the `value` is a base64-encoded MsgPack payload. The decoded MsgPack object must be a MAP whose keys match the PV fields to update. For simple scalar or waveform PVs this is typically `{ "value": <scalar|array> }`. For structures, nested maps can be used to update subfields.
+
+## JSON Structure (request)
 ```json
 {
-    "command": "put",
-    "protocol": "pva|ca",
-    "pv_name": "pv name",
-    "value": "<value>|<value> <value> <value> <value>",
-    "reply_topic": "reply-destination-topic",
-    "reply_id":"reply id",
+  "command": "put",
+  "pv_name": "(pva|ca)://<pv name>[.<field>]",
+  "value": "<base64 of msgpack MAP>",
+  "reply_topic": "reply-destination-topic",
+  "reply_id": "reply id"
 }
 ```
+
+## MsgPack content examples (conceptual)
+- Scalar PV: base64(msgpack({"value": 42}))
+- Waveform PV: base64(msgpack({"value": [1, 2, 3]}))
+- Structured PV: base64(msgpack({"fieldA": 1, "inner": {"subfield": 2}}))
+
+Validation rules:
+- The decoded payload must be a MsgPack MAP; otherwise the command fails.
+- Keys must correspond to existing (and mutable) EPICS fields.
+- Multiple fields can be updated in a single request.
 
 ### Snapshot Command
 
@@ -224,7 +236,7 @@ The **snapshot** command performs a one-time or continuous data acquisition (DAQ
 - `time_window_msec`: Duration of the window to gather PV updates after a snapshot is triggered.
 - `snapshot_name`: Unique name used for identification and topic routing.
 
-**Reply Format(Continuous Mode):**
+**Reply Format (Continuous Mode):**
 - **Header message**:
   ```json
   {
