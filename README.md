@@ -21,11 +21,11 @@ The implementation supports the following features:
 - **Get Command**  
 - **Monitor Command**  
 - **Snapshot Command**  
-- **Put Command** (Supports Scalar and ScalarArray types)  
+- **Put Command**
 
 ### Functionalities
 - **JSON Serialization**  
-- **MSGPack Serialization** (Binary and Compact)  
+- **MessagePack Serialization**  
 - **Multithreaded EPICS Monitoring**  
 - **Snapshot Functionality**  
 
@@ -138,82 +138,7 @@ export EPICS_k2eg_conf-file-name=<path/to/configuration/file>
 
 ## Commands
 
-### General Command Structure
-
-Commands are sent as JSON objects to the Kafka topic. Replies are sent to a client-specific Kafka topic.  
-
-**Base Reply Structure:**  
-```json
-{
-  "error": 0,
-  "reply_id": "rep-id-snapshot",
-  "message": "optional"
-}
-```
-
-- `error`: Execution status (`0` for success, negative for errors).  
-- `reply_id`: Unique identifier for matching replies to requests.  
-- `message`: Additional information or error details.
-
-### Supported Commands
-
-#### Get Command
-Retrieve the value of a PV.  
-```json
-{
-  "command": "get",
-  "serialization": "json|msgpack",
-  "pv_name": "(pva|ca)://<pv name>",
-  "reply_topic": "reply-destination-topic",
-  "reply_id": "reply id"
-}
-```
-
-#### Put Command
-Update the value of a PV. The `value` field must contain a base64-encoded MsgPack MAP with keys matching PV fields (for simple PVs typically `{ "value": <scalar|array> }`).  
-```json
-{
-  "command": "put",
-  "pv_name": "(pva|ca)://<pv name>.attribute",
-  "value": "<base64 of msgpack MAP>",
-  "reply_topic": "reply-destination-topic",
-  "reply_id": "reply id"
-}
-```
-
-#### Monitor Command
-Monitor a PV and send updates to a Kafka topic.  
-```json
-{
-  "command": "monitor",
-  "serialization": "json|msgpack",
-  "pv_name": "(pva|ca)://<pv name>",
-  "reply_topic": "reply-destination-topic",
-  "reply_id": "reply id",
-  "monitor_destination_topic": "alternate-destination-topic"
-}
-```
-
-#### Snapshot Command
-Capture a one-time or continuous snapshot of PV values.  
-```json
-{
-  "command": "snapshot",
-  "snapshot_id": "<custom id>",
-  "pv_name_list": ["(pva|ca)://<pv name>", ...],
-  "reply_topic": "reply-destination-topic",
-  "reply_id": "reply id",
-  "serialization": "json|msgpack",
-  "is_continuous": true|false,
-  "repeat_delay_msec": 1000,
-  "time_window_msec": 1000,
-  "snapshot_name": "snapshot_name"
-}
-```
-
-- `is_continuous`: Set to `true` for periodic snapshots.  
-- `repeat_delay_msec`: Delay between snapshots.  
-- `time_window_msec`: Time window for collecting PV data.  
+For all request/response schemas and examples, see doc/message-format.md. It is the canonical reference for how clients communicate with the k2eg gateway (topics, fields, and serialization).
 
 ## Additional Information
 

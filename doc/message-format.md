@@ -1,24 +1,42 @@
 # Message Format and Serialization
 
-# Message Type
-Every message managed by K2EG has a destination topic where replies are sent. Usually a client uses a single topic to receive replies. K2EG supports multiple serializations, so each message can have a different structure depending on the serialization chosen by the client. The reply serialization is chosen by the client when the command is sent to K2EG.
+## Message Types
+Every message produced by K2EG is sent to a destination topic. A client typically uses a single reply topic to receive responses. K2EG supports multiple serialization formats; the wire shape of messages depends on the chosen serialization. The serialization for responses is specified by the client in the command.
 
-# Command Structure
-Each command includes the following minimum attributes (commands are always sent as JSON; `serialization` selects the reply format):
+## Command Structure
+Each command has a common set of attributes:
 ```json
 {
-    "command": "<command>",
+    "command": "<command name>",
     "serialization": "json|msgpack",
-    "pv_name": "(pva|ca)://<pv name>",
-    "reply_topic": "reply-destination-topic",
-    "reply_id": "reply id"
+    "pv_name": "<pv name>",
+    "reply_topic": "<reply topic>",
+    "reply_id": "<correlation id>"
 }
 ```
-The `serialization` field applies to commands that produce data (read behavior, e.g., get/monitor/snapshot) and selects the reply serialization only. Commands themselves are always JSON. For write commands (e.g., put), it applies only to the optional reply message.
-K2EG supports JSON and MsgPack for replies. Below is the description of EPICS value payloads for each serialization. The MsgPack structure is shown using JSON-like notation for clarity.
+Notes:
+- `serialization` applies to commands that produce EPICS data (read-like operations). For write-like operations, it matters only if a payload is returned.
+- K2EG supports JSON and MessagePack payloads. Commands are submitted in JSON. For brevity, MessagePack is illustrated using JSON-like notation below.
 
-# EPICS Value Serialization
-EPICS values are serialized differently depending on the reply serialization type:
+### Common Fields and Base Reply
+
+- `reply_topic`: Kafka topic where the gateway publishes the response or stream of events for the request.
+- `reply_id`: Correlation id chosen by the client; echoed back on replies to allow matching.
+- `protocol`: EPICS protocol for PV access (`pva` or `ca`) when applicable.
+- `pv_name`: EPICS process variable name (without protocol prefix unless otherwise noted).
+
+Base reply envelope (used for acks and simple responses):
+```json
+{
+  "error": 0,
+  "reply_id": "<correlation id>",
+  "message": "<optional info>"
+}
+```
+Where `error` is `0` on success; non-zero indicates an error with details in `message`.
+
+## EPICS Value Serialization
+EPICS values are serialized differently depending on the format:
 
 ## JSON Serialization (json)
 ```json
@@ -67,8 +85,8 @@ EPICS values are serialized differently depending on the reply serialization typ
 }
 ```
 
-## MsgPack serialization (msgpack)
-MsgPack uses a map mirroring the JSON structure. At level 0 there is a map where the key is the PV name and the value is another map containing the sub-keys value, alarm, timeStamp, display, control, valueAlarm:
+## MessagePack serialization (msgpack)
+MessagePack uses a map analogous to the JSON structure. At level-0 the key is the PV name and the value is a map with sub-keys `value`, `alarm`, `timeStamp`, `display`, `control`, `valueAlarm`:
 ```
 MAP( "<pv name>", MAP(
     "value": scalar | scalar array,
@@ -111,79 +129,92 @@ MAP( "<pv name>", MAP(
     )
 ))
 ```
+ 
 
-
-# Get Command
-The get command retrieves the current value of an EPICS PV and generates a single reply message.
-## JSON Structure (request)
+## Get Command
+Retrieve the current value of an EPICS PV; produces a single reply message.
+### JSON Structure
 ```json
 {
     "command": "get",
     "serialization": "json|msgpack",
     "pv_name": "(pva|ca)://<pv name>",
     "reply_topic": "reply-destination-topic",
-    "reply_id": "reply id"
+    "reply_id": "<reply id>"
 }
 ```
-
-# Monitor Command
-The monitor command enables streaming updates for one or more EPICS PVs to a Kafka topic. The reply messages have the same schema as the get command.
-
-## JSON Structure (request)
-Single PV:
+Reply example (JSON serialization):
 ```json
 {
-  "command": "monitor",
-  "serialization": "json|msgpack",
-  "pv_name": "(pva|ca)://<pv name>",
-  "reply_topic": "reply-destination-topic",
-  "reply_id": "reply id",
-  "monitor_destination_topic": "optional-topic-for-monitor-events"
+  "error": 0,
+  "reply_id": "<reply id>",
+  "BPMS:LTUH:250:X": {
+    "value": 0.123,
+    "timeStamp": { "secondsPastEpoch": 1750509, "nanoseconds": 123000000 },
+    "alarm": { "severity": 0, "status": 0, "message": "NO_ALARM" }
+  }
 }
 ```
+
+## Monitor Command
+Enable or disable update notifications for a specific EPICS PV on a Kafka topic. The monitor event payload matches the Get response schema.
+### JSON Structure — Activation
+```json
+{
+    "command": "monitor",
+    "serialization": "json|msgpack",
+    "protocol": "pva|ca",
+    "pv_name": "<pv name>",
+    "reply_topic": "reply-destination-topic",
+    "reply_id": "<reply id>",
+    "activate": true
+}
+```
+### JSON Structure — Deactivation
 
 Multiple PVs:
 ```json
 {
-  "command": "monitor",
-  "serialization": "json|msgpack",
-  "pv_name": ["(pva|ca)://<pv1>", "(pva|ca)://<pv2>", "..."],
-  "reply_topic": "reply-destination-topic",
-  "reply_id": "reply id",
-  "monitor_destination_topic": "optional-topic-for-monitor-events"
+    "command": "monitor",
+    "pv_name": "<pv name>",
+    "reply_topic": "reply-destination-topic",
+    "reply_id": "<reply id>",
+    "activate": false
 }
 ```
-
-Notes:
-- If `monitor_destination_topic` is omitted, the system uses `reply_topic` for event delivery.
-- Deactivation is handled by controller logic and configuration; there is no `activate` field in the request.
-# Put Command
-The put command is similar to EPICS caput/pvput. It applies one or more field updates to a PV.
-
-Important: the `value` is a base64-encoded MsgPack payload. The decoded MsgPack object must be a MAP whose keys match the PV fields to update. For simple scalar or waveform PVs this is typically `{ "value": <scalar|array> }`. For structures, nested maps can be used to update subfields.
-
-## JSON Structure (request)
+Ack example:
+```json
+{ "error": 0, "reply_id": "<reply id>" }
+```
+Event example (published to `reply_topic` while active):
 ```json
 {
-  "command": "put",
-  "pv_name": "(pva|ca)://<pv name>[.<field>]",
-  "value": "<base64 of msgpack MAP>",
-  "reply_topic": "reply-destination-topic",
-  "reply_id": "reply id"
+  "BPMS:LTUH:250:X": {
+    "value": 0.127,
+    "timeStamp": { "secondsPastEpoch": 1750510, "nanoseconds": 321000000 },
+    "alarm": { "severity": 0, "status": 0, "message": "NO_ALARM" }
+  }
 }
 ```
+## Put Command
+Apply a value to a PV (similar to caput/pvput). For scalar arrays, provide values separated by spaces.
+### JSON Structure
+```json
+{
+    "command": "put",
+    "protocol": "pva|ca",
+    "pv_name": "<pv name>",
+    "value": "<value>" | "<v1> <v2> <v3>",
+    "reply_topic": "reply-destination-topic",
+    "reply_id": "<reply id>",
+}
+```
+Ack example:
+```json
+{ "error": 0, "reply_id": "<reply id>", "message": "applied" }
+```
 
-## MsgPack content examples (conceptual)
-- Scalar PV: base64(msgpack({"value": 42}))
-- Waveform PV: base64(msgpack({"value": [1, 2, 3]}))
-- Structured PV: base64(msgpack({"fieldA": 1, "inner": {"subfield": 2}}))
-
-Validation rules:
-- The decoded payload must be a MsgPack MAP; otherwise the command fails.
-- Keys must correspond to existing (and mutable) EPICS fields.
-- Multiple fields can be updated in a single request.
-
-### Snapshot Command
+## Snapshot Command
 
 The **snapshot** command performs a one-time or continuous data acquisition (DAQ) of multiple EPICS PVs. Its structure is as follows:
 
@@ -209,8 +240,8 @@ The **snapshot** command performs a one-time or continuous data acquisition (DAQ
 - Each PV's data is sent asynchronously to the client as it arrives—no need to wait for the full time window.
 - A final **completion message** is sent after the time window elapses.
 
-**Reply Format:**
-- **One message per PV**:
+Reply Format (one-shot):
+- One message per PV:
   ```json
   {
     "error": 0,
@@ -218,51 +249,99 @@ The **snapshot** command performs a one-time or continuous data acquisition (DAQ
     "<pv name>": { "value": 0, ... }
   }
   ```
-- **Completion message**:
+- Completion message:
   ```json
   {
-    "error": 1,
+    "error": 0,
     "reply_id": "<reply id>"
   }
   ```
 
-**Continuous Mode (`is_continuous: true`)**:
+Continuous Mode (`is_continuous: true`):
 - The snapshot is repeatedly triggered.
 - After each snapshot completes, it waits for `repeat_delay_msec` before starting a new one.
 - `snapshot_name` is used as a unique identifier and also defines the topic where data is published.
 
-**Field Descriptions**:
+Field Descriptions:
 - `repeat_delay_msec`: Delay between two snapshots (in milliseconds).
 - `time_window_msec`: Duration of the window to gather PV updates after a snapshot is triggered.
 - `snapshot_name`: Unique name used for identification and topic routing.
 
-**Reply Format (Continuous Mode):**
-- **Header message**:
+Reply Format (Continuous Mode):
+- Header message:
   ```json
   {
-    "type": 0,  ==> identify the header
-    "iter_index": <number of current snapshot trigger starting from 0>
-    "timestamp": "<snapshot timestamp>",
-    "snapshot_name": "the name of the snapshot"
+    "message_type": 0,
+    "iter_index": <iteration index starting from 0>,
+    "timestamp": <header timestamp (ms since epoch)>,
+    "snapshot_name": "<snapshot name>"
   }
   ```
-- **Data message** (one for each pv data):
+- Data message (one per PV sample):
   ```json
   {
-    "type": 1,  ==> identify the data event
-    "iter_index": <number of current snapshot trigger starting from 0>,
-    "timestamp": "<snapshot timestamp>",
-    "pv_name": {pv data object}
+    "message_type": 1,
+    "iter_index": <iteration index>,
+    "timestamp": <pv sample timestamp (ms since epoch)>,
+    "header_timestamp": <header timestamp (ms since epoch)>,
+    "pv_data": { /* EPICS value object as above */ }
   }
   ```
-- **Completion message**:
+  - Completion (Tail) message:
   ```json
   {
-    "type": 2,  ==> identify the completion
+    "message_type": 2,
     "error": 0,
-    "error_message":"in case there has been some issuer during snapshot",
-    "iter_index": <number of current snapshot trigger starting from 0>,
-    "timestamp": "<snapshot timestamp>",
-    "snapshot_name": "the name of the snapshot"
+    "error_message": "<optional error description>",
+    "iter_index": <iteration index>,
+    "timestamp": <completion timestamp (ms since epoch)>,
+    "header_timestamp": <header timestamp (ms since epoch)>,
+    "snapshot_name": "<snapshot name>"
   }
   ```
+
+Notes:
+- The exact wire layout for MessagePack follows the same field semantics; JSON above is illustrative.
+- A metadata header `k2eg-ser-type` accompanies each published message to indicate the serialization type.
+
+### Examples
+
+Header (type 0):
+```json
+{
+  "message_type": 0,
+  "snapshot_name": "my_snapshot",
+  "timestamp": 1750509290000,
+  "iter_index": 7
+}
+```
+
+Data (type 1):
+```json
+{
+  "message_type": 1,
+  "timestamp": 1750509290123,
+  "header_timestamp": 1750509290000,
+  "iter_index": 7,
+  "pv_data": {
+    "BPMS:LTUH:250:X": {
+      "value": 0.123,
+      "timeStamp": { "secondsPastEpoch": 1750509, "nanoseconds": 123000000 },
+      "alarm": { "severity": 0, "status": 0, "message": "NO_ALARM" }
+    }
+  }
+}
+```
+
+Completion / Tail (type 2):
+```json
+{
+  "message_type": 2,
+  "error": 0,
+  "error_message": "",
+  "snapshot_name": "my_snapshot",
+  "timestamp": 1750509290999,
+  "header_timestamp": 1750509290000,
+  "iter_index": 7
+}
+```
