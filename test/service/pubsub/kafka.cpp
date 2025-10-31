@@ -36,7 +36,7 @@ protected:
 
     virtual void SetUp()
     {
-        ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(MakeLogConfigurationUPtr(LogConfiguration{})));
+        ServiceResolver<ILogger>::registerService<k2eg::service::log::ConstLogConfigurationShrdPtr, BoostLogger>(MakeLogConfigurationShrdPtr(LogConfiguration{}));
     }
 
     virtual void TearDown()

@@ -41,7 +41,7 @@ jobs:
                 export WAIT_HOSTS=kafka:9092
                 export PATH=$PATH:$PWD/build/local/bin
                 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/build/local/lib:$PWD/build/local/lib/linux-x86_64
-                wget  https://github.com/ufoscout/docker-compose-wait/releases/download/2.9.0/wait -P docker/build/local/bin
+                wget  https://github.com/ufoscout/docker-compose-wait/releases/download/2.12.0/wait -P docker/build/local/bin
                 chmod +x docker/build/local/bin/wait
                 chmod +x docker/build/local/bin/linux-x86_64/pvget
                 chmod +x docker/build/local/bin/k2eg
@@ -49,10 +49,11 @@ jobs:
                 chmod 777 docker/run-test.sh
                 echo "Create test environment from $TEST_IMAGE"
                 docker compose --profile ${{ inputs.docker_compose_profile  }} -f docker/docker-compose.yml -f docker/docker-compose-app.yml build --build-arg TEST_IMAGE=${{ inputs.build_image  }}
-                docker compose --profile ${{ inputs.docker_compose_profile  }} -f docker/docker-compose.yml -f docker/docker-compose-app.yml up --attach ${{ inputs.docker_compose_profile  }} --exit-code-from ${{ inputs.docker_compose_profile  }}
+                docker compose --profile ${{ inputs.docker_compose_profile  }} -f docker/docker-compose.yml -f docker/docker-compose-app.yml up --exit-code-from ${{ inputs.docker_compose_profile  }}
             - name: Clean resources
               if: always()
               run: |
+                docker compose -f docker/docker-compose.yml -f docker/docker-compose-app.yml logs
                 docker compose -f docker/docker-compose.yml -f docker/docker-compose-app.yml down -v --rmi all
             - uses: ouzi-dev/commit-status-updater@v2
               with:

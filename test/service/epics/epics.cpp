@@ -303,9 +303,9 @@ protected:
 
     virtual void SetUp()
     {
-        ServiceResolver<ILogger>::registerService(std::make_shared<BoostLogger>(MakeLogConfigurationUPtr(LogConfiguration{})));
-        ServiceResolver<Scheduler>::registerService(std::make_shared<Scheduler>(MakeSchedulerConfigurationUPtr(SchedulerConfiguration{})));
-        ServiceResolver<IMetricService>::registerService(std::make_shared<DummyMetricService>(MakeMetricConfigurationUPtr(MetricConfiguration{})));
+        ServiceResolver<ILogger>::registerService<k2eg::service::log::ConstLogConfigurationShrdPtr, BoostLogger>(MakeLogConfigurationShrdPtr(LogConfiguration{}));
+        ServiceResolver<Scheduler>::registerService<k2eg::service::scheduler::ConstSchedulerConfigurationShrdPtr, Scheduler>(MakeSchedulerConfigurationShrdPtr(SchedulerConfiguration{}));
+        ServiceResolver<IMetricService>::registerService<k2eg::service::metric::ConstMetricConfigurationShrdPtr, DummyMetricService>(MakeMetricConfigurationShrdPtr(MetricConfiguration{}));
     }
 
     virtual void TearDown()
